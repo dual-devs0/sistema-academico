@@ -20,10 +20,10 @@ const usuariosIniciales: Usuario[] = [
   { id: 5, nombre: 'Pedro Rojas', email: 'pedro.rojas@uca.edu.py', rol: 'profesor', carrera: 'Ing. Civil', becado: false, activo: true },
 ]
 
-const rolColor: Record<Rol, string> = {
-  admin: 'bg-purple-50 text-purple-700 border-purple-200',
-  profesor: 'bg-blue-50 text-blue-700 border-blue-200',
-  alumno: 'bg-green-50 text-green-700 border-green-200',
+const rolEstilo: Record<Rol, { color: string; bg: string }> = {
+  admin:   { color: 'var(--purple)', bg: 'var(--purple-subtle)' },
+  profesor: { color: 'var(--accent)', bg: 'var(--accent-subtle)' },
+  alumno:  { color: 'var(--success)', bg: 'var(--success-subtle)' },
 }
 
 export default function Usuarios() {
@@ -32,37 +32,59 @@ export default function Usuarios() {
   const [filtroRol, setFiltroRol] = useState<Rol | 'todos'>('todos')
 
   const filtrados = usuarios.filter(u => {
-    const coincideBusqueda = u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    const coincide = u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       u.email.toLowerCase().includes(busqueda.toLowerCase())
-    const coincideRol = filtroRol === 'todos' || u.rol === filtroRol
-    return coincideBusqueda && coincideRol
+    const rol = filtroRol === 'todos' || u.rol === filtroRol
+    return coincide && rol
   })
+
+  const inputStyle = {
+    background: 'var(--bg-base)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '9px 14px',
+    fontSize: '13px',
+    color: 'var(--text-primary)',
+    outline: 'none',
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Gestión de usuarios</h1>
-          <p className="text-sm text-gray-500 mt-1">{usuarios.length} usuarios registrados</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+            Gestión de usuarios
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{usuarios.length} usuarios registrados</p>
         </div>
-        <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-          + Nuevo usuario
+        <button style={{
+          background: 'var(--accent)', border: 'none',
+          borderRadius: '8px', padding: '9px 16px',
+          fontSize: '13px', fontWeight: 500, color: 'white',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Nuevo usuario
         </button>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-4">
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
         <input
           type="text"
           placeholder="Buscar por nombre o email..."
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ ...inputStyle, flex: 1 }}
+          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+          onBlur={e => e.target.style.borderColor = 'var(--border)'}
         />
         <select
           value={filtroRol}
           onChange={e => setFiltroRol(e.target.value as Rol | 'todos')}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ ...inputStyle, cursor: 'pointer' }}
         >
           <option value="todos">Todos los roles</option>
           <option value="admin">Admin</option>
@@ -72,47 +94,63 @@ export default function Usuarios() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+      <div style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+      }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr className="bg-gray-50 text-xs text-gray-500 uppercase">
-              <th className="text-left px-5 py-3">Nombre</th>
-              <th className="text-left px-5 py-3">Email</th>
-              <th className="text-left px-5 py-3">Rol</th>
-              <th className="text-left px-5 py-3">Carrera</th>
-              <th className="text-center px-5 py-3">Becado</th>
-              <th className="text-center px-5 py-3">Estado</th>
-              <th className="text-center px-5 py-3">Acciones</th>
+            <tr style={{ background: 'var(--bg-base)' }}>
+              {['Nombre', 'Email', 'Rol', 'Carrera', 'Becado', 'Estado', 'Acciones'].map(h => (
+                <th key={h} style={{
+                  padding: '10px 20px',
+                  textAlign: ['Becado', 'Estado', 'Acciones'].includes(h) ? 'center' : 'left',
+                  fontSize: '11px', fontWeight: 500,
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody>
             {filtrados.map(u => (
-              <tr key={u.id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-3 font-medium text-gray-700">{u.nombre}</td>
-                <td className="px-5 py-3 text-gray-500">{u.email}</td>
-                <td className="px-5 py-3">
-                  <span className={`text-xs px-2 py-1 rounded-full border font-medium ${rolColor[u.rol]}`}>
-                    {u.rol}
-                  </span>
+              <tr key={u.id} style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <td style={{ padding: '12px 20px', fontWeight: 500, color: 'var(--text-primary)' }}>{u.nombre}</td>
+                <td style={{ padding: '12px 20px', color: 'var(--text-muted)' }}>{u.email}</td>
+                <td style={{ padding: '12px 20px' }}>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 500,
+                    padding: '3px 10px', borderRadius: '20px',
+                    color: rolEstilo[u.rol].color,
+                    background: rolEstilo[u.rol].bg,
+                  }}>{u.rol}</span>
                 </td>
-                <td className="px-5 py-3 text-gray-500">{u.carrera}</td>
-                <td className="px-5 py-3 text-center">
-                  {u.becado ? <span className="text-green-600">✓</span> : <span className="text-gray-300">—</span>}
+                <td style={{ padding: '12px 20px', color: 'var(--text-muted)' }}>{u.carrera}</td>
+                <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                  {u.becado
+                    ? <span style={{ color: 'var(--success)', fontSize: '14px' }}>✓</span>
+                    : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                 </td>
-                <td className="px-5 py-3 text-center">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${u.activo ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {u.activo ? 'Activo' : 'Inactivo'}
-                  </span>
+                <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 500,
+                    padding: '3px 10px', borderRadius: '20px',
+                    color: u.activo ? 'var(--success)' : 'var(--text-muted)',
+                    background: u.activo ? 'var(--success-subtle)' : 'var(--bg-hover)',
+                  }}>{u.activo ? 'Activo' : 'Inactivo'}</span>
                 </td>
-                <td className="px-5 py-3 text-center">
-                  <button className="text-blue-500 hover:text-blue-700 text-xs mr-3">Editar</button>
-                  <button className="text-red-400 hover:text-red-600 text-xs">Desactivar</button>
+                <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', marginRight: '12px' }}>Editar</button>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '12px', cursor: 'pointer' }}>Desactivar</button>
                 </td>
               </tr>
             ))}
             {filtrados.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-400 text-sm">
+                <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                   No se encontraron usuarios
                 </td>
               </tr>

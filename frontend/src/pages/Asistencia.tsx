@@ -41,53 +41,109 @@ function porcentaje(clases: { presente: boolean }[]) {
   return Math.round((presentes / clases.length) * 100)
 }
 
-function colorPorcentaje(p: number) {
-  if (p >= 80) return 'text-green-600'
-  if (p >= 60) return 'text-amber-600'
-  return 'text-red-600'
+function colorPct(p: number) {
+  if (p >= 80) return 'var(--success)'
+  if (p >= 60) return 'var(--warning)'
+  return 'var(--danger)'
 }
 
-function colorBarra(p: number) {
-  if (p >= 80) return 'bg-green-500'
-  if (p >= 60) return 'bg-amber-500'
-  return 'bg-red-500'
+function bgPct(p: number) {
+  if (p >= 80) return 'var(--success-subtle)'
+  if (p >= 60) return 'var(--warning-subtle)'
+  return 'var(--danger-subtle)'
 }
 
 export default function Asistencia() {
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">Mi asistencia</h1>
-        <p className="text-sm text-gray-500 mt-1">Semestre 1 — 2026</p>
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+          Mi asistencia
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Semestre 1 — 2026</p>
       </div>
 
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {asistencias.map(a => {
           const pct = porcentaje(a.clases)
           const presentes = a.clases.filter(c => c.presente).length
+
           return (
-            <div key={a.materia} className="bg-white rounded-xl border border-gray-100 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-700">{a.materia}</h2>
-                <span className={`text-lg font-semibold ${colorPorcentaje(pct)}`}>{pct}%</span>
+            <div key={a.materia} style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '20px',
+            }}>
+              {/* Header */}
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', marginBottom: '16px',
+              }}>
+                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                  {a.materia}
+                </span>
+                <span style={{
+                  fontSize: '20px', fontWeight: 600,
+                  color: colorPct(pct),
+                  background: bgPct(pct),
+                  padding: '2px 12px', borderRadius: '8px',
+                }}>
+                  {pct}%
+                </span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
-                <div className={`h-2 rounded-full transition-all ${colorBarra(pct)}`} style={{ width: `${pct}%` }} />
+
+              {/* Barra */}
+              <div style={{
+                width: '100%', height: '6px',
+                background: 'var(--bg-hover)',
+                borderRadius: '3px', marginBottom: '16px',
+              }}>
+                <div style={{
+                  width: `${pct}%`, height: '6px',
+                  background: colorPct(pct),
+                  borderRadius: '3px',
+                  transition: 'width 300ms ease',
+                }} />
               </div>
-              <div className="flex items-center gap-4 mb-4 text-xs text-gray-500">
-                <span>✅ {presentes} presentes</span>
-                <span>❌ {a.clases.length - presentes} ausentes</span>
-                <span>📅 {a.clases.length} clases totales</span>
+
+              {/* Resumen */}
+              <div style={{
+                display: 'flex', gap: '20px',
+                marginBottom: '16px', fontSize: '12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--success)' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                  <span>{presentes} presentes</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                  <span>{a.clases.length - presentes} ausentes</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)' }}>
+                  {a.clases.length} clases totales
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+
+              {/* Grilla de clases */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {a.clases.map(c => (
                   <div
                     key={c.fecha}
                     title={c.fecha}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium
-                      ${c.presente
-                        ? 'bg-green-50 text-green-600 border border-green-200'
-                        : 'bg-red-50 text-red-500 border border-red-200'}`}
+                    style={{
+                      width: '32px', height: '32px',
+                      borderRadius: '8px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '12px', fontWeight: 500,
+                      background: c.presente ? 'var(--success-subtle)' : 'var(--danger-subtle)',
+                      color: c.presente ? 'var(--success)' : 'var(--danger)',
+                      border: `1px solid ${c.presente ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`,
+                    }}
                   >
                     {c.presente ? '✓' : '✗'}
                   </div>
