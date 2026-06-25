@@ -1,12 +1,15 @@
-import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 
 const menuItems = [
   { label: 'Dashboard', path: '/dashboard', icon: '🏠' },
-  { label: 'Asistencia', path: '/asistencia', icon: '📋' },
   { label: 'Puntajes', path: '/puntajes', icon: '📊' },
+  { label: 'Asistencia', path: '/asistencia', icon: '📋' },
+  { label: 'Perfil', path: '/perfil', icon: '👤' },
+  { label: 'Usuarios', path: '/usuarios', icon: '👥' },
+  { label: 'Materias', path: '/materias', icon: '📚' },
   { label: 'Calendario', path: '/calendario', icon: '📅' },
-  { label: 'Biblioteca', path: '/biblioteca', icon: '📚' },
+  { label: 'Biblioteca', path: '/biblioteca', icon: '🗂️' },
   { label: 'Temario', path: '/temario', icon: '📝' },
 ]
 
@@ -39,7 +42,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Menu */}
-        <nav className="flex-1 py-4 space-y-1 px-2">
+        <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
           {menuItems.map(item => (
             <button
               key={item.path}
