@@ -15,78 +15,147 @@ export default function Perfil() {
   const [editando, setEditando] = useState(false)
   const [telefono, setTelefono] = useState(alumno.telefono)
 
+  const iniciales = alumno.nombre.split(' ').map(n => n[0]).join('').slice(0, 2)
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">Mi perfil</h1>
-        <p className="text-sm text-gray-500 mt-1">Datos personales y académicos</p>
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+          Mi perfil
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Datos personales y académicos</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
 
-        {/* Avatar y datos principales */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-            <span className="text-white text-2xl font-bold">
-              {alumno.nombre.split(' ').map(n => n[0]).join('').slice(0, 2)}
-            </span>
+        {/* Avatar */}
+        <div style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '32px 20px',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', textAlign: 'center',
+        }}>
+          <div style={{
+            width: '72px', height: '72px',
+            background: 'var(--accent)',
+            borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '24px', fontWeight: 600, color: 'white',
+            marginBottom: '16px',
+          }}>
+            {iniciales}
           </div>
-          <h2 className="text-base font-semibold text-gray-800">{alumno.nombre}</h2>
-          <p className="text-sm text-gray-500 mt-1">{alumno.email}</p>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+            {alumno.nombre}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            {alumno.email}
+          </div>
           {alumno.becado && (
-            <span className="mt-3 inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs font-medium px-3 py-1 rounded-full border border-green-200">
-              ✓ Becado
-            </span>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              background: 'var(--success-subtle)',
+              border: '1px solid rgba(52,211,153,0.2)',
+              borderRadius: '20px',
+              padding: '4px 12px',
+              fontSize: '12px', fontWeight: 500,
+              color: 'var(--success)',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+              Becado
+            </div>
           )}
         </div>
 
-        {/* Datos académicos */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6 md:col-span-2">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Información académica</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: 'Carrera', value: alumno.carrera },
-              { label: 'Legajo', value: alumno.legajo },
-              { label: 'Año', value: `${alumno.anio}° año` },
-              { label: 'Semestre', value: `Semestre ${alumno.semestre}` },
-            ].map(item => (
-              <div key={item.label}>
-                <div className="text-xs text-gray-400 mb-1">{item.label}</div>
-                <div className="text-sm font-medium text-gray-700">{item.value}</div>
-              </div>
-            ))}
+        {/* Datos */}
+        <div style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '24px',
+        }}>
+          {/* Académicos */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
+              Información académica
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {[
+                { label: 'Carrera', value: alumno.carrera },
+                { label: 'Legajo', value: alumno.legajo },
+                { label: 'Año', value: `${alumno.anio}° año` },
+                { label: 'Semestre', value: `Semestre ${alumno.semestre}` },
+              ].map(item => (
+                <div key={item.label}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    {item.label}
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="border-t border-gray-50 mt-5 pt-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Datos de contacto</h3>
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <div className="text-xs text-gray-400 mb-1">Teléfono</div>
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'var(--border)', marginBottom: '24px' }} />
+
+          {/* Contacto */}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
+              Datos de contacto
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Teléfono</div>
                 {editando ? (
                   <input
                     type="text"
                     value={telefono}
                     onChange={e => setTelefono(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-base)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 ) : (
-                  <div className="text-sm font-medium text-gray-700">{telefono}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {telefono}
+                  </div>
                 )}
               </div>
               <button
                 onClick={() => setEditando(!editando)}
-                className={`text-sm px-4 py-1.5 rounded-lg border transition ${
-                  editando
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                }`}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: editando ? 'none' : '1px solid var(--border)',
+                  background: editando ? 'var(--accent)' : 'transparent',
+                  color: editando ? 'white' : 'var(--text-secondary)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 150ms ease',
+                  marginTop: '16px',
+                }}
               >
                 {editando ? 'Guardar' : 'Editar'}
               </button>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   )

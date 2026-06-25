@@ -60,101 +60,162 @@ export default function Temario() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">Temario de clases</h1>
-        <p className="text-sm text-gray-500 mt-1">Cronograma semanal por materia</p>
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+          Temario de clases
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Cronograma semanal por materia</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '16px' }}>
 
-        {/* Lista de materias */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-1 h-fit">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">Materias</h3>
+        {/* Lista materias */}
+        <div style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '12px',
+          height: 'fit-content',
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', padding: '0 4px' }}>
+            Materias
+          </div>
           {temarios.map(t => {
             const comp = t.clases.filter(c => c.completada).length
             const pct = Math.round((comp / t.clases.length) * 100)
+            const active = materiaActiva === t.materia
             return (
               <button
                 key={t.materia}
                 onClick={() => { setMateriaActiva(t.materia); setClaseAbierta(null) }}
-                className={`w-full text-left px-3 py-2.5 rounded-lg transition text-sm ${
-                  materiaActiva === t.materia
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
+                style={{
+                  width: '100%', textAlign: 'left',
+                  padding: '10px 12px', borderRadius: '8px',
+                  border: 'none', cursor: 'pointer',
+                  background: active ? 'var(--accent-subtle)' : 'transparent',
+                  color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                  marginBottom: '2px',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={e => {
+                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'
+                }}
+                onMouseLeave={e => {
+                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                }}
               >
-                <div className="truncate">{t.materia}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{pct}% completado</div>
+                <div style={{ fontSize: '13px', fontWeight: active ? 500 : 400, marginBottom: '4px' }}>
+                  {t.materia}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{pct}% completado</div>
               </button>
             )
           })}
         </div>
 
-        {/* Temario de la materia */}
-        <div className="lg:col-span-3 space-y-3">
+        {/* Contenido */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
           {/* Header materia */}
-          <div className="bg-white rounded-xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-3">
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            padding: '20px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <div>
-                <h2 className="text-base font-semibold text-gray-700">{temario.materia}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Prof. {temario.profesor}</p>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                  {temario.materia}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Prof. {temario.profesor}</div>
               </div>
-              <span className="text-sm font-semibold text-blue-600">{progreso}%</span>
+              <span style={{ fontSize: '20px', fontWeight: 600, color: 'var(--accent)' }}>{progreso}%</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
-              <div
-                className="h-2 rounded-full bg-blue-500 transition-all"
-                style={{ width: `${progreso}%` }}
-              />
+            <div style={{ width: '100%', height: '6px', background: 'var(--bg-hover)', borderRadius: '3px', marginBottom: '8px' }}>
+              <div style={{
+                width: `${progreso}%`, height: '6px',
+                background: 'var(--accent)', borderRadius: '3px',
+                transition: 'width 300ms ease',
+              }} />
             </div>
-            <div className="text-xs text-gray-400 mt-2">
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               {completadas} de {temario.clases.length} clases completadas
             </div>
           </div>
 
           {/* Clases */}
           {temario.clases.map(c => (
-            <div
-              key={c.semana}
-              className="bg-white rounded-xl border border-gray-100 overflow-hidden"
-            >
+            <div key={c.semana} style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+            }}>
               <button
                 onClick={() => setClaseAbierta(claseAbierta === c.semana ? null : c.semana)}
-                className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-gray-50 transition"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '16px',
+                  padding: '16px 20px', border: 'none', cursor: 'pointer',
+                  background: 'transparent', textAlign: 'left',
+                  transition: 'background 150ms ease',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
               >
                 {/* Indicador */}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold
-                  ${c.completada ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  {c.completada ? '✓' : c.semana}
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, fontSize: '12px', fontWeight: 600,
+                  background: c.completada ? 'var(--success-subtle)' : 'var(--bg-hover)',
+                  color: c.completada ? 'var(--success)' : 'var(--text-muted)',
+                }}>
+                  {c.completada ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  ) : c.semana}
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">Semana {c.semana}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Semana {c.semana}</span>
                     {c.completada && (
-                      <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">
-                        Completada
-                      </span>
+                      <span style={{
+                        fontSize: '10px', fontWeight: 500,
+                        background: 'var(--success-subtle)',
+                        color: 'var(--success)',
+                        padding: '1px 8px', borderRadius: '20px',
+                      }}>Completada</span>
                     )}
                   </div>
-                  <div className="text-sm font-medium text-gray-700 mt-0.5">{c.titulo}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {c.titulo}
+                  </div>
                 </div>
 
-                <span className="text-gray-400 text-xs">
-                  {claseAbierta === c.semana ? '▲' : '▼'}
-                </span>
+                <svg
+                  width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ color: 'var(--text-muted)', transition: 'transform 150ms ease', transform: claseAbierta === c.semana ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                >
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
               </button>
 
-              {/* Descripción expandible */}
               {claseAbierta === c.semana && (
-                <div className="px-5 pb-4 border-t border-gray-50">
-                  <p className="text-sm text-gray-600 mt-3 leading-relaxed">{c.descripcion}</p>
+                <div style={{
+                  padding: '0 20px 16px 68px',
+                  borderTop: '1px solid var(--border-subtle)',
+                }}>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: '12px' }}>
+                    {c.descripcion}
+                  </p>
                 </div>
               )}
             </div>
           ))}
-
         </div>
       </div>
     </div>
