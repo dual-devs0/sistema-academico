@@ -7,6 +7,9 @@ import Asistencia from './pages/Asistencia'
 import Perfil from './pages/Perfil'
 import Usuarios from './pages/Usuarios'
 import Materias from './pages/Materias'
+import Calendario from './pages/Calendario'
+import Biblioteca from './pages/Biblioteca'
+import Temario from './pages/Temario'
 
 function App() {
   return (
@@ -20,6 +23,9 @@ function App() {
         <Route path="/perfil" element={<Layout><Perfil /></Layout>} />
         <Route path="/usuarios" element={<Layout><Usuarios /></Layout>} />
         <Route path="/materias" element={<Layout><Materias /></Layout>} />
+        <Route path="/calendario" element={<Layout><Calendario /></Layout>} />
+        <Route path="/biblioteca" element={<Layout><Biblioteca /></Layout>} />
+        <Route path="/temario" element={<Layout><Temario /></Layout>} />
       </Routes>
     </BrowserRouter>
   )
