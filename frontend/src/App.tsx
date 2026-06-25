@@ -10,6 +10,9 @@ import Materias from './pages/Materias'
 import Calendario from './pages/Calendario'
 import Biblioteca from './pages/Biblioteca'
 import Temario from './pages/Temario'
+import Estadisticas from './pages/Estadisticas'
+import Boleta from './pages/Boleta' 
+import Reportes from './pages/Reportes'
 
 function App() {
   return (
@@ -26,6 +29,9 @@ function App() {
         <Route path="/calendario" element={<Layout><Calendario /></Layout>} />
         <Route path="/biblioteca" element={<Layout><Biblioteca /></Layout>} />
         <Route path="/temario" element={<Layout><Temario /></Layout>} />
+        <Route path="/estadisticas" element={<Layout><Estadisticas /></Layout>} />
+        <Route path="/boleta" element={<Layout><Boleta /></Layout>} />
+        <Route path="/reportes" element={<Layout><Reportes /></Layout>} />
       </Routes>
     </BrowserRouter>
   )
