@@ -1,3 +1,4 @@
+main
 from fastapi import FastAPI
 import backend.app.routers.users_router as users_router
 import backend.app.routers.auth_router as auth_router
@@ -15,3 +16,5 @@ print(auth_router.router.routes)
 @app.get("/")
 def root():
     return {"message": "API Sistema Académico funcionando"}
+
+routers/
