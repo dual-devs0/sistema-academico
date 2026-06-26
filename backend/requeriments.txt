@@ -1,0 +1,30 @@
+# Framework principal
+fastapi
+uvicorn[standard]
+
+# Base de datos y ORM
+sqlalchemy
+alembic
+psycopg2-binary
+
+# Autenticación y seguridad
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Manejo de PDFs
+pymupdf
+pdfplumber
+
+# Gemini API
+google-generativeai
+
+# Generación de PDFs y QR
+reportlab
+weasyprint
+qrcode
+
+# Email y notificaciones
+fastapi-mail
+
+# Pruebas
+pytest
