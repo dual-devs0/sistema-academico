@@ -1,15 +1,11 @@
 from fastapi import FastAPI
-import backend.app.routers.users_router as users_router
-import backend.app.routers.auth_router as auth_router
-from backend.app.routers import test
+from app.routers import users_router, auth_router, test
+
 app = FastAPI(title="Sistema Académico")
 
-# Incluimos routers
 app.include_router(users_router.router)
 app.include_router(auth_router.router)
 app.include_router(test.router)
-print(users_router.router.routes)
-print(auth_router.router.routes)
 
 
 @app.get("/")
