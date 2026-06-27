@@ -10,5 +10,9 @@ class UserCreate(UserBase):
 class UserOut(UserBase):
     id: int
 
+<<<<<<< HEAD
+    model_config = {"from_attributes": True}
+=======
     class Config:
         orm_mode = True
+>>>>>>> 5cf3462cf0a0a1b7e9c9ac03a2a5c248594d7758
