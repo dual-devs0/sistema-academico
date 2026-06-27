@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useState } from 'react'
-import logoUCASmall from '../assets/uca-removebg-preview.png'
+import { useState, useEffect } from 'react'
+import logoUCASmall from '../assets/uc_logo_sist_academico.png'
 
 const menuItems = [
   { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
@@ -20,6 +20,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => {
+    document.title = 'Universidad Católica Caacupé'
+  }, [])
 
   return (
     <>
