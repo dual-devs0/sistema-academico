@@ -1,27 +1,59 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import logoUCASmall from '../assets/uc_logo_sist_academico.png'
+import { decodeToken } from '../lib/api'
 
-const menuItems = [
-  { label: 'Dashboard',  path: '/dashboard', icon: 'ti-layout-dashboard' },
-  { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
-  { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
-  { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
-  { label: 'Usuarios',   path: '/usuarios',  icon: 'ti-users' },
-  { label: 'Materias',   path: '/materias',  icon: 'ti-book' },
-  { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
-  { label: 'Biblioteca', path: '/biblioteca',icon: 'ti-books' },
-  { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
-  { label: 'Boleta PDF', path: '/boleta',    icon: 'ti-file-text' },
-  { label: 'Reportes',   path: '/reportes',  icon: 'ti-report' },
-]
+const menuPorRol: Record<string, { label: string; path: string; icon: string }[]> = {
+  admin: [
+    { label: 'Dashboard',     path: '/dashboard',    icon: 'ti-layout-dashboard' },
+    { label: 'Estadísticas',  path: '/estadisticas', icon: 'ti-chart-dots' },
+    { label: 'Usuarios',      path: '/usuarios',     icon: 'ti-users' },
+    { label: 'Materias',   path: '/materias',  icon: 'ti-book' },
+    { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
+    { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
+    { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
+    { label: 'Biblioteca', path: '/biblioteca',icon: 'ti-books' },
+    { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
+    { label: 'Boleta PDF', path: '/boleta',    icon: 'ti-file-text' },
+    { label: 'Reportes',   path: '/reportes',  icon: 'ti-report' },
+    { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
+  ],
+  profesor: [
+    { label: 'Mis Cursos',    path: '/miscursos',    icon: 'ti-school' },
+    { label: 'Dashboard',     path: '/dashboard',    icon: 'ti-layout-dashboard' },
+    { label: 'Estadísticas',  path: '/estadisticas', icon: 'ti-chart-dots' },
+    { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
+    { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
+    { label: 'Materias',   path: '/materias',  icon: 'ti-book' },
+    { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
+    { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
+    { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
+  ],
+  alumno: [
+    { label: 'Dashboard',  path: '/dashboard', icon: 'ti-layout-dashboard' },
+    { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
+    { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
+    { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
+    { label: 'Biblioteca', path: '/biblioteca',icon: 'ti-books' },
+    { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
+    { label: 'Boleta PDF', path: '/boleta',    icon: 'ti-file-text' },
+    { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
+  ],
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const token = localStorage.getItem('token')
+  const user = token ? decodeToken(token) : null
+  const role = user?.role || 'alumno'
+  const menuItems = menuPorRol[role] || menuPorRol.alumno
 
-  useEffect(() => { document.title = 'Universidad Católica Caacupé' }, [])
+  useEffect(() => {
+    document.title = 'Universidad Católica Caacupé'
+    if (!token) navigate('/login', { replace: true })
+  }, [navigate, token])
 
   function handleNav(path: string) {
     navigate(path)
@@ -198,7 +230,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="sidebar-footer">
             <button
               className="sidebar-footer-btn"
-              onClick={() => navigate('/login')}
+              onClick={() => { localStorage.removeItem('token'); navigate('/login') }}
               style={{ color:'#e05555' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#1a1015'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}

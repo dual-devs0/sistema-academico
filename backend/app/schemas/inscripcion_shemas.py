@@ -11,5 +11,4 @@ class InscripcionCreate(InscripcionBase):
 class InscripcionOut(InscripcionBase):
     id: int
 
-    # Configuración Pydantic v2
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {"from_attributes": True}

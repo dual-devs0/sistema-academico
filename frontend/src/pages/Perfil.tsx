@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { decodeToken, api } from '../lib/api'
 
 type Tab = 'perfil' | 'contrasena'
 
@@ -300,11 +301,30 @@ export default function Perfil() {
   const fileRef     = useRef<HTMLInputElement>(null)
   const modalRef    = useRef<HTMLInputElement>(null)
 
+  const user = (() => {
+    const token = localStorage.getItem('token')
+    return token ? decodeToken(token) : null
+  })()
+
   // Estado real
-  const [foto,      setFoto]      = useState<string|null>(null)
-  const [nombre,    setNombre]    = useState('María González')
-  const [telefono,  setTelefono]  = useState('0981-123456')
-  const [direccion, setDireccion] = useState('Caacupé, Paraguay')
+  const [foto,        setFoto]       = useState<string|null>(null)
+  const [nombre,      setNombre]     = useState(user?.username || 'Usuario')
+  const [email,       setEmail]      = useState('—')
+  const [carreraId,   setCarreraId]  = useState<number|null>(null)
+  const [esBecado,    setEsBecado]   = useState(false)
+  const [telefono,    setTelefono]   = useState('—')
+  const [direccion,   setDireccion]  = useState('—')
+
+  useEffect(() => {
+    api.get<{ nombre: string; email: string | null; carrera_id: number | null; es_becado: boolean | null }>('/users/me')
+      .then(data => {
+        if (data.nombre) setNombre(data.nombre)
+        if (data.email) setEmail(data.email)
+        if (data.carrera_id) setCarreraId(data.carrera_id)
+        if (data.es_becado) setEsBecado(data.es_becado)
+      })
+      .catch(() => {})
+  }, [])
 
   // Draft (para cancelar)
   const [dFoto,  setDFoto]  = useState<string|null>(null)
@@ -387,13 +407,10 @@ export default function Perfil() {
                 <div className="hero-info">
                   <div className="hero-name">{nombre}</div>
                   <div className="hero-meta">
-                    <span>Ing. Informática</span>
+                    <span>{user?.role === 'alumno' ? 'Alumno' : user?.role === 'profesor' ? 'Docente' : user?.role === 'admin' ? 'Administrador' : 'Usuario'}</span>
                     <div className="dot-sep"/>
-                    <span>2° año</span>
-                    <div className="dot-sep"/>
-                    <span style={{color:'#00b4d8', fontWeight:600}}>2024-0123</span>
-                    <div className="dot-sep"/>
-                    <span className="beca-badge">★ Becada</span>
+                    <span>UCA — Caacupé</span>
+                    {esBecado && <><div className="dot-sep"/><span className="beca-badge">★ Becado/a</span></>}
                   </div>
                 </div>
               </div>
@@ -467,7 +484,7 @@ export default function Perfil() {
                     icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.8a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.18 6.18l1.27-.84a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
                   },
                   {
-                    label:'Email institucional', val:'maria.gonzalez@uca.edu.py',
+                    label:'Email institucional', val: email,
                     icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                   },
                   {
@@ -545,7 +562,7 @@ export default function Perfil() {
 
                     <div className="form-group">
                       <label className="form-label">Email institucional</label>
-                      <input className="form-input" value="maria.gonzalez@uca.edu.py" disabled />
+                      <input className="form-input" value={email} disabled />
                       <span className="form-hint">El email institucional no puede modificarse.</span>
                     </div>
 

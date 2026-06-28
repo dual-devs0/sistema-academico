@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { api } from '../lib/api'
 
 const MESES   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS_L  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
@@ -13,7 +14,7 @@ interface Evento {
   materia: string
 }
 
-const eventos: Evento[] = [
+const mockEventos: Evento[] = [
   { date:'2026-03-10', tipo:'actividad', nombre:'Inicio del semestre',      materia:'General'               },
   { date:'2026-03-20', tipo:'entrega',   nombre:'TP Nº1 — Cálculo',         materia:'Análisis Matemático I' },
   { date:'2026-04-02', tipo:'feriado',   nombre:'Semana Santa',             materia:'General'               },
@@ -41,9 +42,6 @@ const tipoEstilo: Record<TipoEvento,{color:string;bg:string;border:string;label:
 
 function dateKey(y:number, m:number, d:number) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-}
-function eventosDelDia(y:number, m:number, d:number) {
-  return eventos.filter(e => e.date === dateKey(y,m,d))
 }
 function fmtFecha(dateStr:string) {
   const f = new Date(dateStr+'T00:00:00')
@@ -262,10 +260,31 @@ const css = `
 `
 
 export default function Calendario() {
+  const [eventos, setEventos] = useState<Evento[]>(mockEventos)
   const hoy = new Date()
   const [actual,    setActual]    = useState(new Date(2026, 3, 1))
   const [selDia,    setSelDia]    = useState<number|null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data: any[] = await api.get('/eventos/') || []
+        if (data.length > 0) {
+          setEventos(data.map((e: any) => ({
+            date: e.fecha,
+            tipo: e.tipo || 'actividad',
+            nombre: e.titulo || e.descripcion || '',
+            materia: e.materia_id ? `Materia #${e.materia_id}` : 'General',
+          })))
+        }
+      } catch { /* fallback to mock */ }
+    })()
+  }, [])
+
+  function eventosDelDia(y:number, m:number, d:number) {
+    return eventos.filter(e => e.date === dateKey(y,m,d))
+  }
 
   const y = actual.getFullYear()
   const m = actual.getMonth()

@@ -21,4 +21,30 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: <T>(path: string) =>
+    request<T>(path, { method: 'DELETE' }),
+}
+
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+}
+
+export interface UserInfo {
+  username: string
+  role: string
+  user_id?: number
+}
+
+export function decodeToken(token: string): UserInfo | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return { username: payload.sub, role: payload.role, user_id: payload.user_id }
+  } catch {
+    return null
+  }
 }

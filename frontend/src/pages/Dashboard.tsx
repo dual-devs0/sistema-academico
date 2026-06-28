@@ -1,36 +1,42 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { decodeToken, api } from '../lib/api'
 
-const materias = [
+const materiasMock = [
   { nombre: 'Análisis Matemático I', profesor: 'Carlos Méndez', parcial1: 7.5, parcial2: 8.0,  tp: 9.0,  promedio: 8.2, promClass: 'mid' },
   { nombre: 'Física I',              profesor: 'Ana Torres',    parcial1: 6.0, parcial2: 7.5,  tp: 8.5,  promedio: 7.3, promClass: 'low' },
   { nombre: 'Matemática Discreta',   profesor: 'Carlos Méndez', parcial1: 9.0, parcial2: null, tp: 8.0,  promedio: 8.5, promClass: 'mid' },
   { nombre: 'Programación I',        profesor: 'Luis Paredes',  parcial1: 10.0,parcial2: 9.5,  tp: 10.0, promedio: 9.8, promClass: 'high' },
 ]
 
-const eventos = [
+const eventosMock = [
   { tipo: 'final',   titulo: 'Final — Física I',      sub: 'Ana Torres',    fecha: '5 Ago' },
   { tipo: 'final',   titulo: 'Final — Mat. Discreta', sub: 'Carlos Méndez', fecha: '7 Ago' },
   { tipo: 'final',   titulo: 'Final — Análisis',      sub: 'Carlos Méndez', fecha: '12 Ago' },
   { tipo: 'entrega', titulo: 'TP — Programación I',   sub: 'Luis Paredes',  fecha: '28 Jul' },
 ]
 
-const notificaciones = [
+const notificacionesMock = [
   { icon: 'ti-chart-bar', color: '#22c55e', bg: '#15803d18', titulo: 'Nueva nota cargada',     sub: 'Parcial 2 — Programación I: 9.5', tiempo: 'Hace 10 min', path: '/puntajes' },
   { icon: 'ti-calendar',  color: '#00b4d8', bg: '#00b4d818', titulo: 'Evento próximo',          sub: 'Final Física I — 5 de agosto',    tiempo: 'Hace 1 h',   path: '/calendario' },
   { icon: 'ti-checkbox',  color: '#f59e0b', bg: '#f59e0b18', titulo: 'Asistencia actualizada', sub: 'Análisis Matemático I: 75%',       tiempo: 'Ayer',        path: '/asistencia' },
 ]
 
-const asistencias = [
+const asistenciasMock = [
   { nombre: 'Análisis Matemático I', pct: 75,  clase: 'warn' },
   { nombre: 'Física I',              pct: 83,  clase: 'ok' },
   { nombre: 'Programación I',        pct: 100, clase: 'ok' },
 ]
 
-const tps = [
+const tpsMock = [
   { nombre: 'Trabajo Práctico N° 3', materia: 'Programación I', fecha: '28 Jul' },
   { nombre: 'Informe — Laboratorio', materia: 'Física I',        fecha: '2 Ago' },
 ]
+
+type MateriaRow = { nombre: string; profesor: string; parcial1: number | null; parcial2: number | null; tp: number | null; promedio: number; promClass: string }
+type EventoRow = { tipo: string; titulo: string; sub: string; fecha: string }
+type AsistenciaRow = { nombre: string; pct: number; clase: string }
+type TpRow = { nombre: string; materia: string; fecha: string }
 
 const dotColor: Record<string, string> = { final: '#ef4444', entrega: '#f59e0b', parcial: '#a855f7', asueto: '#22c55e' }
 const gradeColor: Record<string, string> = { high: '#22c55e', mid: '#00b4d8', low: '#f59e0b', empty: '#506070' }
@@ -286,6 +292,71 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [showNotif, setShowNotif] = useState(false)
   const [searchVal, setSearchVal] = useState('')
+  const [user, setUser] = useState(() => {
+    const token = localStorage.getItem('token')
+    return token ? decodeToken(token) : null
+  })
+  const [materias, setMaterias] = useState<MateriaRow[]>(materiasMock)
+  const [eventos, setEventos] = useState<EventoRow[]>(eventosMock)
+  const [asistencias, setAsistencias] = useState<AsistenciaRow[]>(asistenciasMock)
+  const [tps] = useState<TpRow[]>(tpsMock)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) setUser(decodeToken(token))
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    const userData = token ? decodeToken(token) : null
+    if (!userData) return
+
+    (async () => {
+      try {
+        const materiasRes: any[] = await api.get('/materias/') || []
+        const puntajesRes: any[] = await api.get(`/puntajes/?user_id=${userData.user_id}`) || []
+        const asistenciasRes: any[] = await api.get(`/asistencias/?user_id=${userData.user_id}`) || []
+        const eventosRes: any[] = await api.get('/eventos/') || []
+
+        if (materiasRes.length > 0 && puntajesRes.length > 0) {
+          const rows: MateriaRow[] = materiasRes.map((m: any) => {
+            const pts = puntajesRes.filter((p: any) => p.materia_id === m.id)
+            const p1 = pts.find((p: any) => p.tipo === 'parcial1')?.valor ?? null
+            const p2 = pts.find((p: any) => p.tipo === 'parcial2')?.valor ?? null
+            const tpVal = pts.find((p: any) => p.tipo === 'practico')?.valor ?? null
+            const vals = [p1, p2, tpVal].filter((v): v is number => v !== null)
+            const prom = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+            const cls = prom >= 8 ? 'high' : prom >= 6.5 ? 'mid' : 'low'
+            return { nombre: m.nombre, profesor: `Prof. ${m.nombre}`, parcial1: p1, parcial2: p2, tp: tpVal, promedio: Math.round(prom * 10) / 10, promClass: cls }
+          })
+          if (rows.length > 0) setMaterias(rows)
+        }
+        if (asistenciasRes.length > 0) {
+          const grouped: Record<string, { presente: number; total: number }> = {}
+          asistenciasRes.forEach((a: any) => {
+            const key = String(a.materia_id)
+            if (!grouped[key]) grouped[key] = { presente: 0, total: 0 }
+            grouped[key].total++
+            if (a.presente) grouped[key].presente++
+          })
+          const rows: AsistenciaRow[] = Object.entries(grouped).map(([id, g]) => {
+            const pct = g.total > 0 ? Math.round((g.presente / g.total) * 100) : 0
+            return { nombre: `Materia #${id}`, pct, clase: pct >= 80 ? 'ok' : 'warn' }
+          })
+          if (rows.length > 0) setAsistencias(rows)
+        }
+        if (eventosRes.length > 0) {
+          const rows: EventoRow[] = eventosRes.slice(0, 4).map((e: any) => ({
+            tipo: e.tipo || 'evento',
+            titulo: e.titulo,
+            sub: e.descripcion || '',
+            fecha: e.fecha?.slice(5, 10) || '—',
+          }))
+          if (rows.length > 0) setEventos(rows)
+        }
+      } catch { /* fallback to mock */ }
+    })()
+  }, [])
 
   function handleNotifClick(path: string) {
     setShowNotif(false)
@@ -350,7 +421,7 @@ export default function Dashboard() {
 
                     {/* Body scrolleable en mobile */}
                     <div className="notif-body">
-                      {notificaciones.map((n, i) => (
+                      {(notificacionesMock as typeof notificacionesMock).map((n, i) => (
                         <div
                           key={i}
                           className="notif-item"
@@ -400,7 +471,7 @@ export default function Dashboard() {
               aria-label="Ir al perfil"
               onKeyDown={e => e.key === 'Enter' && navigate('/perfil')}
             >
-              MG
+              {user?.username?.charAt(0).toUpperCase() || 'U'}
             </div>
           </div>
         </header>
@@ -411,8 +482,8 @@ export default function Dashboard() {
           {/* Welcome */}
           <div className="welcome-banner">
             <div className="welcome-text">
-              <h2>¡Bienvenida, María González! 👋</h2>
-              <p>Ing. Informática · 2° año · Legajo 2024-0123 · <span style={{ color:'#22c55e', fontWeight:600 }}>★ Becada</span></p>
+              <h2>¡Bienvenido/a, {user?.username || 'Usuario'}! 👋</h2>
+              <p>Rol: {user?.role || '—'} · Sistema Académico UCA</p>
             </div>
             <div className="semester-badge">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -424,22 +495,29 @@ export default function Dashboard() {
 
           {/* Stats */}
           <div className="stats-grid">
-            {[
-              { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>, cls:'cyan',   value:'5',   label:'Materias cursando',   trend:'↑ activo',   trendCls:'up' },
-              { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,  cls:'green',  value:'8.4', label:'Promedio general',    trend:'↑ bueno',    trendCls:'up',  bar:84,  barColor:'#22c55e', valueColor:'#22c55e' },
-              { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,              cls:'yellow', value:'92%', label:'Asistencia promedio', trend:'↑ ok',       trendCls:'up',  bar:92,  barColor:'#f59e0b', valueColor:'#f59e0b' },
-              { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,                                                              cls:'purple', value:'2',   label:'TPs pendientes',     trend:'⚠ pendiente', trendCls:'warn', valueColor:'#a855f7' },
-            ].map(s => (
+            {(() => {
+              const numMaterias = materias.length
+              const promedios = materias.map(m => m.promedio).filter(v => v > 0)
+              const promGeneral = promedios.length > 0 ? promedios.reduce((a, b) => a + b, 0) / promedios.length : 0
+              const promAsistencia = asistencias.length > 0 ? asistencias.reduce((a, b) => a + b.pct, 0) / asistencias.length : 0
+              const numTps = tps.length
+              return [
+                { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>, cls:'cyan',   value:String(numMaterias), label:'Materias cursando',   trend:'↑ activo',   trendCls:'up' },
+                { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,  cls:'green',  value:promGeneral.toFixed(1), label:'Promedio general',    trend:'↑ bueno',    trendCls:'up',  bar:Math.round(promGeneral * 10),  barColor:'#22c55e', valueColor:'#22c55e' },
+                { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,              cls:'yellow', value:`${Math.round(promAsistencia)}%`, label:'Asistencia promedio', trend:'↑ ok',       trendCls:'up',  bar:Math.round(promAsistencia),  barColor:'#f59e0b', valueColor:'#f59e0b' },
+                { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,                                                              cls:'purple', value:String(numTps),   label:'TPs pendientes',     trend:'⚠ pendiente', trendCls:'warn', valueColor:'#a855f7' },
+              ]
+            })().map(s => (
               <div key={s.label} className="stat-card">
                 <div className="stat-card-top">
                   <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
                   <span className={`stat-trend ${s.trendCls}`}>{s.trend}</span>
                 </div>
                 <div>
-                  <div className="stat-value" style={{ color: s.valueColor }}>{s.value}</div>
+                  <div className="stat-value" style={{ color: s.valueColor } as React.CSSProperties}>{s.value}</div>
                   <div className="stat-label">{s.label}</div>
                 </div>
-                {s.bar && (
+                {s.bar !== undefined && (
                   <div className="stat-bar">
                     <div className="stat-bar-fill" style={{ width:`${s.bar}%`, background:s.barColor }} />
                   </div>
