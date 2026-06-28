@@ -3,7 +3,6 @@ from app.routers import users, auth, materias, inscripciones
 
 app = FastAPI(title="Sistema Académico")
 
-# Incluimos routers
 app.include_router(users.router)
 app.include_router(auth.router)
 app.include_router(materias.router)
