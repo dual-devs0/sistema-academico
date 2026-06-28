@@ -1,15 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, useInView } from 'motion/react'
+import { useNavigate } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.png'
+import { api } from '../lib/api'
 
 type Rol = 'alumno' | 'profesor' | 'admin'
 type Tab = 'login' | 'registro'
-
-const credencialesDemo: Record<Rol, { doc: string; pass: string }> = {
-  alumno:   { doc: '12345678',         pass: 'Alumno1234!' },
-  profesor: { doc: 'prof@uca.edu.py',  pass: 'Profesor1234!' },
-  admin:    { doc: 'admin@uca.edu.py', pass: 'Admin1234!' },
-}
 
 const placeholderDoc: Record<Rol, string> = {
   alumno:   'ej. 12345678',
@@ -45,6 +41,7 @@ function AnimatedLabel({ children, htmlFor }: { children: React.ReactNode; htmlF
 }
 
 export default function Login() {
+  const navigate = useNavigate()
   const [tab, setTab]         = useState<Tab>('login')
   const [rol, setRol]         = useState<Rol>('alumno')
   const [documento, setDoc]   = useState('')
@@ -71,21 +68,29 @@ export default function Login() {
     'Estados Unidos', 'Otro',
   ]
 
+  useEffect(() => { document.title = 'Universidad Católica Caacupé - Inicio' }, [])
+
   const semestreActual = `Semestre ${new Date().getMonth() < 6 ? 1 : 2} · ${new Date().getFullYear()}`
 
   function handleRolChange(r: Rol) { setRol(r); setDoc(''); setPass(''); setError('') }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setError('')
     if (!documento || !password) { setError('Completá todos los campos.'); return }
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const res = await api.post<{ access_token: string; token_type: string }>('/auth/login', {
+        username: documento,
+        password,
+        role: rol,
+      })
+      localStorage.setItem('token', res.access_token)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error de conexión')
+    } finally {
       setLoading(false)
-      const demo = credencialesDemo[rol]
-      if (documento === demo.doc && password === demo.pass) {
-        window.location.href = '/dashboard'
-      } else { setError('Credenciales incorrectas.') }
-    }, 1000)
+    }
   }
 
   function handleRegistro(e: React.FormEvent) {
@@ -465,6 +470,9 @@ export default function Login() {
     }
 
     @media(max-width:420px){
+      html, body { overscroll-behavior:none; }
+      .login-root { overflow:auto; scrollbar-width:none; }
+      .login-root::-webkit-scrollbar { display:none; }
       .panel-left { padding:16px 14px 16px; min-height:240px; }
       .hero-title { font-size:23px; }
       .pr-logo { padding:14px 14px 12px; }
@@ -539,9 +547,9 @@ export default function Login() {
                 <div className="sx-form-sub">Ingresá con tus credenciales institucionales</div>
 
                 <div className="role-selector">
-                  {(['alumno','profesor'] as Rol[]).map(r => (
+                  {(['alumno','profesor','admin'] as Rol[]).map(r => (
                     <button key={r} className={`role-btn${rol===r?' active':''}`} onClick={() => handleRolChange(r)}>
-                      {r.charAt(0).toUpperCase()+r.slice(1)}
+                      {r === 'admin' ? 'Admin' : r.charAt(0).toUpperCase()+r.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -638,7 +646,11 @@ export default function Login() {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                       </svg>
-                      <p>Demo: <strong>{credencialesDemo[rol].doc}</strong> · <strong>{credencialesDemo[rol].pass}</strong></p>
+                      <p style={{fontSize:10, lineHeight:1.4}}>
+                        <strong>Alumno:</strong> 12345678 · Alumno1234! &nbsp;
+                        <strong>Profesor:</strong> prof@uca.edu.py · Profesor1234! &nbsp;
+                        <strong>Admin:</strong> admin@uca.edu.py · Admin1234!
+                      </p>
                     </div>
                   )}
 

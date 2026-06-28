@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { api } from '../lib/api'
 
 interface Apunte {
   id: number
@@ -14,7 +15,7 @@ interface Apunte {
   tipo: 'resumen' | 'ejercicios' | 'guia' | 'apuntes'
 }
 
-const apuntesIniciales: Apunte[] = [
+const apuntesMock: Apunte[] = [
   { id:1, titulo:'Resumen Análisis Matemático I — Unidad 1 y 2', materia:'Análisis Matemático I',    carrera:'Ing. Informática', anio:1, semestre:1, autor:'María González', fecha:'14/3/2026', tags:['limites','derivadas','resumen'],       paginas:12, tipo:'resumen'    },
   { id:2, titulo:'Ejercicios resueltos Física I — Cinemática',   materia:'Física I',                carrera:'Ing. Informática', anio:1, semestre:1, autor:'Luis Paredes',  fecha:'19/3/2026', tags:['cinemática','ejercicios','parcial'],   paginas:8,  tipo:'ejercicios' },
   { id:3, titulo:'Guía completa Programación I — Punteros',      materia:'Programación I',          carrera:'Ing. Informática', anio:1, semestre:1, autor:'Ana Torres',    fecha:'31/3/2026', tags:['punteros','C++','guía'],               paginas:20, tipo:'guia'       },
@@ -318,7 +319,7 @@ const css = `
 `
 
 export default function Biblioteca() {
-  const [apuntes, setApuntes] = useState<Apunte[]>(apuntesIniciales)
+  const [apuntes, setApuntes] = useState<Apunte[]>([])
   const [busqueda,      setBusqueda]      = useState('')
   const [filtroCarrera, setFiltroCarrera] = useState('todas')
   const [filtroMateria, setFiltroMateria] = useState('todas')
@@ -347,6 +348,36 @@ export default function Biblioteca() {
       setFiltroMateria('todas')
     }
   }, [filtroCarrera])
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const apuntesData: any[] = await api.get('/apuntes/') || []
+        const materiasData: any[] = await api.get('/materias/') || []
+        if (apuntesData.length > 0) {
+          const materiaMap: Record<number, string> = {}
+          materiasData.forEach((m: any) => { materiaMap[m.id] = m.nombre })
+          setApuntes(apuntesData.map((a: any) => ({
+            id: a.id,
+            titulo: a.titulo || a.descripcion || `Apunte #${a.id}`,
+            materia: materiaMap[a.materia_id] || `Materia #${a.materia_id}`,
+            carrera: 'Ing. Informática',
+            anio: 1,
+            semestre: 1,
+            autor: `Usuario #${a.user_id}`,
+            fecha: a.created_at?.slice(0, 10).replace(/-/g, '/') || '—',
+            tags: [],
+            paginas: 0,
+            tipo: 'apuntes' as const,
+          })))
+        } else {
+          setApuntes(apuntesMock)
+        }
+      } catch {
+        setApuntes(apuntesMock)
+      }
+    })()
+  }, [])
 
   function showToast(msg:string){ setToast(msg); setTimeout(()=>setToast(''),2200) }
 

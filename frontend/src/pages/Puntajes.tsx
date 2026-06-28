@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { api, decodeToken } from '../lib/api'
 
 type Materia = {
   nombre: string
@@ -319,13 +320,41 @@ export default function Puntajes() {
   const [semestre, setSemestre] = useState(semestres[0])
   const [dropOpen, setDropOpen] = useState(false)
   const [search, setSearch]     = useState('')
+  const [materias, setMaterias] = useState<Materia[]>([])
   const dropRef = useRef<HTMLDivElement>(null)
 
-  const materias = datosPorSemestre[semestre] ?? []
-  const filtered = materias.filter(m => m.nombre.toLowerCase().includes(search.toLowerCase()))
+  // Cargar datos reales desde la API
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    const user = token ? decodeToken(token) : null
+    if (!user) return
+
+    Promise.all([
+      api.get<{ id: number; nombre: string; profesor_id: number }[]>('/materias/').catch(() => []),
+      api.get<{ id: number; user_id: number; materia_id: number; tipo: string; valor: number }[]>(`/puntajes/?user_id=${user.username}`).catch(() => []),
+    ]).then(([materiasData, puntajesData]) => {
+      const grouped: Materia[] = materiasData.map(m => {
+        const pts = puntajesData.filter(p => p.materia_id === m.id)
+        return {
+          nombre: m.nombre,
+          profesor: `Prof. ${m.profesor_id}`,
+          parcial1: pts.find(p => p.tipo === 'parcial1')?.valor ?? null,
+          parcial2: pts.find(p => p.tipo === 'parcial2')?.valor ?? null,
+          tp: pts.find(p => p.tipo === 'practico')?.valor ?? null,
+          final: pts.find(p => p.tipo === 'final')?.valor ?? null,
+        }
+      })
+      if (grouped.length > 0) {
+        setMaterias(grouped)
+      }
+    }).catch(() => {})
+  }, [])
+
+  const materiasActuales = materias.length > 0 ? materias : (datosPorSemestre[semestre] ?? [])
+  const filtered = materiasActuales.filter(m => m.nombre.toLowerCase().includes(search.toLowerCase()))
 
   const promGeneral = (() => {
-    const ps = materias.map(calcProm).filter(p => p !== null) as number[]
+    const ps = materiasActuales.map(calcProm).filter(p => p !== null) as number[]
     if (!ps.length) return 0
     return Math.round((ps.reduce((a,b)=>a+b,0)/ps.length)*10)/10
   })()
@@ -357,7 +386,7 @@ export default function Puntajes() {
           <div className="kpi-row">
             <div className="kpi">
               <div className="kpi-lbl">Materias</div>
-              <div className="kpi-val" style={{color:'#00b4d8'}}>{materias.length}</div>
+              <div className="kpi-val" style={{color:'#00b4d8'}}>{materiasActuales.length}</div>
             </div>
             <div className="kpi">
               <div className="kpi-lbl">Promedio general</div>
@@ -366,19 +395,19 @@ export default function Puntajes() {
             <div className="kpi">
               <div className="kpi-lbl">Mejor nota</div>
               <div className="kpi-val" style={{color:'#22c55e'}}>
-                {Math.max(...materias.flatMap(m=>[m.parcial1,m.parcial2,m.tp,m.final]).filter(n=>n!==null) as number[])}
+                {Math.max(...materiasActuales.flatMap(m=>[m.parcial1,m.parcial2,m.tp,m.final]).filter(n=>n!==null) as number[])}
               </div>
             </div>
             <div className="kpi">
               <div className="kpi-lbl">Finales pendientes</div>
-              <div className="kpi-val" style={{color:'#f59e0b'}}>{materias.filter(m=>m.final===null).length}</div>
+              <div className="kpi-val" style={{color:'#f59e0b'}}>{materiasActuales.filter(m=>m.final===null).length}</div>
             </div>
           </div>
 
           {/* Toolbar */}
           <div className="toolbar">
             <div className="toolbar-left">
-              {materias.length} materias · Promedio: <strong>{promGeneral}</strong>
+              {materiasActuales.length} materias · Promedio: <strong>{promGeneral}</strong>
             </div>
             <div className="toolbar-right">
               <div className="search-box">
