@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
 
 class InscripcionBase(BaseModel):
     alumno_id: int
@@ -10,5 +11,5 @@ class InscripcionCreate(InscripcionBase):
 class InscripcionOut(InscripcionBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    # Configuración Pydantic v2
+    model_config = ConfigDict(from_attributes=True)
