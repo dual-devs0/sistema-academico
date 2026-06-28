@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { api } from '../lib/api'
 
 type Rol = 'alumno' | 'profesor'
 
@@ -277,7 +278,7 @@ const css = `
 `
 
 export default function Usuarios() {
-  const [usuarios,  setUsuarios]  = useState<Usuario[]>(usuariosIniciales)
+  const [usuarios,  setUsuarios]  = useState<Usuario[]>([])
   const [search,    setSearch]    = useState('')
   const [filtroRol, setFiltroRol] = useState<Rol|'todos'>('todos')
   const [dropRol,   setDropRol]   = useState(false)
@@ -285,7 +286,29 @@ export default function Usuarios() {
   const [draft,     setDraft]     = useState<Omit<Usuario,'id'>>(emptyDraft)
   const [toast,     setToast]     = useState('')
   const [confirm,   setConfirm]   = useState<number|null>(null)
+  const [loading,   setLoading]   = useState(true)
   const rolRef = useRef<HTMLDivElement>(null)
+
+  // Cargar usuarios del backend al montar
+  useEffect(() => {
+    api.get<{ id: number; username: string; role: string; nombre: string; email: string; carrera_id: number | null; es_becado: boolean }[]>('/users/')
+      .then(data => {
+        setUsuarios(data.map(u => ({
+          id: u.id,
+          nombre: u.nombre || u.username,
+          email: u.email || u.username,
+          rol: u.role as Rol,
+          carrera: '',
+          becado: u.es_becado || false,
+          activo: true,
+        })))
+        setLoading(false)
+      })
+      .catch(() => {
+        setUsuarios(usuariosIniciales)
+        setLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
     function h(e:MouseEvent){
@@ -308,22 +331,45 @@ export default function Usuarios() {
   function abrirEditar(u:Usuario){ setDraft({nombre:u.nombre,email:u.email,rol:u.rol,carrera:u.carrera,becado:u.becado,activo:u.activo}); setModal(u) }
   function cerrar(){ setModal(null) }
 
-  function guardar(){
+  async function guardar(){
     if(!draft.nombre.trim()||!draft.email.trim()) return
-    if(modal==='nuevo'){
-      setUsuarios(prev=>[...prev,{...draft,id:Date.now()}])
-      showToast('Usuario creado')
-    } else {
-      setUsuarios(prev=>prev.map(u=>u.id===(modal as Usuario).id?{...u,...draft}:u))
-      showToast('Cambios guardados')
+    try {
+      if(modal==='nuevo'){
+        await api.post('/users/', { username: draft.email, password: 'default123', role: draft.rol, nombre: draft.nombre, email: draft.email, es_becado: draft.becado })
+        showToast('Usuario creado')
+      } else {
+        await api.patch(`/users/${(modal as Usuario).id}`, { nombre: draft.nombre, email: draft.email, role: draft.rol, es_becado: draft.becado })
+        showToast('Cambios guardados')
+      }
+      const data = await api.get<{ id: number; username: string; role: string; nombre: string; email: string; es_becado: boolean }[]>('/users/')
+      setUsuarios(data.map(u => ({
+        id: u.id,
+        nombre: u.nombre || u.username,
+        email: u.email || u.username,
+        rol: u.role as Rol,
+        carrera: '',
+        becado: u.es_becado || false,
+        activo: true,
+      })))
+    } catch {
+      if(modal==='nuevo'){
+        setUsuarios(prev=>[...prev,{...draft,id:Date.now()}])
+        showToast('Usuario creado (offline)')
+      } else {
+        setUsuarios(prev=>prev.map(u=>u.id===(modal as Usuario).id?{...u,...draft}:u))
+        showToast('Cambios guardados (offline)')
+      }
     }
     cerrar()
   }
 
   function toggleActivo(id:number){ setUsuarios(prev=>prev.map(u=>u.id===id?{...u,activo:!u.activo}:u)) }
   function pedirEliminar(id:number){ setConfirm(id) }
-  function confirmarEliminar(){
+  async function confirmarEliminar(){
     if(confirm===null) return
+    try {
+      await api.delete(`/users/${confirm}`)
+    } catch { /* ignore, remove from local state anyway */ }
     setUsuarios(prev=>prev.filter(u=>u.id!==confirm))
     setConfirm(null)
     showToast('Usuario eliminado')
@@ -354,7 +400,7 @@ export default function Usuarios() {
 
           {/* Toolbar */}
           <div className="toolbar">
-            <p className="toolbar-sub">{usuarios.length} registrados · {totales.activos} activos</p>
+            <p className="toolbar-sub">{loading ? 'Cargando...' : `${usuarios.length} registrados · ${totales.activos} activos`}</p>
             <button className="btn-primary" onClick={abrirNuevo}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

@@ -10,6 +10,7 @@ psycopg2-binary
 # Autenticación y seguridad
 python-jose[cryptography]
 passlib[bcrypt]
+python-dotenv
 
 # Manejo de PDFs
 pymupdf
@@ -28,3 +29,4 @@ fastapi-mail
 
 # Pruebas
 pytest
+httpx
