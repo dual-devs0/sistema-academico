@@ -2,8 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import require_role
-from app.dependencias import get_current_user
-
 
 router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
 
