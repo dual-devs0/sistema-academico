@@ -1,3 +1,6 @@
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+
 from app.database import engine, SessionLocal, Base
 from app.models.users import User
 from app.models.carrera import Carrera
