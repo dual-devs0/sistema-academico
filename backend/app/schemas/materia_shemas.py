@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class MateriaBase(BaseModel):
     nombre: str
@@ -10,5 +10,5 @@ class MateriaOut(MateriaBase):
     id: int
     profesor_id: int
 
-    class Config:
-        orm_mode = True
+    # Configuración Pydantic v2
+    model_config = ConfigDict(from_attributes=True)
