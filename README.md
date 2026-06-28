@@ -1,23 +1,25 @@
-# Sistema Académico — Universidad Católica
+# Sistema Académico — Universidad Católica de Caacupé
 
-Sistema web para gestión académica: asistencia, puntajes, calendario, biblioteca de apuntes y temario de clases.
+Sistema web para gestión académica: autenticación por roles, asistencias, puntajes, boleta PDF, estadísticas, calendario de eventos, biblioteca de apuntes y temario de clases.
 
 ## Stack
 
 | Capa | Tecnología |
 |------|-----------|
-| Frontend | React + TypeScript + Vite + Tailwind CSS |
-| Backend | Node.js + Fastify + Prisma ORM |
-| Base de datos | PostgreSQL |
-| Storage | Supabase Storage |
-| Auth | JWT + bcrypt |
+| Frontend | React 19 + TypeScript + Vite 8 + Tailwind v4 + Recharts |
+| Backend | Python 3.11 + FastAPI + Uvicorn |
+| ORM / Migraciones | SQLAlchemy + Alembic |
+| Base de datos | SQLite (desarrollo) · PostgreSQL (producción) |
+| Auth | JWT (python-jose) + bcrypt (passlib) |
+| PDF server-side | ReportLab |
 
 ---
 
 ## Requisitos previos
 
+- [Python 3.11+](https://www.python.org/)
 - [Node.js 20+](https://nodejs.org/)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para la BD local)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (solo para PostgreSQL en producción)
 - [Git](https://git-scm.com/)
 
 ---
@@ -31,59 +33,90 @@ git clone https://github.com/TU_USUARIO/sistema-academico.git
 cd sistema-academico
 ```
 
-### 2. Configurar variables de entorno
+### 2. Configurar el backend
 
 ```bash
-cp .env.example .env
-# Editar .env con tus valores locales
-```
-
-### 3. Levantar la base de datos local
-
-```bash
-docker compose up -d
-```
-
-Esto levanta PostgreSQL en `localhost:5432` con:
-- Usuario: `sa_user`
-- Contraseña: `sa_pass`
-- Base de datos: `sistema_academico`
-
-### 4. Instalar dependencias y migrar BD
-
-```bash
-# Backend
 cd backend
-npm install
-npx prisma migrate dev
-npx prisma db seed   # datos iniciales (admin por defecto)
-cd ..
 
-# Frontend
+# Crear y activar entorno virtual
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux / macOS
+
+# Instalar dependencias
+pip install -r requeriments.txt
+
+# Crear archivo .env con las variables de entorno
+copy .env.example .env
+# Editar .env con tus valores (JWT_SECRET, DATABASE_URL, etc.)
+
+# Aplicar migraciones y cargar datos iniciales
+alembic upgrade head
+python seed.py
+
+cd ..
+```
+
+### 3. Configurar el frontend
+
+```bash
 cd frontend
 npm install
 cd ..
 ```
 
-### 5. Levantar el proyecto
+### 4. Levantar el proyecto
 
 ```bash
-# Terminal 1 — backend
-cd backend && npm run dev
+# Terminal 1 — backend (puerto 8000)
+cd backend
+venv\Scripts\activate
+uvicorn app.main:app --reload
 
-# Terminal 2 — frontend
-cd frontend && npm run dev
+# Terminal 2 — frontend (puerto 5173)
+cd frontend
+npm run dev
 ```
 
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:3001/api/v1
-- Documentación API: http://localhost:3001/docs
+- Backend API: http://localhost:8000
+- Swagger UI (docs interactivos): http://localhost:8000/docs
+
+---
+
+## Variables de entorno (`backend/.env`)
+
+| Variable | Ejemplo | Descripción |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./sistema_academico.db` | Conexión a la base de datos |
+| `JWT_SECRET` | `<cadena aleatoria 32+ chars>` | Clave para firmar tokens JWT |
+| `JWT_EXPIRES_MINUTES` | `480` | Duración del token (480 = 8 horas) |
+| `CORS_ORIGINS` | `http://localhost:5173` | Orígenes permitidos (separados por coma) |
+
+> El archivo `.env` está en `.gitignore` y **nunca** debe subirse al repositorio.
+
+---
+
+## Base de datos PostgreSQL (producción)
+
+```bash
+cd backend
+docker compose up -d
+```
+
+Levanta PostgreSQL en `localhost:5432` con:
+- Usuario: `sa_user`
+- Contraseña: `sa_pass`
+- Base de datos: `sistema_academico`
+
+Luego actualizar `DATABASE_URL` en `.env`:
+```
+DATABASE_URL=postgresql://sa_user:sa_pass@localhost:5432/sistema_academico
+```
 
 ---
 
 ## Flujo de trabajo Git
-
-Ver [CONTRIBUTING.md](./CONTRIBUTING.md) para el flujo completo de ramas y Pull Requests.
 
 ### Ramas principales
 
@@ -119,41 +152,73 @@ git push origin feature/nombre-modulo
 sistema-academico/
 ├── frontend/
 │   └── src/
-│       ├── components/   # componentes reutilizables
-│       ├── pages/        # vistas por ruta
-│       ├── hooks/        # custom hooks
-│       ├── lib/          # cliente API, utils
-│       └── types/        # tipos TypeScript compartidos
+│       ├── components/     # Layout con sidebar dinámico por rol
+│       ├── pages/          # 14 páginas (una por ruta)
+│       ├── lib/api.ts      # Cliente HTTP centralizado + decodeToken
+│       └── App.tsx         # Rutas protegidas por rol
 ├── backend/
-│   ├── prisma/
-│   │   └── schema.prisma
-│   └── src/
-│       ├── routes/       # asistencia, puntajes, usuarios, calendario...
-│       ├── plugins/      # auth, db, pdf
-│       └── services/     # lógica de negocio
-├── .env.example
-├── .gitignore
+│   ├── app/
+│   │   ├── main.py         # Punto de entrada, 13 routers registrados
+│   │   ├── auth.py         # Generación JWT
+│   │   ├── dependencias.py # get_current_user, require_role
+│   │   ├── models/         # 9 modelos SQLAlchemy
+│   │   ├── schemas/        # Schemas Pydantic v2
+│   │   ├── routers/        # auth, users, materias, carreras, puntajes,
+│   │   │                   # asistencias, inscripciones, apuntes,
+│   │   │                   # temarios, eventos, reportes, boleta
+│   │   └── middleware/     # SecurityHeadersMiddleware
+│   ├── alembic/            # Migraciones de base de datos
+│   ├── tests/              # Suite Pytest con fixtures en memoria
+│   ├── seed.py             # Datos iniciales
+│   ├── .env                # Variables de entorno (no versionar)
+│   └── requeriments.txt    # Dependencias Python
 ├── docker-compose.yml
 └── README.md
 ```
 
 ---
 
+## Roles del sistema
+
+| Rol | Acceso |
+|-----|--------|
+| `admin` | Total: usuarios, materias, reportes, estadísticas, boletas |
+| `profesor` | Mis Cursos, materias, puntajes, asistencias, estadísticas |
+| `alumno` | Dashboard, puntajes propios, asistencia, boleta, biblioteca |
+
+---
+
+## Pruebas
+
+```bash
+cd backend
+pytest tests/ -v
+```
+
+Las pruebas usan SQLite en memoria y no afectan la base de datos de desarrollo.
+
+---
+
 ## Credenciales por defecto (desarrollo)
 
-Después del seed:
+Generadas por `seed.py`. Cambiar antes de cualquier deploy.
 
-| Usuario | Email | Contraseña |
-|---------|-------|-----------|
-| Admin | admin@uca.edu.py | Admin1234! |
+| Rol | Usuario | Contraseña |
+|-----|---------|-----------|
+| admin | `admin@uca.edu.py` | `Admin1234!` |
+| alumno | `12345678` | `Alumno1234!` |
+| profesor | `prof@uca.edu.py` | `Profesor1234!` |
 
-**Cambiar antes de cualquier deploy a producción.**
+---
+
+## Documentación
+
+Ver [`DOCUMENTACION.md`](../DOCUMENTACION.md) para la referencia completa de la API, modelos de datos, arquitectura y guía de seguridad.
 
 ---
 
 ## Fases del proyecto
 
-- **v1 (MVP):** Auth + usuarios + asistencia + puntajes + vista alumno
-- **v1.1:** Biblioteca + temario + calendario académico
-- **v1.2:** Notificaciones + PDF + estadísticas
-- **v2:** QR, foro, mobile
+- **v0.1 (Beta):** Auth + roles + CRUD usuarios/materias + puntajes + asistencias + boleta PDF + estadísticas + reportes + seguridad (JWT, CORS, headers, RLS)
+- **v1.0:** Notificaciones + QR de asistencia + mobile responsive
+- **v2.0:** Foro, integración Moodle
