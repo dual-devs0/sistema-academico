@@ -2,12 +2,23 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.security import hash_password
-from app.dependencias import get_current_user
+from app.dependencias import require_role
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.post("/", response_model=schemas.user.UserOut)
-def create_user(user: schemas.user.UserCreate, db: Session = Depends(database.SessionLocal)):
+@router.post(
+    "/",
+    response_model=schemas.user.UserOut,
+    responses={
+        403: {"description": "No autorizado"},
+        400: {"description": "Error de validación"}
+    }
+)
+def create_user(
+    user: schemas.user.UserCreate,
+    db: Session = Depends(database.SessionLocal),
+    current_user = Depends(require_role("admin"))
+):
     new_user = models.user.User(
         username=user.username,
         hashed_password=hash_password(user.password),
@@ -15,14 +26,20 @@ def create_user(user: schemas.user.UserCreate, db: Session = Depends(database.Se
     )
     db.add(new_user)
     db.commit()
-    db.refresh(new_user) 
+    db.refresh(new_user)
     return new_user
 
-@router.get("/", response_model=list[schemas.user.UserOut])
-def list_users(db: Session = Depends(database.SessionLocal)):
-    return db.query(models.user.User).all()
+@router.get(
+    "/",
+    response_model=list[schemas.user.UserOut],
+    responses={
+        403: {"description": "No autorizado"}
+    }
+)
 
-# 🔒 Endpoint protegido con JWT
-@router.get("/secure")
-def secure_endpoint(current_user = Depends(get_current_user)):
-    return {"msg": f"Hola {current_user['username']}, tu rol es {current_user['role']}"}
+#@router.get("/", response_model=list[schemas.user.UserOut])
+def list_users(
+    db: Session = Depends(database.SessionLocal),
+    current_user = Depends(require_role("admin"))
+):
+    return db.query(models.user.User).all()
