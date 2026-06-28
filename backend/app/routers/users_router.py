@@ -15,7 +15,7 @@ def create_user(user: schemas.user.UserCreate, db: Session = Depends(database.Se
     )
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)
+    db.refresh(new_user) 
     return new_user
 
 @router.get("/", response_model=list[schemas.user.UserOut])
