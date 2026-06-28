@@ -1,12 +1,12 @@
 from fastapi import FastAPI
-from app.routers import users_router, auth_router, test
+from app.routers import users, auth, materias, inscripciones
 
 app = FastAPI(title="Sistema Académico")
 
-app.include_router(users_router.router)
-app.include_router(auth_router.router)
-app.include_router(test.router)
-
+app.include_router(users.router)
+app.include_router(auth.router)
+app.include_router(materias.router)
+app.include_router(inscripciones.router)
 
 @app.get("/")
 def root():
