@@ -6,6 +6,6 @@ from . import asistencia
 from . import puntaje
 from . import apunte
 from . import evento_calendario as evento
-from . import temario
+from . import programa
 
-__all__ = ["user", "materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "temario"]
+__all__ = ["user", "materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa"]

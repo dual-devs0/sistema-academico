@@ -24,6 +24,9 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class RecuperarRequest(BaseModel):
+    username_or_email: str
+
 class UserOut(BaseModel):
     id: int
     username: str

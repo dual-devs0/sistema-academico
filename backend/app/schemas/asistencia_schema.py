@@ -13,5 +13,6 @@ class AsistenciaCreate(AsistenciaBase):
 
 class AsistenciaOut(AsistenciaBase):
     id: int
+    materia_nombre: str | None = None
 
-    model_config = {"from_attributes": True}
+    mod

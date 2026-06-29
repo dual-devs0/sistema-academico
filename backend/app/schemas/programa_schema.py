@@ -1,15 +1,15 @@
 from pydantic import BaseModel
 
-class TemarioBase(BaseModel):
+class ProgramaBase(BaseModel):
     materia_id: int
     semana: int
     titulo: str
     descripcion: str | None = None
 
-class TemarioCreate(TemarioBase):
+class ProgramaCreate(ProgramaBase):
     pass
 
-class TemarioOut(TemarioBase):
+class ProgramaOut(ProgramaBase):
     id: int
 
     model_config = {"from_attributes": True}

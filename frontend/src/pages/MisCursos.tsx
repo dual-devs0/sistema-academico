@@ -147,7 +147,7 @@ const PAGE_SIZE = 10
 
 export default function MisCursos() {
   const navigate  = useNavigate()
-  const token     = localStorage.getItem('token')
+  const token     = sessionStorage.getItem('token')
   const userData  = token ? decodeToken(token) : null
   const userId    = userData?.user_id
 

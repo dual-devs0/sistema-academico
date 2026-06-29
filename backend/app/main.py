@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
-    carreras, asistencias, puntajes, apuntes, eventos, temarios, reportes, boleta,
+    carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta,
 )
 
 app = FastAPI(
@@ -35,7 +35,7 @@ app.include_router(asistencias.router)
 app.include_router(puntajes.router)
 app.include_router(apuntes.router)
 app.include_router(eventos.router)
-app.include_router(temarios.router)
+app.include_router(programas.router)
 app.include_router(reportes.router)
 app.include_router(boleta.router)
 app.include_router(test_router.router)

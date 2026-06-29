@@ -302,7 +302,7 @@ export default function Perfil() {
   const modalRef    = useRef<HTMLInputElement>(null)
 
   const user = (() => {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     return token ? decodeToken(token) : null
   })()
 
@@ -310,7 +310,7 @@ export default function Perfil() {
   const [foto,        setFoto]       = useState<string|null>(null)
   const [nombre,      setNombre]     = useState(user?.username || 'Usuario')
   const [email,       setEmail]      = useState('—')
-  const [carreraId,   setCarreraId]  = useState<number|null>(null)
+  const [_carreraId,   setCarreraId]  = useState<number|null>(null)
   const [esBecado,    setEsBecado]   = useState(false)
   const [telefono,    setTelefono]   = useState('—')
   const [direccion,   setDireccion]  = useState('—')
@@ -378,7 +378,7 @@ export default function Perfil() {
         <header className="topbar">
           <div>
             <h1>Mi perfil</h1>
-            <p>Datos personales y académicos</p>
+            <p>{user?.role === 'admin' ? 'Datos personales y configuración' : user?.role === 'profesor' ? 'Datos personales y docentes' : 'Datos personales y académicos'}</p>
           </div>
         </header>
 
@@ -453,21 +453,69 @@ export default function Perfil() {
           {/* ── INFO GRID ── */}
           <div className="info-grid">
 
-            {/* Académica */}
+            {/* Académica / Docente / Administrador */}
             <div className="card">
-              <div className="card-header"><h3>Información académica</h3></div>
+              <div className="card-header">
+                <h3>
+                  {user?.role === 'profesor' ? 'Información docente'
+                    : user?.role === 'admin' ? 'Información de administrador'
+                    : 'Información académica'}
+                </h3>
+              </div>
               <div className="field-grid2">
-                {[
-                  { l:'Carrera',   v:'Ingeniería Informática' },
-                  { l:'Legajo',    v:'2024-0123', color:'#00b4d8' },
-                  { l:'Año',       v:'2° año' },
-                  { l:'Semestre',  v:'Semestre 1 · 2026' },
-                ].map(f => (
-                  <div key={f.l} className="fg-cell">
-                    <div className="field-label">{f.l}</div>
-                    <div className="field-val" style={{color: f.color ?? '#f0f4f8'}}>{f.v}</div>
-                  </div>
-                ))}
+                {user?.role === 'profesor' ? (
+                  <>
+                    <div className="fg-cell">
+                      <div className="field-label">Rol</div>
+                      <div className="field-val" style={{color:'#00b4d8'}}>Docente</div>
+                    </div>
+                    <div className="fg-cell">
+                      <div className="field-label">ID Docente</div>
+                      <div className="field-val" style={{color:'#00b4d8'}}>#{user?.user_id ?? '—'}</div>
+                    </div>
+                    <div className="fg-cell">
+                      <div className="field-label">Departamento</div>
+                      <div className="field-val">Sistema Académico UCA</div>
+                    </div>
+                    <div className="fg-cell">
+                      <div className="field-label">Estado</div>
+                      <div className="field-val" style={{color:'#22c55e'}}>Activo</div>
+                    </div>
+                  </>
+                ) : user?.role === 'admin' ? (
+                  <>
+                    <div className="fg-cell">
+                      <div className="field-label">Rol</div>
+                      <div className="field-val" style={{color:'#f59e0b'}}>Administrador</div>
+                    </div>
+                    <div className="fg-cell">
+                      <div className="field-label">ID Admin</div>
+                      <div className="field-val" style={{color:'#f59e0b'}}>#{user?.user_id ?? '—'}</div>
+                    </div>
+                    <div className="fg-cell">
+                      <div className="field-label">Institución</div>
+                      <div className="field-val">UCA — Caacupé</div>
+                    </div>
+                    <div className="fg-cell">
+                      <div className="field-label">Acceso</div>
+                      <div className="field-val" style={{color:'#22c55e'}}>Total</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {([
+                      { l:'Carrera',   v:'Ingeniería Informática' },
+                      { l:'Legajo',    v:'2024-0123', color:'#00b4d8' },
+                      { l:'Año',       v:'2° año' },
+                      { l:'Semestre',  v:'Semestre 1 · 2026' },
+                    ] as { l: string; v: string; color?: string }[]).map(f => (
+                      <div key={f.l} className="fg-cell">
+                        <div className="field-label">{f.l}</div>
+                        <div className="field-val" style={{color: f.color ?? '#f0f4f8'}}>{f.v}</div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
 
@@ -573,53 +621,4 @@ export default function Perfil() {
 
                     <div className="form-group">
                       <label className="form-label">Dirección</label>
-                      <input className="form-input" value={dDir} onChange={e=>setDDir(e.target.value)} placeholder="Ciudad, Paraguay" />
-                    </div>
-                  </>
-                )}
-
-                {tab === 'contrasena' && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">Contraseña actual</label>
-                      <input className="form-input" type="password" value={pwAct} onChange={e=>setPwAct(e.target.value)} placeholder="••••••••" />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Nueva contraseña</label>
-                      <input className="form-input" type="password" value={pwNew} onChange={e=>setPwNew(e.target.value)} placeholder="••••••••" />
-                      <span className="form-hint">Mínimo 8 caracteres.</span>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Confirmar contraseña</label>
-                      <input className="form-input" type="password" value={pwConf} onChange={e=>setPwConf(e.target.value)} placeholder="••••••••"
-                        style={{borderColor: pwConf && pwNew!==pwConf ? '#ef4444' : ''}} />
-                      {pwConf && pwNew!==pwConf && <span className="form-hint" style={{color:'#ef4444'}}>Las contraseñas no coinciden.</span>}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="modal-foot">
-                <button className="btn-secondary" onClick={()=>setModal(false)}>Cancelar</button>
-                <button className="btn-primary"
-                  onClick={tab==='perfil' ? guardar : guardarPwd}
-                  disabled={tab==='contrasena' && !pwValid}
-                  style={{opacity: tab==='contrasena' && !pwValid ? .4 : 1, cursor: tab==='contrasena' && !pwValid ? 'not-allowed':'pointer'}}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:13,height:13}}>
-                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-                  </svg>
-                  Guardar cambios
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {toast && <div className="toast">✓ Cambios guardados correctamente</div>}
-
-      </div>
-    </>
-  )
-}
+                      <input className="form-input" value={dDir} onChange={e=>setDDir(e.targ

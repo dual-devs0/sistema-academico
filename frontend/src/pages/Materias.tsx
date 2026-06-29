@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, decodeToken } from '../lib/api'
 
 interface Materia {
   id: number
@@ -222,12 +222,13 @@ export default function Materias() {
 
   function mapMaterias(
     data: { id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number; semestre: number }[],
-    pMap: Record<number, string>
+    pMap: Record<number, string>,
+    cMap: Record<number, string>
   ): Materia[] {
     return data.map(m => ({
       id: m.id,
       nombre: m.nombre,
-      carrera: '',
+      carrera: (m.carrera_id && cMap[m.carrera_id]) ? cMap[m.carrera_id] : 'Sin carrera',
       anio: m.anio || 1,
       semestre: m.semestre || 1,
       profesor: pMap[m.profesor_id] ?? `Prof. #${m.profesor_id}`,
@@ -239,17 +240,20 @@ export default function Materias() {
     Promise.all([
       api.get<{ id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number; semestre: number }[]>('/materias/'),
       api.get<{ id: number; username: string; nombre: string; role: string }[]>('/users/').catch(() => []),
-    ]).then(([mData, uData]) => {
+      api.get<{ id: number; nombre: string }[]>('/carreras/').catch(() => []),
+    ]).then(([mData, uData, cData]) => {
       const pMap: Record<number, string> = {}
       const pNameId: Record<string, number> = {}
+      const cMap: Record<number, string> = {}
       uData.filter(u => u.role === 'profesor').forEach(u => {
         const name = u.nombre || u.username
         pMap[u.id] = name
         pNameId[name] = u.id
       })
+      cData.forEach(c => { cMap[c.id] = c.nombre })
       setProfMap(pMap)
       setProfNameToId(pNameId)
-      setMaterias(mapMaterias(mData, pMap))
+      setMaterias(mapMaterias(mData, pMap, cMap))
       setLoading(false)
     }).catch(() => {
       setMaterias(materiasIniciales)
@@ -326,12 +330,18 @@ export default function Materias() {
           {/* Toolbar */}
           <div className="toolbar">
             <p className="toolbar-sub">{loading ? 'Cargando...' : `${materias.length} registradas · ${carrerasStats.length} carreras`}</p>
-            <button className="btn-primary" onClick={abrirNuevo}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Nueva materia
-            </button>
+            {(() => {
+              const token = sessionStorage.getItem('token')
+              const rol = token ? (decodeToken(token)?.role ?? '') : ''
+              return rol !== 'profesor' ? (
+                <button className="btn-primary" onClick={abrirNuevo}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Nueva materia
+                </button>
+              ) : null
+            })()}
           </div>
 
           {/* Carrera cards — toggle filtro */}
@@ -592,22 +602,4 @@ export default function Materias() {
               </div>
               <div className="confirm-btns">
                 <button className="btn-cancel" onClick={() => setConfirmar(null)}>Cancelar</button>
-                <button className="btn-eliminar" onClick={confirmarEliminar}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14H6L5 6"/>
-                    <path d="M10 11v6M14 11v6"/>
-                    <path d="M9 6V4h6v2"/>
-                  </svg>
-                  Sí, eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {toast && <div className="toast">✓ {toast}</div>}
-      </div>
-    </>
-  )
-}
+                <button className="btn-elim

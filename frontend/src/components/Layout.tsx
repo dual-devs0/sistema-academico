@@ -1,263 +1,204 @@
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import logoUCASmall from '../assets/uc_logo_sist_academico.png'
 import { decodeToken } from '../lib/api'
 
-const menuPorRol: Record<string, { label: string; path: string; icon: string }[]> = {
+const menuItems: Record<string, { label: string; path: string; icon: string }[]> = {
   admin: [
-    { label: 'Dashboard',     path: '/dashboard',    icon: 'ti-layout-dashboard' },
-    { label: 'Estadísticas',  path: '/estadisticas', icon: 'ti-chart-dots' },
-    { label: 'Usuarios',      path: '/usuarios',     icon: 'ti-users' },
-    { label: 'Materias',   path: '/materias',  icon: 'ti-book' },
-    { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
-    { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
-    { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
-    { label: 'Biblioteca', path: '/biblioteca',icon: 'ti-books' },
-    { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
-    { label: 'Boleta PDF', path: '/boleta',    icon: 'ti-file-text' },
-    { label: 'Reportes',   path: '/reportes',  icon: 'ti-report' },
-    { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
+    { label: 'Dashboard', path: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
+    { label: 'Usuarios', path: '/usuarios', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2' },
+    { label: 'Materias', path: '/materias', icon: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z' },
+    { label: 'Puntajes', path: '/puntajes', icon: 'M18 20V10M12 20V4M6 20v-6' },
+    { label: 'Asistencia', path: '/asistencia', icon: 'M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z' },
+    { label: 'Reportes', path: '/reportes', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+    { label: 'Estadísticas', path: '/estadisticas', icon: 'M18 20V10M12 20V4M6 20v-6' },
+    { label: 'Calendario', path: '/calendario', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { label: 'Programa', path: '/programa', icon: 'M4 6h16M4 12h16M4 18h16' },
+    { label: 'Biblioteca', path: '/biblioteca', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+    { label: 'Inscripciones', path: '/inscripciones', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { label: 'Boleta', path: '/boleta', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+    { label: 'Perfil', path: '/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ],
   profesor: [
-    { label: 'Mis Cursos',    path: '/miscursos',    icon: 'ti-school' },
-    { label: 'Dashboard',     path: '/dashboard',    icon: 'ti-layout-dashboard' },
-    { label: 'Estadísticas',  path: '/estadisticas', icon: 'ti-chart-dots' },
-    { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
-    { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
-    { label: 'Materias',   path: '/materias',  icon: 'ti-book' },
-    { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
-    { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
-    { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
+    { label: 'Dashboard', path: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
+    { label: 'Mis Cursos', path: '/miscursos', icon: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z' },
+    { label: 'Puntajes', path: '/puntajes', icon: 'M18 20V10M12 20V4M6 20v-6' },
+    { label: 'Asistencia', path: '/asistencia', icon: 'M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z' },
+    { label: 'Materias', path: '/materias', icon: 'M4 6h16M4 12h16M4 18h16' },
+    { label: 'Estadísticas', path: '/estadisticas', icon: 'M18 20V10M12 20V4M6 20v-6' },
+    { label: 'Calendario', path: '/calendario', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { label: 'Programa', path: '/programa', icon: 'M4 6h16M4 12h16M4 18h16' },
+    { label: 'Biblioteca', path: '/biblioteca', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+    { label: 'Boleta', path: '/boleta', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+    { label: 'Perfil', path: '/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ],
   alumno: [
-    { label: 'Dashboard',  path: '/dashboard', icon: 'ti-layout-dashboard' },
-    { label: 'Puntajes',   path: '/puntajes',  icon: 'ti-chart-bar' },
-    { label: 'Asistencia', path: '/asistencia',icon: 'ti-checkbox' },
-    { label: 'Calendario', path: '/calendario',icon: 'ti-calendar' },
-    { label: 'Biblioteca', path: '/biblioteca',icon: 'ti-books' },
-    { label: 'Temario',    path: '/temario',   icon: 'ti-list' },
-    { label: 'Boleta PDF', path: '/boleta',    icon: 'ti-file-text' },
-    { label: 'Perfil',     path: '/perfil',    icon: 'ti-user' },
+    { label: 'Dashboard', path: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
+    { label: 'Puntajes', path: '/puntajes', icon: 'M18 20V10M12 20V4M6 20v-6' },
+    { label: 'Asistencia', path: '/asistencia', icon: 'M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z' },
+    { label: 'Calendario', path: '/calendario', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { label: 'Programa', path: '/programa', icon: 'M4 6h16M4 12h16M4 18h16' },
+    { label: 'Biblioteca', path: '/biblioteca', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+    { label: 'Boleta', path: '/boleta', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+    { label: 'Perfil', path: '/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ],
 }
 
+const css = `
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  .layout-root { display: flex; width: 100vw; height: 100vh; background: #0b0f14; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  
+  .sidebar {
+    width: 240px; flex-shrink: 0; background: #0e131a;
+    border-right: 1px solid #1e2d3d; display: flex; flex-direction: column;
+    height: 100vh; position: relative; z-index: 30;
+    transition: transform 0.25s ease;
+  }
+  .sidebar-logo {
+    padding: 20px 18px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #1e2d3d; min-height: 56px;
+  }
+  .sidebar-logo img { width: 120px; height: auto; }
+  .sidebar-user {
+    padding: 14px 18px; border-bottom: 1px solid #1e2d3d;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #00b4d8, #0ea5e9);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #000; flex-shrink: 0;
+  }
+  .sidebar-user-info { flex: 1; min-width: 0; }
+  .sidebar-user-name { font-size: 12px; font-weight: 700; color: #f0f4f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-user-rol  { font-size: 10px; color: #506070; text-transform: uppercase; letter-spacing: 0.05em; }
+  
+  .sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 10px; }
+  .sidebar-section { margin-bottom: 4px; }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 8px;
+    color: #8fa3b8; font-size: 12px; font-weight: 500;
+    text-decoration: none; cursor: pointer; transition: all 0.12s;
+    border: none; background: none; width: 100%; text-align: left; font-family: inherit;
+  }
+  .sidebar-link:hover { background: #1a2230; color: #f0f4f8; }
+  .sidebar-link.active { background: #00b4d815; color: #00b4d8; font-weight: 600; }
+  .sidebar-link svg { width: 15px; height: 15px; flex-shrink: 0; }
+  
+  .sidebar-footer { padding: 12px 10px; border-top: 1px solid #1e2d3d; }
+  .sidebar-logout {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 12px; border-radius: 8px;
+    color: #ef4444; font-size: 12px; font-weight: 500;
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    transition: background 0.12s;
+  }
+  .sidebar-logout:hover { background: #ef444410; }
+  .sidebar-logout svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; overflow-x: hidden; }
+
+  .sidebar-overlay { display: none; }
+
+  @media (max-width: 768px) {
+    .sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-overlay {
+      display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 29; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    }
+    .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
+  }
+
+  .mobile-hamburger {
+    display: none; position: fixed; bottom: 20px; right: 20px; z-index: 50;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: #00b4d8; border: none; color: #000;
+    cursor: pointer; box-shadow: 0 4px 16px rgba(0,180,216,0.4);
+    align-items: center; justify-content: center;
+  }
+  .mobile-hamburger svg { width: 20px; height: 20px; }
+  @media (max-width: 768px) { .mobile-hamburger { display: flex; } }
+`
+
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const token = localStorage.getItem('token')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const token = sessionStorage.getItem('token')
   const user = token ? decodeToken(token) : null
-  const role = user?.role || 'alumno'
-  const menuItems = menuPorRol[role] || menuPorRol.alumno
+  const role = (user?.role || 'alumno') as keyof typeof menuItems
+  const items = menuItems[role] || menuItems.alumno
 
-  useEffect(() => {
-    document.title = 'Universidad Católica Caacupé'
-    if (!token) navigate('/login', { replace: true })
-  }, [navigate, token])
+  const initials = user?.username?.slice(0, 2).toUpperCase() || 'U'
 
-  function handleNav(path: string) {
-    navigate(path)
-    setMobileOpen(false)
+  function handleLogout() {
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user_rol')
+    sessionStorage.removeItem('user_nombre')
+    navigate('/login')
   }
+
+  function closeSidebar() { setSidebarOpen(false) }
 
   return (
     <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .nav-scroll { scrollbar-width:thin; scrollbar-color:transparent transparent; }
-        .nav-scroll::-webkit-scrollbar { width:4px; }
-        .nav-scroll::-webkit-scrollbar-track { background:transparent; }
-        .nav-scroll::-webkit-scrollbar-thumb { background:transparent; border-radius:4px; }
-        .nav-scroll:hover { scrollbar-color:#2a3550 transparent; }
-        .nav-scroll:hover::-webkit-scrollbar-thumb { background:#2a3550; }
-
-        .layout-root {
-          display:flex; background:#0b0f14;
-          height:100dvh; overflow:hidden; font-family:Inter,sans-serif;
-        }
-
-        /* Overlay mobile */
-        .sidebar-overlay {
-          display:none; position:fixed; inset:0; z-index:40;
-          background:rgba(0,0,0,.6); backdrop-filter:blur(2px);
-        }
-        .sidebar-overlay.open { display:block; }
-
-        /* Sidebar */
-        .sidebar {
-          width:190px; height:100%;
-          background:#0b0f14; border-right:1px solid #1a2035;
-          display:flex; flex-direction:column; flex-shrink:0;
-          overflow:hidden; z-index:50; position:relative;
-        }
-
-        @media(max-width:768px){
-          .sidebar {
-            position:fixed; top:0; left:0; height:100dvh;
-            width:240px !important; transform:translateX(-100%);
-            box-shadow:4px 0 24px rgba(0,0,0,.5);
-          }
-          .sidebar.mobile-open { transform:translateX(0); }
-        }
-
-        .sidebar-brand {
-          display:flex; align-items:center; justify-content:center;
-          padding:18px 12px 14px; border-bottom:1px solid #1a2035; flex-shrink:0;
-        }
-        .sidebar-brand-logo {
-          display:flex; align-items:center; justify-content:center; width:100%;
-        }
-
-        /* Ocultar toggle en desktop */
-        .sidebar-toggle-btn { display:none !important; }
-
-        /* Botón de 3 rayas — toggle sidebar en desktop */
-        .sidebar-toggle-btn {
-          display:flex; flex-direction:column; align-items:center; justify-content:center;
-          gap:4px; width:32px; height:32px; flex-shrink:0;
-          background:none; border:1px solid #1a2035; border-radius:7px;
-          cursor:pointer; padding:0; transition:border-color .15s, background .15s;
-        }
-        .sidebar-toggle-btn:hover { border-color:#243447; background:#131920; }
-        .sidebar-toggle-btn span {
-          display:block; width:14px; height:1.5px;
-          background:#4a6fa5; border-radius:2px;
-          transition:all 200ms ease;
-        }
-        /* Animar a X cuando está abierto */
-        .sidebar-toggle-btn.open span:nth-child(1) { transform:rotate(45deg) translate(4px,4px); }
-        .sidebar-toggle-btn.open span:nth-child(2) { opacity:0; transform:scaleX(0); }
-        .sidebar-toggle-btn.open span:nth-child(3) { transform:rotate(-45deg) translate(4px,-4px); }
-
-        .nav-item {
-          width:100%; display:flex; align-items:center;
-          gap:8px; padding:8px 9px; border-radius:9px;
-          border:none; cursor:pointer; margin-bottom:1px;
-          background:transparent; color:#4a6fa5;
-          font-size:12.5px; font-weight:400;
-          text-align:left; font-family:Inter,sans-serif;
-          transition:all 150ms ease; white-space:nowrap; overflow:hidden;
-        }
-        .nav-item.active { background:#0f2044; color:#1a8fff; font-weight:500; }
-        .nav-item:hover:not(.active) { background:#131929; color:#a0b4d0; }
-
-        .sidebar-footer { padding:10px 8px; border-top:1px solid #1a2035; flex-shrink:0; }
-        .sidebar-footer-btn {
-          width:100%; display:flex; align-items:center; gap:8px;
-          padding:8px 10px; border-radius:8px; border:none;
-          cursor:pointer; background:transparent;
-          font-size:12px; font-family:Inter,sans-serif;
-          white-space:nowrap; transition:all 150ms ease;
-        }
-
-        .layout-main {
-          flex:1; height:100%; overflow-y:auto;
-          min-width:0; background:#0b0f14;
-          display:flex; flex-direction:column;
-        }
-
-        /* Topbar mobile */
-        .mobile-topbar {
-          display:none; align-items:center; gap:10px;
-          padding:10px 14px; border-bottom:1px solid #1a2035;
-          background:#0b0f14; position:sticky; top:0; z-index:30; flex-shrink:0;
-        }
-        @media(max-width:768px){ .mobile-topbar { display:flex; } }
-
-        /* Hamburger mobile (3 rayas simples) */
-        .hamburger {
-          display:flex; flex-direction:column; align-items:center;
-          justify-content:center; gap:4px;
-          width:36px; height:36px; flex-shrink:0;
-          background:#131920; border:1px solid #243447;
-          border-radius:8px; cursor:pointer; padding:0;
-        }
-        .hamburger span {
-          display:block; width:16px; height:1.5px;
-          background:#8fa3b8; border-radius:2px;
-        }
-      `}</style>
-
+      <style>{css}</style>
       <div className="layout-root">
+        <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sidebar-logo">
+            <img src="/icono web.png" alt="UCA" style={{ width: 28, height: 28, borderRadius: 6 }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#f0f4f8' }}>Sistema UCA</span>
+          </div>
 
-        {/* Overlay mobile */}
-        <div
-          className={`sidebar-overlay${mobileOpen ? ' open' : ''}`}
-          onClick={() => setMobileOpen(false)}
-        />
-
-        {/* Sidebar */}
-        <div className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
-
-          {/* Brand */}
-          <div className="sidebar-brand">
-            <div className="sidebar-brand-logo">
-              <img
-                src={logoUCASmall}
-                alt="UCA"
-                style={{
-                  width: '100%',
-                  height: 'auto',
-                  maxHeight: 64,
-                  objectFit: 'contain',
-                  filter: 'brightness(0) invert(1)',
-                  opacity: 0.92,
-                }}
-              />
+          <div className="sidebar-user">
+            <div className="sidebar-avatar">{initials}</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{user?.username || 'Usuario'}</div>
+              <div className="sidebar-user-rol">{role === 'admin' ? 'Administrador' : role === 'profesor' ? 'Profesor' : 'Alumno'}</div>
             </div>
           </div>
 
-          {/* Nav */}
-          <div className="nav-scroll" style={{ flex:1, padding:'10px 8px', overflowY:'auto' }}>
-            {menuItems.map(item => {
-              const active = location.pathname === item.path
+          <nav className="sidebar-nav">
+            {items.map(item => {
+              const isActive = location.pathname === item.path
               return (
-                <button
-                  key={item.path}
-                  onClick={() => handleNav(item.path)}
-                  title={undefined}
-                  className={`nav-item${active ? ' active' : ''}`}
-                >
-                  <i className={`ti ${item.icon}`} aria-hidden="true" style={{ fontSize:'15px', flexShrink:0 }} />
-                  <span>{item.label}</span>
-                </button>
+                <div key={item.path} className="sidebar-section">
+                  <button
+                    className={`sidebar-link${isActive ? ' active' : ''}`}
+                    onClick={() => { navigate(item.path); closeSidebar() }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={item.icon} />
+                    </svg>
+                    {item.label}
+                  </button>
+                </div>
               )
             })}
-          </div>
+          </nav>
 
-          {/* Footer — solo cerrar sesión */}
           <div className="sidebar-footer">
-            <button
-              className="sidebar-footer-btn"
-              onClick={() => { localStorage.removeItem('token'); navigate('/login') }}
-              style={{ color:'#e05555' }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#1a1015'}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
-            >
-              <i className="ti ti-logout" aria-hidden="true" style={{ fontSize:'14px', flexShrink:0 }} />
+            <button className="sidebar-logout" onClick={handleLogout}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
               Cerrar sesión
             </button>
           </div>
         </div>
 
-        {/* Main */}
-        <main className="layout-main">
-          {/* Topbar mobile — 3 rayas + logo */}
-          <div className="mobile-topbar">
-            <button className="hamburger" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">
-              <span /><span /><span />
-            </button>
-            <img
-              src={logoUCASmall}
-              alt="UCA"
-              style={{ height:28, width:'auto', filter:'brightness(0) invert(1)', opacity:0.9 }}
-            />
-          </div>
-          {children}
-        </main>
+        <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={closeSidebar} />
 
-      </div>
-    </>
-  )
-}
+        <div className="main-area">
+          {children}
+        </div>
+
+        <button className="mobile-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="20" y2="18" />
+          </svg>
+        </button>
+      <

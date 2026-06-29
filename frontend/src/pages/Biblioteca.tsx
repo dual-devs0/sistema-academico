@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, decodeToken } from '../lib/api'
 
 interface Apunte {
   id: number
@@ -319,6 +319,10 @@ const css = `
 `
 
 export default function Biblioteca() {
+  const token = sessionStorage.getItem('token')
+  const userRole = token ? (decodeToken(token)?.role || '') : ''
+  const puedeSubir = userRole === 'admin' || userRole === 'profesor'
+
   const [apuntes, setApuntes] = useState<Apunte[]>([])
   const [busqueda,      setBusqueda]      = useState('')
   const [filtroCarrera, setFiltroCarrera] = useState('todas')
@@ -440,12 +444,14 @@ export default function Biblioteca() {
           {/* Toolbar */}
           <div className="toolbar">
             <p className="toolbar-sub">{filtrados.length} de {apuntes.length} apuntes disponibles</p>
-            <button className="btn-primary" onClick={()=>setModalSubir(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Subir apunte
-            </button>
+            {puedeSubir && (
+              <button className="btn-primary" onClick={()=>setModalSubir(true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Subir apunte
+              </button>
+            )}
           </div>
 
           {/* Stats */}
@@ -840,17 +846,4 @@ export default function Biblioteca() {
                           <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
                         Descargar PDF
-                      </button>
-                    </div>
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-        )}
-
-        {toast && <div className="toast">✓ {toast}</div>}
-      </div>
-    </>
-  )
-}
+        

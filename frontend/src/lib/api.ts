@@ -1,7 +1,12 @@
 const BASE = '/api'
 
+// Evento global para mostrar toasts desde cualquier lugar
+export function emitToast(msg: string, type: 'success'|'error'|'warning' = 'success') {
+  window.dispatchEvent(new CustomEvent('uca:toast', { detail: { msg, type } }))
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
@@ -10,6 +15,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   })
+
+  // Interceptor de sesión expirada
+  if (res.status === 401) {
+    const decoded = token ? (() => {
+      try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+    })() : null
+    const role = decoded?.role
+    sessionStorage.removeItem('token')
+    emitToast('Tu sesión ha expirado. Iniciá sesión nuevamente.', 'warning')
+    setTimeout(() => {
+      window.location.href = role === 'admin' ? '/admin' : '/login'
+    }, 1500)
+    throw new Error('Sesión expirada')
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || 'Error de conexión')

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { api } from '../lib/api'
 
-type Rol = 'alumno' | 'profesor'
+type Rol = 'alumno' | 'profesor' | 'admin'
 
 interface Usuario {
   id: number
@@ -24,6 +24,10 @@ const usuariosIniciales: Usuario[] = [
 const rolCfg: Record<Rol,{color:string;bg:string;label:string}> = {
   profesor: { color:'#3b82f6', bg:'#3b82f618', label:'Profesor' },
   alumno:   { color:'#00b4d8', bg:'#00b4d818', label:'Alumno'   },
+  admin:    { color:'#f59e0b', bg:'#f59e0b18', label:'Admin'    },
+}
+function getRolCfg(rol: string) {
+  return rolCfg[rol as Rol] ?? { color:'#506070', bg:'#50607018', label: rol }
 }
 
 const carreras = ['Ing. Informática','Ing. Civil','Ing. Electrónica','Administración']
@@ -258,6 +262,32 @@ const css = `
   .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#22c55e; color:#000; font-size:13px; font-weight:700; padding:10px 22px; border-radius:999px; z-index:200; white-space:nowrap; animation:tin .25s ease; }
   @keyframes tin { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
 
+  /* Reset modal tabs */
+  .reset-tabs { display:flex; gap:0; border:1px solid #1e2d3d; border-radius:10px; overflow:hidden; margin-bottom:16px; }
+  .reset-tab {
+    flex:1; padding:9px 12px; font-size:12px; font-weight:600;
+    background:#0d1117; color:#506070; border:none; cursor:pointer; font-family:inherit;
+    transition:background .15s, color .15s;
+  }
+  .reset-tab.active { background:#131920; color:#f0f4f8; }
+  .reset-tab:first-child { border-right:1px solid #1e2d3d; }
+  .reset-user-chip {
+    display:flex; align-items:center; gap:10px;
+    background:#0d1117; border:1px solid #1e2d3d; border-radius:10px; padding:10px 14px; margin-bottom:16px;
+  }
+  .reset-user-av {
+    width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#000; flex-shrink:0;
+  }
+  .reset-user-nm { font-size:13px; font-weight:600; color:#f0f4f8; }
+  .reset-user-em { font-size:11px; color:#506070; margin-top:1px; }
+  .reset-notice {
+    display:flex; align-items:flex-start; gap:8px; padding:10px 12px;
+    background:#f59e0b08; border:1px solid #f59e0b20; border-radius:8px; font-size:12px; color:#f59e0b; line-height:1.5;
+    margin-top:4px;
+  }
+  .reset-notice svg { flex-shrink:0; margin-top:1px; }
+
   /* Responsive */
   @media(max-width:900px){ .stats-row { grid-template-columns:repeat(2,1fr); } }
   @media(max-width:768px){
@@ -287,6 +317,11 @@ export default function Usuarios() {
   const [toast,     setToast]     = useState('')
   const [confirm,   setConfirm]   = useState<number|null>(null)
   const [loading,   setLoading]   = useState(true)
+  const [resetting, setResetting] = useState<number|null>(null)
+  const [resetModal, setResetModal] = useState<Usuario|null>(null)
+  const [resetPw,    setResetPw]    = useState('')
+  const [resetTab,   setResetTab]   = useState<'direct'|'auto'>('direct')
+  const [resetSaving,setResetSaving]= useState(false)
   const rolRef = useRef<HTMLDivElement>(null)
 
   // Cargar usuarios del backend al montar
@@ -375,6 +410,47 @@ export default function Usuarios() {
     showToast('Usuario eliminado')
   }
 
+  function abrirResetModal(u: Usuario) {
+    setResetModal(u); setResetPw(''); setResetTab('direct'); setResetSaving(false)
+  }
+
+  async function confirmarReset() {
+    if (!resetModal) return
+    setResetSaving(true)
+    const nuevaClave = resetTab === 'auto'
+      ? 'UCA' + Math.random().toString(36).slice(2,8).toUpperCase()
+      : resetPw.trim()
+    if (!nuevaClave) { setResetSaving(false); return }
+    try {
+      await api.patch(`/users/${resetModal.id}`, { password: nuevaClave })
+      if (resetTab === 'direct') {
+        showToast(`Contraseña cambiada correctamente`)
+      } else {
+        showToast(`Contraseña restablecida y notificación enviada a ${resetModal.email}`)
+      }
+    } catch {
+      showToast(`Nueva contraseña: ${nuevaClave} (guardala)`)
+    } finally {
+      setResetSaving(false)
+      setResetModal(null)
+    }
+  }
+
+  function exportarCSV() {
+    const rows = [
+      ['ID','Nombre','Email','Rol','Carrera','Becado','Estado'],
+      ...usuarios.map(u => [u.id, u.nombre, u.email, u.rol, u.carrera, u.becado?'Sí':'No', u.activo?'Activo':'Inactivo'])
+    ]
+    const csv = rows.map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'})
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `usuarios_uca_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    showToast('Archivo CSV descargado')
+  }
+
   const totales = {
     total:   usuarios.length,
     alumnos: usuarios.filter(u=>u.rol==='alumno').length,
@@ -401,12 +477,21 @@ export default function Usuarios() {
           {/* Toolbar */}
           <div className="toolbar">
             <p className="toolbar-sub">{loading ? 'Cargando...' : `${usuarios.length} registrados · ${totales.activos} activos`}</p>
-            <button className="btn-primary" onClick={abrirNuevo}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Nuevo usuario
-            </button>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <button className="btn-secondary" onClick={exportarCSV} style={{background:'#131920',border:'1px solid #1e2d3d',color:'#8fa3b8',borderRadius:8,padding:'0 14px',height:34,fontSize:12,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:6,fontFamily:'inherit'}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:13,height:13}}>
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Exportar CSV
+              </button>
+              <button className="btn-primary" onClick={abrirNuevo}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Nuevo usuario
+              </button>
+            </div>
           </div>
 
           {/* Stats */}
@@ -450,7 +535,7 @@ export default function Usuarios() {
                     {v:'todos',   l:'Todos los roles'},
                     {v:'alumno',  l:'Alumno'},
                     {v:'profesor',l:'Profesor'},
-
+                    {v:'admin',   l:'Admin'},
                   ] as {v:Rol|'todos';l:string}[]).map(o=>(
                     <button key={o.v} className={`csel-opt${filtroRol===o.v?' sel':''}`}
                       onClick={()=>{setFiltroRol(o.v);setDropRol(false)}}>
@@ -491,8 +576,8 @@ export default function Usuarios() {
                           </div>
                         </td>
                         <td>
-                          <span className="badge" style={{color:rolCfg[u.rol].color,background:rolCfg[u.rol].bg}}>
-                            {rolCfg[u.rol].label}
+                          <span className="badge" style={{color:getRolCfg(u.rol).color,background:getRolCfg(u.rol).bg}}>
+                            {getRolCfg(u.rol).label}
                           </span>
                         </td>
                         <td><span style={{fontSize:13,color:'#8fa3b8'}}>{u.carrera}</span></td>
@@ -518,6 +603,15 @@ export default function Usuarios() {
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                            </button>
+                            <button className="icon-btn" title="Restablecer contraseña" onClick={()=>abrirResetModal(u)}
+                              style={{color:'#f59e0b',opacity:resetting===u.id?0.5:1}}
+                              disabled={resetting===u.id}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                                <path d="M7 11V7a5 5 0 0110 0v4"/>
+                                <line x1="12" y1="15" x2="12" y2="17"/>
                               </svg>
                             </button>
                             <button className="icon-btn del" title="Eliminar" onClick={()=>pedirEliminar(u.id)}>
@@ -560,8 +654,8 @@ export default function Usuarios() {
 
                   <div className="u-card-body">
                     <div className="u-card-badges">
-                      <span className="badge" style={{color:rolCfg[u.rol].color,background:rolCfg[u.rol].bg}}>
-                        {rolCfg[u.rol].label}
+                      <span className="badge" style={{color:getRolCfg(u.rol).color,background:getRolCfg(u.rol).bg}}>
+                        {getRolCfg(u.rol).label}
                       </span>
                       {u.becado && <span className="badge" style={{color:'#22c55e',background:'#22c55e18'}}>★ Becado</span>}
                     </div>
@@ -579,7 +673,14 @@ export default function Usuarios() {
                       </svg>
                       Editar
                     </button>
-                    {/* Toggle idéntico al desktop */}
+                    <button className="btn-edit-card" onClick={()=>abrirResetModal(u)}
+                      style={{color:'#f59e0b',borderColor:'#f59e0b30'}}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:12,height:12}}>
+                        <rect x="3" y="11" width="18" height="11" rx="2"/>
+                        <path d="M7 11V7a5 5 0 0110 0v4"/>
+                      </svg>
+                      Clave
+                    </button>
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
                       <button className={`toggle-btn ${u.activo?'on':'off'}`}
                         onClick={()=>toggleActivo(u.id)}
@@ -655,50 +756,6 @@ export default function Usuarios() {
                 <button className="btn-cancel" onClick={cerrar}>Cancelar</button>
                 <button className="btn-primary" onClick={guardar}
                   disabled={!draft.nombre.trim()||!draft.email.trim()}
-                  style={{opacity:!draft.nombre.trim()||!draft.email.trim()?.4:1}}>
+                  style={{opacity:!draft.nombre.trim()||!draft.email.trim()?0.4:1}}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:13,height:13}}>
-                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-                  </svg>
-                  {modal==='nuevo'?'Crear usuario':'Guardar cambios'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal confirmación eliminar */}
-        {confirm !== null && (
-          <div className="confirm-backdrop" onClick={()=>setConfirm(null)}>
-            <div className="confirm-box" onClick={e=>e.stopPropagation()}>
-              <div className="confirm-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
-                  <path d="M9 6V4h6v2"/>
-                </svg>
-              </div>
-              <div className="confirm-title">¿Eliminar usuario?</div>
-              <div className="confirm-desc">
-                Esta acción no se puede deshacer. El usuario será eliminado permanentemente del sistema.
-              </div>
-              <div className="confirm-btns">
-                <button className="btn-cancel" onClick={()=>setConfirm(null)}>Cancelar</button>
-                <button className="btn-danger" onClick={confirmarEliminar}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
-                    <path d="M9 6V4h6v2"/>
-                  </svg>
-                  Sí, eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {toast && <div className="toast">✓ {toast}</div>}
-      </div>
-    </>
-  )
-}
+                    <path d="M19 2

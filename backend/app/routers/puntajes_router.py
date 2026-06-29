@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
@@ -7,7 +7,9 @@ from app.dependencias import get_current_user
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
 
 @router.post("/", response_model=schemas.puntaje.PuntajeOut)
-def create_puntaje(puntaje: schemas.puntaje.PuntajeCreate, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+def create_puntaje(puntaje: schemas.puntaje.PuntajeCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+    from app.email_utils import send_new_grade_email_bg
+
     user = db.query(models.user.User).filter(models.user.User.username == current_user["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -21,6 +23,16 @@ def create_puntaje(puntaje: schemas.puntaje.PuntajeCreate, db: Session = Depends
     db.add(new_puntaje)
     db.commit()
     db.refresh(new_puntaje)
+
+    target_user = db.query(models.user.User).filter(models.user.User.id == puntaje.user_id).first()
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == puntaje.materia_id).first()
+    
+    if target_user and target_user.email and materia:
+        try:
+            send_new_grade_email_bg(background_tasks, target_user.email, target_user.nombre or target_user.username, materia.nombre, puntaje.tipo, puntaje.valor)
+        except Exception as e:
+            print("Error sending new grade email:", e)
+
     return new_puntaje
 
 @router.get("/", response_model=list[schemas.puntaje.PuntajeOut])
