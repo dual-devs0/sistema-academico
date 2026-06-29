@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class CarreraBase(BaseModel):
     nombre: str
@@ -9,4 +9,4 @@ class CarreraCreate(CarreraBase):
 class CarreraOut(CarreraBase):
     id: int
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

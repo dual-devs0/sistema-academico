@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
 
 class AsistenciaBase(BaseModel):
@@ -14,4 +14,4 @@ class AsistenciaCreate(AsistenciaBase):
 class AsistenciaOut(AsistenciaBase):
     id: int
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

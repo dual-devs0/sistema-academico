@@ -16,4 +16,4 @@ class MateriaOut(MateriaBase):
     anio: int | None = None
     semestre: int | None = None
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

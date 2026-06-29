@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
 
 class EventoBase(BaseModel):
@@ -16,4 +16,4 @@ class EventoCreate(EventoBase):
 class EventoOut(EventoBase):
     id: int
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

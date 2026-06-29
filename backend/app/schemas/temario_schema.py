@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class TemarioBase(BaseModel):
     materia_id: int
@@ -12,4 +12,4 @@ class TemarioCreate(TemarioBase):
 class TemarioOut(TemarioBase):
     id: int
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
