@@ -1,27 +1,12 @@
 import { useState, useRef } from 'react'
-import { motion, useInView } from 'motion/react'
+import { motion, AnimatePresence, useInView } from 'motion/react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.png'
+import { api, decodeToken } from '../lib/api'
+import { setDocTitle } from '../lib/docTitle'
 
-type Rol = 'alumno' | 'profesor' | 'admin'
+type Rol = 'alumno' | 'profesor'
 type Tab = 'login' | 'registro'
-
-const credencialesDemo: Record<Rol, { doc: string; pass: string }> = {
-  alumno:   { doc: '12345678',         pass: 'Alumno1234!' },
-  profesor: { doc: 'prof@uca.edu.py',  pass: 'Profesor1234!' },
-  admin:    { doc: 'admin@uca.edu.py', pass: 'Admin1234!' },
-}
-
-const placeholderDoc: Record<Rol, string> = {
-  alumno:   'ej. 12345678',
-  profesor: 'ej. prof@uca.edu.py',
-  admin:    'ej. admin@uca.edu.py',
-}
-
-const labelDoc: Record<Rol, string> = {
-  alumno:   'Nro. de Documento',
-  profesor: 'Email institucional',
-  admin:    'Email de administrador',
-}
 
 function AnimatedLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor: string }) {
   const ref = useRef<HTMLLabelElement>(null)
@@ -44,16 +29,25 @@ function AnimatedLabel({ children, htmlFor }: { children: React.ReactNode; htmlF
   )
 }
 
-export default function Login() {
-  const [tab, setTab]         = useState<Tab>('login')
-  const [rol, setRol]         = useState<Rol>('alumno')
-  const [documento, setDoc]   = useState('')
-  const [password, setPass]   = useState('')
-  const [matricula, setMat]   = useState('')
-  const [showPass, setShow]       = useState(false)
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState('')
-  const [showSoporte, setSoporte] = useState(false)
+export default function AcademicoLogin() {
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const redirect = params.get('redirect') || ''
+
+  const [tab, setTab]              = useState<Tab>('login')
+  const [rol, setRol]              = useState<Rol>('alumno')
+  const [documento, setDoc]        = useState('')
+  const [password, setPass]        = useState('')
+  const [matricula, setMat]        = useState('')
+  const [showPass, setShow]        = useState(false)
+  const [loading, setLoading]      = useState(false)
+  const [error, setError]          = useState('')
+  const [showSoporte, setSoporte]  = useState(false)
+  const [showRecuperar, setShowRecuperar] = useState(false)
+  const [recEmail, setRecEmail] = useState('')
+  const [recLoading, setRecLoading] = useState(false)
+  const [recEnviado, setRecEnviado] = useState(false)
+  const [recError, setRecError] = useState('')
   const [showDocExtranjero, setDocExtranjero] = useState(false)
   const [tipoDocumento, setTipoDocumento] = useState('Pasaporte')
   const [paisDocumento, setPaisDocumento] = useState('Paraguay')
@@ -73,19 +67,37 @@ export default function Login() {
 
   const semestreActual = `Semestre ${new Date().getMonth() < 6 ? 1 : 2} · ${new Date().getFullYear()}`
 
-  function handleRolChange(r: Rol) { setRol(r); setDoc(''); setPass(''); setError('') }
+  const accentColor  = rol === 'profesor' ? '#8b5cf6' : '#00b4d8'
+  const accentGlow   = rol === 'profesor' ? '#8b5cf620' : '#00b4d820'
+  const accentBright = rol === 'profesor' ? '#c4b5fd' : '#48cae4'
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setError('')
     if (!documento || !password) { setError('Completá todos los campos.'); return }
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const res = await api.post<{ access_token: string; token_type: string }>('/auth/login', {
+        username: documento, password, role: rol,
+      })
+      sessionStorage.setItem('token', res.access_token)
+      const decoded = decodeToken(res.access_token)
+      const rolReal = decoded?.role || ''
+      sessionStorage.setItem('user_rol', rolReal)
+      sessionStorage.setItem('user_nombre', decoded?.username || '')
+
+      if (rolReal !== rol) {
+        setError('Acceso denegado para este rol.')
+        sessionStorage.removeItem('token')
+        return
+      }
+
+      setDocTitle(rolReal, decoded?.username || '')
+      navigate(redirect || '/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error de conexión')
+    } finally {
       setLoading(false)
-      const demo = credencialesDemo[rol]
-      if (documento === demo.doc && password === demo.pass) {
-        window.location.href = '/dashboard'
-      } else { setError('Credenciales incorrectas.') }
-    }, 1000)
+    }
   }
 
   function handleRegistro(e: React.FormEvent) {
@@ -95,12 +107,28 @@ export default function Login() {
     setTimeout(() => { setLoading(false); setError('Registro en proceso. Contactá a administración.') }, 1000)
   }
 
+  async function handleRecuperar(e: React.FormEvent) {
+    e.preventDefault(); setRecError('')
+    if (!recEmail) { setRecError('Ingresá tu documento o email.'); return }
+    setRecLoading(true)
+    try {
+      await api.post<{ detail: string }>('/auth/recuperar-contrasena', {
+        username_or_email: recEmail,
+      })
+      setRecEnviado(true)
+    } catch (err) {
+      setRecError(err instanceof Error ? err.message : 'Error de conexión')
+    } finally {
+      setRecLoading(false)
+    }
+  }
+
   const css = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #0b0f14; --surface: #131920;
       --border: #1e2d3d; --border2: #243447;
-      --cyan: #00b4d8; --cyan-glow: #00b4d820;
+      --accent: ${accentColor}; --accent-glow: ${accentGlow}; --accent-bright: ${accentBright};
       --text-1: #f0f4f8; --text-2: #8fa3b8; --text-3: #506070;
       --danger: rgba(239,68,68,0.12); --danger-border: rgba(239,68,68,0.35);
     }
@@ -113,7 +141,6 @@ export default function Login() {
       display: flex; align-items: stretch; overflow: hidden;
     }
 
-    /* LEFT */
     .panel-left {
       flex: 1; display: flex; flex-direction: column;
       justify-content: center; align-items: flex-start;
@@ -127,10 +154,15 @@ export default function Login() {
     }
     .panel-left-overlay {
       position:absolute; inset:0; z-index:1;
-      background: linear-gradient(to bottom,
-        rgba(11,15,20,.60) 0%,
+      background: linear-gradient(135deg,
+        rgba(11,15,20,.75) 0%,
         rgba(11,15,20,.40) 50%,
-        rgba(11,15,20,.80) 100%);
+        rgba(11,15,20,.70) 100%);
+    }
+    .panel-left-overlay-accent {
+      position:absolute; inset:0; z-index:2;
+      background: linear-gradient(135deg, transparent 30%, ${accentColor}08 100%);
+      pointer-events: none;
     }
     .panel-left-content {
       position:relative; z-index:3;
@@ -139,19 +171,22 @@ export default function Login() {
     }
     .hero-eyebrow {
       display:inline-flex; align-items:center; gap:8px;
-      background:var(--cyan-glow); border:1px solid #00b4d830;
+      background:var(--accent-glow); border:1px solid var(--accent-color)40;
       border-radius:20px; padding:4px 12px;
-      font-size:11px; font-weight:500; color:var(--cyan);
+      font-size:11px; font-weight:500; color:var(--accent);
     }
-    .hero-dot { width:6px; height:6px; border-radius:50%; background:var(--cyan); display:block; }
+    .hero-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); display:block; }
     .hero-title {
       font-size:clamp(26px,2.8vw,42px); font-weight:800;
       line-height:1.15; color:var(--text-1); letter-spacing:-.02em;
     }
-    .hero-title span { color:var(--cyan); }
+    .hero-title span {
+      background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
     .hero-desc { font-size:13.5px; color:var(--text-2); line-height:1.6; max-width:420px; }
 
-    /* RIGHT */
     .panel-right {
       width: 500px; flex-shrink: 0;
       background: var(--bg); border-left: 1px solid var(--border);
@@ -161,13 +196,11 @@ export default function Login() {
       padding: 0;
       overflow: hidden;
     }
-    /* Logo — fijo arriba */
     .pr-logo {
       flex-shrink: 0;
       display: flex; justify-content: center;
       padding: 20px 48px 0;
     }
-    /* Área scrolleable del form */
     .pr-scroll {
       flex: 1; overflow-y: auto; overflow-x: hidden;
       padding: 14px 48px 0;
@@ -179,7 +212,6 @@ export default function Login() {
     .pr-scroll::-webkit-scrollbar { width: 4px; }
     .pr-scroll::-webkit-scrollbar-track { background: transparent; }
     .pr-scroll::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 4px; }
-    /* Footer — fijo abajo */
     .pr-footer {
       flex-shrink: 0;
       padding: 10px 48px 16px;
@@ -196,7 +228,7 @@ export default function Login() {
       border-bottom:2px solid transparent; margin-bottom:-1px;
       transition:color .15s, border-color .15s;
     }
-    .sx-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+    .sx-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
 
     .sx-form-title {
       font-size:23px; font-weight:700; letter-spacing:-.03em;
@@ -204,17 +236,19 @@ export default function Login() {
     }
     .sx-form-sub { font-size:12px; color:var(--text-3); margin-bottom:12px; }
 
-    .role-selector {
-      display:flex; background:var(--surface); border:1px solid var(--border);
-      border-radius:9px; padding:3px; gap:3px; margin-bottom:12px; width:100%;
+    .rol-switch {
+      display:flex; background:rgba(255,255,255,0.04); border:1px solid var(--border);
+      border-radius:12px; padding:4px; margin-bottom:18px; gap:4px;
     }
-    .role-btn {
-      flex:1; padding:7px 0; border:none; border-radius:7px;
-      background:transparent; color:var(--text-2);
-      font-size:13px; font-weight:500; cursor:pointer;
-      transition:all .18s ease; font-family:inherit;
+    .rol-btn {
+      flex:1; height:36px; border:none; border-radius:9px;
+      font-size:13px; font-weight:600; cursor:pointer;
+      transition:all 0.2s; color:var(--text-3); background:transparent; font-family:inherit;
     }
-    .role-btn.active { background:var(--cyan); color:#000; font-weight:600; }
+    .rol-btn.active { background:var(--accent); color:#fff; box-shadow:0 2px 8px var(--accent-glow); }
+
+    .form-title { font-size:23px; font-weight:700; letter-spacing:-.03em; color:var(--text-1); line-height:1.2; margin-bottom:2px; }
+    .form-sub { font-size:12px; color:var(--text-3); margin-bottom:16px; }
 
     .sx-divider {
       position:relative; display:flex; align-items:center; width:100%; margin:10px 0;
@@ -240,7 +274,7 @@ export default function Login() {
       transition:border-color .18s, box-shadow .18s;
     }
     .sx-input::placeholder { color:var(--text-3); }
-    .sx-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px var(--cyan-glow); }
+    .sx-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
     .sx-select {
       background:var(--surface); color:var(--text-1);
       padding:0 8px; height:37px;
@@ -248,14 +282,14 @@ export default function Login() {
       font-size:13px; font-family:inherit; outline:none; width:100%;
       transition:border-color .18s, box-shadow .18s;
     }
-    .sx-select:focus { border-color:var(--cyan); box-shadow:0 0 0 3px var(--cyan-glow); }
+    .sx-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
     .sx-select option { background:#131920; color:var(--text-1); }
     .sx-pw-toggle {
       position:absolute; right:10px; top:50%; transform:translateY(-50%);
       background:none; border:none; cursor:pointer; color:var(--text-3);
       padding:3px; display:flex; align-items:center;
     }
-    .sx-forgot { font-size:11px; color:var(--cyan); text-decoration:none; }
+    .sx-forgot { font-size:11px; color:var(--accent); text-decoration:none; }
     .sx-forgot:hover { text-decoration:underline; }
 
     .sx-demo {
@@ -263,12 +297,12 @@ export default function Login() {
       background:var(--surface); border:1px solid var(--border);
       border-radius:7px; padding:7px 11px; margin-bottom:10px; width:100%;
     }
-    .sx-demo p { font-size:11px; color:var(--text-2); }
+    .sx-demo p { font-size:10px; color:var(--text-2); line-height:1.4; }
     .sx-demo strong { color:var(--text-1); font-weight:600; }
 
     .sx-btn-primary {
       width:100%; height:39px;
-      background:var(--cyan); border:none; border-radius:8px;
+      background:var(--accent); border:none; border-radius:8px;
       color:#000; font-size:13.5px; font-weight:700;
       font-family:inherit; cursor:pointer;
       transition:opacity .18s, transform .1s;
@@ -286,8 +320,8 @@ export default function Login() {
       display:flex; align-items:center; justify-content:center; gap:6px;
       transition:border-color .15s, color .15s, background .15s;
     }
-    .sx-btn-alt:hover { border-color:var(--cyan); color:var(--text-1); }
-    .sx-btn-alt.active { border-color:var(--cyan); color:var(--cyan); background:var(--cyan-glow); }
+    .sx-btn-alt:hover { border-color:var(--accent); color:var(--text-1); }
+    .sx-btn-alt.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
 
     .sx-switch { font-size:12px; color:var(--text-3); text-align:center; margin-top:9px; width:100%; }
     .sx-switch a { font-weight:600; color:var(--text-1); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
@@ -298,17 +332,15 @@ export default function Login() {
       font-size:11.5px; color:#f87171; width:100%;
     }
 
-    /* Banner doc extranjero activo */
     .sx-ext-banner {
       display:flex; align-items:center; gap:8px;
-      background:#00b4d812; border:1px solid #00b4d830;
+      background:${accentGlow}; border:1px solid ${accentColor}30;
       border-radius:7px; padding:7px 11px; margin-bottom:10px; width:100%;
-      font-size:11px; color:var(--cyan);
+      font-size:11px; color:var(--accent);
     }
 
-    .sx-footer { display: none; } /* reemplazado por .pr-footer */
+    .sx-footer { display: none; }
 
-    /* ── Modal Soporte ── */
     .modal-backdrop {
       position:fixed; inset:0; z-index:100;
       background:rgba(0,0,0,.70); backdrop-filter:blur(5px);
@@ -354,7 +386,7 @@ export default function Login() {
       transition:border-color .18s, box-shadow .18s;
     }
     .modal-input::placeholder { color:#506070; }
-    .modal-input:focus { border-color:#00b4d8; box-shadow:0 0 0 3px #00b4d820; }
+    .modal-input:focus { border-color:${accentColor}; box-shadow:0 0 0 3px ${accentGlow}; }
     .modal-textarea {
       width:100%; padding:10px 12px 10px 34px;
       background:#0f1520; border:1px solid #1e2d3d;
@@ -363,7 +395,7 @@ export default function Login() {
       transition:border-color .18s, box-shadow .18s;
     }
     .modal-textarea::placeholder { color:#506070; }
-    .modal-textarea:focus { border-color:#00b4d8; box-shadow:0 0 0 3px #00b4d820; }
+    .modal-textarea:focus { border-color:${accentColor}; box-shadow:0 0 0 3px ${accentGlow}; }
     .modal-textarea-icon {
       position:absolute; left:11px; top:12px;
       width:14px; height:14px; color:#506070; pointer-events:none;
@@ -376,7 +408,7 @@ export default function Login() {
       display:flex; align-items:center; justify-content:center; gap:6px;
       transition:border-color .15s, background .15s;
     }
-    .modal-btn-email:hover { border-color:#00b4d8; background:#1e2d3d; }
+    .modal-btn-email:hover { border-color:${accentColor}; background:#1e2d3d; }
     .modal-btn-wa2 {
       flex:1; height:40px; border:none;
       border-radius:9px; background:#25D366; color:#fff;
@@ -390,52 +422,38 @@ export default function Login() {
       padding-top:12px; border-top:1px solid #1e2d3d;
     }
     .modal-contact-item { display:flex; align-items:center; gap:5px; font-size:11.5px; }
-    .modal-contact-item a { color:#00b4d8; text-decoration:none; }
+    .modal-contact-item a { color:${accentColor}; text-decoration:none; }
     .modal-contact-item a:hover { text-decoration:underline; }
     .modal-contact-item span { color:#8fa3b8; }
 
     @media(max-width:960px){
       .login-root { flex-direction:column; height:auto; min-height:100dvh; overflow:auto; }
       html, body { overflow:auto; }
-
-      /* Hero mobile */
       .panel-left {
         height:auto; min-height:260px;
         padding:20px 18px 20px;
         align-items:flex-start;
         justify-content:space-between;
       }
-      /* Overlay mobile: desvanecido hacia abajo, funde con el fondo del form */
       .panel-left-overlay {
         background: linear-gradient(to bottom,
           rgba(11,15,20,.50) 0%,
           rgba(11,15,20,.25) 45%,
           #0b0f14 100%) !important;
       }
-      /* Sin línea entre hero y form */
+      .panel-left-overlay-accent { display: none; }
       .panel-right { border-top: none !important; }
       .panel-left-content { gap:10px; max-width:100%; width:100%; }
       .hero-title { font-size:26px; line-height:1.15; }
       .hero-desc { font-size:12.5px; max-width:100%; }
-
-      /* Stats glass cards — solo mobile */
-      .mobile-stats {
-        display:flex !important; gap:8px; width:100%; margin-top:4px;
-      }
+      .mobile-stats { display:flex !important; gap:8px; width:100%; margin-top:4px; }
       .mobile-stat {
         flex:1; background:rgba(13,15,20,.65); backdrop-filter:blur(8px);
         border:1px solid rgba(255,255,255,.07);
         border-radius:10px; padding:7px 10px; text-align:center;
       }
-      .mobile-stat-val {
-        font-size:16px; font-weight:800; color:#fff; line-height:1.1;
-      }
-      .mobile-stat-lbl {
-        font-size:8px; color:#4a6fa5; text-transform:uppercase;
-        letter-spacing:.05em; margin-top:2px;
-      }
-
-      /* Panel form mobile */
+      .mobile-stat-val { font-size:16px; font-weight:800; color:#fff; line-height:1.1; }
+      .mobile-stat-lbl { font-size:8px; color:#4a6fa5; text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
       .panel-right {
         width:100%; height:auto;
         border-left:none; border-top:1px solid var(--border);
@@ -444,18 +462,11 @@ export default function Login() {
       .pr-logo { padding:18px 20px 0; border-bottom:1px solid var(--border); padding-bottom:14px; }
       .pr-scroll { padding:14px 20px 0; overflow-y:visible; flex:none; }
       .pr-footer { padding:8px 20px 20px; }
-
-      /* Inputs mobile: más grandes para touch */
       .sx-input { height:44px; font-size:14px; }
       .sx-select { height:44px; font-size:14px; }
       .sx-btn-primary { height:46px; font-size:15px; border-radius:12px; }
       .role-btn { padding:10px 0; font-size:13.5px; }
-
-      /* Modal soporte: bottom sheet en mobile */
-      .modal-backdrop {
-        align-items:flex-end !important;
-        padding:0 !important;
-      }
+      .modal-backdrop { align-items:flex-end !important; padding:0 !important; }
       .modal-box {
         border-radius:20px 20px 0 0 !important;
         max-width:100% !important;
@@ -465,14 +476,15 @@ export default function Login() {
     }
 
     @media(max-width:420px){
+      html, body { overscroll-behavior:none; }
+      .login-root { overflow:auto; scrollbar-width:none; }
+      .login-root::-webkit-scrollbar { display:none; }
       .panel-left { padding:16px 14px 16px; min-height:240px; }
       .hero-title { font-size:23px; }
       .pr-logo { padding:14px 14px 12px; }
       .pr-scroll { padding:12px 14px 0; }
       .pr-footer { padding:6px 14px 18px; }
     }
-
-    /* Stats mobile — oculto en desktop */
     .mobile-stats { display:none; }
   `
 
@@ -492,6 +504,7 @@ export default function Login() {
         <div className="panel-left">
           <div className="panel-left-bg" />
           <div className="panel-left-overlay" />
+          <div className="panel-left-overlay-accent" />
           <div className="panel-left-content">
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <img src="/icono web.png" alt="UC" style={{ width:52, height:52, borderRadius:'50%', border:'2px solid rgba(255,255,255,.2)', objectFit:'cover', flexShrink:0 }} />
@@ -504,26 +517,21 @@ export default function Login() {
               <span className="hero-dot" />{semestreActual}
             </div>
             <h1 className="hero-title" style={{ textShadow:'0 2px 12px rgba(0,0,0,.9)' }}>
-              Tu expediente académico,{' '}<span>siempre al día</span>
+              Tu academia,<br /><span>en un solo lugar</span>
             </h1>
             <p className="hero-desc" style={{ textShadow:'0 2px 8px rgba(0,0,0,.9)' }}>
-              Consultá calificaciones, asistencia, calendario de exámenes y boletas en un solo lugar.
-              Acceso seguro para alumnos y docentes.
+              Accedé a tus calificaciones, asistencia, calendario y boletas desde cualquier dispositivo.
             </p>
           </div>
         </div>
 
         {/* RIGHT */}
         <div className="panel-right">
-
-          {/* Logo — siempre visible arriba */}
           <div className="pr-logo">
             <img src={logoUCA} alt="Universidad Católica" style={{ width:210, maxWidth:'100%', height:'auto', opacity:0.95 }} />
           </div>
 
-          {/* Área scrolleable */}
           <div className="pr-scroll">
-
             <div className="sx-tabs">
               {(['login','registro'] as Tab[]).map(t => (
                 <button key={t} className={`sx-tab${tab===t?' active':''}`} onClick={() => { setTab(t); setError('') }}>
@@ -532,25 +540,36 @@ export default function Login() {
               ))}
             </div>
 
+            {/* ── ROL SWITCHER ── */}
+            <div className="rol-switch">
+              <button className={`rol-btn ${rol === 'alumno' ? 'active' : ''}`} onClick={() => { setRol('alumno'); setError('') }}>
+                Alumno
+              </button>
+              <button className={`rol-btn ${rol === 'profesor' ? 'active' : ''}`} onClick={() => { setRol('profesor'); setError('') }}>
+                Profesor
+              </button>
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div key={rol} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                <h2 className="form-title">
+                  {rol === 'alumno' ? 'Portal del Alumno' : 'Portal del Profesor'}
+                </h2>
+                <p className="form-sub">
+                  {rol === 'alumno'
+                    ? 'Accedé a tus puntajes, asistencia y boleta'
+                    : 'Gestioná calificaciones y asistencia de tus cursos'}
+                </p>
+              </motion.div>
+            </AnimatePresence>
+
             {/* ── LOGIN ── */}
             {tab === 'login' && (
               <motion.div key="login" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{duration:0.4,ease:'easeOut'}} style={{width:'100%'}}>
-                <div className="sx-form-title">Bienvenido de vuelta</div>
-                <div className="sx-form-sub">Ingresá con tus credenciales institucionales</div>
-
-                <div className="role-selector">
-                  {(['alumno','profesor'] as Rol[]).map(r => (
-                    <button key={r} className={`role-btn${rol===r?' active':''}`} onClick={() => handleRolChange(r)}>
-                      {r.charAt(0).toUpperCase()+r.slice(1)}
-                    </button>
-                  ))}
-                </div>
 
                 {error && <div className="sx-error">{error}</div>}
 
                 <form onSubmit={handleLogin} style={{width:'100%'}}>
-
-                  {/* Modo doc extranjero en login: reemplaza campo documento */}
                   {showDocExtranjero && rol === 'alumno' ? (
                     <>
                       <div className="sx-ext-banner">
@@ -578,7 +597,7 @@ export default function Login() {
                         <div className="sx-field-header">
                           <AnimatedLabel htmlFor="pais-login">País de Emisión</AnimatedLabel>
                           {paisDocumento === 'Otro' && (
-                            <button type="button" onClick={()=>{ setPaisDocumento('Paraguay'); setPaisPersonalizado('') }} style={{ fontSize:11, color:'var(--cyan)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}>
+                            <button type="button" onClick={()=>{ setPaisDocumento('Paraguay'); setPaisPersonalizado('') }} style={{ fontSize:11, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}>
                               ← Ver lista
                             </button>
                           )}
@@ -599,7 +618,9 @@ export default function Login() {
                     </>
                   ) : (
                     <div className="sx-field">
-                      <AnimatedLabel htmlFor="documento">{labelDoc[rol]}</AnimatedLabel>
+                      <AnimatedLabel htmlFor="documento">
+                        {rol === 'alumno' ? 'Nro. de Documento' : 'Email institucional'}
+                      </AnimatedLabel>
                       <div className="sx-input-wrap">
                         <svg className="sx-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           {rol==='alumno'
@@ -607,7 +628,10 @@ export default function Login() {
                             : <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>
                           }
                         </svg>
-                        <input id="documento" className="sx-input" type={rol==='alumno'?'text':'email'} placeholder={placeholderDoc[rol]} value={documento} onChange={e=>setDoc(e.target.value)} autoComplete="username" />
+                        <input id="documento" className="sx-input"
+                          type={rol==='alumno'?'text':'email'}
+                          placeholder={rol==='alumno' ? '12345678' : 'profesor@uca.edu.py'}
+                          value={documento} onChange={e=>setDoc(e.target.value)} autoComplete="username" />
                       </div>
                     </div>
                   )}
@@ -615,7 +639,7 @@ export default function Login() {
                   <div className="sx-field">
                     <div className="sx-field-header">
                       <AnimatedLabel htmlFor="password">Contraseña</AnimatedLabel>
-                      <a href="#" className="sx-forgot">¿Olvidaste tu contraseña?</a>
+                      <button type="button" className="sx-forgot" onClick={()=>{ setShowRecuperar(true); setRecEmail(''); setRecError(''); setRecEnviado(false) }} style={{background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:11,color:'var(--accent)',textDecoration:'none'}}>¿Olvidaste tu contraseña?</button>
                     </div>
                     <div className="sx-input-wrap">
                       <svg className="sx-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -638,7 +662,10 @@ export default function Login() {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                       </svg>
-                      <p>Demo: <strong>{credencialesDemo[rol].doc}</strong> · <strong>{credencialesDemo[rol].pass}</strong></p>
+                      <p>
+                        <strong>Alumno:</strong> 12345678 · Alumno1234! &nbsp;
+                        <strong>Profesor:</strong> prof@uca.edu.py · Profesor1234!
+                      </p>
                     </div>
                   )}
 
@@ -652,22 +679,24 @@ export default function Login() {
                         </svg>
                         Ingresando...
                       </>
-                    ) : 'Ingresar'}
+                    ) : `Ingresar como ${rol === 'alumno' ? 'alumno' : 'profesor'}`}
                   </button>
                 </form>
 
                 <div className="sx-divider"><span>o acceder con</span></div>
 
                 <div className="sx-alt-row">
-                  <button
-                    className={`sx-btn-alt${showDocExtranjero?' active':''}`}
-                    onClick={()=>{ setDocExtranjero(!showDocExtranjero); setDoc(''); setError('') }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    {showDocExtranjero ? 'Cancelar' : 'Doc. extranjero'}
-                  </button>
+                  {rol === 'alumno' && (
+                    <button
+                      className={`sx-btn-alt${showDocExtranjero?' active':''}`}
+                      onClick={()=>{ setDocExtranjero(!showDocExtranjero); setDoc(''); setError('') }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                      </svg>
+                      {showDocExtranjero ? 'Cancelar' : 'Doc. extranjero'}
+                    </button>
+                  )}
                   <button className="sx-btn-alt" onClick={()=>setSoporte(true)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M21 2H3v16h5l4 4 4-4h5V2z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="11" y2="13"/>
@@ -692,7 +721,6 @@ export default function Login() {
                 {error && <div className="sx-error">{error}</div>}
 
                 <form onSubmit={handleRegistro} style={{width:'100%'}}>
-
                   {showDocExtranjero ? (
                     <>
                       <div className="sx-ext-banner">
@@ -720,7 +748,7 @@ export default function Login() {
                         <div className="sx-field-header">
                           <AnimatedLabel htmlFor="reg-pais">País de Emisión</AnimatedLabel>
                           {paisDocumento === 'Otro' && (
-                            <button type="button" onClick={()=>{ setPaisDocumento('Paraguay'); setPaisPersonalizado('') }} style={{ fontSize:11, color:'var(--cyan)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}>
+                            <button type="button" onClick={()=>{ setPaisDocumento('Paraguay'); setPaisPersonalizado('') }} style={{ fontSize:11, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}>
                               ← Ver lista
                             </button>
                           )}
@@ -777,16 +805,18 @@ export default function Login() {
                 <div className="sx-divider"><span>o registrarse con</span></div>
 
                 <div className="sx-alt-row" style={{marginBottom:0}}>
-                  <button
-                    className={`sx-btn-alt${showDocExtranjero?' active':''}`}
-                    type="button"
-                    onClick={()=>{ setDocExtranjero(!showDocExtranjero); setDoc(''); setError('') }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    {showDocExtranjero ? 'Cancelar' : 'Doc. extranjero'}
-                  </button>
+                  {rol === 'alumno' && (
+                    <button
+                      className={`sx-btn-alt${showDocExtranjero?' active':''}`}
+                      type="button"
+                      onClick={()=>{ setDocExtranjero(!showDocExtranjero); setDoc(''); setError('') }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                      </svg>
+                      {showDocExtranjero ? 'Cancelar' : 'Doc. extranjero'}
+                    </button>
+                  )}
                   <button className="sx-btn-alt" type="button" onClick={()=>setSoporte(true)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M21 2H3v16h5l4 4 4-4h5V2z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="11" y2="13"/>
@@ -803,15 +833,83 @@ export default function Login() {
             )}
 
             <div className="sx-footer" />
+          </div>
 
-          </div>{/* /pr-scroll */}
-
-          {/* Footer — siempre visible abajo */}
-          <div className="pr-footer">Sistema de gestión académica · UCA 2026</div>
-
+          <div className="pr-footer">
+            Sistema de gestión académica · UCA 2026
+            <span style={{ display:'inline-block', marginLeft:14, paddingLeft:14, borderLeft:'1px solid #1e2d3d' }}>
+              <button onClick={()=>navigate('/admin')} style={{ background:'none', border:'none', color:'#506070', cursor:'pointer', fontSize:11, fontFamily:'inherit', textDecoration:'underline', textUnderlineOffset:2 }}>Acceso administradores</button>
+            </span>
+          </div>
         </div>
-
       </div>
+
+      {/* ── MODAL RECUPERAR CONTRASEÑA ── */}
+      {showRecuperar && (
+        <div className="modal-backdrop" onClick={()=>setShowRecuperar(false)}>
+          <div className="modal-box" onClick={e=>e.stopPropagation()}>
+            <button className="modal-close" onClick={()=>setShowRecuperar(false)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+
+            {recEnviado ? (
+              <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{duration:0.3}}>
+                <div className="modal-title">Revisá tu correo</div>
+                <div className="modal-sub">Si el usuario existe, recibirás un email con tu nueva contraseña.</div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 0',color:'#34d399'}}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                  </svg>
+                </div>
+                <button className="sx-btn-primary" style={{background:'var(--accent)',height:40}} onClick={()=>setShowRecuperar(false)}>
+                  Entendido
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{duration:0.3}}>
+                <div className="modal-title">Restablecer contraseña</div>
+                <div className="modal-sub">Ingresá tu documento de identidad o email institucional.</div>
+
+                {recError && (
+                  <div className="sx-error" style={{marginBottom:12}}>{recError}</div>
+                )}
+
+                <form onSubmit={handleRecuperar}>
+                  <div className="modal-field">
+                    <label className="modal-label">Documento o Email</label>
+                    <div className="modal-input-wrap">
+                      <svg className="modal-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                      </svg>
+                      <input className="modal-input" type="text" placeholder="ej. 12345678 o email@uca.edu.py"
+                        value={recEmail} onChange={e=>setRecEmail(e.target.value)} autoFocus />
+                    </div>
+                  </div>
+                  <button className="sx-btn-primary" type="submit" disabled={recLoading} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,height:40}}>
+                    {recLoading ? (
+                      <>
+                        <svg style={{animation:'spin .8s linear infinite',flexShrink:0}} width="15" height="15" viewBox="0 0 24 24" fill="none">
+                          <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+                          <circle cx="12" cy="12" r="10" stroke="rgba(0,0,0,.3)" strokeWidth="3"/>
+                          <path d="M12 2a10 10 0 0110 10" stroke="#000" strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                        Enviando...
+                      </>
+                    ) : 'Enviar instrucciones'}
+                  </button>
+                </form>
+
+                <div style={{textAlign:'center',marginTop:14,fontSize:11,color:'var(--text-3)'}}>
+                  ¿No tenés acceso a tu correo?{' '}
+                  <a onClick={()=>{setShowRecuperar(false);setSoporte(true)}} style={{color:'var(--accent)',cursor:'pointer',textDecoration:'underline',textUnderlineOffset:2}}>Contactá a soporte</a>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL SOPORTE ── */}
       {showSoporte && (
@@ -894,7 +992,6 @@ export default function Login() {
           </div>
         </div>
       )}
-
     </>
   )
 }

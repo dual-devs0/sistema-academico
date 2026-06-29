@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { api, decodeToken } from '../lib/api'
 
 interface Materia {
   nombre: string
@@ -9,271 +10,645 @@ interface Materia {
   final: number | null
 }
 
-const alumno = {
-  nombre: 'María González',
-  legajo: '2024-0123',
-  carrera: 'Ingeniería Informática',
-  anio: 2,
+interface AlumnoData {
+  nombre:   string
+  legajo:   string
+  carrera:  string
+  anio:     number
+  semestre: number
+  email:    string
+  becado:   boolean
+}
+
+const alumnoDefault: AlumnoData = {
+  nombre:   '—',
+  legajo:   '—',
+  carrera:  '—',
+  anio:     1,
   semestre: 1,
-  email: 'maria.gonzalez@uca.edu.py',
-  becado: true,
+  email:    '—',
+  becado:   false,
 }
 
-const materias: Materia[] = [
-  { nombre: 'Análisis Matemático I', profesor: 'Carlos Méndez', parcial1: 7.5, parcial2: 8.0, tp: 9.0, final: null },
-  { nombre: 'Física I',              profesor: 'Ana Torres',    parcial1: 6.0, parcial2: 7.5, tp: 8.5, final: null },
-  { nombre: 'Matemática Discreta',   profesor: 'Carlos Méndez', parcial1: 9.0, parcial2: null, tp: 8.0, final: null },
-  { nombre: 'Programación I',        profesor: 'Luis Paredes',  parcial1: 10.0, parcial2: 9.5, tp: 10.0, final: null },
-]
-
-function calcPromedio(m: Materia): string {
-  const notas = [m.parcial1, m.parcial2, m.tp, m.final].filter((n): n is number => n !== null)
-  if (!notas.length) return '—'
-  return (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1)
+function calcProm(m: Materia): string {
+  const ns = [m.parcial1,m.parcial2,m.tp,m.final].filter((n): n is number => n!==null)
+  if (!ns.length) return '—'
+  return (ns.reduce((a,b)=>a+b,0)/ns.length).toFixed(1)
 }
 
-function calcPromedioGeneral(): string {
-  const promedios = materias.map(m => parseFloat(calcPromedio(m))).filter(n => !isNaN(n))
-  if (!promedios.length) return '—'
-  return (promedios.reduce((a, b) => a + b, 0) / promedios.length).toFixed(1)
+function calcPromGeneral(mats: Materia[]): string {
+  const ps = mats.map(m=>parseFloat(calcProm(m))).filter(n=>!isNaN(n))
+  if (!ps.length) return '—'
+  return (ps.reduce((a,b)=>a+b,0)/ps.length).toFixed(1)
 }
 
-function colorPromedio(prom: string): string {
-  const n = parseFloat(prom)
+function colorProm(p: string): string {
+  const n = parseFloat(p)
   if (isNaN(n)) return '#8fa3b8'
-  if (n >= 8) return '#22c55e'
-  if (n >= 6) return '#f59e0b'
+  if (n>=8) return '#22c55e'
+  if (n>=6) return '#f59e0b'
   return '#ef4444'
 }
 
-function colorNota(n: number | null): string {
-  if (n === null) return '#506070'
-  if (n >= 8) return '#f0f4f8'
-  if (n >= 6) return '#f59e0b'
+function colorNota(n: number|null): string {
+  if (n===null) return '#506070'
+  if (n>=8) return '#f0f4f8'
+  if (n>=6) return '#f59e0b'
   return '#ef4444'
+}
+
+// ── HTML blanco para PDF (independiente del DOM dark) ──
+function buildPdfHtml(alumno: AlumnoData, mats: Materia[]): string {
+  const fecha = new Date().toLocaleDateString('es-PY',{day:'2-digit',month:'long',year:'numeric'})
+  const prom  = calcPromGeneral(mats)
+  const pc    = parseFloat(prom)>=8?'#16a34a':parseFloat(prom)>=6?'#d97706':'#dc2626'
+
+  const filas = mats.map(m=>{
+    const p  = calcProm(m)
+    const pc = parseFloat(p)>=8?'#16a34a':parseFloat(p)>=6?'#d97706':'#dc2626'
+    const nc = (n:number|null)=>n===null?'#94a3b8':n>=8?'#1e293b':n>=6?'#d97706':'#dc2626'
+    return `<tr>
+      <td style="font-weight:600;color:#1e293b;padding:12px 16px;border-bottom:1px solid #f1f5f9;">${m.nombre}</td>
+      <td style="color:#0284c7;font-size:12px;padding:12px 16px;border-bottom:1px solid #f1f5f9;">${m.profesor}</td>
+      <td style="text-align:center;font-weight:700;color:${nc(m.parcial1)};padding:12px 16px;border-bottom:1px solid #f1f5f9;">${m.parcial1??'—'}</td>
+      <td style="text-align:center;font-weight:700;color:${nc(m.parcial2)};padding:12px 16px;border-bottom:1px solid #f1f5f9;">${m.parcial2??'—'}</td>
+      <td style="text-align:center;font-weight:700;color:${nc(m.tp)};padding:12px 16px;border-bottom:1px solid #f1f5f9;">${m.tp??'—'}</td>
+      <td style="text-align:center;color:#94a3b8;padding:12px 16px;border-bottom:1px solid #f1f5f9;">${m.final??'—'}</td>
+      <td style="text-align:center;font-weight:800;font-size:15px;color:${pc};padding:12px 16px;border-bottom:1px solid #f1f5f9;">${p}</td>
+    </tr>`
+  }).join('')
+
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#1e293b;font-size:13px;}
+  .wrap{max-width:740px;margin:0 auto;}
+  .hdr{display:flex;align-items:center;justify-content:space-between;padding:22px 28px 20px;border-bottom:3px solid #0284c7;}
+  .hdr-logo{width:46px;height:46px;background:#0284c7;border-radius:12px;display:flex;align-items:center;justify-content:center;}
+  .hdr-logo svg{width:22px;height:22px;}
+  .hdr-inst{font-size:17px;font-weight:800;color:#0f172a;}
+  .hdr-sub{font-size:11px;color:#64748b;margin-top:2px;}
+  .hdr-r{text-align:right;}
+  .hdr-rl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;}
+  .hdr-rd{font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;}
+  .meta{display:grid;grid-template-columns:repeat(3,1fr);background:#f8fafc;border-bottom:1px solid #e2e8f0;}
+  .mc{padding:14px 20px;border-right:1px solid #e2e8f0;}
+  .mc:nth-child(3n){border-right:none;}
+  .ml{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+  .mv{font-size:13px;font-weight:600;color:#1e293b;}
+  .mc-cy{color:#0284c7;font-size:13px;font-weight:700;}
+  .beca{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:#dcfce7;color:#16a34a;font-size:11px;font-weight:700;}
+  .sec{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:700;padding:14px 20px 8px;}
+  table{width:100%;border-collapse:collapse;}
+  thead th{padding:9px 16px;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;text-align:left;border-bottom:2px solid #e2e8f0;background:#f8fafc;}
+  thead th.c{text-align:center;}
+  .total{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;background:#eff6ff;border-top:2px solid #0284c7;}
+  .tl{font-size:14px;font-weight:700;color:#1e40af;}
+  .tv{font-size:28px;font-weight:900;color:${pc};}
+  .foot{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;}
+  .foot span{font-size:10px;color:#94a3b8;}
+  .wm{text-align:center;padding:8px;font-size:10px;color:#cbd5e1;letter-spacing:.05em;}
+</style>
+</head><body><div class="wrap">
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="hdr-logo"><svg viewBox="0 0 24 24" fill="white"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg></div>
+    <div><div class="hdr-inst">Universidad Católica</div><div class="hdr-sub">Ntra. Sra. de la Asunción — Unidad Pedagógica Caacupé</div></div>
+  </div>
+  <div class="hdr-r"><div class="hdr-rl">Fecha de emisión</div><div class="hdr-rd">${fecha}</div></div>
+</div>
+<div class="meta">
+  <div class="mc"><div class="ml">Alumno</div><div class="mv">${alumno.nombre}</div></div>
+  <div class="mc"><div class="ml">Legajo</div><div class="mc-cy">${alumno.legajo}</div></div>
+  <div class="mc"><div class="ml">Carrera</div><div class="mv">${alumno.carrera}</div></div>
+  <div class="mc"><div class="ml">Año</div><div class="mv">${alumno.anio}° año</div></div>
+  <div class="mc"><div class="ml">Semestre</div><div class="mv">Semestre ${alumno.semestre} · 2026</div></div>
+  <div class="mc"><div class="ml">Estado</div>${alumno.becado?'<span class="beca">★ Becada</span>':'<div class="mv">Regular</div>'}</div>
+</div>
+<div class="sec">Detalle de calificaciones — Semestre ${alumno.semestre} · 2026</div>
+<table>
+  <thead><tr>
+    <th>Materia</th><th>Profesor</th>
+    <th class="c">P1</th><th class="c">P2</th><th class="c">TP</th><th class="c">Final</th><th class="c">Promedio</th>
+  </tr></thead>
+  <tbody>${filas}</tbody>
+</table>
+<div class="total"><div class="tl">Promedio general del semestre</div><div class="tv">${prom}</div></div>
+<div class="foot">
+  <span>Documento generado por el Sistema Académico UCA · Uso oficial</span>
+  <span>Legajo: ${alumno.legajo} · Sem. ${alumno.semestre} · 2026</span>
+</div>
+<div class="wm">UNIVERSIDAD CATÓLICA — DOCUMENTO OFICIAL</div>
+</div></body></html>`
 }
 
 const css = `
-  .bol-root { display:flex; flex-direction:column; font-family:'Inter',system-ui,sans-serif; }
-  .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 28px; border-bottom:1px solid #1e2d3d; background:#0b0f14; position:sticky; top:0; z-index:10; }
-  .topbar h1 { font-size:18px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; font-family:'Plus Jakarta Sans',sans-serif; }
-  .topbar p { font-size:11px; color:#506070; margin-top:1px; }
-  .topbar-right { display:flex; align-items:center; gap:10px; }
-  .topbar-btn { display:flex; align-items:center; justify-content:center; width:34px; height:34px; background:#131920; border:1px solid #243447; border-radius:8px; color:#8fa3b8; cursor:pointer; }
-  .topbar-btn svg { width:15px; height:15px; }
-  .topbar-btn:hover { border-color:#00b4d8; color:#f0f4f8; }
-  .avatar { width:34px; height:34px; background:linear-gradient(135deg,#00b4d8,#0ea5e9); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#000; cursor:pointer; }
-  .content { padding:24px 28px; }
-  .actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:24px; }
-  .btn-primary { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; background:#00b4d8; border:none; border-radius:9px; color:#000; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
-  .btn-primary:hover { opacity:.88; }
-  .btn-primary svg { width:14px; height:14px; }
-  .btn-secondary { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; background:#1a2230; border:1px solid #243447; border-radius:9px; color:#8fa3b8; font-size:13px; font-weight:500; font-family:inherit; cursor:pointer; }
+  *, *::before, *::after { box-sizing:border-box; }
+  .bol-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; }
+
+  .topbar {
+    display:flex; align-items:center; padding:0 24px; height:56px;
+    border-bottom:1px solid #1e2d3d; background:#0b0f14;
+    position:sticky; top:0; z-index:20; flex-shrink:0;
+  }
+  .topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
+
+  .content { padding:20px 24px; flex:1; }
+
+  /* ── Admin selector bar ── */
+  .sel-bar {
+    display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;
+    background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:14px 16px;
+  }
+  .sel-bar-lbl { font-size:12px; color:#506070; font-weight:600; white-space:nowrap; }
+  .sel-search-wrap { flex:1; min-width:200px; position:relative; }
+  .sel-search-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:#506070; pointer-events:none; }
+  .sel-search {
+    width:100%; background:#0d1117; border:1px solid #243447;
+    border-radius:9px; color:#f0f4f8; font-size:13px;
+    font-family:inherit; outline:none; padding:8px 14px 8px 34px; transition:border-color .15s;
+  }
+  .sel-search:focus { border-color:#00b4d8; }
+  .sel-search::placeholder { color:#506070; }
+  .sel-dropdown {
+    position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:50;
+    background:#131920; border:1px solid #1e2d3d; border-radius:10px;
+    box-shadow:0 12px 32px rgba(0,0,0,.6); max-height:240px; overflow-y:auto;
+  }
+  .sel-option {
+    padding:10px 14px; cursor:pointer; font-size:13px; color:#8fa3b8;
+    border:none; background:none; width:100%; text-align:left; font-family:inherit;
+    display:flex; align-items:center; gap:10px; transition:background .12s;
+  }
+  .sel-option:hover, .sel-option.active { background:#1a2230; color:#f0f4f8; }
+  .sel-avatar {
+    width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; color:#000; flex-shrink:0;
+    background:linear-gradient(135deg,#00b4d8,#0ea5e9);
+  }
+  .sel-info { flex:1; min-width:0; }
+  .sel-name { font-size:13px; font-weight:600; color:#f0f4f8; }
+  .sel-email { font-size:11px; color:#506070; }
+  .sel-selected-chip {
+    display:inline-flex; align-items:center; gap:8px;
+    background:#00b4d818; border:1px solid #00b4d830;
+    border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:#00b4d8;
+  }
+  .sel-selected-chip button { background:none; border:none; color:#00b4d8; cursor:pointer; padding:0; display:flex; line-height:1; }
+  .sel-selected-chip button:hover { color:#f0f4f8; }
+
+  /* ── Empty state ── */
+  .bol-empty {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:80px 20px; text-align:center; color:#506070;
+  }
+  .bol-empty-icon { width:56px; height:56px; margin-bottom:16px; opacity:.2; }
+  .bol-empty-title { font-size:16px; font-weight:600; color:#8fa3b8; margin-bottom:6px; }
+  .bol-empty-sub { font-size:13px; }
+
+  .actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+  .btn-primary {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:9px 16px; background:#00b4d8; border:none;
+    border-radius:9px; color:#000; font-size:13px; font-weight:700;
+    font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap;
+  }
+  .btn-primary:hover { opacity:.85; }
+  .btn-primary svg { width:13px; height:13px; flex-shrink:0; }
+  .btn-secondary {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:9px 16px; background:#131920; border:1px solid #1e2d3d;
+    border-radius:9px; color:#8fa3b8; font-size:13px; font-weight:600;
+    font-family:inherit; cursor:pointer; white-space:nowrap; transition:border-color .15s, color .15s;
+  }
   .btn-secondary:hover { border-color:#00b4d8; color:#f0f4f8; }
-  .btn-secondary svg { width:14px; height:14px; }
-  .boleta { max-width:800px; margin:0 auto; background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
-  .bol-header { padding:22px 28px; border-bottom:1px solid #1e2d3d; display:flex; align-items:center; justify-content:space-between; }
-  .bol-logo { width:44px; height:44px; background:linear-gradient(135deg,#00b4d8,#0ea5e9); border-radius:10px; display:flex; align-items:center; justify-content:center; }
+  .btn-secondary svg { width:13px; height:13px; flex-shrink:0; }
+
+  /* Boleta dark preview */
+  .boleta { max-width:820px; margin:0 auto; background:#131920; border:1px solid #1e2d3d; border-radius:16px; overflow:hidden; }
+
+  /* Header */
+  .bol-hdr { padding:20px 24px 18px; border-bottom:3px solid #00b4d8; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .bol-hdr-left { display:flex; align-items:center; gap:12px; }
+  .bol-logo { width:44px; height:44px; background:linear-gradient(135deg,#00b4d8,#0ea5e9); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .bol-logo svg { width:22px; height:22px; }
-  .bol-inst-name { font-family:'Plus Jakarta Sans',sans-serif; font-size:16px; font-weight:800; color:#f0f4f8; }
-  .bol-inst-sub { font-size:12px; color:#506070; margin-top:2px; }
-  .bol-emit-label { font-size:10px; color:#506070; text-transform:uppercase; letter-spacing:.07em; text-align:right; }
-  .bol-emit-date { font-size:14px; font-weight:600; color:#f0f4f8; margin-top:2px; text-align:right; }
-  .bol-meta { padding:18px 28px; border-bottom:1px solid #1e2d3d; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; background:#1a2230; }
-  .bol-meta-label { font-size:10px; color:#506070; text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; }
-  .bol-meta-value { font-size:14px; font-weight:600; color:#f0f4f8; }
-  .bol-meta-cyan { font-size:14px; font-weight:700; color:#00b4d8; font-family:'Plus Jakarta Sans',sans-serif; }
-  .bol-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; background:#15803d18; color:#22c55e; }
-  .bol-section { font-size:10px; color:#506070; text-transform:uppercase; letter-spacing:.08em; padding:16px 28px 10px; }
-  .bol-table { width:100%; border-collapse:collapse; }
-  .bol-table th { padding:9px 20px; font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; text-align:left; border-bottom:1px solid #1e2d3d; white-space:nowrap; }
-  .bol-table th.center { text-align:center; }
-  .bol-table td { padding:13px 20px; border-bottom:1px solid #1e2d3d44; vertical-align:middle; font-size:13px; }
-  .bol-table tr:last-child td { border-bottom:none; }
-  .bol-table tr:hover td { background:#1a2230; }
-  .bol-table td.center { text-align:center; font-weight:700; }
-  .bol-total { padding:18px 28px; border-top:2px solid #00b4d8; display:flex; justify-content:space-between; align-items:center; }
-  .bol-total-label { font-size:14px; font-weight:700; color:#00b4d8; }
-  .bol-total-value { font-family:'Plus Jakarta Sans',sans-serif; font-size:28px; font-weight:800; color:#00b4d8; }
-  .bol-footer { padding:12px 28px; background:#1a2230; border-top:1px solid #1e2d3d; display:flex; justify-content:space-between; align-items:center; }
-  .bol-footer span { font-size:11px; color:#506070; }
+  .bol-inst { font-size:15px; font-weight:800; color:#f0f4f8; }
+  .bol-isub { font-size:11px; color:#506070; margin-top:2px; }
+  .bol-hdr-right { text-align:right; }
+  .bol-emit-lbl  { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
+  .bol-emit-date { font-size:13px; font-weight:700; color:#f0f4f8; margin-top:3px; }
+
+  /* Meta grid */
+  .bol-meta { display:grid; grid-template-columns:repeat(3,1fr); background:#1a2230; border-bottom:1px solid #1e2d3d; }
+  .mc { padding:13px 18px; border-right:1px solid #1e2d3d; }
+  .mc:nth-child(3n) { border-right:none; }
+  .ml { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; font-weight:600; }
+  .mv { font-size:13px; font-weight:600; color:#f0f4f8; }
+  .mc-cy { font-size:13px; font-weight:700; color:#00b4d8; }
+  .beca-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; background:#15803d18; color:#22c55e; font-size:11px; font-weight:700; }
+
+  /* Sección */
+  .sec-lbl { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.08em; font-weight:700; padding:13px 18px 7px; }
+
+  /* Tabla */
+  .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .table-scroll table { min-width:520px; }
+  table { width:100%; border-collapse:collapse; }
+  thead th { padding:9px 14px; font-size:9px; font-weight:700; color:#506070; text-transform:uppercase; letter-spacing:.07em; text-align:left; border-bottom:1px solid #1e2d3d; background:#0d1117; white-space:nowrap; }
+  thead th.c { text-align:center; }
+  tbody td { padding:12px 14px; border-bottom:1px solid #1e2d3d22; vertical-align:middle; }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr:hover td { background:#1a2230; }
+  td.c { text-align:center; font-weight:700; }
+
+  /* Total */
+  .bol-total { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-top:2px solid #00b4d8; background:#00b4d808; }
+  .bol-total-lbl { font-size:14px; font-weight:700; color:#00b4d8; }
+  .bol-total-val { font-size:28px; font-weight:900; line-height:1; }
+
+  /* Footer */
+  .bol-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; padding:11px 20px; background:#1a2230; border-top:1px solid #1e2d3d; }
+  .bol-foot span { font-size:11px; color:#506070; }
+
+  @media(max-width:768px){
+    .topbar  { padding:0 14px; }
+    .content { padding:14px 14px 80px; }
+    .actions { justify-content:stretch; }
+    .btn-primary, .btn-secondary { flex:1; justify-content:center; }
+    .bol-hdr { padding:14px 16px 12px; }
+    .bol-meta { grid-template-columns:1fr 1fr; }
+    .mc:nth-child(3n)  { border-right:1px solid #1e2d3d; }
+    .mc:nth-child(even){ border-right:none; }
+    .mc:nth-last-child(-n+2){ border-bottom:none; }
+    .bol-foot { flex-direction:column; gap:3px; }
+    .sel-bar { flex-direction:column; align-items:stretch; }
+  }
+  @media(max-width:480px){
+    .bol-hdr { flex-direction:column; align-items:flex-start; gap:10px; }
+    .bol-hdr-right { text-align:left; }
+  }
 `
 
-export default function Boleta() {
-  const boletaRef = useRef<HTMLDivElement>(null)
+// ── Boleta visual compartida ──
+function BoletaPreview({ alumno, materias }: { alumno: AlumnoData; materias: Materia[] }) {
+  const promGeneral  = calcPromGeneral(materias)
+  const fechaEmision = new Date().toLocaleDateString('es-PY',{day:'2-digit',month:'long',year:'numeric'})
+  return (
+    <div className="boleta">
+      <div className="bol-hdr">
+        <div className="bol-hdr-left">
+          <div className="bol-logo">
+            <svg viewBox="0 0 24 24" fill="white">
+              <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/>
+            </svg>
+          </div>
+          <div>
+            <div className="bol-inst">Universidad Católica</div>
+            <div className="bol-isub">Ntra. Sra. de la Asunción — Unidad Pedagógica Caacupé</div>
+          </div>
+        </div>
+        <div className="bol-hdr-right">
+          <div className="bol-emit-lbl">Fecha de emisión</div>
+          <div className="bol-emit-date">{fechaEmision}</div>
+        </div>
+      </div>
 
-  const fechaEmision = new Date().toLocaleDateString('es-PY', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  })
+      <div className="bol-meta">
+        <div className="mc"><div className="ml">Alumno</div><div className="mv">{alumno.nombre}</div></div>
+        <div className="mc"><div className="ml">Legajo</div><div className="mc-cy">{alumno.legajo}</div></div>
+        <div className="mc"><div className="ml">Carrera</div><div className="mv">{alumno.carrera}</div></div>
+        <div className="mc"><div className="ml">Año</div><div className="mv">{alumno.anio}° año</div></div>
+        <div className="mc"><div className="ml">Semestre</div><div className="mv">Semestre {alumno.semestre} · 2026</div></div>
+        <div className="mc"><div className="ml">Estado</div>{alumno.becado?<span className="beca-badge">★ Becada</span>:<div className="mv">Regular</div>}</div>
+      </div>
 
-  async function descargarPDF() {
-    const html2pdf = (await import('html2pdf.js')).default
-    const el = boletaRef.current
-    if (!el) return
+      <div className="sec-lbl">Detalle de calificaciones — Semestre {alumno.semestre} · 2026</div>
 
-    const clone = el.cloneNode(true) as HTMLElement
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Materia</th><th>Profesor</th>
+              <th className="c">Parcial 1</th><th className="c">Parcial 2</th>
+              <th className="c">TP</th><th className="c">Final</th><th className="c">Promedio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {materias.map(m=>{
+              const p = calcProm(m)
+              return (
+                <tr key={m.nombre}>
+                  <td style={{fontWeight:600,color:'#f0f4f8',fontSize:13}}>{m.nombre}</td>
+                  <td style={{color:'#00b4d8',fontSize:12}}>{m.profesor}</td>
+                  <td className="c" style={{color:colorNota(m.parcial1)}}>{m.parcial1??'—'}</td>
+                  <td className="c" style={{color:colorNota(m.parcial2)}}>{m.parcial2??'—'}</td>
+                  <td className="c" style={{color:colorNota(m.tp)}}>{m.tp??'—'}</td>
+                  <td className="c" style={{color:'#506070'}}>{m.final??'—'}</td>
+                  <td className="c" style={{fontSize:15,fontWeight:800,color:colorProm(p)}}>{p}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-    const styleLight = document.createElement('style')
-    styleLight.textContent = `
-      .boleta { background:#ffffff !important; border:1px solid #e2e8f0 !important; border-radius:0 !important; }
-      .bol-header { background:#ffffff !important; border-bottom:1px solid #e2e8f0 !important; }
-      .bol-inst-name { color:#0f172a !important; }
-      .bol-inst-sub { color:#64748b !important; }
-      .bol-emit-label { color:#94a3b8 !important; }
-      .bol-emit-date { color:#1e293b !important; }
-      .bol-meta { background:#f8fafc !important; border-bottom:1px solid #e2e8f0 !important; }
-      .bol-meta-label { color:#94a3b8 !important; }
-      .bol-meta-value { color:#1e293b !important; }
-      .bol-meta-cyan { color:#0284c7 !important; }
-      .bol-badge { background:#dcfce7 !important; color:#166534 !important; }
-      .bol-section { color:#94a3b8 !important; }
-      .bol-table th { color:#94a3b8 !important; border-bottom:1px solid #e2e8f0 !important; }
-      .bol-table td { color:#334155 !important; border-bottom:1px solid #f1f5f9 !important; }
-      .bol-table tr:hover td { background:#f8fafc !important; }
-      .bol-total { background:#eff6ff !important; border-top:2px solid #0284c7 !important; }
-      .bol-total-label { color:#1e40af !important; }
-      .bol-total-value { color:#0284c7 !important; }
-      .bol-footer { background:#f8fafc !important; border-top:1px solid #e2e8f0 !important; }
-      .bol-footer span { color:#94a3b8 !important; }
-    `
-    clone.prepend(styleLight)
+      <div className="bol-total">
+        <div className="bol-total-lbl">Promedio general del semestre</div>
+        <div className="bol-total-val" style={{color:colorProm(promGeneral)}}>{promGeneral}</div>
+      </div>
 
-    const wrapper = document.createElement('div')
-    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#ffffff'
-    wrapper.appendChild(clone)
-    document.body.appendChild(wrapper)
+      <div className="bol-foot">
+        <span>Documento generado por el Sistema Académico UCA · Uso oficial</span>
+        <span>Legajo: {alumno.legajo} · Sem. {alumno.semestre} · 2026</span>
+      </div>
+    </div>
+  )
+}
 
-    await html2pdf().set({
-      margin: [12, 14],
-      filename: `boleta_${alumno.legajo}_sem${alumno.semestre}_2026.pdf`,
-      image: { type: 'jpeg' as const, quality: 0.99 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    } as any).from(clone).save()
-
-    document.body.removeChild(wrapper)
+async function descargarPDF(alumno: AlumnoData, materias: Materia[]) {
+  const html2pdf = (await import('html2pdf.js')).default
+  const container = document.createElement('div')
+  container.style.cssText = [
+    'position:fixed','top:0','left:0','width:794px','min-height:100px',
+    'background:#ffffff','z-index:-9999','opacity:0.01','pointer-events:none',
+  ].join(';')
+  container.innerHTML = buildPdfHtml(alumno, materias)
+  document.body.appendChild(container)
+  await new Promise(r=>setTimeout(r,600))
+  try {
+    await (html2pdf() as any).set({
+      margin:[8,8],
+      filename:`boleta_${alumno.legajo}_sem${alumno.semestre || 1}_2026.pdf`,
+      image:{type:'jpeg',quality:1},
+      html2canvas:{ scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false, allowTaint:true, windowWidth:794 },
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+    }).from(container).save()
+  } finally {
+    document.body.removeChild(container)
   }
+}
+
+// ── ADMIN VIEW: selector de alumno ──
+function AdminBoletaView() {
+  const [alumnos, setAlumnos] = useState<{id:number;nombre:string;email:string}[]>([])
+  const [search,  setSearch]  = useState('')
+  const [open,    setOpen]    = useState(false)
+  const [selId,   setSelId]   = useState<number|null>(null)
+  const [selNom,  setSelNom]  = useState('')
+  const [alumno,  setAlumno]  = useState<AlumnoData>(alumnoDefault)
+  const [materias,setMaterias]= useState<Materia[]>([])
+  const [loading, setLoading] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    api.get<{id:number;username:string;role:string;nombre:string;email:string}[]>('/users/')
+      .then(data => {
+        setAlumnos(
+          data.filter(u => u.role === 'alumno').map(u => ({
+            id: u.id,
+            nombre: u.nombre || u.username,
+            email: u.email || u.username,
+          }))
+        )
+      }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    function h(e:MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const filtrados = search.trim()
+    ? alumnos.filter(a =>
+        a.nombre.toLowerCase().includes(search.toLowerCase()) ||
+        a.email.toLowerCase().includes(search.toLowerCase())
+      )
+    : alumnos
+
+  function selectAlumno(a: {id:number;nombre:string;email:string}) {
+    setSelId(a.id)
+    setSelNom(a.nombre)
+    setSearch('')
+    setOpen(false)
+    setLoading(true)
+
+    Promise.all([
+      api.get<{id:number;username:string;nombre:string;email:string|null;carrera_id:number|null;es_becado:boolean|null}>(`/users/${a.id}`),
+      api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${a.id}`),
+      api.get<{id:number;nombre:string;profesor_id:number}[]>('/materias/'),
+    ]).then(([user, puntajes, mats]) => {
+      setAlumno({
+        nombre:   user.nombre || user.username,
+        legajo:   user.username,
+        carrera:  user.carrera_id ? `Carrera #${user.carrera_id}` : '—',
+        anio:     1,
+        semestre: 1,
+        email:    user.email || '—',
+        becado:   user.es_becado || false,
+      })
+      const byMateria: Record<number,{parcial1:number|null;parcial2:number|null;tp:number|null;final:number|null}> = {}
+      puntajes.forEach(p => {
+        if (!byMateria[p.materia_id]) byMateria[p.materia_id] = {parcial1:null,parcial2:null,tp:null,final:null}
+        if (p.tipo==='parcial1') byMateria[p.materia_id].parcial1 = p.valor
+        else if (p.tipo==='parcial2') byMateria[p.materia_id].parcial2 = p.valor
+        else if (p.tipo==='practico') byMateria[p.materia_id].tp = p.valor
+        else if (p.tipo==='final') byMateria[p.materia_id].final = p.valor
+      })
+      setMaterias(mats.map(m => ({
+        nombre:   m.nombre,
+        profesor: `Prof. #${m.profesor_id}`,
+        ...(byMateria[m.id] ?? {parcial1:null,parcial2:null,tp:null,final:null}),
+      })))
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }
+
+  function limpiar() {
+    setSelId(null); setSelNom(''); setSearch('')
+    setAlumno(alumnoDefault); setMaterias([])
+  }
+
+  function initials(n:string){ return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase() }
 
   return (
     <>
       <style>{css}</style>
       <div className="bol-root">
-
         <header className="topbar">
-          <div>
-            <h1>Boleta de notas</h1>
-            <p>Semestre 1 — 2026</p>
-          </div>
-          <div className="topbar-right">
-            <button className="topbar-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
-            <button className="topbar-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-            </button>
-            <div className="avatar">MG</div>
-          </div>
+          <h1>Boleta de notas</h1>
         </header>
 
         <div className="content">
-          <div className="actions">
-            <button className="btn-secondary" onClick={() => window.print()}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              Imprimir
-            </button>
-            <button className="btn-primary" onClick={descargarPDF}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Descargar PDF
-            </button>
+
+          {/* Selector de alumno */}
+          <div className="sel-bar">
+            <span className="sel-bar-lbl">Alumno:</span>
+            {selId ? (
+              <div className="sel-selected-chip">
+                {selNom}
+                <button onClick={limpiar} title="Cambiar alumno">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div className="sel-search-wrap" ref={wrapRef} style={{position:'relative'}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  className="sel-search"
+                  placeholder="Buscar alumno por nombre o email…"
+                  value={search}
+                  onChange={e=>{ setSearch(e.target.value); setOpen(true) }}
+                  onFocus={()=>setOpen(true)}
+                />
+                {open && filtrados.length > 0 && (
+                  <div className="sel-dropdown">
+                    {filtrados.slice(0,20).map(a => (
+                      <button key={a.id} className="sel-option" onMouseDown={()=>selectAlumno(a)}>
+                        <div className="sel-avatar">{initials(a.nombre)}</div>
+                        <div className="sel-info">
+                          <div className="sel-name">{a.nombre}</div>
+                          <div className="sel-email">{a.email}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <div ref={boletaRef} className="boleta">
-
-            {/* Header */}
-            <div className="bol-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div className="bol-logo">
-                  <svg viewBox="0 0 24 24" fill="white"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
-                </div>
-                <div>
-                  <div className="bol-inst-name">Universidad Católica</div>
-                  <div className="bol-inst-sub">Sistema Académico — Boleta Oficial</div>
-                </div>
+          {!selId ? (
+            <div className="bol-empty">
+              <svg className="bol-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <div className="bol-empty-title">Seleccioná un alumno</div>
+              <div className="bol-empty-sub">Buscá por nombre o email para ver su boleta de notas</div>
+            </div>
+          ) : loading ? (
+            <div className="bol-empty">
+              <div style={{color:'#00b4d8',fontSize:13}}>Cargando boleta…</div>
+            </div>
+          ) : (
+            <>
+              <div className="actions">
+                <button className="btn-secondary" onClick={()=>window.print()}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 6 2 18 2 18 9"/>
+                    <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                    <rect x="6" y="14" width="12" height="8"/>
+                  </svg>
+                  Imprimir
+                </button>
+                <button className="btn-primary" onClick={()=>descargarPDF(alumno, materias)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Descargar PDF
+                </button>
               </div>
-              <div>
-                <div className="bol-emit-label">Fecha de emisión</div>
-                <div className="bol-emit-date">{fechaEmision}</div>
-              </div>
-            </div>
-
-            {/* Datos alumno */}
-            <div className="bol-meta">
-              <div><div className="bol-meta-label">Alumno</div><div className="bol-meta-value">{alumno.nombre}</div></div>
-              <div><div className="bol-meta-label">Legajo</div><div className="bol-meta-cyan">{alumno.legajo}</div></div>
-              <div><div className="bol-meta-label">Carrera</div><div className="bol-meta-value">{alumno.carrera}</div></div>
-              <div><div className="bol-meta-label">Año</div><div className="bol-meta-value">{alumno.anio}° año</div></div>
-              <div><div className="bol-meta-label">Semestre</div><div className="bol-meta-value">Semestre {alumno.semestre} · 2026</div></div>
-              <div>
-                <div className="bol-meta-label">Estado</div>
-                {alumno.becado
-                  ? <span className="bol-badge">★ Becada</span>
-                  : <div className="bol-meta-value">Regular</div>}
-              </div>
-            </div>
-
-            {/* Sección */}
-            <div className="bol-section">Detalle de calificaciones</div>
-
-            {/* Tabla */}
-            <table className="bol-table">
-              <thead>
-                <tr>
-                  <th>Materia</th>
-                  <th>Profesor</th>
-                  <th className="center">Parcial 1</th>
-                  <th className="center">Parcial 2</th>
-                  <th className="center">TP</th>
-                  <th className="center">Final</th>
-                  <th className="center">Promedio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {materias.map(m => {
-                  const prom = calcPromedio(m)
-                  return (
-                    <tr key={m.nombre}>
-                      <td style={{ fontWeight: 600, color: '#f0f4f8' }}>{m.nombre}</td>
-                      <td style={{ color: '#00b4d8', fontSize: 12 }}>{m.profesor}</td>
-                      <td className="center" style={{ color: colorNota(m.parcial1) }}>{m.parcial1 ?? '—'}</td>
-                      <td className="center" style={{ color: colorNota(m.parcial2) }}>{m.parcial2 ?? '—'}</td>
-                      <td className="center" style={{ color: colorNota(m.tp) }}>{m.tp ?? '—'}</td>
-                      <td className="center" style={{ color: '#506070' }}>{m.final ?? '—'}</td>
-                      <td className="center">
-                        <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 14, fontWeight: 800, color: colorPromedio(prom) }}>
-                          {prom}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-
-            {/* Promedio general */}
-            <div className="bol-total">
-              <div className="bol-total-label">Promedio general del semestre</div>
-              <div className="bol-total-value">{calcPromedioGeneral()}</div>
-            </div>
-
-            {/* Footer */}
-            <div className="bol-footer">
-              <span>Documento generado por el Sistema Académico UCA</span>
-              <span>Legajo: {alumno.legajo} · Semestre {alumno.semestre} · 2026</span>
-            </div>
-
-          </div>
+              <BoletaPreview alumno={alumno} materias={materias} />
+            </>
+          )}
         </div>
       </div>
     </>
   )
+}
+
+// ── ALUMNO VIEW: boleta propia ──
+function AlumnoBoletaView() {
+  const [alumno,   setAlumno]   = useState<AlumnoData>(alumnoDefault)
+  const [materias, setMaterias] = useState<Materia[]>([])
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('token')
+    const userData = token ? decodeToken(token) : null
+
+    api.get<{id:number;nombre:string|null;username:string;email:string|null;carrera_id:number|null;es_becado:boolean|null}>('/users/me')
+      .then(u => {
+        setAlumno({
+          nombre:   u.nombre || u.username,
+          legajo:   u.username,
+          carrera:  u.carrera_id ? `Carrera #${u.carrera_id}` : '—',
+          anio:     1,
+          semestre: 1,
+          email:    u.email || '—',
+          becado:   u.es_becado || false,
+        })
+      }).catch(() => {})
+
+    if (userData?.user_id) {
+      api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${userData.user_id}`)
+        .then(puntajes => {
+          const byMateria: Record<number,{parcial1:number|null;parcial2:number|null;tp:number|null;final:number|null}> = {}
+          puntajes.forEach(p => {
+            if (!byMateria[p.materia_id]) byMateria[p.materia_id] = {parcial1:null,parcial2:null,tp:null,final:null}
+            if (p.tipo==='parcial1') byMateria[p.materia_id].parcial1 = p.valor
+            else if (p.tipo==='parcial2') byMateria[p.materia_id].parcial2 = p.valor
+            else if (p.tipo==='practico') byMateria[p.materia_id].tp = p.valor
+            else if (p.tipo==='final') byMateria[p.materia_id].final = p.valor
+          })
+          api.get<{id:number;nombre:string;profesor_id:number}[]>('/materias/')
+            .then(mats => {
+              setMaterias(mats.map(m => ({
+                nombre:   m.nombre,
+                profesor: `Prof. #${m.profesor_id}`,
+                ...(byMateria[m.id] ?? {parcial1:null,parcial2:null,tp:null,final:null}),
+              })))
+            }).catch(() => {})
+        }).catch(() => {})
+    }
+  }, [])
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="bol-root">
+        <header className="topbar">
+          <h1>Boleta de notas</h1>
+        </header>
+
+        <div className="content">
+          <div className="actions">
+            <button className="btn-secondary" onClick={()=>window.print()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              Imprimir
+            </button>
+            <button className="btn-primary" onClick={()=>descargarPDF(alumno, materias)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Descargar PDF
+            </button>
+          </div>
+          <BoletaPreview alumno={alumno} materias={materias} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default function Boleta() {
+  const token = sessionStorage.getItem('token')
+  const currentUser = token ? decodeToken(token) : null
+  if (currentUser?.role === 'admin') return <AdminBoletaView />
+  return <AlumnoBoletaView />
 }
