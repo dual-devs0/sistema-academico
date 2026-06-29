@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.security import hash_password
 from app.dependencias import require_role
+from backend.app.dependencias import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 

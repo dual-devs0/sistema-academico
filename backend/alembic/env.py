@@ -1,4 +1,5 @@
 import os
+import sys
 from logging.config import fileConfig
 from pathlib import Path
 
@@ -6,7 +7,10 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from dotenv import load_dotenv
 
-# Load .env from backend/ directory (one level up from alembic/)
+# Agregar backend al PYTHONPATH (sube un nivel desde alembic/)
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+# Cargar variables de entorno desde backend/.env
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 config = context.config
@@ -18,19 +22,17 @@ if database_url:
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import Base and all models so every table is registered in metadata
+# Importar Base y modelos
 from app.database import Base
-from app.models import (  # noqa: F401
-    user,
-    materia,
-    inscripcion,
-    carrera,
-    asistencia,
-    puntaje,
-    apunte,
-    evento_calendario,
-    temario,
-)
+import app.models.users
+import app.models.materia
+import app.models.inscripcion
+import app.models.carrera
+import app.models.asistencia
+import app.models.puntaje
+import app.models.apunte
+import app.models.evento_calendario
+import app.models.temario
 
 target_metadata = Base.metadata
 
