@@ -185,6 +185,29 @@ async function exportarPDF(materias: Materia[], semestre: string, promGeneral: n
   doc.save('puntajes_' + semestre.replace(/[·\s]/g,'_') + '.pdf')
 }
 
+function exportarCSV(materias: Materia[], semestre: string) {
+  const rows = [
+    ['Materia','Parcial 1','Parcial 2','Trabajo Práctico','Examen Final','Promedio','Progreso','Estado'],
+    ...materias.map(m => {
+      const p  = calcProm(m)
+      const st = estadoChip(m).label
+      const completadas = [m.parcial1, m.parcial2, m.tp, m.final].filter(n => n !== null).length
+      return [
+        m.nombre, m.parcial1??'-', m.parcial2??'-', m.tp??'-', m.final??'-',
+        p !== null ? p.toFixed(1) : '-', Math.round((completadas/4)*100)+'%', st
+      ]
+    })
+  ]
+  const csv = rows.map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'})
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `puntajes_${semestre.replace(/[·\s]/g,'_')}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+  import('../lib/api').then(m => m.emitToast('Archivo CSV descargado'))
+}
+
 const css = `
   *, *::before, *::after { box-sizing:border-box; }
   .puntajes-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; }
@@ -448,14 +471,24 @@ export default function Puntajes() {
                 )}
               </div>
 
-              <button className="btn-export" onClick={() => exportarPDF(filtered, semestre, promGeneral)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Exportar PDF
-              </button>
+              <div style={{display:'flex',gap:8}}>
+                <button className="btn-export" style={{background:'#131920',borderColor:'#1e2d3d'}} onClick={() => exportarCSV(filtered, semestre)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Exportar CSV
+                </button>
+                <button className="btn-export" onClick={() => exportarPDF(filtered, semestre, promGeneral)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Exportar PDF
+                </button>
+              </div>
             </div>
           </div>
 

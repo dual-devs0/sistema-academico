@@ -319,6 +319,7 @@ export default function Asistencia() {
   const [modalInfo, setModalInfo] = useState<ModalInfo>(null)
   const [modalCRUD, setModalCRUD] = useState<ModalCRUD>(null)
   const [apiData, setApiData] = useState<MateriaAsistencia[] | null>(null)
+  const [qrModal, setQrModal] = useState<{show:boolean; imagen?:string; nombre?:string; countdown?:number}>({show:false})
 
   const semRef = useRef<HTMLDivElement>(null)
   const filRef = useRef<HTMLDivElement>(null)
@@ -370,6 +371,22 @@ export default function Asistencia() {
     api.delete(`/asistencias/${id}`)
       .then(() => cargarAsistencias())
       .catch(() => alert('Error al eliminar asistencia'))
+  }
+
+  function generarQR(materiaId: number, materiaNombre: string) {
+    import('../lib/api').then(({ api }) => {
+      api.get<{qr_image:string; expires_in:number}>(`/asistencias/qr/${materiaId}`)
+        .then(res => {
+          let secs = res.expires_in
+          setQrModal({ show:true, imagen:res.qr_image, nombre:materiaNombre, countdown:secs })
+          const iv = setInterval(() => {
+            secs--
+            if (secs <= 0) { clearInterval(iv); setQrModal(p => ({...p, countdown:0})); return }
+            setQrModal(p => ({...p, countdown:secs}))
+          }, 1000)
+        })
+        .catch(err => alert('Error generando QR: ' + (err.message || 'intente nuevamente')))
+    })
   }
 
   const materias = apiData ?? datosPorSemestre[semestre] ?? []
@@ -541,6 +558,17 @@ export default function Asistencia() {
                     <div className="ac-badge" style={{ color:col.text, background:col.bg, borderColor:col.border }}>
                       {col.label}
                     </div>
+                    {puedeEditar && m.materia_id && (
+                      <button onClick={() => generarQR(m.materia_id!, m.nombre)}
+                        style={{marginTop:10,display:'flex',alignItems:'center',gap:6,padding:'6px 12px',borderRadius:8,border:'1px solid #00b4d840',background:'#00b4d812',color:'#00b4d8',cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:600}}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                          <rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="4" height="4"/>
+                          <rect x="14" y="14" width="3" height="3"/>
+                        </svg>
+                        Generar QR
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -639,6 +667,33 @@ export default function Asistencia() {
                 })()}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {qrModal.show && (
+        <div className="modal-backdrop" onClick={() => setQrModal({show:false})}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:340,textAlign:'center'}}>
+            <button className="modal-close" onClick={() => setQrModal({show:false})}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <div style={{fontSize:11,color:'#00b4d8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>QR Asistencia</div>
+            <div style={{fontSize:15,fontWeight:700,color:'#f0f4f8',marginBottom:4}}>{qrModal.nombre}</div>
+            <div style={{fontSize:11,color:'#506070',marginBottom:16}}>Mostrá este código a tus alumnos para registrar asistencia</div>
+            {qrModal.imagen && (
+              <img src={qrModal.imagen} alt="QR"
+                style={{width:210,height:210,borderRadius:12,border:'4px solid #1e2d3d',margin:'0 auto 16px',display:'block'}} />
+            )}
+            <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,
+              background:(qrModal.countdown??0)>60?'#22c55e18':'#ef444418',
+              border:'1px solid',borderColor:(qrModal.countdown??0)>60?'#22c55e40':'#ef444440',
+              color:(qrModal.countdown??0)>60?'#22c55e':'#ef4444',fontSize:13,fontWeight:700}}>
+              {(qrModal.countdown??0)>0
+                ?`⏱ Expira en ${Math.floor((qrModal.countdown??0)/60)}:${String((qrModal.countdown??0)%60).padStart(2,'0')}`
+                :'❌ QR expirado'}
+            </div>
           </div>
         </div>
       )}
