@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.security import hash_password
-from app.dependencias import get_current_user
+from app.dependencias import require_role, get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -77,7 +77,4 @@ def delete_user(user_id: int, db: Session = Depends(database.get_db), current_us
         raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    db.delete(user)
-    db.commit()
-    return {"detail": "Usuario eliminado"}
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")

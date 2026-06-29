@@ -244,18 +244,29 @@ def profesor_alumnos(
             "asistencia_id": asist.id if asist else None,
             "presente": asist.presente if asist else None,
             "es_becado": alumno.es_becado,
+            "motivo": asist.motivo if asist else None,
         })
 
     return {"fecha": str(hoy), "materia": materia.nombre, "alumnos": alumnos}
 
 @router.put("/profesor/toggle/{asistencia_id}")
-def toggle_asistencia(asistencia_id: int, presente: bool = Query(...), db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+def toggle_asistencia(
+    asistencia_id: int,
+    presente: bool = Query(...),
+    motivo: str = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
+):
     if current_user["role"] != "profesor":
         raise HTTPException(status_code=403)
     asist = db.query(models.asistencia.Asistencia).filter(models.asistencia.Asistencia.id == asistencia_id).first()
     if not asist:
         raise HTTPException(status_code=404, detail="Asistencia no encontrada")
     asist.presente = presente
+    if not presente and motivo:
+        asist.motivo = motivo
+    elif presente:
+        asist.motivo = None
     db.commit()
     return {"detail": "Actualizado", "presente": presente}
 
@@ -265,6 +276,7 @@ def marcar_asistencia(
     alumno_id: int = Query(...),
     fecha: date = Query(...),
     presente: bool = Query(...),
+    motivo: str = Query(None),
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
@@ -276,4 +288,21 @@ def marcar_asistencia(
         models.asistencia.Asistencia.fecha == fecha,
     ).first()
     if existing:
-      
+        existing.presente = presente
+        if not presente and motivo:
+            existing.motivo = motivo
+        elif presente:
+            existing.motivo = None
+        db.commit()
+        return {"detail": "Actualizado", "asistencia_id": existing.id, "presente": presente}
+    nueva = models.asistencia.Asistencia(
+        user_id=alumno_id,
+        materia_id=materia_id,
+        fecha=fecha,
+        presente=presente,
+        motivo=motivo if not presente else None,
+    )
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return {"detail": "Creado", "asistencia_id": nueva.id, "presente": presente}

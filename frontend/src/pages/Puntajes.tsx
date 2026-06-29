@@ -624,10 +624,11 @@ async function exportarPDF(materias: Materia[], semestre: string, promGeneral: n
         while (doc.getTextWidth(txt) > maxW && txt.length > 1) txt = txt.slice(0, -1)
         doc.text(txt, cx + 2, y + 6)
         cx += colW[i]
-      })
-      y += 9
-      if (y > 270) { doc.addPage(); y = 14 }
+      }
     })
+    y += 9
+    if (y > 270) { doc.addPage(); y = 14 }
+  })
 
   // Footer
   const totalPages = doc.getNumberOfPages()
@@ -800,7 +801,301 @@ export default function Puntajes() {
   if (currentUser?.role === 'profesor') {
     return <ProfesorView profesorId={Number(currentUser.user_id)} />
   }
+  if (currentUser?.role === 'admin') {
+    return <AdminView />
+  }
   return <AlumnoAdminView />
+}
+
+/* ─── ADMIN VIEW ─────────────────────────────── */
+type AlumnoOpt = { id: number; nombre: string; username: string }
+
+const cssAdmin = `
+  .adm-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; min-height:100%; }
+  .adm-topbar { display:flex; align-items:center; padding:0 24px; height:56px; border-bottom:1px solid #1e2d3d; background:#0b0f14; position:sticky; top:0; z-index:20; }
+  .adm-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
+  .adm-content { padding:20px 24px 60px; flex:1; }
+
+  .adm-sel-bar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
+  .adm-sel-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:220px; }
+  .adm-sel-group label { font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
+  .adm-sel-wrap { position:relative; }
+  .adm-search { width:100%; background:#131920; border:1px solid #1e2d3d; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; outline:none; padding:9px 14px; transition:border-color .15s; }
+  .adm-search:focus { border-color:#00b4d8; }
+  .adm-search::placeholder { color:#506070; }
+  .adm-drop { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#131920; border:1px solid #1e2d3d; border-radius:10px; z-index:50; max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+  .adm-opt { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; transition:background .12s; }
+  .adm-opt:hover { background:#1a2230; }
+  .adm-av { width:30px; height:30px; border-radius:50%; background:#1e2d3d; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#00b4d8; flex-shrink:0; }
+  .adm-opt-name { font-size:13px; font-weight:600; color:#f0f4f8; }
+  .adm-opt-user { font-size:11px; color:#506070; }
+  .adm-chip { display:inline-flex; align-items:center; gap:8px; background:#00b4d812; border:1px solid #00b4d830; border-radius:9px; padding:7px 12px; font-size:13px; color:#f0f4f8; font-weight:600; }
+  .adm-chip-clear { background:none; border:none; cursor:pointer; color:#506070; padding:0; display:flex; margin-left:4px; }
+  .adm-chip-clear:hover { color:#ef4444; }
+  .adm-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 24px; text-align:center; gap:14px; }
+  .adm-empty svg { width:52px; height:52px; color:#1e2d3d; }
+  .adm-empty h3 { font-size:16px; font-weight:600; color:#506070; margin:0; }
+  .adm-empty p { font-size:13px; color:#3a4a5a; margin:0; }
+  .adm-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
+  .adm-kpi { background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:14px 16px; }
+  .adm-kpi-lbl { font-size:10px; color:#506070; font-weight:600; text-transform:uppercase; letter-spacing:.07em; margin-bottom:6px; }
+  .adm-kpi-val { font-size:22px; font-weight:800; letter-spacing:-.02em; }
+  .adm-tbl-wrap { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
+  .adm-tbl-wrap table { width:100%; border-collapse:collapse; }
+  .adm-tbl-wrap thead th { padding:10px 16px; font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; text-align:center; border-bottom:1px solid #1e2d3d; background:#0d1117; }
+  .adm-tbl-wrap thead th:first-child { text-align:left; }
+  .adm-tbl-wrap tbody td { padding:12px 16px; border-bottom:1px solid #1e2d3d18; text-align:center; vertical-align:middle; }
+  .adm-tbl-wrap tbody tr:last-child td { border-bottom:none; }
+  .adm-tbl-wrap tbody tr:hover { background:#1a2230; }
+  .adm-m-name { font-size:13px; font-weight:600; color:#f0f4f8; text-align:left; }
+  .adm-m-prof { font-size:11px; color:#506070; text-align:left; margin-top:2px; }
+  .adm-nota { font-size:13px; font-weight:700; }
+  .adm-prom { display:inline-flex; align-items:center; justify-content:center; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; border:1px solid; }
+  .adm-cards { display:none; flex-direction:column; gap:10px; }
+  .adm-card { background:#131920; border:1px solid #1e2d3d; border-radius:14px; padding:14px 16px; }
+  .adm-card-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+  .adm-card-notas { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .adm-nota-cell { background:#0d1117; border-radius:8px; padding:8px; text-align:center; }
+  .adm-nota-lbl { font-size:9px; color:#506070; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
+  .adm-nota-num { font-size:15px; font-weight:700; }
+  @media(max-width:768px) {
+    .adm-content { padding:14px; }
+    .adm-kpi-row { grid-template-columns:repeat(2,1fr); }
+    .adm-tbl-wrap { display:none; }
+    .adm-cards { display:flex; }
+  }
+`
+
+function AdminView() {
+  const [alumnos,    setAlumnos]    = useState<AlumnoOpt[]>([])
+  const [search,     setSearch]     = useState('')
+  const [dropOpen,   setDropOpen]   = useState(false)
+  const [selected,   setSelected]   = useState<AlumnoOpt | null>(null)
+  const [materias,   setMaterias]   = useState<Materia[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    api.get<{ id: number; nombre: string; username: string; role: string }[]>('/users/').then(data => {
+      setAlumnos(data.filter(u => u.role === 'alumno'))
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setDropOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  function selectAlumno(a: AlumnoOpt) {
+    setSelected(a); setSearch(''); setDropOpen(false)
+    setLoading(true)
+    Promise.all([
+      api.get<{ id: number; nombre: string; profesor_nombre?: string | null }[]>('/materias/'),
+      api.get<{ materia_id: number; tipo: string; valor: number }[]>(`/puntajes/?user_id=${a.id}`),
+    ]).then(([mats, pts]) => {
+      const rows: Materia[] = mats.map(m => ({
+        nombre: m.nombre,
+        profesor: m.profesor_nombre || '—',
+        parcial1: pts.find(p => p.materia_id === m.id && p.tipo === 'parcial1')?.valor ?? null,
+        parcial2: pts.find(p => p.materia_id === m.id && p.tipo === 'parcial2')?.valor ?? null,
+        tp:       pts.find(p => p.materia_id === m.id && p.tipo === 'practico')?.valor  ?? null,
+        final:    pts.find(p => p.materia_id === m.id && p.tipo === 'final')?.valor     ?? null,
+      })).filter(m => m.parcial1 !== null || m.parcial2 !== null || m.tp !== null || m.final !== null)
+      setMaterias(rows)
+    }).finally(() => setLoading(false))
+  }
+
+  const filtered = alumnos.filter(a =>
+    (a.nombre || a.username).toLowerCase().includes(search.toLowerCase()) ||
+    a.username.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const promGeneral = (() => {
+    const ps = materias.map(calcProm).filter((p): p is number => p !== null)
+    return ps.length ? Math.round((ps.reduce((a, b) => a + b, 0) / ps.length) * 10) / 10 : 0
+  })()
+
+  function notaClr(n: number | null) {
+    if (n === null) return '#3a4a5a'
+    return n >= 7 ? '#22c55e' : n >= 5 ? '#f59e0b' : '#ef4444'
+  }
+  function promStyle(p: number | null) {
+    if (p === null) return { color: '#506070', bg: '#1e2d3d', border: '#1e2d3d' }
+    return p >= 7 ? { color: '#22c55e', bg: '#22c55e12', border: '#22c55e30' }
+         : p >= 5 ? { color: '#f59e0b', bg: '#f59e0b12', border: '#f59e0b30' }
+         :          { color: '#ef4444', bg: '#ef444412', border: '#ef444430' }
+  }
+
+  return (
+    <>
+      <style>{css}</style>
+      <style>{cssAdmin}</style>
+      <div className="adm-root">
+        <header className="adm-topbar">
+          <h1>Puntajes — Vista Administrador</h1>
+        </header>
+        <div className="adm-content">
+
+          {/* Selector alumno */}
+          <div className="adm-sel-bar">
+            <div className="adm-sel-group">
+              <label>Alumno</label>
+              {selected ? (
+                <div className="adm-chip">
+                  <div className="adm-av">{(selected.nombre || selected.username)[0].toUpperCase()}</div>
+                  <span>{selected.nombre || selected.username}</span>
+                  <button className="adm-chip-clear" onClick={() => { setSelected(null); setMaterias([]) }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div className="adm-sel-wrap" ref={dropRef}>
+                  <input
+                    className="adm-search"
+                    placeholder="Buscar alumno..."
+                    value={search}
+                    onChange={e => { setSearch(e.target.value); setDropOpen(true) }}
+                    onFocus={() => setDropOpen(true)}
+                  />
+                  {dropOpen && filtered.length > 0 && (
+                    <div className="adm-drop">
+                      {filtered.map(a => (
+                        <div key={a.id} className="adm-opt" onClick={() => selectAlumno(a)}>
+                          <div className="adm-av">{(a.nombre || a.username)[0].toUpperCase()}</div>
+                          <div>
+                            <div className="adm-opt-name">{a.nombre || a.username}</div>
+                            <div className="adm-opt-user">@{a.username}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Empty state */}
+          {!selected && (
+            <div className="adm-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <h3>Selecciona un alumno</h3>
+              <p>Elige un alumno del selector para ver sus puntajes</p>
+            </div>
+          )}
+
+          {selected && loading && (
+            <div className="adm-empty"><p style={{color:'#506070'}}>Cargando puntajes...</p></div>
+          )}
+
+          {selected && !loading && materias.length === 0 && (
+            <div className="adm-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <h3>Sin puntajes registrados</h3>
+              <p>Este alumno no tiene notas cargadas aún</p>
+            </div>
+          )}
+
+          {selected && !loading && materias.length > 0 && (
+            <>
+              {/* KPIs */}
+              <div className="adm-kpi-row">
+                <div className="adm-kpi">
+                  <div className="adm-kpi-lbl">Materias</div>
+                  <div className="adm-kpi-val" style={{color:'#00b4d8'}}>{materias.length}</div>
+                </div>
+                <div className="adm-kpi">
+                  <div className="adm-kpi-lbl">Promedio</div>
+                  <div className="adm-kpi-val" style={{color: promGeneral >= 7 ? '#22c55e' : promGeneral >= 5 ? '#f59e0b' : '#ef4444'}}>{promGeneral}</div>
+                </div>
+                <div className="adm-kpi">
+                  <div className="adm-kpi-lbl">Mejor nota</div>
+                  <div className="adm-kpi-val" style={{color:'#22c55e'}}>
+                    {(() => { const ns = materias.flatMap(m => [m.parcial1,m.parcial2,m.tp,m.final]).filter((n): n is number => n !== null); return ns.length ? Math.max(...ns) : '—' })()}
+                  </div>
+                </div>
+                <div className="adm-kpi">
+                  <div className="adm-kpi-lbl">Finales pendientes</div>
+                  <div className="adm-kpi-val" style={{color:'#f59e0b'}}>{materias.filter(m => m.final === null).length}</div>
+                </div>
+              </div>
+
+              {/* Tabla desktop */}
+              <div className="adm-tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{textAlign:'left'}}>Materia</th>
+                      <th>Parc. 1</th><th>Parc. 2</th><th>TP</th><th>Final</th><th>Promedio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materias.map(m => {
+                      const p = calcProm(m)
+                      const ps = promStyle(p)
+                      return (
+                        <tr key={m.nombre}>
+                          <td>
+                            <div className="adm-m-name">{m.nombre}</div>
+                            <div className="adm-m-prof">{m.profesor}</div>
+                          </td>
+                          {[m.parcial1, m.parcial2, m.tp, m.final].map((n, i) => (
+                            <td key={i}><span className="adm-nota" style={{color: notaClr(n)}}>{n ?? '—'}</span></td>
+                          ))}
+                          <td>
+                            <span className="adm-prom" style={{color:ps.color, background:ps.bg, borderColor:ps.border}}>{p ?? '—'}</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cards mobile */}
+              <div className="adm-cards">
+                {materias.map(m => {
+                  const p = calcProm(m)
+                  const ps = promStyle(p)
+                  return (
+                    <div key={m.nombre} className="adm-card">
+                      <div className="adm-card-head">
+                        <div>
+                          <div className="adm-m-name">{m.nombre}</div>
+                          <div className="adm-m-prof">{m.profesor}</div>
+                        </div>
+                        <span className="adm-prom" style={{color:ps.color, background:ps.bg, borderColor:ps.border}}>{p ?? '—'}</span>
+                      </div>
+                      <div className="adm-card-notas">
+                        {[m.parcial1, m.parcial2, m.tp, m.final].map((n, i) => (
+                          <div key={i} className="adm-nota-cell">
+                            <div className="adm-nota-lbl">{['P1','P2','TP','FN'][i]}</div>
+                            <div className="adm-nota-num" style={{color: notaClr(n)}}>{n ?? '—'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  )
 }
 
 function AlumnoAdminView() {
@@ -818,14 +1113,14 @@ function AlumnoAdminView() {
     const uid = Number(user.user_id)
     const puntajesUrl = isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/'
     Promise.all([
-      api.get<{ id: number; nombre: string; profesor_id: number }[]>('/materias/').catch(() => []),
+      api.get<{ id: number; nombre: string; profesor_id: number; profesor_nombre?: string | null }[]>('/materias/').catch(() => []),
       api.get<{ id: number; user_id: number; materia_id: number; tipo: string; valor: number }[]>(puntajesUrl).catch(() => []),
     ]).then(([materiasData, puntajesData]) => {
       const grouped: Materia[] = materiasData.map(m => {
         const pts = puntajesData.filter(p => p.materia_id === m.id)
         return {
           nombre: m.nombre,
-          profesor: `Prof. ${m.profesor_id}`,
+          profesor: m.profesor_nombre || (m.profesor_id ? `Prof. #${m.profesor_id}` : '—'),
           parcial1: pts.find(p => p.tipo === 'parcial1')?.valor ?? null,
           parcial2: pts.find(p => p.tipo === 'parcial2')?.valor ?? null,
           tp: pts.find(p => p.tipo === 'practico')?.valor ?? null,
@@ -1016,4 +1311,3 @@ function AlumnoAdminView() {
     </>
   )
 }
-="estado-chip" style={{ color: 

@@ -14,5 +14,6 @@ class PuntajeOut(PuntajeBase):
     id: int
     editado_por: int | None = None
     editado_en: datetime | None = None
+    materia_nombre: str | None = None
 
     model_config = {"from_attributes": True}

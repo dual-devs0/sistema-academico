@@ -379,10 +379,227 @@ function EditorProfesor({
   )
 }
 
+/* ─── PROFESOR PROGRAMA EDITOR ─────────────────── */
+const cssProg = `
+  .pp-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; min-height:100%; }
+  .pp-topbar { display:flex; align-items:center; justify-content:space-between; padding:0 24px; height:56px; border-bottom:1px solid #1e2d3d; background:#0b0f14; position:sticky; top:0; z-index:20; }
+  .pp-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
+  .pp-content { padding:20px 24px 60px; flex:1; }
+
+  .pp-mat-row { display:flex; gap:12px; align-items:flex-end; margin-bottom:20px; flex-wrap:wrap; }
+  .pp-mat-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:220px; }
+  .pp-mat-group label { font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
+  .pp-sel { background:#131920; border:1px solid #1e2d3d; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; padding:9px 12px; outline:none; appearance:none; cursor:pointer; transition:border-color .15s; }
+  .pp-sel:focus { border-color:#00b4d8; }
+  .pp-sel option { background:#131920; }
+
+  .pp-units { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+  .pp-unit { background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:16px; position:relative; }
+  .pp-unit-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .pp-unit-num { width:28px; height:28px; border-radius:8px; background:#00b4d815; border:1px solid #00b4d830; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#00b4d8; flex-shrink:0; }
+  .pp-unit-titulo { flex:1; background:#0d1117; border:1px solid #243447; border-radius:8px; color:#f0f4f8; font-size:13px; font-family:inherit; padding:7px 10px; outline:none; transition:border-color .15s; }
+  .pp-unit-titulo:focus { border-color:#00b4d8; }
+  .pp-unit-titulo::placeholder { color:#3a4a5a; }
+  .pp-unit-desc { width:100%; background:#0d1117; border:1px solid #243447; border-radius:8px; color:#f0f4f8; font-size:12px; font-family:inherit; padding:7px 10px; outline:none; resize:vertical; min-height:60px; transition:border-color .15s; }
+  .pp-unit-desc:focus { border-color:#00b4d8; }
+  .pp-unit-desc::placeholder { color:#3a4a5a; }
+  .pp-del-btn { background:none; border:none; cursor:pointer; color:#3a4a5a; padding:4px; border-radius:6px; display:flex; transition:color .12s,background .12s; }
+  .pp-del-btn:hover { color:#ef4444; background:#ef444418; }
+  .pp-del-btn svg { width:14px; height:14px; }
+
+  .pp-add-btn { display:flex; align-items:center; gap:8px; padding:10px 16px; background:#131920; border:1px dashed #1e2d3d; border-radius:10px; color:#506070; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .15s; width:100%; justify-content:center; }
+  .pp-add-btn:hover { border-color:#00b4d8; color:#00b4d8; background:#00b4d808; }
+  .pp-add-btn svg { width:14px; height:14px; }
+
+  .pp-save-bar { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid #1e2d3d; margin-top:16px; gap:10px; flex-wrap:wrap; }
+  .pp-save-info { font-size:12px; color:#506070; }
+  .pp-save-btn { display:inline-flex; align-items:center; gap:7px; padding:10px 20px; background:#00b4d8; border:none; border-radius:10px; color:#000; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; }
+  .pp-save-btn:hover { opacity:.85; }
+  .pp-save-btn:disabled { opacity:.4; cursor:not-allowed; }
+  .pp-save-btn svg { width:14px; height:14px; }
+
+  .pp-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 24px; text-align:center; gap:14px; }
+  .pp-empty svg { width:52px; height:52px; color:#1e2d3d; }
+  .pp-empty h3 { font-size:16px; font-weight:600; color:#506070; margin:0; }
+  .pp-empty p { font-size:13px; color:#3a4a5a; margin:0; }
+  .pp-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#22c55e; color:#000; font-size:13px; font-weight:700; padding:10px 22px; border-radius:999px; z-index:300; white-space:nowrap; animation:tin .25s ease; }
+  @keyframes tin { from{opacity:0;transform:translateX(-50%) translateY(10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+`
+
+type ProgramaUnit = { titulo: string; descripcion: string; semana: number }
+
+function ProfesorProgramaView() {
+  const token = sessionStorage.getItem('token')
+  const user  = token ? decodeToken(token) : null
+  const uid   = Number(user?.user_id)
+
+  const [materias,   setMaterias]   = useState<{ id: number; nombre: string }[]>([])
+  const [selMatId,   setSelMatId]   = useState<number | null>(null)
+  const [units,      setUnits]      = useState<ProgramaUnit[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [saving,     setSaving]     = useState(false)
+  const [toast,      setToast]      = useState('')
+
+  function showToast(msg: string, ok = true) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2400)
+  }
+
+  useEffect(() => {
+    if (!uid) return
+    api.get<{ id: number; nombre: string }[]>(`/materias/?profesor_id=${uid}`)
+      .then(d => {
+        setMaterias(d || [])
+        if (d && d.length > 0) loadMateria(d[0].id)
+      }).catch(() => {})
+  }, [uid])
+
+  function loadMateria(id: number) {
+    setSelMatId(id); setLoading(true)
+    api.get<{ id: number; semana: number; titulo: string; descripcion: string | null }[]>(`/programas/${id}`)
+      .then(items => {
+        const sorted = (items || []).sort((a, b) => a.semana - b.semana)
+        if (sorted.length > 0) {
+          setUnits(sorted.map((x, i) => ({ semana: i + 1, titulo: x.titulo, descripcion: x.descripcion || '' })))
+        } else {
+          setUnits([{ semana: 1, titulo: '', descripcion: '' }])
+        }
+        setLoading(false)
+      }).catch(() => { setUnits([{ semana: 1, titulo: '', descripcion: '' }]); setLoading(false) })
+  }
+
+  function addUnit() {
+    setUnits(prev => [...prev, { semana: prev.length + 1, titulo: '', descripcion: '' }])
+  }
+
+  function removeUnit(i: number) {
+    setUnits(prev => prev.filter((_, idx) => idx !== i).map((u, idx) => ({ ...u, semana: idx + 1 })))
+  }
+
+  function updateUnit(i: number, field: 'titulo' | 'descripcion', val: string) {
+    setUnits(prev => prev.map((u, idx) => idx === i ? { ...u, [field]: val } : u))
+  }
+
+  async function guardar() {
+    if (!selMatId) return
+    const payload = units.filter(u => u.titulo.trim()).map((u, i) => ({
+      materia_id: selMatId,
+      semana: i + 1,
+      titulo: u.titulo.trim(),
+      descripcion: u.descripcion.trim() || null,
+    }))
+    if (!payload.length) { showToast('Agregá al menos una unidad'); return }
+    setSaving(true)
+    try {
+      await api.put(`/programas/materia/${selMatId}/bulk`, payload)
+      showToast('Programa guardado correctamente')
+    } catch {
+      showToast('Error al guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selMatNombre = materias.find(m => m.id === selMatId)?.nombre || ''
+
+  return (
+    <>
+      <style>{cssProg}</style>
+      {toast && <div className="pp-toast">{toast}</div>}
+      <div className="pp-root">
+        <header className="pp-topbar">
+          <h1>Programa de clases</h1>
+          <div style={{ fontSize:11, background:'#3b82f615', color:'#3b82f6', border:'1px solid #3b82f630', borderRadius:20, padding:'4px 10px', fontWeight:600 }}>
+            Modo Profesor
+          </div>
+        </header>
+        <div className="pp-content">
+
+          {/* Materia selector */}
+          <div className="pp-mat-row">
+            <div className="pp-mat-group">
+              <label>Materia</label>
+              <select className="pp-sel" value={selMatId ?? ''} onChange={e => loadMateria(Number(e.target.value))}>
+                {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {materias.length === 0 && (
+            <div className="pp-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+              </svg>
+              <h3>Sin materias asignadas</h3>
+              <p>El administrador debe asignarte materias primero</p>
+            </div>
+          )}
+
+          {selMatId && !loading && (
+            <>
+              <div className="pp-units">
+                {units.map((u, i) => (
+                  <div key={i} className="pp-unit">
+                    <div className="pp-unit-head">
+                      <div className="pp-unit-num">{i + 1}</div>
+                      <input
+                        className="pp-unit-titulo"
+                        placeholder={`Unidad ${i + 1} — Título`}
+                        value={u.titulo}
+                        onChange={e => updateUnit(i, 'titulo', e.target.value)}
+                      />
+                      <button className="pp-del-btn" onClick={() => removeUnit(i)} title="Eliminar unidad">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <textarea
+                      className="pp-unit-desc"
+                      placeholder="Descripción del contenido (opcional)"
+                      value={u.descripcion}
+                      onChange={e => updateUnit(i, 'descripcion', e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button className="pp-add-btn" onClick={addUnit}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Agregar unidad
+              </button>
+
+              <div className="pp-save-bar">
+                <span className="pp-save-info">{units.filter(u => u.titulo.trim()).length} unidades · {selMatNombre}</span>
+                <button className="pp-save-btn" onClick={guardar} disabled={saving}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                  {saving ? 'Guardando…' : 'Guardar programa'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {selMatId && loading && (
+            <div className="pp-empty"><p style={{color:'#506070'}}>Cargando programa…</p></div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function Programa() {
   const token = sessionStorage.getItem('token')
   const user = token ? decodeToken(token) : null
   const ROL = user?.role || 'alumno'
+
+  if (ROL === 'profesor') return <ProfesorProgramaView />
 
   const [data,       setData]       = useState<MateriaTemario[]>([])
   const [activa,     setActiva]     = useState('')
@@ -637,4 +854,48 @@ export default function Programa() {
                             : <span>{c.semana}</span>
                           }
                         </div>
-                        <div className="clase-me
+                        <div className="clase-meta">
+                          <div className="clase-semana">Semana {c.semana} · {c.fecha}</div>
+                          <div className="clase-titulo">{c.titulo}</div>
+                        </div>
+                        <div className="clase-right">
+                          {ev && (
+                            <span className="eval-chip" style={{color:ev.color,background:ev.bg,borderColor:ev.border}}>
+                              ⚠ {ev.label}
+                            </span>
+                          )}
+                          <span className={`clase-status ${c.completada?'status-done':'status-pending'}`}>
+                            {c.completada?'✓ Completada':'● Pendiente'}
+                          </span>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                            className={`clase-chev${isOpen?' open':''}`}>
+                            <polyline points="6 9 12 15 18 9"/>
+                          </svg>
+                        </div>
+                      </button>
+
+                      {/* Expandido según rol */}
+                      {isOpen && (
+                        ROL==='alumno'
+                          ? <DetalleAlumno c={c}/>
+                          : <EditorProfesor
+                              c={c}
+                              onChange={(campo,val)=>updateClase(c.semana,campo,val)}
+                              onToggle={()=>toggleCompletada(c.semana)}
+                              onGuardar={()=>guardarClase()}
+                            />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {toast && <div className="toast">✓ {toast}</div>}
+      </div>
+    </>
+  )
+}

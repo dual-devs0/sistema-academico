@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { decodeToken } from '../lib/api'
+import ucaLogo from '../assets/uc_logo_sist_academico.png'
 
 const menuItems: Record<string, { label: string; path: string; icon: string }[]> = {
   admin: [
@@ -54,10 +55,18 @@ const css = `
     transition: transform 0.25s ease;
   }
   .sidebar-logo {
-    padding: 20px 18px; display: flex; align-items: center; gap: 10px;
-    border-bottom: 1px solid #1e2d3d; min-height: 56px;
+    padding: 18px 16px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    border-bottom: 1px solid #1e2d3d;
   }
-  .sidebar-logo img { width: 120px; height: auto; }
+  .sidebar-logo-img {
+    width: 176px; height: auto; object-fit: contain;
+    display: block; max-width: 100%;
+  }
+  .sidebar-logo-label {
+    font-size: 11px; font-weight: 700; color: #506070;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
   .sidebar-user {
     padding: 14px 18px; border-bottom: 1px solid #1e2d3d;
     display: flex; align-items: center; gap: 10px;
@@ -147,8 +156,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="layout-root">
         <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sidebar-logo">
-            <img src="/icono web.png" alt="UCA" style={{ width: 28, height: 28, borderRadius: 6 }} />
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#f0f4f8' }}>Sistema UCA</span>
+            <img src={ucaLogo} alt="Universidad Católica" className="sidebar-logo-img" />
+            <span className="sidebar-logo-label">Sistema UCA</span>
           </div>
 
           <div className="sidebar-user">
@@ -201,4 +210,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <line x1="4" y1="18" x2="20" y2="18" />
           </svg>
         </button>
-      <
+      </div>
+    </>
+  )
+}

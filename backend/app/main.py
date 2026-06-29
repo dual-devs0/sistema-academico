@@ -1,5 +1,6 @@
 # Run: alembic upgrade head before starting the server
 import os
+import sqlite3
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
@@ -9,8 +10,8 @@ from app.routers import (
 )
 
 app = FastAPI(
-    title="Sistema Académico",
-    description="API para gestión académica de la Universidad Católica",
+    title="Sistema Academico",
+    description="API para gestion academica de la Universidad Catolica",
     version="0.1.0",
 )
 
@@ -41,10 +42,35 @@ app.include_router(boleta.router)
 app.include_router(test_router.router)
 
 
+def _apply_db_migrations():
+    """Safe incremental migrations for SQLite (ADD COLUMN only)."""
+    db_url = os.getenv("DATABASE_URL", "sqlite:///./sistema_academico.db")
+    if "sqlite" not in db_url:
+        return
+    db_path = db_url.replace("sqlite:///", "")
+    if not os.path.exists(db_path):
+        return
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("PRAGMA table_info(asistencias)")
+        cols = {row[1] for row in c.fetchall()}
+        if "motivo" not in cols:
+            conn.execute("ALTER TABLE asistencias ADD COLUMN motivo VARCHAR")
+            conn.commit()
+            print("[migration] Added column: asistencias.motivo")
+        conn.close()
+    except Exception as e:
+        print(f"[migration] Warning: {e}")
+
+
+_apply_db_migrations()
+
+
 @app.get(
     "/",
     tags=["default"],
     responses={200: {"description": "API funcionando correctamente"}},
 )
 def root():
-    return {"message": "API Sistema Académico funcionando"}
+    return {"message": "API Sistema Academico funcionando"}

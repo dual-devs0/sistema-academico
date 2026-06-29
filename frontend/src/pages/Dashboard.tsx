@@ -327,15 +327,6 @@ export default function Dashboard() {
         ) || []
         const eventosRes: any[] = await api.get('/eventos/') || []
 
-        // Build professor name map from users (admin/profesor can call /users/)
-        let profMap: Record<number, string> = {}
-        if (userData.role === 'admin') {
-          const usersRes: any[] = await api.get('/users/').catch(() => [])
-          usersRes.filter((u: any) => u.role === 'profesor').forEach((u: any) => {
-            profMap[u.id] = u.nombre || u.username
-          })
-        }
-
         if (materiasRes.length > 0) {
           const rows: MateriaRow[] = materiasRes.map((m: any) => {
             const pts = puntajesRes.filter((p: any) => p.materia_id === m.id)
@@ -345,7 +336,7 @@ export default function Dashboard() {
             const vals = [p1, p2, tpVal].filter((v): v is number => v !== null)
             const prom = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
             const cls = prom >= 8 ? 'high' : prom >= 6.5 ? 'mid' : 'low'
-            const profName = m.profesor_id && profMap[m.profesor_id] ? profMap[m.profesor_id] : `Prof. #${m.profesor_id}`
+            const profName = m.profesor_nombre || (m.profesor_id ? `Prof. #${m.profesor_id}` : '—')
             return { nombre: m.nombre, profesor: profName, parcial1: p1, parcial2: p2, tp: tpVal, promedio: Math.round(prom * 10) / 10, promClass: cls }
           })
           if (rows.length > 0) setMaterias(rows)
@@ -624,4 +615,56 @@ export default function Dashboard() {
                 {eventos.map((ev, i) => (
                   <div key={i} className="event-item">
                     <div className="event-dot" style={{ background:dotColor[ev.tipo] }} />
-   
+                    <div style={{ flex:1 }}>
+                      <div className="event-title">{ev.titulo}</div>
+                      <div className="event-sub">{ev.sub}</div>
+                    </div>
+                    <div className="event-date">{ev.fecha}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Asistencia */}
+              <div className="card">
+                <div className="card-header">
+                  <div><h3>Asistencia</h3><p>Por materia</p></div>
+                  <button className="card-action" onClick={() => navigate('/asistencia')}>Ver →</button>
+                </div>
+                {asistencias.map(a => (
+                  <div key={a.nombre} className="att-item">
+                    <div className="att-header">
+                      <span className="att-name">{a.nombre}</span>
+                      <span className={`att-pct ${a.clase}`}>{a.pct}%</span>
+                    </div>
+                    <div className="att-bar">
+                      <div className={`att-fill ${a.clase}`} style={{ width:`${a.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* TPs pendientes */}
+              <div className="card">
+                <div className="card-header">
+                  <div><h3>TPs pendientes</h3></div>
+                  <button className="card-action" onClick={() => navigate('/puntajes')}>Ver 2 →</button>
+                </div>
+                {tps.map((tp, i) => (
+                  <div key={i} className="tp-item">
+                    <div className="tp-dot" />
+                    <div style={{ flex:1 }}>
+                      <div className="tp-name">{tp.nombre}</div>
+                      <div className="tp-sub">{tp.materia}</div>
+                    </div>
+                    <div className="tp-due">{tp.fecha}</div>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}

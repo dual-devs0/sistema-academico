@@ -15,5 +15,7 @@ class MateriaOut(MateriaBase):
     carrera_id: int | None = None
     anio: int | None = None
     semestre: int | None = None
+    profesor_nombre: str | None = None
+    carrera_nombre: str | None = None
 
     model_config = {"from_attributes": True}

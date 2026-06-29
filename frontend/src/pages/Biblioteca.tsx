@@ -846,4 +846,17 @@ export default function Biblioteca() {
                           <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
                         Descargar PDF
-        
+                      </button>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
+        {toast && <div className="toast">✓ {toast}</div>}
+      </div>
+    </>
+  )
+}

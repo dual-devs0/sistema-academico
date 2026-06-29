@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { api, decodeToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 import QRModal from '../components/QRModal'
@@ -11,6 +10,7 @@ interface Materia { id: number; nombre: string; codigo: string }
 interface AlumnoAsist {
   id: number; nombre: string; documento: string
   asistencia_id: number | null; presente: boolean | null; es_becado: boolean
+  motivo?: string | null
 }
 
 const css = `
@@ -152,7 +152,6 @@ const css = `
 `
 
 export default function Asistencia() {
-  const navigate = useNavigate()
   const token = sessionStorage.getItem('token')
   const user = token ? decodeToken(token) : null
   const rol = user?.role || ''
@@ -271,7 +270,7 @@ function AlumnoView() {
 
 /* ─── PROFESOR: carreras → materias → alumnos ─── */
 function ProfesorView() {
-  const [view, setView]    = useState<View>('carreras')
+  const [view, setView]         = useState<View>('carreras')
   const [carreras, setCarr]     = useState<Carrera[]>([])
   const [materias, setMat]      = useState<Materia[]>([])
   const [alumnos, setAlumn]     = useState<AlumnoAsist[]>([])
@@ -284,6 +283,15 @@ function ProfesorView() {
     const d = new Date()
     return d.toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   })
+  // QR session timer (visible in toolbar without keeping modal open)
+  const [qrSeg, setQrSeg]       = useState(0)
+  const [qrActive, setQrActive] = useState(false)
+  const qrTimerRef              = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Motivo modal for absent
+  const [motivoModal, setMotivoModal] = useState<AlumnoAsist | null>(null)
+  const [motivoText, setMotivoText]   = useState('')
+  // Polling ref
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -299,12 +307,51 @@ function ProfesorView() {
       .catch(() => setLoading(false))
   }
 
+  const refreshAlumnos = useCallback((matId: number, f: string) => {
+    api.get<{ fecha: string; materia: string; alumnos: AlumnoAsist[] }>(`/asistencias/profesor/alumnos?materia_id=${matId}&fecha=${f}`)
+      .then(d => setAlumn(d.alumnos || []))
+      .catch(() => {})
+  }, [])
+
   function selectMateria(m: Materia) {
     setSelMat(m); setLoading(true)
+    // stop old poll
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
     api.get<{ fecha: string; materia: string; alumnos: AlumnoAsist[] }>(`/asistencias/profesor/alumnos?materia_id=${m.id}&fecha=${fecha}`)
-      .then(d => { setAlumn(d.alumnos || []); setLoading(false); setView('alumnos') })
+      .then(d => {
+        setAlumn(d.alumnos || [])
+        setLoading(false)
+        setView('alumnos')
+        // start polling every 5s
+        pollRef.current = setInterval(() => refreshAlumnos(m.id, fecha), 5000)
+      })
       .catch(() => setLoading(false))
   }
+
+  // cleanup poll on unmount or view change
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [])
+  useEffect(() => {
+    if (view !== 'alumnos' && pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+  }, [view])
+
+  // QR timer countdown
+  function startQrTimer(expiraEn: number) {
+    setQrSeg(expiraEn); setQrActive(true)
+    if (qrTimerRef.current) clearInterval(qrTimerRef.current)
+    qrTimerRef.current = setInterval(() => {
+      setQrSeg(s => {
+        if (s <= 1) {
+          clearInterval(qrTimerRef.current!)
+          setQrActive(false)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+  }
+  useEffect(() => { return () => { if (qrTimerRef.current) clearInterval(qrTimerRef.current) } }, [])
 
   function cambiarFecha(nf: string) {
     setFecha(nf)
@@ -315,22 +362,41 @@ function ProfesorView() {
       api.get<{ fecha: string; materia: string; alumnos: AlumnoAsist[] }>(`/asistencias/profesor/alumnos?materia_id=${selMat.id}&fecha=${nf}`)
         .then(d => { setAlumn(d.alumnos || []); setLoading(false) })
         .catch(() => setLoading(false))
+      // restart poll with new date
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      pollRef.current = setInterval(() => refreshAlumnos(selMat.id, nf), 5000)
     }
   }
 
-  async function toggleAlumno(alumno: AlumnoAsist) {
+  async function marcarPresente(alumno: AlumnoAsist) {
     if (alumno.asistencia_id) {
-      const nuevoEstado = !alumno.presente
-      await api.put(`/asistencias/profesor/toggle/${alumno.asistencia_id}?presente=${nuevoEstado}`)
-      setAlumn(prev => prev.map(a => a.id === alumno.id ? { ...a, presente: nuevoEstado } : a))
+      await api.put(`/asistencias/profesor/toggle/${alumno.asistencia_id}?presente=true`, {})
+      setAlumn(prev => prev.map(a => a.id === alumno.id ? { ...a, presente: true, motivo: null } : a))
     } else {
-      await api.post(`/asistencias/profesor/marcar?materia_id=${selMat!.id}&alumno_id=${alumno.id}&fecha=${fecha}&presente=true`)
-      selectMateria(selMat!)
+      await api.post(`/asistencias/profesor/marcar?materia_id=${selMat!.id}&alumno_id=${alumno.id}&fecha=${fecha}&presente=true`, {})
+      refreshAlumnos(selMat!.id, fecha)
     }
+  }
+
+  async function confirmarAusente() {
+    if (!motivoModal) return
+    const a = motivoModal
+    const q = motivoText.trim() ? `&motivo=${encodeURIComponent(motivoText.trim())}` : ''
+    if (a.asistencia_id) {
+      await api.put(`/asistencias/profesor/toggle/${a.asistencia_id}?presente=false${q}`, {})
+      setAlumn(prev => prev.map(x => x.id === a.id ? { ...x, presente: false, motivo: motivoText.trim() || null } : x))
+    } else {
+      await api.post(`/asistencias/profesor/marcar?materia_id=${selMat!.id}&alumno_id=${a.id}&fecha=${fecha}&presente=false${q}`, {})
+      refreshAlumnos(selMat!.id, fecha)
+    }
+    setMotivoModal(null); setMotivoText('')
   }
 
   const presentes = alumnos.filter(a => a.presente === true).length
   const total     = alumnos.length
+  const qrMin = Math.floor(qrSeg / 60)
+  const qrS   = qrSeg % 60
+  const qrClr = qrSeg > 300 ? '#00b4d8' : qrSeg > 60 ? '#f59e0b' : '#ef4444'
 
   return (
     <>
@@ -363,4 +429,286 @@ function ProfesorView() {
           : carreras.length === 0 ? <div className="as-empty"><div className="as-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No tenés carreras asignadas</div>
           : <div className="grid-2">{carreras.map(c => (
               <div key={c.id} className="sel-card" onClick={() => selectCarrera(c)}>
- 
+                <div className="sel-card-nom">{c.nombre}</div>
+                <div className="sel-card-sub">Carrera</div>
+              </div>
+            ))}</div>
+        )}
+
+        {view === 'materias' && (
+          loading ? <div className="as-empty">Cargando materias…</div>
+          : materias.length === 0 ? <div className="as-empty"><div className="as-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No hay materias en esta carrera</div>
+          : <div className="grid-2">{materias.map(m => (
+              <div key={m.id} className="sel-card" onClick={() => selectMateria(m)}>
+                <div className="sel-card-nom">{m.nombre}</div>
+                <div className="sel-card-sub">{m.codigo}</div>
+              </div>
+            ))}</div>
+        )}
+
+        {view === 'alumnos' && (
+          <>
+            <div className="as-toolbar">
+              <div className="as-toolbar-left">
+                <input type="date" value={fecha} onChange={e => cambiarFecha(e.target.value)}
+                  style={{ height: 34, padding: '0 12px', borderRadius: 8, border: '1px solid #1e2d3d', background: '#0e131a', color: '#f0f4f8', fontSize: 13, fontFamily: 'inherit' }} />
+                <span style={{ fontSize: 12, color: '#506070' }}>{fechaLabel}</span>
+              </div>
+              <div className="as-toolbar-right">
+                <span style={{ fontSize: 12, color: '#8fa3b8' }}>{presentes}/{total} presentes</span>
+                {/* QR timer badge — visible without modal */}
+                {qrActive && (
+                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'#131920', border:`1px solid ${qrClr}30`, borderRadius:8, padding:'5px 10px' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={qrClr} strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span style={{ fontFamily:'monospace', fontSize:13, fontWeight:700, color:qrClr }}>
+                      {String(qrMin).padStart(2,'0')}:{String(qrS).padStart(2,'0')}
+                    </span>
+                    <button className="as-btn as-btn-primary" style={{ padding:'4px 10px', fontSize:11 }} onClick={() => setQrMatId(selMat!.id)}>
+                      Ver QR
+                    </button>
+                  </div>
+                )}
+                <button className="as-btn as-btn-primary" onClick={() => setQrMatId(selMat!.id)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/>
+                  </svg>
+                  {qrActive ? 'Nuevo QR' : 'Generar QR'}
+                </button>
+              </div>
+            </div>
+
+            {loading ? <div className="as-empty">Cargando alumnos…</div>
+            : alumnos.length === 0 ? <div className="as-empty"><div className="as-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>No hay alumnos inscriptos en esta materia</div>
+            : <div className="as-table-wrap"><table className="as-table">
+              <thead><tr>
+                <th>N°</th>
+                <th>Alumno</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr></thead>
+              <tbody>
+                {alumnos.map((a, i) => (
+                  <tr key={a.id}>
+                    <td style={{ color: '#506070', width:40 }}>{i + 1}</td>
+                    <td>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        {a.nombre}
+                        {a.es_becado && <span className="as-badge as-badge-becado">Becado</span>}
+                      </div>
+                      {a.presente === false && a.motivo && (
+                        <div style={{ fontSize:11, color:'#f59e0b', marginTop:3 }}>
+                          Motivo: {a.motivo}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {a.presente === true  && <span className="as-badge as-badge-presente">Presente</span>}
+                      {a.presente === false && <span className="as-badge as-badge-ausente">Ausente</span>}
+                      {a.presente === null  && <span className="as-badge as-badge-ausente" style={{ opacity:0.4 }}>Sin registro</span>}
+                    </td>
+                    <td>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button
+                          onClick={() => marcarPresente(a)}
+                          disabled={a.presente === true}
+                          style={{ padding:'5px 10px', borderRadius:7, border:'1px solid #22c55e40', background: a.presente===true ? '#22c55e18':'transparent', color:'#22c55e', fontSize:11, fontWeight:700, fontFamily:'inherit', cursor: a.presente===true ? 'default':'pointer', opacity: a.presente===true ? 0.5 : 1, transition:'all .15s' }}
+                        >✓ Presente</button>
+                        <button
+                          onClick={() => { setMotivoModal(a); setMotivoText('') }}
+                          disabled={a.presente === false}
+                          style={{ padding:'5px 10px', borderRadius:7, border:'1px solid #ef444440', background: a.presente===false ? '#ef444418':'transparent', color:'#ef4444', fontSize:11, fontWeight:700, fontFamily:'inherit', cursor: a.presente===false ? 'default':'pointer', opacity: a.presente===false ? 0.5 : 1, transition:'all .15s' }}
+                        >✗ Ausente</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>}
+          </>
+        )}
+      </div>
+
+      {qrMatId !== null && (
+        <QRModal
+          materiaId={qrMatId}
+          materiaNombre={selMat?.nombre || ''}
+          onClose={() => setQrMatId(null)}
+          onQrActive={startQrTimer}
+        />
+      )}
+
+      {/* Motivo ausencia modal */}
+      {motivoModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', backdropFilter:'blur(4px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ background:'#131920', border:'1px solid #1e2d3d', borderRadius:16, width:'100%', maxWidth:360, padding:24, boxShadow:'0 24px 60px rgba(0,0,0,.6)' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#f0f4f8', marginBottom:6 }}>Marcar ausente</div>
+            <div style={{ fontSize:13, color:'#8fa3b8', marginBottom:16 }}>{motivoModal.nombre}</div>
+            <label style={{ display:'block', fontSize:10, fontWeight:600, color:'#506070', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Motivo de ausencia (opcional)</label>
+            <input
+              autoFocus
+              value={motivoText}
+              onChange={e => setMotivoText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmarAusente()}
+              placeholder="Ej: Enfermedad, falta justificada..."
+              style={{ width:'100%', background:'#0d1117', border:'1px solid #243447', borderRadius:8, color:'#f0f4f8', fontSize:13, fontFamily:'inherit', padding:'9px 12px', outline:'none', marginBottom:16 }}
+            />
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => { setMotivoModal(null); setMotivoText('') }}
+                style={{ flex:1, padding:10, background:'#1a2230', border:'1px solid #243447', borderRadius:9, color:'#8fa3b8', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={confirmarAusente}
+                style={{ flex:1, padding:10, background:'#ef4444', border:'none', borderRadius:9, color:'#fff', fontSize:13, fontWeight:700, fontFamily:'inherit', cursor:'pointer' }}>
+                Confirmar ausente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/* ─── ADMIN: resumen global por materia ─── */
+function AdminView() {
+  interface ResumenRow {
+    materia_id: number
+    materia: string
+    total: number
+    presentes: number
+    ausentes: number
+    pct: number
+  }
+
+  const [rows, setRows]       = useState<ResumenRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch]   = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      api.get<{ id: number; nombre: string }[]>('/materias/'),
+      api.get<{ materia_id: number; presente: boolean | null }[]>('/asistencias/'),
+    ]).then(([mats, asists]) => {
+      const byMat: Record<number, { total: number; presentes: number }> = {}
+      asists.forEach(a => {
+        if (!byMat[a.materia_id]) byMat[a.materia_id] = { total: 0, presentes: 0 }
+        byMat[a.materia_id].total++
+        if (a.presente === true) byMat[a.materia_id].presentes++
+      })
+      const result: ResumenRow[] = mats.map(m => {
+        const c = byMat[m.id] ?? { total: 0, presentes: 0 }
+        const pct = c.total > 0 ? Math.round((c.presentes / c.total) * 100) : 0
+        return {
+          materia_id: m.id,
+          materia: m.nombre,
+          total: c.total,
+          presentes: c.presentes,
+          ausentes: c.total - c.presentes,
+          pct,
+        }
+      }).sort((a, b) => b.total - a.total)
+      setRows(result)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const filtradas = search.trim()
+    ? rows.filter(r => r.materia.toLowerCase().includes(search.toLowerCase()))
+    : rows
+
+  const totalRegistros = rows.reduce((s, r) => s + r.total, 0)
+  const totalPresentes = rows.reduce((s, r) => s + r.presentes, 0)
+  const pctGlobal = totalRegistros > 0 ? Math.round((totalPresentes / totalRegistros) * 100) : 0
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="as-root">
+        <div className="as-header">
+          <div className="as-title">Asistencia — Resumen institucional</div>
+          <div className="as-sub">Estadísticas de asistencia por materia en todo el sistema</div>
+        </div>
+
+        {/* KPI cards */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12, marginBottom:24 }}>
+          {[
+            { lbl:'Total registros', val:totalRegistros, color:'#00b4d8', bg:'#00b4d818' },
+            { lbl:'Presencias',      val:totalPresentes, color:'#22c55e', bg:'#22c55e18' },
+            { lbl:'Ausencias',       val:totalRegistros-totalPresentes, color:'#ef4444', bg:'#ef444418' },
+            { lbl:'% Global',        val:`${pctGlobal}%`, color: pctGlobal>=75?'#22c55e':pctGlobal>=50?'#f59e0b':'#ef4444', bg:'#1a2230' },
+          ].map(k => (
+            <div key={k.lbl} style={{ background:'#0e131a', border:'1px solid #1e2d3d', borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'#506070', marginBottom:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{k.lbl}</div>
+              <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Buscador */}
+        <div style={{ position:'relative', marginBottom:14, maxWidth:360 }}>
+          <svg style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', width:14, height:14, color:'#506070', pointerEvents:'none' }}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar materia…"
+            style={{ width:'100%', background:'#0e131a', border:'1px solid #1e2d3d', borderRadius:9, color:'#f0f4f8', fontSize:13, fontFamily:'inherit', outline:'none', padding:'8px 14px 8px 34px' }}
+          />
+        </div>
+
+        {loading ? (
+          <div className="as-empty">Cargando datos de asistencia…</div>
+        ) : filtradas.length === 0 ? (
+          <div className="as-empty">
+            <div className="as-empty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            No se encontraron materias
+          </div>
+        ) : (
+          <div className="as-table-wrap">
+            <table className="as-table">
+              <thead>
+                <tr>
+                  <th>Materia</th>
+                  <th style={{ textAlign:'center' }}>Registros</th>
+                  <th style={{ textAlign:'center' }}>Presentes</th>
+                  <th style={{ textAlign:'center' }}>Ausentes</th>
+                  <th style={{ textAlign:'center' }}>Asistencia</th>
+                  <th>Nivel</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtradas.map(r => {
+                  const pctColor = r.pct >= 75 ? '#22c55e' : r.pct >= 50 ? '#f59e0b' : '#ef4444'
+                  return (
+                    <tr key={r.materia_id}>
+                      <td style={{ fontWeight:600, color:'#f0f4f8' }}>{r.materia}</td>
+                      <td style={{ textAlign:'center', color:'#8fa3b8' }}>{r.total}</td>
+                      <td style={{ textAlign:'center', color:'#22c55e', fontWeight:600 }}>{r.presentes}</td>
+                      <td style={{ textAlign:'center', color:'#ef4444', fontWeight:600 }}>{r.ausentes}</td>
+                      <td style={{ textAlign:'center', fontWeight:800, color:pctColor }}>{r.pct}%</td>
+                      <td>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <div style={{ flex:1, height:6, background:'#1e2d3d', borderRadius:3, overflow:'hidden', minWidth:60 }}>
+                            <div style={{ height:'100%', width:`${r.pct}%`, background:pctColor, borderRadius:3, transition:'width .3s' }} />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}

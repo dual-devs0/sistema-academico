@@ -69,4 +69,11 @@ function App() {
         <Route path="/reportes"   element={<Layout><RutaProtegida path="/reportes"><Reportes /></RutaProtegida></Layout>} />
         <Route path="/miscursos"    element={<Layout><RutaProtegida path="/miscursos"><MisCursos /></RutaProtegida></Layout>} />
         <Route path="/estadisticas" element={<Layout><RutaProtegida path="/estadisticas"><Estadisticas /></RutaProtegida></Layout>} />
-        <Route path="/inscripciones" element={<Layout
+        <Route path="/inscripciones" element={<Layout><RutaProtegida path="/inscripciones"><Inscripciones /></RutaProtegida></Layout>} />
+        <Route path="/asistencia/scan" element={<AsistenciaScan />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
+
+export default App

@@ -424,4 +424,231 @@ function AdminBoletaView() {
   const filtrados = search.trim()
     ? alumnos.filter(a =>
         a.nombre.toLowerCase().includes(search.toLowerCase()) ||
-        a.email.toLowerCase().includes
+        a.email.toLowerCase().includes(search.toLowerCase())
+      )
+    : alumnos
+
+  function selectAlumno(a: {id:number;nombre:string;email:string}) {
+    setSelId(a.id)
+    setSelNom(a.nombre)
+    setSearch('')
+    setOpen(false)
+    setLoading(true)
+
+    Promise.all([
+      api.get<{id:number;username:string;nombre:string;email:string|null;carrera_id:number|null;es_becado:boolean|null}>(`/users/${a.id}`),
+      api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${a.id}`),
+      api.get<{id:number;nombre:string;profesor_id:number}[]>('/materias/'),
+    ]).then(([user, puntajes, mats]) => {
+      setAlumno({
+        nombre:   user.nombre || user.username,
+        legajo:   user.username,
+        carrera:  user.carrera_id ? `Carrera #${user.carrera_id}` : '—',
+        anio:     1,
+        semestre: 1,
+        email:    user.email || '—',
+        becado:   user.es_becado || false,
+      })
+      const byMateria: Record<number,{parcial1:number|null;parcial2:number|null;tp:number|null;final:number|null}> = {}
+      puntajes.forEach(p => {
+        if (!byMateria[p.materia_id]) byMateria[p.materia_id] = {parcial1:null,parcial2:null,tp:null,final:null}
+        if (p.tipo==='parcial1') byMateria[p.materia_id].parcial1 = p.valor
+        else if (p.tipo==='parcial2') byMateria[p.materia_id].parcial2 = p.valor
+        else if (p.tipo==='practico') byMateria[p.materia_id].tp = p.valor
+        else if (p.tipo==='final') byMateria[p.materia_id].final = p.valor
+      })
+      setMaterias(mats.map(m => ({
+        nombre:   m.nombre,
+        profesor: `Prof. #${m.profesor_id}`,
+        ...(byMateria[m.id] ?? {parcial1:null,parcial2:null,tp:null,final:null}),
+      })))
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }
+
+  function limpiar() {
+    setSelId(null); setSelNom(''); setSearch('')
+    setAlumno(alumnoDefault); setMaterias([])
+  }
+
+  function initials(n:string){ return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase() }
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="bol-root">
+        <header className="topbar">
+          <h1>Boleta de notas</h1>
+        </header>
+
+        <div className="content">
+
+          {/* Selector de alumno */}
+          <div className="sel-bar">
+            <span className="sel-bar-lbl">Alumno:</span>
+            {selId ? (
+              <div className="sel-selected-chip">
+                {selNom}
+                <button onClick={limpiar} title="Cambiar alumno">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div className="sel-search-wrap" ref={wrapRef} style={{position:'relative'}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  className="sel-search"
+                  placeholder="Buscar alumno por nombre o email…"
+                  value={search}
+                  onChange={e=>{ setSearch(e.target.value); setOpen(true) }}
+                  onFocus={()=>setOpen(true)}
+                />
+                {open && filtrados.length > 0 && (
+                  <div className="sel-dropdown">
+                    {filtrados.slice(0,20).map(a => (
+                      <button key={a.id} className="sel-option" onMouseDown={()=>selectAlumno(a)}>
+                        <div className="sel-avatar">{initials(a.nombre)}</div>
+                        <div className="sel-info">
+                          <div className="sel-name">{a.nombre}</div>
+                          <div className="sel-email">{a.email}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!selId ? (
+            <div className="bol-empty">
+              <svg className="bol-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <div className="bol-empty-title">Seleccioná un alumno</div>
+              <div className="bol-empty-sub">Buscá por nombre o email para ver su boleta de notas</div>
+            </div>
+          ) : loading ? (
+            <div className="bol-empty">
+              <div style={{color:'#00b4d8',fontSize:13}}>Cargando boleta…</div>
+            </div>
+          ) : (
+            <>
+              <div className="actions">
+                <button className="btn-secondary" onClick={()=>window.print()}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 6 2 18 2 18 9"/>
+                    <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                    <rect x="6" y="14" width="12" height="8"/>
+                  </svg>
+                  Imprimir
+                </button>
+                <button className="btn-primary" onClick={()=>descargarPDF(alumno, materias)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Descargar PDF
+                </button>
+              </div>
+              <BoletaPreview alumno={alumno} materias={materias} />
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── ALUMNO VIEW: boleta propia ──
+function AlumnoBoletaView() {
+  const [alumno,   setAlumno]   = useState<AlumnoData>(alumnoDefault)
+  const [materias, setMaterias] = useState<Materia[]>([])
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('token')
+    const userData = token ? decodeToken(token) : null
+
+    api.get<{id:number;nombre:string|null;username:string;email:string|null;carrera_id:number|null;es_becado:boolean|null}>('/users/me')
+      .then(u => {
+        setAlumno({
+          nombre:   u.nombre || u.username,
+          legajo:   u.username,
+          carrera:  u.carrera_id ? `Carrera #${u.carrera_id}` : '—',
+          anio:     1,
+          semestre: 1,
+          email:    u.email || '—',
+          becado:   u.es_becado || false,
+        })
+      }).catch(() => {})
+
+    if (userData?.user_id) {
+      api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${userData.user_id}`)
+        .then(puntajes => {
+          const byMateria: Record<number,{parcial1:number|null;parcial2:number|null;tp:number|null;final:number|null}> = {}
+          puntajes.forEach(p => {
+            if (!byMateria[p.materia_id]) byMateria[p.materia_id] = {parcial1:null,parcial2:null,tp:null,final:null}
+            if (p.tipo==='parcial1') byMateria[p.materia_id].parcial1 = p.valor
+            else if (p.tipo==='parcial2') byMateria[p.materia_id].parcial2 = p.valor
+            else if (p.tipo==='practico') byMateria[p.materia_id].tp = p.valor
+            else if (p.tipo==='final') byMateria[p.materia_id].final = p.valor
+          })
+          api.get<{id:number;nombre:string;profesor_id:number}[]>('/materias/')
+            .then(mats => {
+              setMaterias(mats.map(m => ({
+                nombre:   m.nombre,
+                profesor: `Prof. #${m.profesor_id}`,
+                ...(byMateria[m.id] ?? {parcial1:null,parcial2:null,tp:null,final:null}),
+              })))
+            }).catch(() => {})
+        }).catch(() => {})
+    }
+  }, [])
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="bol-root">
+        <header className="topbar">
+          <h1>Boleta de notas</h1>
+        </header>
+
+        <div className="content">
+          <div className="actions">
+            <button className="btn-secondary" onClick={()=>window.print()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              Imprimir
+            </button>
+            <button className="btn-primary" onClick={()=>descargarPDF(alumno, materias)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Descargar PDF
+            </button>
+          </div>
+          <BoletaPreview alumno={alumno} materias={materias} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default function Boleta() {
+  const token = sessionStorage.getItem('token')
+  const currentUser = token ? decodeToken(token) : null
+  if (currentUser?.role === 'admin') return <AdminBoletaView />
+  return <AlumnoBoletaView />
+}

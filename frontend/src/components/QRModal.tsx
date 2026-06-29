@@ -13,9 +13,10 @@ interface QRModalProps {
   materiaId: number
   materiaNombre: string
   onClose: () => void
+  onQrActive?: (expiraEn: number) => void
 }
 
-export default function QRModal({ materiaId, materiaNombre, onClose }: QRModalProps) {
+export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive }: QRModalProps) {
   const [estado, setEstado]     = useState<'cargando' | 'listo' | 'expirado' | 'error'>('cargando')
   const [qrData, setQrData]     = useState<QRData | null>(null)
   const [segundos, setSegundos] = useState(0)
@@ -31,6 +32,7 @@ export default function QRModal({ materiaId, materiaNombre, onClose }: QRModalPr
       setQrData(data)
       setSegundos(data.expira_en)
       setEstado('listo')
+      if (onQrActive) onQrActive(data.expira_en)
     } catch (e: any) {
       setEstado('error')
       setErrorMsg(e.message || 'Error generando QR')

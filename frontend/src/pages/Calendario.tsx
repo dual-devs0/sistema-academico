@@ -582,4 +582,17 @@ export default function Calendario() {
                           {fmtFechaLarga(e.date)}
                         </span>
                       </div>
-                      <div className="sel-ev-nom
+                      <div className="sel-ev-nombre">{e.nombre}</div>
+                      <div className="sel-ev-mat">{e.materia}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
+  )
+}

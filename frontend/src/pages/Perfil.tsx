@@ -621,4 +621,53 @@ export default function Perfil() {
 
                     <div className="form-group">
                       <label className="form-label">Dirección</label>
-                      <input className="form-input" value={dDir} onChange={e=>setDDir(e.targ
+                      <input className="form-input" value={dDir} onChange={e=>setDDir(e.target.value)} placeholder="Ciudad, Paraguay" />
+                    </div>
+                  </>
+                )}
+
+                {tab === 'contrasena' && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Contraseña actual</label>
+                      <input className="form-input" type="password" value={pwAct} onChange={e=>setPwAct(e.target.value)} placeholder="••••••••" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Nueva contraseña</label>
+                      <input className="form-input" type="password" value={pwNew} onChange={e=>setPwNew(e.target.value)} placeholder="••••••••" />
+                      <span className="form-hint">Mínimo 8 caracteres.</span>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Confirmar contraseña</label>
+                      <input className="form-input" type="password" value={pwConf} onChange={e=>setPwConf(e.target.value)} placeholder="••••••••"
+                        style={{borderColor: pwConf && pwNew!==pwConf ? '#ef4444' : ''}} />
+                      {pwConf && pwNew!==pwConf && <span className="form-hint" style={{color:'#ef4444'}}>Las contraseñas no coinciden.</span>}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="modal-foot">
+                <button className="btn-secondary" onClick={()=>setModal(false)}>Cancelar</button>
+                <button className="btn-primary"
+                  onClick={tab==='perfil' ? guardar : guardarPwd}
+                  disabled={tab==='contrasena' && !pwValid}
+                  style={{opacity: tab==='contrasena' && !pwValid ? .4 : 1, cursor: tab==='contrasena' && !pwValid ? 'not-allowed':'pointer'}}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:13,height:13}}>
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && <div className="toast">✓ Cambios guardados correctamente</div>}
+
+      </div>
+    </>
+  )
+}

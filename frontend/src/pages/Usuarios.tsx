@@ -317,7 +317,7 @@ export default function Usuarios() {
   const [toast,     setToast]     = useState('')
   const [confirm,   setConfirm]   = useState<number|null>(null)
   const [loading,   setLoading]   = useState(true)
-  const [resetting, setResetting] = useState<number|null>(null)
+  const [resetting, _setResetting] = useState<number|null>(null)
   const [resetModal, setResetModal] = useState<Usuario|null>(null)
   const [resetPw,    setResetPw]    = useState('')
   const [resetTab,   setResetTab]   = useState<'direct'|'auto'>('direct')
@@ -758,4 +758,136 @@ export default function Usuarios() {
                   disabled={!draft.nombre.trim()||!draft.email.trim()}
                   style={{opacity:!draft.nombre.trim()||!draft.email.trim()?0.4:1}}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:13,height:13}}>
-                    <path d="M19 2
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                  {modal==='nuevo'?'Crear usuario':'Guardar cambios'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal confirmación eliminar */}
+        {confirm !== null && (
+          <div className="confirm-backdrop" onClick={()=>setConfirm(null)}>
+            <div className="confirm-box" onClick={e=>e.stopPropagation()}>
+              <div className="confirm-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4h6v2"/>
+                </svg>
+              </div>
+              <div className="confirm-title">¿Eliminar usuario?</div>
+              <div className="confirm-desc">
+                Esta acción no se puede deshacer. El usuario será eliminado permanentemente del sistema.
+              </div>
+              <div className="confirm-btns">
+                <button className="btn-cancel" onClick={()=>setConfirm(null)}>Cancelar</button>
+                <button className="btn-danger" onClick={confirmarEliminar}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                  </svg>
+                  Sí, eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL RESET CONTRASEÑA ── */}
+        {resetModal && (
+          <div className="modal-backdrop" onClick={e=>{if(e.target===e.currentTarget)setResetModal(null)}}>
+            <div className="modal-box">
+              <div className="modal-head">
+                <h2>Restablecer contraseña</h2>
+                <button className="modal-close" onClick={()=>setResetModal(null)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="modal-body">
+
+                {/* Usuario chip */}
+                <div className="reset-user-chip">
+                  <div className="reset-user-av" style={{background:avatarColor(resetModal.nombre)}}>
+                    {initials(resetModal.nombre)}
+                  </div>
+                  <div>
+                    <div className="reset-user-nm">{resetModal.nombre}</div>
+                    <div className="reset-user-em">{resetModal.email}</div>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="reset-tabs">
+                  <button className={`reset-tab${resetTab==='direct'?' active':''}`} onClick={()=>setResetTab('direct')}>
+                    Establecer directamente
+                  </button>
+                  <button className={`reset-tab${resetTab==='auto'?' active':''}`} onClick={()=>setResetTab('auto')}>
+                    Generar y notificar
+                  </button>
+                </div>
+
+                {resetTab === 'direct' ? (
+                  <>
+                    <div className="fg">
+                      <label>Nueva contraseña</label>
+                      <input
+                        type="text"
+                        value={resetPw}
+                        onChange={e=>setResetPw(e.target.value)}
+                        placeholder="Ingresá la nueva contraseña"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div className="reset-notice">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      La contraseña se actualiza de inmediato. Comunicale la nueva clave al usuario.
+                    </div>
+                  </>
+                ) : (
+                  <div className="reset-notice" style={{flexDirection:'column',gap:6}}>
+                    <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{flexShrink:0,marginTop:1}}>
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                      </svg>
+                      Se generará una contraseña temporal y se enviará automáticamente al email del usuario.
+                    </div>
+                    <div style={{color:'#8fa3b8',fontSize:11}}>
+                      Destinatario: <strong style={{color:'#f59e0b'}}>{resetModal.email}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-foot">
+                <button className="btn-cancel" onClick={()=>setResetModal(null)}>Cancelar</button>
+                <button className="btn-primary"
+                  onClick={confirmarReset}
+                  disabled={resetSaving || (resetTab==='direct' && !resetPw.trim())}
+                  style={{opacity:resetSaving||(resetTab==='direct'&&!resetPw.trim())?0.4:1}}>
+                  {resetSaving ? 'Guardando…' : resetTab==='direct' ? 'Cambiar contraseña' : 'Generar y enviar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <div className="toast" style={{
+            position:'fixed', bottom:24, right:24, zIndex:9999,
+            background:'#131920', border:'1px solid #22c55e40', borderRadius:12, padding:'12px 20px',
+            color:'#22c55e', fontSize:13, fontWeight:600, boxShadow:'0 8px 32px rgba(0,0,0,.5)',
+            maxWidth: 400, wordBreak: 'break-all', lineHeight: 1.5,
+          }}>✓ {toast}</div>
+        )}
+      </div>
+    </>
+  )
+}

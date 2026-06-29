@@ -217,43 +217,34 @@ export default function Materias() {
   const [confirmar,     setConfirmar]     = useState<Materia | null>(null)
   const [toast,         setToast]         = useState('')
   const [loading,       setLoading]       = useState(true)
-  const [profMap,       setProfMap]       = useState<Record<number, string>>({})
   const [profNameToId,  setProfNameToId]  = useState<Record<string, number>>({})
 
-  function mapMaterias(
-    data: { id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number; semestre: number }[],
-    pMap: Record<number, string>,
-    cMap: Record<number, string>
-  ): Materia[] {
+  type MateriaRaw = { id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number; semestre: number; profesor_nombre?: string | null; carrera_nombre?: string | null }
+
+  function mapMaterias(data: MateriaRaw[]): Materia[] {
     return data.map(m => ({
       id: m.id,
       nombre: m.nombre,
-      carrera: (m.carrera_id && cMap[m.carrera_id]) ? cMap[m.carrera_id] : 'Sin carrera',
+      carrera: m.carrera_nombre || 'Sin carrera',
       anio: m.anio || 1,
       semestre: m.semestre || 1,
-      profesor: pMap[m.profesor_id] ?? `Prof. #${m.profesor_id}`,
+      profesor: m.profesor_nombre || `Prof. #${m.profesor_id}`,
       alumnos: 0,
     }))
   }
 
   useEffect(() => {
     Promise.all([
-      api.get<{ id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number; semestre: number }[]>('/materias/'),
+      api.get<MateriaRaw[]>('/materias/'),
       api.get<{ id: number; username: string; nombre: string; role: string }[]>('/users/').catch(() => []),
-      api.get<{ id: number; nombre: string }[]>('/carreras/').catch(() => []),
-    ]).then(([mData, uData, cData]) => {
-      const pMap: Record<number, string> = {}
+    ]).then(([mData, uData]) => {
       const pNameId: Record<string, number> = {}
-      const cMap: Record<number, string> = {}
       uData.filter(u => u.role === 'profesor').forEach(u => {
         const name = u.nombre || u.username
-        pMap[u.id] = name
         pNameId[name] = u.id
       })
-      cData.forEach(c => { cMap[c.id] = c.nombre })
-      setProfMap(pMap)
       setProfNameToId(pNameId)
-      setMaterias(mapMaterias(mData, pMap, cMap))
+      setMaterias(mapMaterias(mData))
       setLoading(false)
     }).catch(() => {
       setMaterias(materiasIniciales)
@@ -289,8 +280,8 @@ export default function Materias() {
         cerrar()
         return
       }
-      const data = await api.get<{ id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number; semestre: number }[]>('/materias/')
-      setMaterias(mapMaterias(data, profMap))
+      const data = await api.get<MateriaRaw[]>('/materias/')
+      setMaterias(mapMaterias(data))
     } catch {
       if (modal === 'nuevo') {
         setMaterias(prev => [...prev, { ...draft, id: Date.now() }])
@@ -602,4 +593,22 @@ export default function Materias() {
               </div>
               <div className="confirm-btns">
                 <button className="btn-cancel" onClick={() => setConfirmar(null)}>Cancelar</button>
-                <button className="btn-elim
+                <button className="btn-eliminar" onClick={confirmarEliminar}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14H6L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                  </svg>
+                  Sí, eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && <div className="toast">✓ {toast}</div>}
+      </div>
+    </>
+  )
+}
