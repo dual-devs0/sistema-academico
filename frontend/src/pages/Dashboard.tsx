@@ -314,8 +314,14 @@ export default function Dashboard() {
     (async () => {
       try {
         const materiasRes: any[] = await api.get('/materias/') || []
-        const puntajesRes: any[] = await api.get(`/puntajes/?user_id=${userData.user_id}`) || []
-        const asistenciasRes: any[] = await api.get(`/asistencias/?user_id=${userData.user_id}`) || []
+        const isAlumno = userData.role === 'alumno'
+        const uid = Number(userData.user_id)
+        const puntajesRes: any[] = await api.get(
+          isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/'
+        ) || []
+        const asistenciasRes: any[] = await api.get(
+          isAlumno && !isNaN(uid) ? `/asistencias/?user_id=${uid}` : '/asistencias/'
+        ) || []
         const eventosRes: any[] = await api.get('/eventos/') || []
 
         if (materiasRes.length > 0 && puntajesRes.length > 0) {
