@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.security import hash_password
-from app.dependencias import get_current_user
+from app.dependencias import require_role, get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -42,19 +42,33 @@ def secure_endpoint(current_user = Depends(get_current_user)):
     return {"msg": f"Hola {current_user['username']}, tu rol es {current_user['role']}"}
 
 @router.patch("/{user_id}", response_model=schemas.user.UserOut)
-def update_user(user_id: int, data: schemas.user.UserUpdate, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+def update_user(user_id: int, data: schemas.user.UserUpdate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+    from app.email_utils import send_password_reset_email_bg
+
     if current_user["role"] != "admin" and current_user["user_id"] != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
     update_data = data.model_dump(exclude_unset=True)
+    new_password = update_data.get("password")
+    
     if "password" in update_data:
         user.hashed_password = hash_password(update_data.pop("password"))
+        
     for key, value in update_data.items():
         setattr(user, key, value)
+        
     db.commit()
     db.refresh(user)
+    
+    if new_password and user.email:
+        try:
+            send_password_reset_email_bg(background_tasks, user.email, user.nombre or user.username, new_password)
+        except Exception as e:
+            print("Error sending password reset email:", e)
+            
     return user
 
 @router.delete("/{user_id}")
@@ -63,7 +77,4 @@ def delete_user(user_id: int, db: Session = Depends(database.get_db), current_us
         raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    db.delete(user)
-    db.commit()
-    return {"detail": "Usuario eliminado"}
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")

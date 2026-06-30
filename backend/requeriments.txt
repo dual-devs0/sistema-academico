@@ -22,10 +22,13 @@ google-generativeai
 # Generación de PDFs y QR
 reportlab
 weasyprint
-qrcode
+qrcode[pil]
+Pillow
 
 # Email y notificaciones
 fastapi-mail
+aiofiles
+email-validator
 
 # Pruebas
 pytest

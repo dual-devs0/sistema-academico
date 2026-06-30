@@ -33,3 +33,18 @@ coverage/
 
 # Docker volumes locales
 postgres_data/
+
+# Base de datos SQLite local
+*.db
+*.sqlite
+*.sqlite3
+
+# Sesiones de Claude / IDE local
+.claude/
+
+# Archivos de borrador
+mark.txt
+
+# Venv de Python (backend)
+backend/venv/
+venv/

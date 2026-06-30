@@ -293,7 +293,7 @@ export default function Dashboard() {
   const [showNotif, setShowNotif] = useState(false)
   const [searchVal, setSearchVal] = useState('')
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     return token ? decodeToken(token) : null
   })
   const [materias, setMaterias] = useState<MateriaRow[]>(materiasMock)
@@ -302,20 +302,23 @@ export default function Dashboard() {
   const [tps] = useState<TpRow[]>(tpsMock)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     if (token) setUser(decodeToken(token))
   }, [])
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     const userData = token ? decodeToken(token) : null
     if (!userData) return
 
     (async () => {
       try {
-        const materiasRes: any[] = await api.get('/materias/') || []
         const isAlumno = userData.role === 'alumno'
+        const isProfesor = userData.role === 'profesor'
         const uid = Number(userData.user_id)
+        const materiasRes: any[] = await api.get(
+          isProfesor && !isNaN(uid) ? `/materias/?profesor_id=${uid}` : '/materias/'
+        ) || []
         const puntajesRes: any[] = await api.get(
           isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/'
         ) || []
@@ -324,7 +327,7 @@ export default function Dashboard() {
         ) || []
         const eventosRes: any[] = await api.get('/eventos/') || []
 
-        if (materiasRes.length > 0 && puntajesRes.length > 0) {
+        if (materiasRes.length > 0) {
           const rows: MateriaRow[] = materiasRes.map((m: any) => {
             const pts = puntajesRes.filter((p: any) => p.materia_id === m.id)
             const p1 = pts.find((p: any) => p.tipo === 'parcial1')?.valor ?? null
@@ -333,21 +336,28 @@ export default function Dashboard() {
             const vals = [p1, p2, tpVal].filter((v): v is number => v !== null)
             const prom = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
             const cls = prom >= 8 ? 'high' : prom >= 6.5 ? 'mid' : 'low'
-            return { nombre: m.nombre, profesor: `Prof. ${m.nombre}`, parcial1: p1, parcial2: p2, tp: tpVal, promedio: Math.round(prom * 10) / 10, promClass: cls }
+            const profName = m.profesor_nombre || (m.profesor_id ? `Prof. #${m.profesor_id}` : '—')
+            return { nombre: m.nombre, profesor: profName, parcial1: p1, parcial2: p2, tp: tpVal, promedio: Math.round(prom * 10) / 10, promClass: cls }
           })
           if (rows.length > 0) setMaterias(rows)
         }
         if (asistenciasRes.length > 0) {
-          const grouped: Record<string, { presente: number; total: number }> = {}
+          const materiaMap: Record<string, string> = {}
+          materiasRes.forEach((m: any) => { materiaMap[String(m.id)] = m.nombre })
+          const grouped: Record<string, { presente: number; total: number; nombre: string }> = {}
           asistenciasRes.forEach((a: any) => {
             const key = String(a.materia_id)
-            if (!grouped[key]) grouped[key] = { presente: 0, total: 0 }
+            if (!grouped[key]) grouped[key] = {
+              presente: 0,
+              total: 0,
+              nombre: a.materia_nombre || materiaMap[key] || `Materia #${key}`,
+            }
             grouped[key].total++
             if (a.presente) grouped[key].presente++
           })
-          const rows: AsistenciaRow[] = Object.entries(grouped).map(([id, g]) => {
+          const rows: AsistenciaRow[] = Object.entries(grouped).map(([, g]) => {
             const pct = g.total > 0 ? Math.round((g.presente / g.total) * 100) : 0
-            return { nombre: `Materia #${id}`, pct, clase: pct >= 80 ? 'ok' : 'warn' }
+            return { nombre: g.nombre, pct, clase: pct >= 80 ? 'ok' : 'warn' }
           })
           if (rows.length > 0) setAsistencias(rows)
         }
@@ -508,7 +518,7 @@ export default function Dashboard() {
               const promAsistencia = asistencias.length > 0 ? asistencias.reduce((a, b) => a + b.pct, 0) / asistencias.length : 0
               const numTps = tps.length
               return [
-                { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>, cls:'cyan',   value:String(numMaterias), label:'Materias cursando',   trend:'↑ activo',   trendCls:'up' },
+                { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>, cls:'cyan',   value:String(numMaterias), label: user?.role === 'admin' ? 'Total materias' : user?.role === 'profesor' ? 'Materias a cargo' : 'Materias cursando',   trend:'↑ activo',   trendCls:'up' },
                 { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,  cls:'green',  value:promGeneral.toFixed(1), label:'Promedio general',    trend:'↑ bueno',    trendCls:'up',  bar:Math.round(promGeneral * 10),  barColor:'#22c55e', valueColor:'#22c55e' },
                 { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,              cls:'yellow', value:`${Math.round(promAsistencia)}%`, label:'Asistencia promedio', trend:'↑ ok',       trendCls:'up',  bar:Math.round(promAsistencia),  barColor:'#f59e0b', valueColor:'#f59e0b' },
                 { icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,                                                              cls:'purple', value:String(numTps),   label:'TPs pendientes',     trend:'⚠ pendiente', trendCls:'warn', valueColor:'#a855f7' },
@@ -538,39 +548,58 @@ export default function Dashboard() {
             {/* Tabla puntajes */}
             <div className="card">
               <div className="card-header">
-                <div><h3>Mis puntajes</h3><p>Semestre 1 · 2026</p></div>
+                <div><h3>{user?.role === 'admin' ? 'Resumen global' : user?.role === 'profesor' ? 'Mis materias' : 'Mis puntajes'}</h3><p>Semestre 1 · 2026</p></div>
                 <button className="card-action" onClick={() => navigate('/puntajes')}>Ver todo →</button>
               </div>
               <div style={{ overflowX:'auto' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Materia</th><th>Parcial 1</th><th>Parcial 2</th><th>TP</th><th>Promedio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {materias.map(m => (
-                      <tr key={m.nombre}>
-                        <td>
-                          <div className="subject-name">{m.nombre}</div>
-                          <div className="subject-code">{m.profesor}</div>
-                        </td>
-                        {[m.parcial1, m.parcial2, m.tp].map((n, i) => (
-                          <td key={i}>
-                            <div className="grade" style={{ color: gradeColor[gradeClass(n)] }}>{n ?? '—'}</div>
-                          </td>
-                        ))}
-                        <td>
-                          <div style={{ textAlign:'center' }}>
-                            <span className="avg-badge" style={{ background:avgBg[m.promClass], color:gradeColor[m.promClass] }}>
-                              {m.promedio}
-                            </span>
-                          </div>
-                        </td>
+                {user?.role === 'profesor' ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Materia</th><th style={{textAlign:'center'}}>Año</th><th style={{textAlign:'center'}}>Semestre</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {materias.map(m => (
+                        <tr key={m.nombre}>
+                          <td><div className="subject-name">{m.nombre}</div></td>
+                          <td style={{textAlign:'center'}}><div className="grade" style={{color:'#00b4d8'}}>—</div></td>
+                          <td style={{textAlign:'center'}}><div className="grade" style={{color:'#00b4d8'}}>—</div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Materia</th><th>Parcial 1</th><th>Parcial 2</th><th>TP</th><th>Promedio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {materias.map(m => (
+                        <tr key={m.nombre}>
+                          <td>
+                            <div className="subject-name">{m.nombre}</div>
+                            <div className="subject-code">{m.profesor}</div>
+                          </td>
+                          {[m.parcial1, m.parcial2, m.tp].map((n, i) => (
+                            <td key={i}>
+                              <div className="grade" style={{ color: gradeColor[gradeClass(n)] }}>{n ?? '—'}</div>
+                            </td>
+                          ))}
+                          <td>
+                            <div style={{ textAlign:'center' }}>
+                              <span className="avg-badge" style={{ background:avgBg[m.promClass], color:gradeColor[m.promClass] }}>
+                                {m.promedio}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
 

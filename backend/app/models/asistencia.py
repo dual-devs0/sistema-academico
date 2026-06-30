@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Boolean, Date, ForeignKey
+from sqlalchemy import Column, Integer, Boolean, Date, String, ForeignKey
 from app.database import Base
 
 class Asistencia(Base):
@@ -10,3 +10,4 @@ class Asistencia(Base):
     fecha = Column(Date, nullable=False)
     presente = Column(Boolean, nullable=False, default=True)
     es_becado = Column(Boolean, default=False)  # snapshot
+    motivo = Column(String, nullable=True)       # motivo de ausencia

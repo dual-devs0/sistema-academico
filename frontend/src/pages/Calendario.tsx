@@ -269,13 +269,18 @@ export default function Calendario() {
   useEffect(() => {
     (async () => {
       try {
-        const data: any[] = await api.get('/eventos/') || []
+        const [data, materiasData]: [any[], any[]] = await Promise.all([
+          api.get('/eventos/').catch(() => []),
+          api.get('/materias/').catch(() => []),
+        ])
+        const mMap: Record<number, string> = {}
+        materiasData.forEach((m: any) => { mMap[m.id] = m.nombre })
         if (data.length > 0) {
           setEventos(data.map((e: any) => ({
             date: e.fecha,
             tipo: e.tipo || 'actividad',
             nombre: e.titulo || e.descripcion || '',
-            materia: e.materia_id ? `Materia #${e.materia_id}` : 'General',
+            materia: e.materia_id ? (mMap[e.materia_id] || `Materia #${e.materia_id}`) : 'General',
           })))
         }
       } catch { /* fallback to mock */ }
