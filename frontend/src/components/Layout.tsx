@@ -1,213 +1,217 @@
-import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { decodeToken } from '../lib/api'
-import ucaLogo from '../assets/uc_logo_sist_academico.png'
+import { useState, useEffect } from 'react'
+import logoUCASmall from '../assets/uc_logo_sist_academico.png'
 
-const menuItems: Record<string, { label: string; path: string; icon: string }[]> = {
-  admin: [
-    { label: 'Dashboard', path: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
-    { label: 'Usuarios', path: '/usuarios', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2' },
-    { label: 'Materias', path: '/materias', icon: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z' },
-    { label: 'Puntajes', path: '/puntajes', icon: 'M18 20V10M12 20V4M6 20v-6' },
-    { label: 'Asistencia', path: '/asistencia', icon: 'M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z' },
-    { label: 'Reportes', path: '/reportes', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-    { label: 'Estadísticas', path: '/estadisticas', icon: 'M18 20V10M12 20V4M6 20v-6' },
-    { label: 'Calendario', path: '/calendario', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { label: 'Programa', path: '/programa', icon: 'M4 6h16M4 12h16M4 18h16' },
-    { label: 'Biblioteca', path: '/biblioteca', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-    { label: 'Inscripciones', path: '/inscripciones', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { label: 'Boleta', path: '/boleta', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-    { label: 'Perfil', path: '/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-  ],
-  profesor: [
-    { label: 'Dashboard', path: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
-    { label: 'Mis Cursos', path: '/miscursos', icon: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z' },
-    { label: 'Puntajes', path: '/puntajes', icon: 'M18 20V10M12 20V4M6 20v-6' },
-    { label: 'Asistencia', path: '/asistencia', icon: 'M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z' },
-    { label: 'Materias', path: '/materias', icon: 'M4 6h16M4 12h16M4 18h16' },
-    { label: 'Estadísticas', path: '/estadisticas', icon: 'M18 20V10M12 20V4M6 20v-6' },
-    { label: 'Calendario', path: '/calendario', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { label: 'Programa', path: '/programa', icon: 'M4 6h16M4 12h16M4 18h16' },
-    { label: 'Biblioteca', path: '/biblioteca', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-    { label: 'Boleta', path: '/boleta', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-    { label: 'Perfil', path: '/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-  ],
-  alumno: [
-    { label: 'Dashboard', path: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
-    { label: 'Puntajes', path: '/puntajes', icon: 'M18 20V10M12 20V4M6 20v-6' },
-    { label: 'Asistencia', path: '/asistencia', icon: 'M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z' },
-    { label: 'Calendario', path: '/calendario', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { label: 'Programa', path: '/programa', icon: 'M4 6h16M4 12h16M4 18h16' },
-    { label: 'Biblioteca', path: '/biblioteca', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-    { label: 'Boleta', path: '/boleta', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-    { label: 'Perfil', path: '/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-  ],
+type MenuItem = { label: string; path: string; icon: string }
+
+// ─── Menús por rol ──────────────────────────────────────────────────────────
+
+const menuAdmin: MenuItem[] = [
+  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
+  { label: 'Puntajes', path: '/puntajes', icon: 'ti-chart-bar' },
+  { label: 'Asistencia', path: '/asistencia', icon: 'ti-checkbox' },
+  { label: 'Perfil', path: '/perfil', icon: 'ti-user' },
+  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
+  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
+  { label: 'Programa', path: '/programa', icon: 'ti-list' },
+  { label: 'Boleta PDF', path: '/boleta', icon: 'ti-file-text' },
+  { label: 'Materias', path: '/materias', icon: 'ti-book' },
+  { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-pie' },
+  { label: 'Usuarios', path: '/usuarios', icon: 'ti-users' },
+  { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
+  { label: 'Inscripciones', path: '/inscripciones', icon: 'ti-clipboard-list' },
+]
+
+const menuProfesor: MenuItem[] = [
+  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
+  { label: 'Puntajes', path: '/puntajes', icon: 'ti-chart-bar' },
+  { label: 'Asistencia', path: '/asistencia', icon: 'ti-checkbox' },
+  { label: 'Perfil', path: '/perfil', icon: 'ti-user' },
+  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
+  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
+  { label: 'Programa', path: '/programa', icon: 'ti-list' },
+  { label: 'Boleta PDF', path: '/boleta', icon: 'ti-file-text' },
+  { label: 'Materias', path: '/materias', icon: 'ti-book' },
+  { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-pie' },
+  { label: 'Mis Cursos', path: '/miscursos', icon: 'ti-school' },
+]
+
+const menuAlumno: MenuItem[] = [
+  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
+  { label: 'Puntajes', path: '/puntajes', icon: 'ti-chart-bar' },
+  { label: 'Asistencia', path: '/asistencia', icon: 'ti-checkbox' },
+  { label: 'Escanear QR', path: '/asistencia/scan', icon: 'ti-qrcode' },
+  { label: 'Perfil', path: '/perfil', icon: 'ti-user' },
+  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
+  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
+  { label: 'Programa', path: '/programa', icon: 'ti-list' },
+  { label: 'Boleta PDF', path: '/boleta', icon: 'ti-file-text' },
+]
+
+function getMenuPorRol(rol: string | null): MenuItem[] {
+  if (rol === 'admin' || rol === 'administrador') return menuAdmin
+  if (rol === 'profesor') return menuProfesor
+  return menuAlumno // default: alumno
 }
 
-const css = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  .layout-root { display: flex; width: 100vw; height: 100vh; background: #0b0f14; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
-  
-  .sidebar {
-    width: 240px; flex-shrink: 0; background: #0e131a;
-    border-right: 1px solid #1e2d3d; display: flex; flex-direction: column;
-    height: 100vh; position: relative; z-index: 30;
-    transition: transform 0.25s ease;
-  }
-  .sidebar-logo {
-    padding: 18px 16px 14px;
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
-    border-bottom: 1px solid #1e2d3d;
-  }
-  .sidebar-logo-img {
-    width: 176px; height: auto; object-fit: contain;
-    display: block; max-width: 100%;
-  }
-  .sidebar-logo-label {
-    font-size: 11px; font-weight: 700; color: #506070;
-    text-transform: uppercase; letter-spacing: 0.08em;
-  }
-  .sidebar-user {
-    padding: 14px 18px; border-bottom: 1px solid #1e2d3d;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .sidebar-avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: linear-gradient(135deg, #00b4d8, #0ea5e9);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; color: #000; flex-shrink: 0;
-  }
-  .sidebar-user-info { flex: 1; min-width: 0; }
-  .sidebar-user-name { font-size: 12px; font-weight: 700; color: #f0f4f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sidebar-user-rol  { font-size: 10px; color: #506070; text-transform: uppercase; letter-spacing: 0.05em; }
-  
-  .sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 10px; }
-  .sidebar-section { margin-bottom: 4px; }
-  .sidebar-link {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; border-radius: 8px;
-    color: #8fa3b8; font-size: 12px; font-weight: 500;
-    text-decoration: none; cursor: pointer; transition: all 0.12s;
-    border: none; background: none; width: 100%; text-align: left; font-family: inherit;
-  }
-  .sidebar-link:hover { background: #1a2230; color: #f0f4f8; }
-  .sidebar-link.active { background: #00b4d815; color: #00b4d8; font-weight: 600; }
-  .sidebar-link svg { width: 15px; height: 15px; flex-shrink: 0; }
-  
-  .sidebar-footer { padding: 12px 10px; border-top: 1px solid #1e2d3d; }
-  .sidebar-logout {
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 9px 12px; border-radius: 8px;
-    color: #ef4444; font-size: 12px; font-weight: 500;
-    background: none; border: none; cursor: pointer; font-family: inherit;
-    transition: background 0.12s;
-  }
-  .sidebar-logout:hover { background: #ef444410; }
-  .sidebar-logout svg { width: 15px; height: 15px; flex-shrink: 0; }
-
-  .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; overflow-x: hidden; }
-
-  .sidebar-overlay { display: none; }
-
-  @media (max-width: 768px) {
-    .sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); }
-    .sidebar.open { transform: translateX(0); }
-    .sidebar-overlay {
-      display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-      z-index: 29; opacity: 0; pointer-events: none; transition: opacity 0.25s;
-    }
-    .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
-  }
-
-  .mobile-hamburger {
-    display: none; position: fixed; bottom: 20px; right: 20px; z-index: 50;
-    width: 48px; height: 48px; border-radius: 50%;
-    background: #00b4d8; border: none; color: #000;
-    cursor: pointer; box-shadow: 0 4px 16px rgba(0,180,216,0.4);
-    align-items: center; justify-content: center;
-  }
-  .mobile-hamburger svg { width: 20px; height: 20px; }
-  @media (max-width: 768px) { .mobile-hamburger { display: flex; } }
-`
-
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
-  const role = (user?.role || 'alumno') as keyof typeof menuItems
-  const items = menuItems[role] || menuItems.alumno
 
-  const initials = user?.username?.slice(0, 2).toUpperCase() || 'U'
+  const userRol = sessionStorage.getItem('user_rol')
+  const menuItems = getMenuPorRol(userRol)
 
-  function handleLogout() {
-    sessionStorage.removeItem('token')
-    sessionStorage.removeItem('user_rol')
-    sessionStorage.removeItem('user_nombre')
-    navigate('/login')
-  }
+  useEffect(() => {
+    document.title = 'Universidad Católica Caacupé'
+  }, [])
 
-  function closeSidebar() { setSidebarOpen(false) }
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
+
+  // Bloquea el scroll del contenido de fondo mientras el sidebar mobile está abierto,
+  // así el scroll del menú no "se filtra" hacia el dashboard de atrás.
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [mobileOpen])
 
   return (
     <>
-      <style>{css}</style>
-      <div className="layout-root">
-        <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sidebar-logo">
-            <img src={ucaLogo} alt="Universidad Católica" className="sidebar-logo-img" />
-            <span className="sidebar-logo-label">Sistema UCA</span>
+      <style>{`
+        .nav-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; overscroll-behavior: contain; }
+        .nav-scroll::-webkit-scrollbar { width: 4px; }
+        .nav-scroll::-webkit-scrollbar-track { background: transparent; }
+        .nav-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+        .nav-scroll:hover { scrollbar-color: #2a3550 transparent; }
+        .nav-scroll:hover::-webkit-scrollbar-thumb { background: #2a3550; }
+
+        .layout-content-scroll { overscroll-behavior: contain; }
+
+        /* Desktop: sidebar fijo, SIN cambios respecto a la versión anterior */
+        .layout-sidebar {
+          width: 220px; height: 100%;
+          background: #0d0f14; border-right: 1px solid #1a2035;
+          display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+        }
+
+        .layout-mobile-btn { display: none; }
+
+        @media (max-width: 768px) {
+          .layout-root { display: block !important; }
+          .layout-main { padding: 0 !important; width: 100% !important; max-width: 100vw !important; }
+          .layout-main main { padding: 16px 12px !important; width: 100% !important; box-sizing: border-box; }
+          .layout-mobile-btn { display: flex !important; }
+
+          /* Mobile: sidebar oculto por defecto, fuera de pantalla */
+          .layout-sidebar {
+            position: fixed;
+            top: 0; bottom: 0; left: 0;
+            width: 260px;
+            z-index: 100;
+            transform: translateX(-100%);
+            transition: transform 220ms ease;
+          }
+
+          /* Mobile: sidebar visible cuando se abre con el botón */
+          .layout-sidebar.mobile-open {
+            transform: translateX(0);
+          }
+
+          .layout-overlay {
+            display: block; position: fixed; inset: 0; z-index: 99;
+            background: rgba(0,0,0,0.6);
+          }
+        }
+      `}</style>
+
+      <div className="layout-root" style={{ display: 'flex', background: '#0d0f14', height: '100vh', overflow: 'hidden', fontFamily: 'Inter, sans-serif' }}>
+
+        {/* Overlay mobile — solo se monta cuando el sidebar está abierto */}
+        {mobileOpen && <div className="layout-overlay" onClick={() => setMobileOpen(false)} />}
+
+        {/* Sidebar — fixed 220px desktop (sin cambios), drawer deslizante en mobile */}
+        <div className={`layout-sidebar${mobileOpen ? ' mobile-open' : ''}`}>
+          {/* Brand */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px 6px', borderBottom: '1px solid #1a2035', overflow: 'hidden',
+          }}>
+            <img src={logoUCASmall} alt="UCA" style={{
+              width: '100%', height: 'auto', objectFit: 'contain',
+              filter: 'brightness(0) invert(1)', opacity: 0.9,
+            }} />
           </div>
 
-          <div className="sidebar-user">
-            <div className="sidebar-avatar">{initials}</div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user?.username || 'Usuario'}</div>
-              <div className="sidebar-user-rol">{role === 'admin' ? 'Administrador' : role === 'profesor' ? 'Profesor' : 'Alumno'}</div>
-            </div>
-          </div>
-
-          <nav className="sidebar-nav">
-            {items.map(item => {
-              const isActive = location.pathname === item.path
+          {/* Nav — solo esto scrollea */}
+          <div className="nav-scroll" style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+            {menuItems.map(item => {
+              const active = location.pathname === item.path
               return (
-                <div key={item.path} className="sidebar-section">
-                  <button
-                    className={`sidebar-link${isActive ? ' active' : ''}`}
-                    onClick={() => { navigate(item.path); closeSidebar() }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d={item.icon} />
-                    </svg>
-                    {item.label}
-                  </button>
-                </div>
+                <button key={item.path}
+                  onClick={() => { navigate(item.path); setMobileOpen(false) }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '9px 10px', borderRadius: '10px', border: 'none',
+                    cursor: 'pointer', marginBottom: '2px', fontFamily: 'Inter, sans-serif',
+                    background: active ? '#0f2044' : 'transparent',
+                    color: active ? '#1a8fff' : '#4a6fa5',
+                    fontSize: '13px', fontWeight: active ? 500 : 400,
+                    textAlign: 'left', transition: 'all 150ms ease', whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLButtonElement).style.background = '#131929'; (e.currentTarget as HTMLButtonElement).style.color = '#a0b4d0' } }}
+                  onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#4a6fa5' } }}
+                >
+                  <i className={`ti ${item.icon}`} aria-hidden="true" style={{ fontSize: '16px', flexShrink: 0 }} />
+                  <span>{item.label}</span>
+                </button>
               )
             })}
-          </nav>
+          </div>
 
-          <div className="sidebar-footer">
-            <button className="sidebar-logout" onClick={handleLogout}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
-              Cerrar sesión
+          {/* Footer — fijo abajo */}
+          <div style={{ padding: '10px 8px', borderTop: '1px solid #1a2035', flexShrink: 0 }}>
+            <button onClick={() => navigate('/login')}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 10px', borderRadius: '8px', border: 'none',
+                cursor: 'pointer', background: 'transparent', fontFamily: 'Inter, sans-serif',
+                color: '#e05555', fontSize: '12px', whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#1a1015'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+            >
+              <i className="ti ti-logout" aria-hidden="true" style={{ fontSize: '14px' }} />
+              <span>Cerrar sesión</span>
             </button>
           </div>
         </div>
 
-        <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={closeSidebar} />
-
-        <div className="main-area">
-          {children}
+        {/* Main */}
+        <div className="layout-main" style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <main className="layout-content-scroll" style={{ flex: 1, padding: '28px', overflowY: 'auto', background: '#0d0f14' }}>
+            {children}
+          </main>
         </div>
 
-        <button className="mobile-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="4" y1="6" x2="20" y2="6" />
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <line x1="4" y1="18" x2="20" y2="18" />
+        {/* Floating button mobile — bottom-right */}
+        <button className="layout-mobile-btn" onClick={() => setMobileOpen(true)}
+          style={{
+            position: 'fixed', bottom: 20, right: 20, zIndex: 50,
+            width: 52, height: 52, borderRadius: '50%',
+            background: '#1a8fff', border: 'none', cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(26,143,255,0.4)',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+          aria-label="Abrir menú"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
       </div>
