@@ -11,5 +11,6 @@ from . import eventos_router as eventos
 from . import programas_router as programas
 from . import reportes_router as reportes
 from . import boleta_router as boleta
+from . import alumno_router as alumno
 
-__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta"]
+__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno"]

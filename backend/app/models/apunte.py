@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime
+from sqlalchemy.sql import func
 from app.database import Base
 
 class Apunte(Base):
@@ -8,6 +9,12 @@ class Apunte(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
     titulo = Column(String(200), nullable=False)
+    descripcion = Column(Text, nullable=True)
     archivo_url = Column(Text, nullable=False)
     tags = Column(Text, nullable=True)  # comma-separated
     aprobado = Column(Boolean, default=False)
+    tipo_contenido = Column(String(50), default="pdf")
+    likes = Column(Integer, default=0)
+    descargas = Column(Integer, default=0)
+    visibilidad = Column(String(20), default="publico")
+    fecha_subida = Column(DateTime, server_default=func.now())

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON
 from app.database import Base
 
 class Temario(Base):
@@ -9,3 +9,4 @@ class Temario(Base):
     semana = Column(Integer, nullable=False)
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
+    bibliografia = Column(JSON, nullable=True)  # list of {autor, titulo, anio, tipo}
