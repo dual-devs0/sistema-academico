@@ -1,0 +1,166 @@
+/* ── UCA V2 Design Tokens ─────────────────────────────────────── */
+:root {
+  /* Fondos */
+  --bg-base:      #0b0f14;
+  --bg-surface:   #111827;
+  --bg-elevated:  #1a2233;
+  --bg-hover:     #1e2d42;
+
+  /* Bordes */
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-light:  rgba(255,255,255,0.10);
+  --border: var(--border-light);
+
+  /* Texto */
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #4b5563;
+
+  /* Accent por rol — default alumno */
+  --accent:         #00b4d8;
+  --accent-muted:   rgba(0, 180, 216, 0.12);
+  --accent-hover:   rgba(0, 180, 216, 0.20);
+  --accent-subtle:  var(--accent-muted);
+
+  /* Status */
+  --success: #10b981;
+  --success-subtle: rgba(16,185,129,0.12);
+  --warning: #f59e0b;
+  --warning-subtle: rgba(245,158,11,0.12);
+  --danger:  #ef4444;
+  --danger-subtle: rgba(239,68,68,0.12);
+  --info:    #3b82f6;
+  --info-subtle: rgba(59,130,246,0.12);
+  --purple: #7c3aed;
+  --purple-subtle: rgba(124,58,237,0.12);
+  --amber: #fcd34d;
+  --amber-subtle: rgba(252,211,77,0.12);
+}
+
+[data-role="alumno"]   { --accent: #00b4d8; --accent-muted: rgba(0,180,216,0.12);  --accent-hover: rgba(0,180,216,0.20); }
+[data-role="profesor"] { --accent: #7c3aed; --accent-muted: rgba(124,58,237,0.12); --accent-hover: rgba(124,58,237,0.20); }
+[data-role="admin"]    { --accent: #2563eb; --accent-muted: rgba(37,99,235,0.12);  --accent-hover: rgba(37,99,235,0.20); }
+
+/* ── Componentes base ─────────────────────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+.card-elevated {
+  background: var(--bg-elevated);
+  border-color: var(--border-light);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  font-family: inherit;
+  font-size: 14px;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 13px;
+}
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.input-uca {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.input-uca:focus { border-color: var(--accent); }
+.input-uca::placeholder { color: var(--text-muted); }
+
+.table-uca { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table-uca th {
+  text-align: left;
+  padding: 10px 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.table-uca td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+.table-uca tbody tr { transition: background 0.15s; }
+.table-uca tbody tr:hover { background: var(--bg-hover); }
+
+.page-title { font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+
+.pill-tab {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.pill-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+.pill-tab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+
+.progress-track {
+  height: 6px; border-radius: 999px; background: var(--bg-elevated); overflow: hidden;
+}
+.progress-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.4s ease; }
+
+@keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--success);
+  animation: pulse-dot 1.6s infinite; display: inline-block;
+}

@@ -269,9 +269,9 @@ export default function Calendario() {
   useEffect(() => {
     (async () => {
       try {
-        const [data, materiasData]: [any[], any[]] = await Promise.all([
-          api.get('/eventos/').catch(() => []),
-          api.get('/materias/').catch(() => []),
+        const [data, materiasData] = await Promise.all([
+          api.get<any[]>('/eventos/').catch(() => [] as any[]),
+          api.get<any[]>('/materias/').catch(() => [] as any[]),
         ])
         const mMap: Record<number, string> = {}
         materiasData.forEach((m: any) => { mMap[m.id] = m.nombre })

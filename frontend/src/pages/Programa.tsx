@@ -440,7 +440,7 @@ function ProfesorProgramaView() {
   const [saving,     setSaving]     = useState(false)
   const [toast,      setToast]      = useState('')
 
-  function showToast(msg: string, ok = true) {
+  function showToast(msg: string, _ok = true) {
     setToast(msg)
     setTimeout(() => setToast(''), 2400)
   }

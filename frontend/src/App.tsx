@@ -18,6 +18,7 @@ import MisCursos from './pages/MisCursos'
 import Estadisticas from './pages/Estadisticas'
 import AsistenciaScan from './pages/AsistenciaScan'
 import Inscripciones from './pages/Inscripciones'
+import NotFound from './pages/NotFound'
 import { decodeToken } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -71,6 +72,7 @@ function App() {
         <Route path="/estadisticas" element={<Layout><RutaProtegida path="/estadisticas"><Estadisticas /></RutaProtegida></Layout>} />
         <Route path="/inscripciones" element={<Layout><RutaProtegida path="/inscripciones"><Inscripciones /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><AsistenciaScan /></Layout>} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )

@@ -293,7 +293,7 @@ export default function Estadisticas() {
                       <Tooltip
                         contentStyle={tooltipStyle}
                         cursor={{ fill:'#1e2d3d55' }}
-                        formatter={(v: number) => [v, 'Promedio']}
+                        formatter={(v: any) => [v, 'Promedio']}
                       />
                       <Bar dataKey="promedio" fill={CYAN} radius={[5, 5, 0, 0]} maxBarSize={40} />
                     </BarChart>
@@ -333,7 +333,7 @@ export default function Estadisticas() {
                       </Pie>
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(v: number, name: string) => [v, name]}
+                        formatter={(v: any, name: any) => [v, name]}
                       />
                       <Legend
                         iconType="circle"
@@ -370,7 +370,7 @@ export default function Estadisticas() {
                     <Tooltip
                       contentStyle={tooltipStyle}
                       cursor={{ stroke:'#1e2d3d', strokeWidth:1 }}
-                      formatter={(v: number) => [`${v}%`, 'Asistencia']}
+                      formatter={(v: any) => [`${v}%`, 'Asistencia']}
                     />
                     <Line
                       type="monotone"
