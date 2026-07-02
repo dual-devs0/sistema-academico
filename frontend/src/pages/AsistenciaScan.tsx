@@ -67,7 +67,7 @@ export default function AsistenciaScan() {
     : ''
 
   return (
-    <div className="min-h-screen bg-[#0b0f14] flex items-center justify-center p-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center p-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <p className="text-[var(--accent)] text-xs font-semibold uppercase tracking-widest">Sistema Académico UCA</p>

@@ -15,60 +15,60 @@ interface AlumnoAsist {
 
 const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  .as-root { padding: 28px 36px 60px; min-height: 100%; background: #0b0f14; font-family: 'Inter', system-ui, sans-serif; color: #f0f4f8; }
+  .as-root { padding: 28px 36px 60px; min-height: 100%; background: var(--bg-base); font-family: 'Inter', system-ui, sans-serif; color: var(--text-primary); }
   .as-header { margin-bottom: 28px; }
   .as-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-  .as-sub { font-size: 13px; color: #8fa3b8; margin-top: 3px; }
+  .as-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
 
   /* Alumno: layout de 2 columnas en desktop */
   .alumno-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
   .alumno-layout-single { display: flex; flex-direction: column; gap: 20px; max-width: 560px; }
 
   .as-scan-btn {
-    width: 220px; height: 220px; border-radius: 50%; border: 2px dashed #1e2d3d;
-    background: #0e131a; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 220px; height: 220px; border-radius: 50%; border: 2px dashed #2a3040;
+    background: var(--bg-input); display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 14px; cursor: pointer; transition: all 0.2s; margin: 0 auto;
   }
   .as-scan-btn:hover { border-color: var(--accent); background: var(--accent-muted); }
   .as-scan-btn:active { transform: scale(0.97); }
   .as-scan-icon { width: 48px; height: 48px; color: var(--accent); }
-  .as-scan-label { font-size: 15px; font-weight: 600; color: #f0f4f8; }
-  .as-scan-sub { font-size: 12px; color: #506070; text-align: center; max-width: 200px; }
+  .as-scan-label { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+  .as-scan-sub { font-size: 12px; color: var(--text-muted); text-align: center; max-width: 200px; }
 
   .as-hist { margin-top: 40px; }
-  .as-hist-title { font-size: 14px; font-weight: 600; color: #8fa3b8; margin-bottom: 14px; }
+  .as-hist-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 14px; }
   .as-hist-grid { display: flex; flex-direction: column; gap: 8px; }
   .as-hist-item {
     display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    background: #0e131a; border: 1px solid #1e2d3d; border-radius: 10px;
+    background: var(--bg-input); border: 1px solid #2a3040; border-radius: 10px;
   }
   .as-hist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .as-hist-info { flex: 1; min-width: 0; }
-  .as-hist-mat { font-size: 13px; font-weight: 600; color: #f0f4f8; }
-  .as-hist-fec { font-size: 11px; color: #506070; }
+  .as-hist-mat { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .as-hist-fec { font-size: 11px; color: var(--text-muted); }
 
   .bread { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 13px; }
-  .bread-btn { background: none; border: none; color: #8fa3b8; cursor: pointer; font-family: inherit; font-size: 13px; padding: 0; }
-  .bread-btn:hover { color: #f0f4f8; }
-  .bread-sep { color: #1e2d3d; }
-  .bread-cur { color: #f0f4f8; font-weight: 600; }
+  .bread-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-family: inherit; font-size: 13px; padding: 0; }
+  .bread-btn:hover { color: var(--text-primary); }
+  .bread-sep { color: #2a3040; }
+  .bread-cur { color: var(--text-primary); font-weight: 600; }
 
   .grid-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .sel-card {
-    background: #0e131a; border: 1px solid #1e2d3d; border-radius: 12px;
+    background: var(--bg-input); border: 1px solid #2a3040; border-radius: 12px;
     padding: 18px; cursor: pointer; transition: all 0.15s;
   }
   .sel-card:hover { border-color: var(--accent); background: var(--accent-muted); }
   .sel-card:active { transform: scale(0.98); }
-  .sel-card-nom { font-size: 14px; font-weight: 600; color: #f0f4f8; }
-  .sel-card-sub { font-size: 11px; color: #506070; margin-top: 3px; }
+  .sel-card-nom { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .sel-card-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
   .as-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
   .as-toolbar-left { display: flex; align-items: center; gap: 12px; }
   .as-toolbar-right { display: flex; align-items: center; gap: 8px; }
   .as-btn {
-    height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid #1e2d3d;
-    background: #0e131a; color: #f0f4f8; font-size: 12px; font-weight: 500;
+    height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid #2a3040;
+    background: var(--bg-input); color: var(--text-primary); font-size: 12px; font-weight: 500;
     cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px;
     transition: all 0.15s;
   }
@@ -76,19 +76,19 @@ const css = `
   .as-btn-primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
   .as-btn-primary:hover { opacity: 0.88; }
 
-  .as-table-wrap { overflow-x: auto; border: 1px solid #1e2d3d; border-radius: 12px; }
+  .as-table-wrap { overflow-x: auto; border: 1px solid #2a3040; border-radius: 12px; }
   .as-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .as-table th { text-align: left; padding: 12px 16px; background: #0e131a; color: #506070; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #1e2d3d; }
-  .as-table td { padding: 10px 16px; border-bottom: 1px solid #1a2230; color: #cbd5e1; }
+  .as-table th { text-align: left; padding: 12px 16px; background: var(--bg-input); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #2a3040; }
+  .as-table td { padding: 10px 16px; border-bottom: 1px solid var(--bg-hover); color: #cbd5e1; }
   .as-table tr:last-child td { border-bottom: none; }
-  .as-table tr:hover td { background: #0e131a; }
+  .as-table tr:hover td { background: var(--bg-input); }
 
   .as-badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
   }
   .as-badge-presente { background: #34d39915; color: #34d399; }
-  .as-badge-ausente  { background: #1e2d3d; color: #506070; }
+  .as-badge-ausente  { background: #2a3040; color: var(--text-muted); }
   .as-badge-becado   { background: #fbbf2415; color: #fbbf24; }
 
   .as-toggle {
@@ -102,28 +102,28 @@ const css = `
   }
   .as-toggle.on  { background: #34d399; }
   .as-toggle.on::after  { left: 15px; }
-  .as-toggle.off { background: #1e2d3d; }
+  .as-toggle.off { background: #2a3040; }
   .as-toggle.off::after { left: 3px; }
 
   .as-empty {
-    text-align: center; padding: 40px 20px; color: #506070;
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
   }
   .as-empty-icon { width: 40px; height: 40px; margin: 0 auto 12px; opacity: 0.3; }
 
   /* Alumno — instrucciones QR */
   .qr-instruc-card {
-    background: #0e131a; border: 1px solid #1e2d3d; border-radius: 16px;
+    background: var(--bg-input); border: 1px solid #2a3040; border-radius: 16px;
     padding: 28px 24px; max-width: 480px; margin: 0 auto;
   }
   .qr-instruc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
   .qr-instruc-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .qr-instruc-title { font-size: 16px; font-weight: 700; color: #f0f4f8; }
-  .qr-instruc-sub { font-size: 12px; color: #506070; margin-top: 2px; }
+  .qr-instruc-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+  .qr-instruc-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
   .qr-steps { display: flex; flex-direction: column; gap: 12px; }
-  .qr-step { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #131920; border: 1px solid #1a2230; border-radius: 10px; }
+  .qr-step { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--bg-surface); border: 1px solid var(--bg-hover); border-radius: 10px; }
   .qr-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-muted); border: 1px solid var(--accent-hover); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
-  .qr-step-title { font-size: 13px; font-weight: 600; color: #f0f4f8; margin-bottom: 2px; }
-  .qr-step-desc { font-size: 12px; color: #506070; line-height: 1.5; }
+  .qr-step-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .qr-step-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
   .qr-tip { display: flex; align-items: flex-start; gap: 8px; margin-top: 20px; padding: 12px 14px; background: #f59e0b08; border: 1px solid #f59e0b20; border-radius: 8px; font-size: 12px; color: #f59e0b; line-height: 1.5; }
   .qr-tip svg { flex-shrink: 0; margin-top: 1px; }
 
@@ -131,10 +131,10 @@ const css = `
   .as-hist-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; flex-shrink: 0; }
   .as-hist-badge.presente { background: #34d39915; color: #34d399; }
   .as-hist-badge.ausente { background: #ef444415; color: #ef4444; }
-  .as-hist-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #0e131a; border: 1px solid #1e2d3d; border-radius: 10px; }
+  .as-hist-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-input); border: 1px solid #2a3040; border-radius: 10px; }
   .as-hist-left { flex: 1; min-width: 0; }
-  .as-hist-mat { font-size: 13px; font-weight: 600; color: #f0f4f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .as-hist-fec { font-size: 11px; color: #506070; margin-top: 2px; }
+  .as-hist-mat { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .as-hist-fec { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
   @media(max-width:900px){
     .alumno-layout { grid-template-columns: 1fr; }
@@ -236,7 +236,7 @@ function AlumnoView() {
 
           {/* Col 2 — Historial */}
           <div>
-            <div className="as-hist-title" style={{ marginBottom: 14, fontWeight: 700, color: '#8fa3b8', fontSize: 14 }}>
+            <div className="as-hist-title" style={{ marginBottom: 14, fontWeight: 700, color: 'var(--text-secondary)', fontSize: 14 }}>
               Últimos registros
             </div>
             {historial.length > 0 ? (
@@ -256,7 +256,7 @@ function AlumnoView() {
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign:'center', padding:'40px 20px', color:'#506070', fontSize:13, background:'#0e131a', border:'1px solid #1e2d3d', borderRadius:12 }}>
+              <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text-muted)', fontSize:13, background:'var(--bg-input)', border:'1px solid #2a3040', borderRadius:12 }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin:'0 auto 12px', opacity:0.25, display:'block' }}>
                   <path d="M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"/>
                 </svg>
@@ -486,14 +486,14 @@ function ProfesorView() {
             <div className="as-toolbar">
               <div className="as-toolbar-left">
                 <input type="date" value={fecha} onChange={e => cambiarFecha(e.target.value)}
-                  style={{ height: 34, padding: '0 12px', borderRadius: 8, border: '1px solid #1e2d3d', background: '#0e131a', color: '#f0f4f8', fontSize: 13, fontFamily: 'inherit' }} />
-                <span style={{ fontSize: 12, color: '#506070' }}>{fechaLabel}</span>
+                  style={{ height: 34, padding: '0 12px', borderRadius: 8, border: '1px solid #2a3040', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit' }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fechaLabel}</span>
               </div>
               <div className="as-toolbar-right">
-                <span style={{ fontSize: 12, color: '#8fa3b8' }}>{presentes}/{total} presentes</span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{presentes}/{total} presentes</span>
                 {/* QR timer badge — visible without modal */}
                 {qrActive && (
-                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'#131920', border:`1px solid ${qrClr}30`, borderRadius:8, padding:'5px 10px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-surface)', border:`1px solid ${qrClr}30`, borderRadius:8, padding:'5px 10px' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={qrClr} strokeWidth="2">
                       <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                     </svg>
@@ -526,7 +526,7 @@ function ProfesorView() {
               <tbody>
                 {alumnos.map((a, i) => (
                   <tr key={a.id}>
-                    <td style={{ color: '#506070', width:40 }}>{i + 1}</td>
+                    <td style={{ color: 'var(--text-muted)', width:40 }}>{i + 1}</td>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                         {a.nombre}
@@ -600,21 +600,21 @@ function ProfesorView() {
       {/* Motivo ausencia modal */}
       {motivoModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', backdropFilter:'blur(4px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ background:'#131920', border:'1px solid #1e2d3d', borderRadius:16, width:'100%', maxWidth:360, padding:24, boxShadow:'0 24px 60px rgba(0,0,0,.6)' }}>
-            <div style={{ fontSize:15, fontWeight:700, color:'#f0f4f8', marginBottom:6 }}>Marcar ausente</div>
-            <div style={{ fontSize:13, color:'#8fa3b8', marginBottom:16 }}>{motivoModal.nombre}</div>
-            <label style={{ display:'block', fontSize:10, fontWeight:600, color:'#506070', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Motivo de ausencia (opcional)</label>
+          <div style={{ background:'var(--bg-surface)', border:'1px solid #2a3040', borderRadius:16, width:'100%', maxWidth:360, padding:24, boxShadow:'0 24px 60px rgba(0,0,0,.6)' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--text-primary)', marginBottom:6 }}>Marcar ausente</div>
+            <div style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:16 }}>{motivoModal.nombre}</div>
+            <label style={{ display:'block', fontSize:10, fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Motivo de ausencia (opcional)</label>
             <input
               autoFocus
               value={motivoText}
               onChange={e => setMotivoText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && confirmarAusente()}
               placeholder="Ej: Enfermedad, falta justificada..."
-              style={{ width:'100%', background:'#0d1117', border:'1px solid #243447', borderRadius:8, color:'#f0f4f8', fontSize:13, fontFamily:'inherit', padding:'9px 12px', outline:'none', marginBottom:16 }}
+              style={{ width:'100%', background:'var(--bg-input)', border:'1px solid var(--border-light)', borderRadius:8, color:'var(--text-primary)', fontSize:13, fontFamily:'inherit', padding:'9px 12px', outline:'none', marginBottom:16 }}
             />
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => { setMotivoModal(null); setMotivoText('') }}
-                style={{ flex:1, padding:10, background:'#1a2230', border:'1px solid #243447', borderRadius:9, color:'#8fa3b8', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer' }}>
+                style={{ flex:1, padding:10, background:'var(--bg-hover)', border:'1px solid var(--border-light)', borderRadius:9, color:'var(--text-secondary)', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer' }}>
                 Cancelar
               </button>
               <button onClick={confirmarAusente}
@@ -695,10 +695,10 @@ function AdminView() {
             { lbl:'Total registros', val:totalRegistros, color:'var(--accent)', bg:'var(--accent-muted)' },
             { lbl:'Presencias',      val:totalPresentes, color:'#22c55e', bg:'#22c55e18' },
             { lbl:'Ausencias',       val:totalRegistros-totalPresentes, color:'#ef4444', bg:'#ef444418' },
-            { lbl:'% Global',        val:`${pctGlobal}%`, color: pctGlobal>=75?'#22c55e':pctGlobal>=50?'#f59e0b':'#ef4444', bg:'#1a2230' },
+            { lbl:'% Global',        val:`${pctGlobal}%`, color: pctGlobal>=75?'#22c55e':pctGlobal>=50?'#f59e0b':'#ef4444', bg:'var(--bg-hover)' },
           ].map(k => (
-            <div key={k.lbl} style={{ background:'#0e131a', border:'1px solid #1e2d3d', borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:11, color:'#506070', marginBottom:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{k.lbl}</div>
+            <div key={k.lbl} style={{ background:'var(--bg-input)', border:'1px solid #2a3040', borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{k.lbl}</div>
               <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.val}</div>
             </div>
           ))}
@@ -706,7 +706,7 @@ function AdminView() {
 
         {/* Buscador */}
         <div style={{ position:'relative', marginBottom:14, maxWidth:360 }}>
-          <svg style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', width:14, height:14, color:'#506070', pointerEvents:'none' }}
+          <svg style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', width:14, height:14, color:'var(--text-muted)', pointerEvents:'none' }}
             viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
@@ -714,7 +714,7 @@ function AdminView() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar materia…"
-            style={{ width:'100%', background:'#0e131a', border:'1px solid #1e2d3d', borderRadius:9, color:'#f0f4f8', fontSize:13, fontFamily:'inherit', outline:'none', padding:'8px 14px 8px 34px' }}
+            style={{ width:'100%', background:'var(--bg-input)', border:'1px solid #2a3040', borderRadius:9, color:'var(--text-primary)', fontSize:13, fontFamily:'inherit', outline:'none', padding:'8px 14px 8px 34px' }}
           />
         </div>
 
@@ -747,14 +747,14 @@ function AdminView() {
                   const pctColor = r.pct >= 75 ? '#22c55e' : r.pct >= 50 ? '#f59e0b' : '#ef4444'
                   return (
                     <tr key={r.materia_id}>
-                      <td style={{ fontWeight:600, color:'#f0f4f8' }}>{r.materia}</td>
-                      <td style={{ textAlign:'center', color:'#8fa3b8' }}>{r.total}</td>
+                      <td style={{ fontWeight:600, color:'var(--text-primary)' }}>{r.materia}</td>
+                      <td style={{ textAlign:'center', color:'var(--text-secondary)' }}>{r.total}</td>
                       <td style={{ textAlign:'center', color:'#22c55e', fontWeight:600 }}>{r.presentes}</td>
                       <td style={{ textAlign:'center', color:'#ef4444', fontWeight:600 }}>{r.ausentes}</td>
                       <td style={{ textAlign:'center', fontWeight:800, color:pctColor }}>{r.pct}%</td>
                       <td>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                          <div style={{ flex:1, height:6, background:'#1e2d3d', borderRadius:3, overflow:'hidden', minWidth:60 }}>
+                          <div style={{ flex:1, height:6, background:'#2a3040', borderRadius:3, overflow:'hidden', minWidth:60 }}>
                             <div style={{ height:'100%', width:`${r.pct}%`, background:pctColor, borderRadius:3, transition:'width .3s' }} />
                           </div>
                         </div>

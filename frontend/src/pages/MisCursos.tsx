@@ -37,8 +37,8 @@ const TIPO_COLOR: Record<string, string> = {
   final:     '#ef4444',
   entrega:   '#f59e0b',
   actividad: 'var(--accent)',
-  asueto:    '#506070',
-  feriado:   '#506070',
+  asueto:    'var(--text-muted)',
+  feriado:   'var(--text-muted)',
 }
 
 function periodo(anio: number | null, semestre: number | null) {
@@ -54,7 +54,7 @@ function SkeletonRows({ cols }: { cols: number }) {
             <div style={{
               height: 38,
               borderRadius: 6,
-              background: 'linear-gradient(90deg,#131920 25%,#1a2230 50%,#131920 75%)',
+              background: 'linear-gradient(90deg,var(--bg-surface) 25%,var(--bg-hover) 50%,var(--bg-surface) 75%)',
               backgroundSize: '200% 100%',
               animation: 'mc-shimmer 1.4s infinite',
             }} />
@@ -69,60 +69,60 @@ const css = `
   *, *::before, *::after { box-sizing:border-box; }
   @keyframes mc-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-  .mc-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:#f0f4f8; min-height:0; }
+  .mc-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:var(--text-primary); min-height:0; }
 
   .mc-topbar {
     display:flex; align-items:center; gap:12px; padding:0 24px;
-    height:56px; border-bottom:1px solid #1e2d3d; background:#0b0f14;
+    height:56px; border-bottom:1px solid #2a3040; background:var(--bg-base);
     position:sticky; top:0; z-index:20; flex-shrink:0;
   }
-  .mc-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; margin:0; }
+  .mc-topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; margin:0; }
   .mc-tabs { display:flex; gap:4px; margin-left:auto; }
   .mc-tab {
-    padding:6px 14px; border-radius:8px; border:1px solid #1e2d3d;
-    background:transparent; color:#506070; font-size:12px; font-weight:600;
+    padding:6px 14px; border-radius:8px; border:1px solid #2a3040;
+    background:transparent; color:var(--text-muted); font-size:12px; font-weight:600;
     font-family:inherit; cursor:pointer; transition:all .15s;
   }
   .mc-tab.active { background:var(--accent-muted); border-color:var(--accent-hover); color:var(--accent); }
-  .mc-tab:hover:not(.active) { border-color:#243447; color:#8fa3b8; }
+  .mc-tab:hover:not(.active) { border-color:var(--border-light); color:var(--text-secondary); }
 
   .mc-content { padding:20px 24px; flex:1; overflow-y:auto; }
 
-  .mc-card { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
-  .mc-card-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #1e2d3d; }
-  .mc-card-hdr h3 { font-size:13px; font-weight:700; color:#f0f4f8; margin:0; }
+  .mc-card { background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; overflow:hidden; }
+  .mc-card-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #2a3040; }
+  .mc-card-hdr h3 { font-size:13px; font-weight:700; color:var(--text-primary); margin:0; }
 
-  .mc-filter { display:flex; align-items:center; gap:8px; padding:12px 18px; border-bottom:1px solid #1e2d3d; flex-wrap:wrap; }
+  .mc-filter { display:flex; align-items:center; gap:8px; padding:12px 18px; border-bottom:1px solid #2a3040; flex-wrap:wrap; }
   .mc-input {
-    background:#0d1117; border:1px solid #1e2d3d; border-radius:8px;
-    color:#f0f4f8; font-size:12px; font-family:inherit; padding:6px 10px; outline:none;
+    background:var(--bg-input); border:1px solid #2a3040; border-radius:8px;
+    color:var(--text-primary); font-size:12px; font-family:inherit; padding:6px 10px; outline:none;
   }
   .mc-input:focus { border-color:var(--accent-hover); }
   .mc-select {
-    background:#0d1117; border:1px solid #1e2d3d; border-radius:8px;
-    color:#f0f4f8; font-size:12px; font-family:inherit; padding:6px 10px;
+    background:var(--bg-input); border:1px solid #2a3040; border-radius:8px;
+    color:var(--text-primary); font-size:12px; font-family:inherit; padding:6px 10px;
     outline:none; cursor:pointer;
   }
 
   .mc-table { width:100%; border-collapse:collapse; }
   .mc-table thead th {
-    padding:9px 14px; font-size:9px; font-weight:700; color:#506070;
+    padding:9px 14px; font-size:9px; font-weight:700; color:var(--text-muted);
     text-transform:uppercase; letter-spacing:.07em; text-align:left;
-    border-bottom:1px solid #1e2d3d; background:#0d1117; white-space:nowrap;
+    border-bottom:1px solid #2a3040; background:var(--bg-input); white-space:nowrap;
   }
   .mc-table thead th.c { text-align:center; }
-  .mc-table tbody td { padding:11px 14px; border-bottom:1px solid #1e2d3d22; font-size:13px; vertical-align:middle; }
+  .mc-table tbody td { padding:11px 14px; border-bottom:1px solid #2a304022; font-size:13px; vertical-align:middle; }
   .mc-table tbody tr:last-child td { border-bottom:none; }
-  .mc-table tbody tr:hover td { background:#1a2230; }
+  .mc-table tbody tr:hover td { background:var(--bg-hover); }
   .mc-table td.c { text-align:center; }
 
-  .mc-footer { padding:11px 18px; border-top:1px solid #1e2d3d; font-size:12px; color:#506070; }
-  .mc-empty  { text-align:center; padding:40px; color:#506070; font-size:13px; }
+  .mc-footer { padding:11px 18px; border-top:1px solid #2a3040; font-size:12px; color:var(--text-muted); }
+  .mc-empty  { text-align:center; padding:40px; color:var(--text-muted); font-size:13px; }
 
   .mc-btn {
     display:inline-flex; align-items:center; gap:5px;
-    padding:5px 10px; border-radius:7px; border:1px solid #243447;
-    background:transparent; color:#8fa3b8; font-size:11px; font-weight:600;
+    padding:5px 10px; border-radius:7px; border:1px solid var(--border-light);
+    background:transparent; color:var(--text-secondary); font-size:11px; font-weight:600;
     font-family:inherit; cursor:pointer; white-space:nowrap; transition:all .15s;
   }
   .mc-btn:hover { border-color:var(--accent-hover); color:var(--accent); }
@@ -132,8 +132,8 @@ const css = `
 
   .mc-badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
 
-  .mc-pagination { display:flex; align-items:center; gap:8px; padding:11px 18px; border-top:1px solid #1e2d3d; }
-  .mc-pagination span { flex:1; text-align:center; font-size:12px; color:#506070; }
+  .mc-pagination { display:flex; align-items:center; gap:8px; padding:11px 18px; border-top:1px solid #2a3040; }
+  .mc-pagination span { flex:1; text-align:center; font-size:12px; color:var(--text-muted); }
 
   @media(max-width:768px){
     .mc-topbar { height:auto; padding:10px 14px; flex-wrap:wrap; gap:8px; }
@@ -278,11 +278,11 @@ export default function MisCursos() {
                       ? <tr><td colSpan={6} className="mc-empty">No tenés materias asignadas este semestre.</td></tr>
                       : materias.map(m => (
                           <tr key={m.id}>
-                            <td style={{ fontWeight:600, color:'#f0f4f8' }}>{m.nombre}</td>
-                            <td className="c" style={{ color:'#8fa3b8' }}>{m.anio ?? '—'}</td>
-                            <td className="c" style={{ color:'#8fa3b8' }}>{m.semestre ?? '—'}</td>
+                            <td style={{ fontWeight:600, color:'var(--text-primary)' }}>{m.nombre}</td>
+                            <td className="c" style={{ color:'var(--text-secondary)' }}>{m.anio ?? '—'}</td>
+                            <td className="c" style={{ color:'var(--text-secondary)' }}>{m.semestre ?? '—'}</td>
                             <td className="c" style={{ color:'var(--accent)', fontWeight:700 }}>{alumnosMap[m.id] ?? 0}</td>
-                            <td style={{ color:'#8fa3b8' }}>{periodo(m.anio, m.semestre)}</td>
+                            <td style={{ color:'var(--text-secondary)' }}>{periodo(m.anio, m.semestre)}</td>
                             <td>
                               <div style={{ display:'flex', gap:5 }}>
                                 <button className="mc-btn" onClick={() => navigate(`/puntajes?materia_id=${m.id}`)}>Ver Puntajes</button>
@@ -344,11 +344,11 @@ export default function MisCursos() {
                       ? <tr><td colSpan={5} className="mc-empty">Sin resultados.</td></tr>
                       : hPaged.map(m => (
                           <tr key={m.id}>
-                            <td style={{ fontWeight:600, color:'#f0f4f8' }}>{m.nombre}</td>
-                            <td className="c" style={{ color:'#8fa3b8' }}>{m.anio ?? '—'}</td>
-                            <td className="c" style={{ color:'#8fa3b8' }}>{m.semestre ?? '—'}</td>
+                            <td style={{ fontWeight:600, color:'var(--text-primary)' }}>{m.nombre}</td>
+                            <td className="c" style={{ color:'var(--text-secondary)' }}>{m.anio ?? '—'}</td>
+                            <td className="c" style={{ color:'var(--text-secondary)' }}>{m.semestre ?? '—'}</td>
                             <td className="c" style={{ color:'var(--accent)', fontWeight:700 }}>{alumnosMap[m.id] ?? 0}</td>
-                            <td style={{ color:'#8fa3b8' }}>{periodo(m.anio, m.semestre)}</td>
+                            <td style={{ color:'var(--text-secondary)' }}>{periodo(m.anio, m.semestre)}</td>
                           </tr>
                         ))
                     }
@@ -401,22 +401,22 @@ export default function MisCursos() {
                       : aFiltered.length === 0
                       ? <tr><td colSpan={5} className="mc-empty">No hay eventos registrados para tus materias.</td></tr>
                       : aFiltered.map(e => {
-                          const col = TIPO_COLOR[e.tipo] ?? '#506070'
+                          const col = TIPO_COLOR[e.tipo] ?? 'var(--text-muted)'
                           return (
                             <tr key={e.id}>
-                              <td style={{ fontWeight:600, color:'#f0f4f8' }}>
+                              <td style={{ fontWeight:600, color:'var(--text-primary)' }}>
                                 {e.materia_id ? (materiaName[e.materia_id] ?? '—') : '—'}
                               </td>
                               <td>
                                 <span className="mc-badge" style={{ background:`${col}22`, color:col }}>{e.tipo}</span>
                               </td>
-                              <td style={{ color:'#8fa3b8', maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              <td style={{ color:'var(--text-secondary)', maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                                 {e.descripcion || e.titulo}
                               </td>
-                              <td style={{ color:'#8fa3b8', whiteSpace:'nowrap' }}>
+                              <td style={{ color:'var(--text-secondary)', whiteSpace:'nowrap' }}>
                                 {new Date(e.fecha + 'T00:00:00').toLocaleDateString('es-PY')}
                               </td>
-                              <td className="c" style={{ color:'#f0f4f8', fontWeight:700 }}>{oportunidad[e.id] ?? 1}</td>
+                              <td className="c" style={{ color:'var(--text-primary)', fontWeight:700 }}>{oportunidad[e.id] ?? 1}</td>
                             </tr>
                           )
                         })

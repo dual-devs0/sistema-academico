@@ -13,9 +13,9 @@ interface ToastItem {
 }
 
 const colors: Record<ToastType, { border: string; color: string; bg: string; icon: string }> = {
-  success: { border: '#22c55e40', color: '#22c55e', bg: '#0d1117', icon: '✓' },
-  error:   { border: '#ef444440', color: '#ef4444', bg: '#0d1117', icon: '✕' },
-  warning: { border: '#f59e0b40', color: '#f59e0b', bg: '#0d1117', icon: '⚠' },
+  success: { border: '#22c55e40', color: '#22c55e', bg: 'var(--bg-input)', icon: '✓' },
+  error:   { border: '#ef444440', color: '#ef4444', bg: 'var(--bg-input)', icon: '✕' },
+  warning: { border: '#f59e0b40', color: '#f59e0b', bg: 'var(--bg-input)', icon: '⚠' },
 }
 
 export default function GlobalToast() {

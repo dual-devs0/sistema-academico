@@ -44,15 +44,15 @@ function calcPromGeneral(mats: Materia[]): string {
 
 function colorProm(p: string): string {
   const n = parseFloat(p)
-  if (isNaN(n)) return '#8fa3b8'
+  if (isNaN(n)) return 'var(--text-secondary)'
   if (n>=8) return '#22c55e'
   if (n>=6) return '#f59e0b'
   return '#ef4444'
 }
 
 function colorNota(n: number|null): string {
-  if (n===null) return '#506070'
-  if (n>=8) return '#f0f4f8'
+  if (n===null) return 'var(--text-muted)'
+  if (n>=8) return 'var(--text-primary)'
   if (n>=6) return '#f59e0b'
   return '#ef4444'
 }
@@ -144,66 +144,66 @@ function buildPdfHtml(alumno: AlumnoData, mats: Materia[]): string {
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; }
-  .bol-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; }
+  .bol-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:var(--text-primary); }
 
   .topbar {
     display:flex; align-items:center; padding:0 24px; height:56px;
-    border-bottom:1px solid #1e2d3d; background:#0b0f14;
+    border-bottom:1px solid #2a3040; background:var(--bg-base);
     position:sticky; top:0; z-index:20; flex-shrink:0;
   }
-  .topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
+  .topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; }
 
   .content { padding:20px 24px; flex:1; }
 
   /* ── Admin selector bar ── */
   .sel-bar {
     display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;
-    background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:14px 16px;
+    background:var(--bg-surface); border:1px solid #2a3040; border-radius:12px; padding:14px 16px;
   }
-  .sel-bar-lbl { font-size:12px; color:#506070; font-weight:600; white-space:nowrap; }
+  .sel-bar-lbl { font-size:12px; color:var(--text-muted); font-weight:600; white-space:nowrap; }
   .sel-search-wrap { flex:1; min-width:200px; position:relative; }
-  .sel-search-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:#506070; pointer-events:none; }
+  .sel-search-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-muted); pointer-events:none; }
   .sel-search {
-    width:100%; background:#0d1117; border:1px solid #243447;
-    border-radius:9px; color:#f0f4f8; font-size:13px;
+    width:100%; background:var(--bg-input); border:1px solid var(--border-light);
+    border-radius:9px; color:var(--text-primary); font-size:13px;
     font-family:inherit; outline:none; padding:8px 14px 8px 34px; transition:border-color .15s;
   }
   .sel-search:focus { border-color:var(--accent); }
-  .sel-search::placeholder { color:#506070; }
+  .sel-search::placeholder { color:var(--text-muted); }
   .sel-dropdown {
     position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:50;
-    background:#131920; border:1px solid #1e2d3d; border-radius:10px;
+    background:var(--bg-surface); border:1px solid #2a3040; border-radius:10px;
     box-shadow:0 12px 32px rgba(0,0,0,.6); max-height:240px; overflow-y:auto;
   }
   .sel-option {
-    padding:10px 14px; cursor:pointer; font-size:13px; color:#8fa3b8;
+    padding:10px 14px; cursor:pointer; font-size:13px; color:var(--text-secondary);
     border:none; background:none; width:100%; text-align:left; font-family:inherit;
     display:flex; align-items:center; gap:10px; transition:background .12s;
   }
-  .sel-option:hover, .sel-option.active { background:#1a2230; color:#f0f4f8; }
+  .sel-option:hover, .sel-option.active { background:var(--bg-hover); color:var(--text-primary); }
   .sel-avatar {
     width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:10px; font-weight:700; color:#000; flex-shrink:0;
     background:linear-gradient(135deg,var(--accent),#0ea5e9);
   }
   .sel-info { flex:1; min-width:0; }
-  .sel-name { font-size:13px; font-weight:600; color:#f0f4f8; }
-  .sel-email { font-size:11px; color:#506070; }
+  .sel-name { font-size:13px; font-weight:600; color:var(--text-primary); }
+  .sel-email { font-size:11px; color:var(--text-muted); }
   .sel-selected-chip {
     display:inline-flex; align-items:center; gap:8px;
     background:var(--accent-muted); border:1px solid var(--accent-hover);
     border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--accent);
   }
   .sel-selected-chip button { background:none; border:none; color:var(--accent); cursor:pointer; padding:0; display:flex; line-height:1; }
-  .sel-selected-chip button:hover { color:#f0f4f8; }
+  .sel-selected-chip button:hover { color:var(--text-primary); }
 
   /* ── Empty state ── */
   .bol-empty {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:80px 20px; text-align:center; color:#506070;
+    padding:80px 20px; text-align:center; color:var(--text-muted);
   }
   .bol-empty-icon { width:56px; height:56px; margin-bottom:16px; opacity:.2; }
-  .bol-empty-title { font-size:16px; font-weight:600; color:#8fa3b8; margin-bottom:6px; }
+  .bol-empty-title { font-size:16px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; }
   .bol-empty-sub { font-size:13px; }
 
   .actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
@@ -217,48 +217,48 @@ const css = `
   .btn-primary svg { width:13px; height:13px; flex-shrink:0; }
   .btn-secondary {
     display:inline-flex; align-items:center; gap:6px;
-    padding:9px 16px; background:#131920; border:1px solid #1e2d3d;
-    border-radius:9px; color:#8fa3b8; font-size:13px; font-weight:600;
+    padding:9px 16px; background:var(--bg-surface); border:1px solid #2a3040;
+    border-radius:9px; color:var(--text-secondary); font-size:13px; font-weight:600;
     font-family:inherit; cursor:pointer; white-space:nowrap; transition:border-color .15s, color .15s;
   }
-  .btn-secondary:hover { border-color:var(--accent); color:#f0f4f8; }
+  .btn-secondary:hover { border-color:var(--accent); color:var(--text-primary); }
   .btn-secondary svg { width:13px; height:13px; flex-shrink:0; }
 
   /* Boleta dark preview */
-  .boleta { max-width:820px; margin:0 auto; background:#131920; border:1px solid #1e2d3d; border-radius:16px; overflow:hidden; }
+  .boleta { max-width:820px; margin:0 auto; background:var(--bg-surface); border:1px solid #2a3040; border-radius:16px; overflow:hidden; }
 
   /* Header */
   .bol-hdr { padding:20px 24px 18px; border-bottom:3px solid var(--accent); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
   .bol-hdr-left { display:flex; align-items:center; gap:12px; }
   .bol-logo { width:44px; height:44px; background:linear-gradient(135deg,var(--accent),#0ea5e9); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .bol-logo svg { width:22px; height:22px; }
-  .bol-inst { font-size:15px; font-weight:800; color:#f0f4f8; }
-  .bol-isub { font-size:11px; color:#506070; margin-top:2px; }
+  .bol-inst { font-size:15px; font-weight:800; color:var(--text-primary); }
+  .bol-isub { font-size:11px; color:var(--text-muted); margin-top:2px; }
   .bol-hdr-right { text-align:right; }
-  .bol-emit-lbl  { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
-  .bol-emit-date { font-size:13px; font-weight:700; color:#f0f4f8; margin-top:3px; }
+  .bol-emit-lbl  { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.07em; }
+  .bol-emit-date { font-size:13px; font-weight:700; color:var(--text-primary); margin-top:3px; }
 
   /* Meta grid */
-  .bol-meta { display:grid; grid-template-columns:repeat(3,1fr); background:#1a2230; border-bottom:1px solid #1e2d3d; }
-  .mc { padding:13px 18px; border-right:1px solid #1e2d3d; }
+  .bol-meta { display:grid; grid-template-columns:repeat(3,1fr); background:var(--bg-hover); border-bottom:1px solid #2a3040; }
+  .mc { padding:13px 18px; border-right:1px solid #2a3040; }
   .mc:nth-child(3n) { border-right:none; }
-  .ml { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; font-weight:600; }
-  .mv { font-size:13px; font-weight:600; color:#f0f4f8; }
+  .ml { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; font-weight:600; }
+  .mv { font-size:13px; font-weight:600; color:var(--text-primary); }
   .mc-cy { font-size:13px; font-weight:700; color:var(--accent); }
   .beca-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; background:#15803d18; color:#22c55e; font-size:11px; font-weight:700; }
 
   /* Sección */
-  .sec-lbl { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.08em; font-weight:700; padding:13px 18px 7px; }
+  .sec-lbl { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; font-weight:700; padding:13px 18px 7px; }
 
   /* Tabla */
   .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .table-scroll table { min-width:520px; }
   table { width:100%; border-collapse:collapse; }
-  thead th { padding:9px 14px; font-size:9px; font-weight:700; color:#506070; text-transform:uppercase; letter-spacing:.07em; text-align:left; border-bottom:1px solid #1e2d3d; background:#0d1117; white-space:nowrap; }
+  thead th { padding:9px 14px; font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.07em; text-align:left; border-bottom:1px solid #2a3040; background:var(--bg-input); white-space:nowrap; }
   thead th.c { text-align:center; }
-  tbody td { padding:12px 14px; border-bottom:1px solid #1e2d3d22; vertical-align:middle; }
+  tbody td { padding:12px 14px; border-bottom:1px solid #2a304022; vertical-align:middle; }
   tbody tr:last-child td { border-bottom:none; }
-  tbody tr:hover td { background:#1a2230; }
+  tbody tr:hover td { background:var(--bg-hover); }
   td.c { text-align:center; font-weight:700; }
 
   /* Total */
@@ -267,8 +267,8 @@ const css = `
   .bol-total-val { font-size:28px; font-weight:900; line-height:1; }
 
   /* Footer */
-  .bol-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; padding:11px 20px; background:#1a2230; border-top:1px solid #1e2d3d; }
-  .bol-foot span { font-size:11px; color:#506070; }
+  .bol-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; padding:11px 20px; background:var(--bg-hover); border-top:1px solid #2a3040; }
+  .bol-foot span { font-size:11px; color:var(--text-muted); }
 
   @media(max-width:768px){
     .topbar  { padding:0 14px; }
@@ -277,7 +277,7 @@ const css = `
     .btn-primary, .btn-secondary { flex:1; justify-content:center; }
     .bol-hdr { padding:14px 16px 12px; }
     .bol-meta { grid-template-columns:1fr 1fr; }
-    .mc:nth-child(3n)  { border-right:1px solid #1e2d3d; }
+    .mc:nth-child(3n)  { border-right:1px solid #2a3040; }
     .mc:nth-child(even){ border-right:none; }
     .mc:nth-last-child(-n+2){ border-bottom:none; }
     .bol-foot { flex-direction:column; gap:3px; }
@@ -338,12 +338,12 @@ function BoletaPreview({ alumno, materias }: { alumno: AlumnoData; materias: Mat
               const p = calcProm(m)
               return (
                 <tr key={m.nombre}>
-                  <td style={{fontWeight:600,color:'#f0f4f8',fontSize:13}}>{m.nombre}</td>
+                  <td style={{fontWeight:600,color:'var(--text-primary)',fontSize:13}}>{m.nombre}</td>
                   <td style={{color:'var(--accent)',fontSize:12}}>{m.profesor}</td>
                   <td className="c" style={{color:colorNota(m.parcial1)}}>{m.parcial1??'—'}</td>
                   <td className="c" style={{color:colorNota(m.parcial2)}}>{m.parcial2??'—'}</td>
                   <td className="c" style={{color:colorNota(m.tp)}}>{m.tp??'—'}</td>
-                  <td className="c" style={{color:'#506070'}}>{m.final??'—'}</td>
+                  <td className="c" style={{color:'var(--text-muted)'}}>{m.final??'—'}</td>
                   <td className="c" style={{fontSize:15,fontWeight:800,color:colorProm(p)}}>{p}</td>
                 </tr>
               )

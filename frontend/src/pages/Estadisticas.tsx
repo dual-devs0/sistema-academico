@@ -45,48 +45,48 @@ const css = `
   *, *::before, *::after { box-sizing:border-box; }
   @keyframes est-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-  .est-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:#f0f4f8; min-height:0; }
+  .est-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:var(--text-primary); min-height:0; }
 
   .est-topbar {
     display:flex; align-items:center; padding:0 24px; height:56px;
-    border-bottom:1px solid #1e2d3d; background:#0b0f14;
+    border-bottom:1px solid #2a3040; background:var(--bg-base);
     position:sticky; top:0; z-index:20; flex-shrink:0;
   }
-  .est-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; margin:0; }
-  .est-topbar p  { font-size:12px; color:#506070; margin:2px 0 0; }
+  .est-topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; margin:0; }
+  .est-topbar p  { font-size:12px; color:var(--text-muted); margin:2px 0 0; }
 
   .est-content { padding:20px 24px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
 
   .est-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .est-kpi {
-    background:#131920; border:1px solid #1e2d3d; border-radius:14px;
+    background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px;
     padding:16px; display:flex; flex-direction:column; gap:10px;
     transition:border-color .15s;
   }
-  .est-kpi:hover { border-color:#243447; }
+  .est-kpi:hover { border-color:var(--border-light); }
   .est-kpi-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .est-kpi-icon svg { width:16px; height:16px; }
   .est-kpi-val  { font-size:28px; font-weight:900; line-height:1; }
-  .est-kpi-lbl  { font-size:11px; color:#506070; margin-top:1px; }
-  .est-kpi-bar  { height:4px; background:#1e2d3d; border-radius:2px; overflow:hidden; }
+  .est-kpi-lbl  { font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .est-kpi-bar  { height:4px; background:#2a3040; border-radius:2px; overflow:hidden; }
   .est-kpi-fill { height:100%; border-radius:2px; }
 
   .est-charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   .est-card {
-    background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden;
+    background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; overflow:hidden;
   }
-  .est-card-hdr { padding:14px 18px 12px; border-bottom:1px solid #1e2d3d; }
-  .est-card-hdr h3 { font-size:13px; font-weight:700; color:#f0f4f8; margin:0; }
-  .est-card-hdr p  { font-size:11px; color:#506070; margin:3px 0 0; }
+  .est-card-hdr { padding:14px 18px 12px; border-bottom:1px solid #2a3040; }
+  .est-card-hdr h3 { font-size:13px; font-weight:700; color:var(--text-primary); margin:0; }
+  .est-card-hdr p  { font-size:11px; color:var(--text-muted); margin:3px 0 0; }
   .est-card-body { padding:16px 18px; }
 
   .est-skeleton {
     border-radius:6px;
-    background:linear-gradient(90deg,#131920 25%,#1a2230 50%,#131920 75%);
+    background:linear-gradient(90deg,var(--bg-surface) 25%,var(--bg-hover) 50%,var(--bg-surface) 75%);
     background-size:200% 100%;
     animation:est-shimmer 1.4s infinite;
   }
-  .est-empty { display:flex; align-items:center; justify-content:center; font-size:12px; color:#506070; }
+  .est-empty { display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--text-muted); }
 
   @media(max-width:900px){ .est-charts-row { grid-template-columns:1fr; } .est-kpi-row { grid-template-columns:repeat(2,1fr); } }
   @media(max-width:768px){ .est-content { padding:14px; } .est-topbar { padding:0 14px; } }
@@ -94,13 +94,13 @@ const css = `
 `
 
 const tooltipStyle = {
-  background: '#131920',
-  border: '1px solid #1e2d3d',
+  background: 'var(--bg-surface)',
+  border: '1px solid #2a3040',
   borderRadius: 8,
-  color: '#f0f4f8',
+  color: 'var(--text-primary)',
   fontSize: 12,
 }
-const axisStyle = { fill: '#506070', fontSize: 11 }
+const axisStyle = { fill: 'var(--text-muted)', fontSize: 11 }
 
 function truncate(s: string, n = 10) { return s.length > n ? s.slice(0, n) + '…' : s }
 
@@ -287,12 +287,12 @@ export default function Estadisticas() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={barData} margin={{ top:4, right:8, left:-20, bottom:0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2a3040" vertical={false} />
                       <XAxis dataKey="name" tick={axisStyle} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 10]} tick={axisStyle} axisLine={false} tickLine={false} />
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        cursor={{ fill:'#1e2d3d55' }}
+                        cursor={{ fill:'#2a304055' }}
                         formatter={(v: any) => [v, 'Promedio']}
                       />
                       <Bar dataKey="promedio" fill={CYAN} radius={[5, 5, 0, 0]} maxBarSize={40} />
@@ -339,7 +339,7 @@ export default function Estadisticas() {
                         iconType="circle"
                         iconSize={8}
                         formatter={(value: string) => (
-                          <span style={{ color:'#8fa3b8', fontSize:11 }}>{value}</span>
+                          <span style={{ color:'var(--text-secondary)', fontSize:11 }}>{value}</span>
                         )}
                       />
                     </PieChart>
@@ -364,12 +364,12 @@ export default function Estadisticas() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={lineData} margin={{ top:4, right:16, left:-20, bottom:0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a3040" vertical={false} />
                     <XAxis dataKey="name" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 100]} tick={axisStyle} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      cursor={{ stroke:'#1e2d3d', strokeWidth:1 }}
+                      cursor={{ stroke:'#2a3040', strokeWidth:1 }}
                       formatter={(v: any) => [`${v}%`, 'Asistencia']}
                     />
                     <Line
@@ -378,7 +378,7 @@ export default function Estadisticas() {
                       stroke={GREEN}
                       strokeWidth={2}
                       dot={{ fill:GREEN, r:4, strokeWidth:0 }}
-                      activeDot={{ r:6, fill:GREEN, stroke:'#131920', strokeWidth:2 }}
+                      activeDot={{ r:6, fill:GREEN, stroke:'var(--bg-surface)', strokeWidth:2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>

@@ -150,7 +150,7 @@ export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive 
                 <p className="text-white/40 text-sm">Han pasado los 15 minutos. Generá uno nuevo.</p>
               </div>
               <button onClick={generarQR}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00b4d8] text-[#0b0f14] text-sm font-semibold hover:bg-[#00b4d8]/90 transition-colors">
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00b4d8] text-[var(--bg-base)] text-sm font-semibold hover:bg-[#00b4d8]/90 transition-colors">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
                 </svg>
