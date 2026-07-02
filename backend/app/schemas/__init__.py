@@ -7,5 +7,6 @@ from . import puntaje_schema as puntaje
 from . import apunte_schema as apunte
 from . import evento_schema as evento
 from . import programa_schema as programa
+from . import foro_schema as foro
 
-__all__ = ["user", "materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa"]
+__all__ = ["user", "materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro"]
