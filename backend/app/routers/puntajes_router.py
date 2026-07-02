@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
 from app.dependencias import get_current_user
+from app.email_utils import send_new_grade_email_bg
 
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
 
@@ -41,6 +42,7 @@ def _calcular_promedio_final(notas: dict[str, float | None]) -> float | None:
 @router.post("/", response_model=schemas.puntaje.PuntajeOut)
 def create_puntaje(
     puntaje: schemas.puntaje.PuntajeCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
@@ -59,6 +61,13 @@ def create_puntaje(
     db.add(new_puntaje)
     db.commit()
     db.refresh(new_puntaje)
+
+    # Notificación email
+    target = db.query(models.user.User).filter(models.user.User.id == puntaje.user_id).first()
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == puntaje.materia_id).first()
+    if target and target.email and materia:
+        send_new_grade_email_bg(background_tasks, target.email, target.nombre or target.username, materia.nombre, puntaje.tipo, puntaje.valor)
+
     return new_puntaje
 
 
@@ -87,6 +96,7 @@ def list_puntajes(
 def update_puntaje(
     puntaje_id: int,
     puntaje: schemas.puntaje.PuntajeCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
@@ -104,6 +114,13 @@ def update_puntaje(
     existing.editado_en = __import__("datetime").datetime.utcnow()
     db.commit()
     db.refresh(existing)
+
+    # Notificación email
+    target = db.query(models.user.User).filter(models.user.User.id == existing.user_id).first()
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == existing.materia_id).first()
+    if target and target.email and materia:
+        send_new_grade_email_bg(background_tasks, target.email, target.nombre or target.username, materia.nombre, existing.tipo, existing.valor)
+
     return existing
 
 
@@ -217,6 +234,57 @@ def exportar_materia(
     return schemas.puntaje.ExportacionMateriaOut(
         materia_id=materia_id, materia_nombre=materia.nombre, alumnos=alumnos_out,
     )
+
+
+@router.get("/materia/{materia_id}/estadisticas")
+def estadisticas_materia(
+    materia_id: int,
+    db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
+):
+    """Promedio del grupo, distribución de notas, aprobados/riesgo."""
+    if current_user["role"] not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    puntajes = db.query(models.puntaje.Puntaje).filter(models.puntaje.Puntaje.materia_id == materia_id).all()
+    if not puntajes:
+        return {"materia_id": materia_id, "total_alumnos": 0, "promedio_grupo": 0, "distribucion": {}, "aprobados": 0, "en_riesgo": 0}
+
+    valores = [float(p.valor) for p in puntajes]
+    promedio = round(sum(valores) / len(valores), 2)
+
+    distribucion = {
+        "0-3": sum(1 for v in valores if v < 3),
+        "3-5": sum(1 for v in valores if 3 <= v < 5),
+        "5-6": sum(1 for v in valores if 5 <= v < 6),
+        "6-7": sum(1 for v in valores if 6 <= v < 7),
+        "7-9": sum(1 for v in valores if 7 <= v < 9),
+        "9-10": sum(1 for v in valores if 9 <= v <= 10),
+    }
+
+    alumnos_unicos = set(p.user_id for p in puntajes)
+    aprobados = 0
+    en_riesgo = 0
+    for uid in alumnos_unicos:
+        pts = [float(p.valor) for p in puntajes if p.user_id == uid]
+        if pts:
+            avg = sum(pts) / len(pts)
+            if avg >= 6:
+                aprobados += 1
+            else:
+                en_riesgo += 1
+
+    return {
+        "materia_id": materia_id,
+        "total_alumnos": len(alumnos_unicos),
+        "total_notas": len(puntajes),
+        "promedio_grupo": promedio,
+        "nota_maxima": round(max(valores), 2),
+        "nota_minima": round(min(valores), 2),
+        "distribucion": distribucion,
+        "aprobados": aprobados,
+        "en_riesgo": en_riesgo,
+    }
 
 
 # Keep this route last to avoid catching other /materia/ routes
