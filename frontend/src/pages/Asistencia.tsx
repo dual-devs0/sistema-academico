@@ -405,9 +405,21 @@ function ProfesorView() {
     <>
       <style>{css}</style>
       <div className="as-root">
-        <div className="as-header">
-          <div className="as-title">Control de Asistencia</div>
-          <div className="as-sub">Gestioná la asistencia de tus cursos por carrera y materia</div>
+        <div className="as-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div className="as-title" style={{ fontSize: 24, fontWeight: 800 }}>Control de Asistencia</div>
+            <div className="as-sub">
+              {selMat
+                ? <>Materia: <span style={{ color: 'var(--accent-bright)', fontWeight: 700 }}>{selMat.nombre}</span></>
+                : 'Gestioná la asistencia de tus cursos por carrera y materia'}
+            </div>
+          </div>
+          {view === 'alumnos' && (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-ghost"><i className="ti ti-download" /> Exportar Reporte</button>
+              <button className="btn-primary" onClick={() => setQrMatId(selMat!.id)}><i className="ti ti-hand-finger" /> Pase Manual</button>
+            </div>
+          )}
         </div>
 
         {/* Breadcrumb */}
@@ -451,6 +463,26 @@ function ProfesorView() {
 
         {view === 'alumnos' && (
           <>
+            {/* KPIs estilo captura */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 16 }}>
+              <div className="kpi-card">
+                <div className="mono-label" style={{ marginBottom: 6 }}>Asistencia Hoy</div>
+                <span className="kpi-value" style={{ fontSize: 24 }}>{total > 0 ? Math.round(presentes / total * 100) : 0}%</span>
+              </div>
+              <div className="kpi-card">
+                <div className="mono-label" style={{ marginBottom: 6 }}>Inasistencias</div>
+                <span className="kpi-value" style={{ fontSize: 24 }}>{alumnos.filter(a => a.presente === false).length}</span>
+              </div>
+              <div className="kpi-card">
+                <div className="mono-label" style={{ marginBottom: 6 }}>Sin Registro</div>
+                <span className="kpi-value" style={{ fontSize: 24 }}>{alumnos.filter(a => a.presente === null).length}</span>
+              </div>
+              <div className="kpi-card">
+                <div className="mono-label" style={{ marginBottom: 6 }}>Escaneos QR</div>
+                <span className="kpi-value" style={{ fontSize: 24, color: qrActive ? 'var(--accent-bright)' : undefined }}>{presentes}/{total}</span>
+                {qrActive && <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill" style={{ width: `${total ? presentes / total * 100 : 0}%` }} /></div>}
+              </div>
+            </div>
             <div className="as-toolbar">
               <div className="as-toolbar-left">
                 <input type="date" value={fecha} onChange={e => cambiarFecha(e.target.value)}
@@ -529,6 +561,29 @@ function ProfesorView() {
                 ))}
               </tbody>
             </table></div>}
+
+            {/* Mapa de Calor */}
+            <div className="card" style={{ marginTop: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <h3 style={{ fontSize: 15, fontWeight: 800 }}>Mapa de Calor: Compromiso Académico</h3>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Frecuencia de asistencia por alumno (sesión actual)</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className="mono-label">Baja</span>
+                  {[0.15, 0.35, 0.6, 0.85, 1].map(o => (
+                    <span key={o} style={{ width: 14, height: 10, borderRadius: 3, background: 'var(--accent)', opacity: o }} />
+                  ))}
+                  <span className="mono-label">Alta</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                {alumnos.map(a => (
+                  <span key={a.id} title={a.nombre}
+                    style={{ width: 42, height: 26, borderRadius: 7, background: 'var(--accent)', opacity: a.presente === true ? 0.95 : a.presente === false ? 0.15 : 0.35 }} />
+                ))}
+              </div>
+            </div>
           </>
         )}
       </div>

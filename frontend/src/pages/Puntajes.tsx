@@ -1,162 +1,245 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { api, decodeToken, emitToast } from '../lib/api'
 
-/* ─────────────────────────────────────────────
-   PROFESOR VIEW
-   ───────────────────────────────────────────── */
+/* ═══ Compartido ════════════════════════════════════════════════ */
+
+const css = `
+  .exp-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; }
+  .exp-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+  .ciclo-bars { display:flex; gap:14px; align-items:flex-end; overflow-x:auto; padding:10px 4px 4px; }
+  .ciclo-bar { flex:1; min-width:88px; text-align:center; cursor:default; }
+  .ciclo-rect { border-radius:12px; background:var(--accent-muted); transition:all .2s; margin-bottom:8px; }
+  .ciclo-bar.actual .ciclo-rect { background:var(--accent); box-shadow:0 6px 24px var(--accent-hover); }
+  .mat-card { background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius); padding:16px 18px; }
+  .mat-card.warn { border-color:rgba(245,158,11,.35); }
+  .desglose-row { display:flex; justify-content:space-between; font-size:12px; padding:5px 0; color:var(--text-secondary); }
+  .desglose-row b { color:var(--text-primary); font-family:var(--font-mono); }
+  .pro-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .pro-filtros { display:flex; gap:16px; align-items:center; padding:12px 18px; border-bottom:1px solid var(--border-subtle); flex-wrap:wrap; }
+  .pro-filtro { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); }
+  .pro-filtro span.dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .nota-input {
+    width:60px; padding:6px 8px; text-align:center;
+    background:var(--bg-input); border:1px solid var(--border-light);
+    border-radius:8px; color:var(--text-primary); font-size:13px; font-weight:700;
+    font-family:var(--font-mono); outline:none; transition:border-color .15s;
+  }
+  .nota-input:focus { border-color:var(--accent); }
+  .nota-input:disabled { opacity:.4; cursor:not-allowed; }
+  .prom-float {
+    position:fixed; bottom:26px; right:26px; z-index:50;
+    background:var(--bg-elevated); border:1px solid var(--accent-hover);
+    border-radius:14px; padding:12px 18px; display:flex; align-items:center; gap:12px;
+    box-shadow:0 12px 32px rgba(0,0,0,.5);
+  }
+  .pagi { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; flex-wrap:wrap; gap:8px; }
+  .pagi-btn {
+    min-width:30px; height:30px; border-radius:8px; border:1px solid var(--border-subtle);
+    background:var(--bg-surface); color:var(--text-secondary); font-family:var(--font-mono);
+    font-size:12px; cursor:pointer;
+  }
+  .pagi-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .pagi-btn:disabled { opacity:.4; cursor:not-allowed; }
+  @media(max-width:900px){ .exp-stats { grid-template-columns:1fr; } }
+`
+
+type Puntaje = { id: number; user_id: number; materia_id: number; tipo: string; valor: number }
+type MateriaApi = { id: number; nombre: string; profesor_nombre?: string | null; profesor_id?: number | null }
+
+function notaColor(n: number | null): string {
+  if (n === null) return 'var(--text-muted)'
+  if (n >= 9) return 'var(--accent-bright)'
+  if (n >= 7.5) return 'var(--success)'
+  if (n >= 6) return 'var(--warning)'
+  return 'var(--danger)'
+}
+
+function estadoDe(p: number | null): { label: string; bg: string; color: string } {
+  if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
+  if (p >= 9) return { label: 'PROMOCIONADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
+  if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
+  return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
+}
+
+/* ═══ ALUMNO — Expediente Académico ═════════════════════════════ */
+
+type MateriaExp = {
+  nombre: string; codigo: string; profesor: string
+  p1: number | null; p2: number | null; tp: number | null; final: number | null
+}
+
+const ciclos = [
+  { nombre: 'Ciclo I-22', altura: 46 }, { nombre: 'Ciclo II-22', altura: 60 },
+  { nombre: 'Ciclo I-23', altura: 68 }, { nombre: 'Ciclo II-23', altura: 84, actual: true },
+  { nombre: 'Ciclo I-24', altura: 30, futuro: true },
+]
+
+function promDe(m: MateriaExp): number | null {
+  const ns = [m.p1, m.p2, m.tp, m.final].filter((n): n is number => n !== null)
+  if (!ns.length) return null
+  return Math.round((ns.reduce((a, b) => a + b, 0) / ns.length) * 10) / 10
+}
+
+function AlumnoView({ userId }: { userId: number }) {
+  const [materias, setMaterias] = useState<MateriaExp[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      api.get<MateriaApi[]>('/materias/').catch(() => [] as MateriaApi[]),
+      api.get<Puntaje[]>(`/puntajes/?user_id=${userId}`).catch(() => [] as Puntaje[]),
+    ]).then(([mats, pts]) => {
+      const rows: MateriaExp[] = mats.map(m => {
+        const de = (tipo: string) => pts.find(p => p.materia_id === m.id && p.tipo === tipo)?.valor ?? null
+        return {
+          nombre: m.nombre,
+          codigo: `MAT-${String(m.id).padStart(3, '0')}`,
+          profesor: m.profesor_nombre || '—',
+          p1: de('parcial1'), p2: de('parcial2'), tp: de('practico'), final: de('final'),
+        }
+      }).filter(m => m.p1 !== null || m.p2 !== null || m.tp !== null || m.final !== null)
+      setMaterias(rows)
+    }).finally(() => setLoading(false))
+  }, [userId])
+
+  const proms = materias.map(promDe).filter((p): p is number => p !== null)
+  const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
+  const aprobadas = materias.filter(m => (promDe(m) ?? 0) >= 6).length
+  const pctAprob = materias.length ? Math.round((aprobadas / materias.length) * 100) : 0
+  const ringC = 2 * Math.PI * 34
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div className="mono-label" style={{ color: 'var(--accent-bright)', marginBottom: 4 }}>Expediente Académico</div>
+          <h1 className="page-title">Mis Calificaciones</h1>
+          <p className="page-subtitle">Semestre {new Date().getMonth() < 6 ? 1 : 2} · {new Date().getFullYear()} • Actualizado recientemente</p>
+        </div>
+        <button className="btn-primary" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
+          <i className="ti ti-download" /> Reporte Académico
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="exp-stats">
+        <div className="kpi-card">
+          <div className="kpi-top">
+            <span className="mono-label">Promedio General</span>
+            <span className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)' }}>+0.3 vs ciclo anterior</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <span className="kpi-value" style={{ fontSize: 36 }}>{promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 34 }}>
+              {[12, 16, 14, 20, 26, 34].map((h, i) => (
+                <span key={i} style={{ width: 12, height: h, borderRadius: 4, background: i === 5 ? 'var(--accent)' : 'var(--accent-muted)' }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+            <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="40" cy="40" r="34" stroke="var(--bg-elevated)" strokeWidth="7" fill="none" />
+              <circle cx="40" cy="40" r="34" stroke="var(--accent)" strokeWidth="7" fill="none"
+                strokeDasharray={ringC} strokeDashoffset={ringC * (1 - pctAprob / 100)} strokeLinecap="round" />
+            </svg>
+            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800 }}>{pctAprob}%</span>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 4 }}>Aprobación</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{aprobadas} de {materias.length} Materias</div>
+            {pctAprob >= 80 && <span className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)', marginTop: 6 }}>Sobresaliente</span>}
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-top">
+            <span className="mono-label">Créditos Acumulados</span>
+            <i className="ti ti-certificate" style={{ color: 'var(--accent)', fontSize: 15 }} />
+          </div>
+          <span className="kpi-value" style={{ fontSize: 34 }}>164<span className="kpi-unit"> / 192</span></span>
+          <div className="progress-track" style={{ marginTop: 12 }}><div className="progress-fill" style={{ width: `${164 / 192 * 100}%` }} /></div>
+        </div>
+      </div>
+
+      {/* Proyección Semestral */}
+      <div className="card" style={{ marginBottom: 22 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Proyección Semestral</h3>
+        <div className="ciclo-bars">
+          {ciclos.map(c => (
+            <div key={c.nombre} className={`ciclo-bar${c.actual ? ' actual' : ''}`} style={{ opacity: c.futuro ? 0.35 : 1 }}>
+              {c.actual && <div className="mono-label" style={{ color: 'var(--accent-bright)', marginBottom: 4 }}>{promGeneral || '8.9'}</div>}
+              <div className="ciclo-rect" style={{ height: c.altura }} />
+              <div className="mono-label" style={{ color: c.actual ? 'var(--text-primary)' : undefined }}>{c.nombre}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Detalle de Materias */}
+      <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 12 }}>Detalle de Materias</h3>
+      {loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando expediente…</div>
+      ) : materias.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 46 }}>
+          <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Aún no tenés calificaciones cargadas.</p>
+        </div>
+      ) : (
+        <div className="exp-cards">
+          {materias.map(m => {
+            const p = promDe(m)
+            const pendienteP2 = m.p1 !== null && m.p2 === null
+            return (
+              <div key={m.nombre} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.nombre}</div>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: notaColor(p) }}>{p ?? '—'}</span>
+                </div>
+                <div className="mono-label" style={{ marginBottom: 10 }}>{m.codigo} • {m.profesor}</div>
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
+                  <div className="desglose-row"><span>Examen Parcial 1 (30%)</span><b>{m.p1 ?? '—'}</b></div>
+                  <div className="desglose-row">
+                    <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Examen Parcial 2 {pendienteP2 && '(Pendiente)'}</span>
+                    <b>{m.p2 ?? '—'}</b>
+                  </div>
+                  <div className="desglose-row"><span>Trabajos Prácticos (40%)</span><b>{m.tp ?? '—'}</b></div>
+                  <div className="desglose-row"><span>Examen Final (30%)</span><b>{m.final ?? '—'}</b></div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="badge" style={{ background: estadoDe(p).bg, color: estadoDe(p).color }}>{estadoDe(p).label}</span>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
+                    Ver Feedback →
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+/* ═══ PROFESOR — Gestión de Calificaciones ══════════════════════ */
+
 type MateriaSimple = { id: number; nombre: string }
 type AlumnoRow = {
   alumno_id: number
   nombre: string
   username: string
-  // puntaje ids (0 = aún no existe)
   ids: { parcial1: number; parcial2: number; tp: number; final: number }
-  // valores editables
   vals: { parcial1: string; parcial2: string; tp: string; final: string }
   saving: boolean
 }
 
-const cssPro = `
-  *, *::before, *::after { box-sizing:border-box; }
-  .pro-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; min-height:100%; }
-
-  .pro-topbar {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:0 24px; height:56px;
-    border-bottom:1px solid #1e2d3d; background:#0b0f14;
-    position:sticky; top:0; z-index:20; flex-shrink:0;
-  }
-  .pro-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
-  .pro-topbar p  { font-size:11px; color:#506070; margin-top:1px; }
-
-  .pro-content { padding:20px 24px 60px; flex:1; }
-
-  .pro-materia-tabs {
-    display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;
-  }
-  .pro-tab {
-    padding:6px 16px; border-radius:20px; border:1px solid #1e2d3d;
-    background:#131920; color:#8fa3b8; font-size:12px; font-weight:600;
-    cursor:pointer; transition:all .15s; font-family:inherit;
-  }
-  .pro-tab:hover { border-color:var(--accent); color:#f0f4f8; }
-  .pro-tab.active { background:var(--accent-muted); border-color:var(--accent); color:var(--accent); }
-
-  .pro-empty {
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:60px 24px; text-align:center; gap:12px;
-  }
-  .pro-empty svg { width:48px; height:48px; color:#1e2d3d; }
-  .pro-empty h3 { font-size:16px; font-weight:600; color:#506070; margin:0; }
-  .pro-empty p  { font-size:13px; color:#3a4f6a; margin:0; }
-
-  .pro-alumnos-head {
-    display:flex; align-items:center; justify-content:space-between;
-    margin-bottom:12px; flex-wrap:wrap; gap:8px;
-  }
-  .pro-alumnos-head h2 { font-size:14px; font-weight:700; color:#f0f4f8; margin:0; }
-  .pro-alumnos-head span { font-size:11px; color:#506070; }
-
-  /* Table desktop */
-  .pro-tbl-wrap { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
-  .pro-tbl-wrap table { width:100%; border-collapse:collapse; }
-  .pro-tbl-wrap thead tr { background:#0d1117; }
-  .pro-tbl-wrap th {
-    padding:9px 14px; font-size:10px; font-weight:600;
-    color:#506070; text-transform:uppercase; letter-spacing:.07em;
-    text-align:left; border-bottom:1px solid #1e2d3d; white-space:nowrap;
-  }
-  .pro-tbl-wrap th.c { text-align:center; }
-  .pro-tbl-wrap tbody tr { border-bottom:1px solid #1e2d3d1a; transition:background .12s; }
-  .pro-tbl-wrap tbody tr:last-child { border-bottom:none; }
-  .pro-tbl-wrap tbody tr:hover { background:#1a2230; }
-  .pro-tbl-wrap td { padding:10px 14px; vertical-align:middle; }
-  .pro-tbl-wrap td.c { text-align:center; }
-  .alumno-name { font-weight:600; color:#f0f4f8; font-size:13px; }
-  .alumno-user { font-size:11px; color:#506070; }
-
-  .nota-input {
-    width:64px; padding:5px 8px; text-align:center;
-    background:#0d1117; border:1px solid #1e2d3d;
-    border-radius:7px; color:#f0f4f8; font-size:13px; font-weight:700;
-    font-family:inherit; outline:none; transition:border-color .15s;
-  }
-  .nota-input:focus { border-color:var(--accent); }
-  .nota-input:disabled { opacity:.4; cursor:not-allowed; }
-
-  .btn-save-row {
-    display:inline-flex; align-items:center; gap:5px;
-    padding:5px 12px; border-radius:7px;
-    background:var(--accent-muted); border:1px solid var(--accent-hover);
-    color:var(--accent); font-size:11px; font-weight:700;
-    font-family:inherit; cursor:pointer;
-    transition:all .15s; white-space:nowrap;
-  }
-  .btn-save-row:hover:not(:disabled) { background:var(--accent-hover); border-color:var(--accent); }
-  .btn-save-row:disabled { opacity:.5; cursor:not-allowed; }
-  .btn-save-row svg { width:12px; height:12px; }
-
-  .pro-prom-chip {
-    display:inline-flex; align-items:center;
-    padding:3px 10px; border-radius:20px;
-    font-size:12px; font-weight:800; border:1px solid;
-  }
-
-  /* Mobile cards */
-  .pro-cards { display:none; }
-  .pro-alumno-card {
-    background:#131920; border:1px solid #1e2d3d; border-radius:14px;
-    margin-bottom:12px; overflow:hidden;
-  }
-  .pro-alumno-card-head {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:12px 14px; border-bottom:1px solid #1e2d3d;
-  }
-  .pro-notas-grid {
-    display:grid; grid-template-columns:repeat(4,1fr);
-    border-bottom:1px solid #1e2d3d;
-  }
-  .pro-nota-cell {
-    padding:12px 8px; text-align:center;
-    border-right:1px solid #1e2d3d;
-  }
-  .pro-nota-cell:last-child { border-right:none; }
-  .pro-nota-lbl { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
-  .pro-alumno-card-footer { padding:10px 14px; display:flex; justify-content:flex-end; gap:8px; align-items:center; }
-
-  .pro-spinner {
-    display:flex; align-items:center; justify-content:center; padding:40px;
-    color:#506070; font-size:13px; gap:8px;
-  }
-  .spin-icon { animation:spin .8s linear infinite; width:18px; height:18px; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-
-  @media(max-width:768px){
-    .pro-tbl-wrap { display:none; }
-    .pro-cards { display:block; }
-    .pro-content { padding:14px 14px 80px; }
-    .pro-topbar { padding:0 14px; }
-    .pro-materia-tabs { gap:6px; }
-    .pro-tab { font-size:11px; padding:5px 12px; }
-    .nota-input { width:54px; }
-  }
-`
-
-function proChipStyle(n: number | null) {
-  if (n === null) return { color: '#506070', bg: '#1e2d3d18', border: '#1e2d3d' }
-  if (n >= 9)  return { color: '#22c55e', bg: '#22c55e15', border: '#22c55e40' }
-  if (n >= 7.5) return { color: 'var(--accent)', bg: 'var(--accent-muted)', border: 'var(--accent-hover)' }
-  if (n >= 6)  return { color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40' }
-  return { color: '#ef4444', bg: '#ef444415', border: '#ef444440' }
-}
-
 function proCalcProm(v: AlumnoRow['vals']): number | null {
-  const ns = [v.parcial1, v.parcial2, v.tp, v.final]
-    .map(s => parseFloat(s))
-    .filter(n => !isNaN(n))
+  const ns = [v.parcial1, v.parcial2, v.tp, v.final].map(s => parseFloat(s)).filter(n => !isNaN(n))
   if (!ns.length) return null
   return Math.round((ns.reduce((a, b) => a + b, 0) / ns.length) * 10) / 10
 }
+
+const PAGE_SIZE = 8
 
 function ProfesorView({ profesorId }: { profesorId: number }) {
   const [materias, setMaterias] = useState<MateriaSimple[]>([])
@@ -164,81 +247,56 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
   const [alumnos, setAlumnos] = useState<AlumnoRow[]>([])
   const [loadingMaterias, setLoadingMaterias] = useState(true)
   const [loadingAlumnos, setLoadingAlumnos] = useState(false)
+  const [page, setPage] = useState(1)
 
-  // Fetch materias del profesor
   useEffect(() => {
-    api.get<{ id: number; nombre: string }[]>(`/materias/?profesor_id=${profesorId}`)
-      .then(data => {
-        setMaterias(data)
-        if (data.length > 0) setSelectedMateria(data[0])
-      })
+    api.get<MateriaSimple[]>(`/materias/?profesor_id=${profesorId}`)
+      .then(data => { setMaterias(data); if (data.length > 0) setSelectedMateria(data[0]) })
       .catch(() => {})
       .finally(() => setLoadingMaterias(false))
   }, [profesorId])
 
-  // Fetch alumnos + puntajes when materia changes
   const fetchAlumnos = useCallback(async (materia: MateriaSimple) => {
     setLoadingAlumnos(true)
+    setPage(1)
     try {
       const [alumnosData, puntajesData] = await Promise.all([
-        api.get<{ alumno_id: number; nombre: string; username: string }[]>(
-          `/inscripciones/materia/${materia.id}`
-        ).catch(() => []),
-        api.get<{ id: number; user_id: number; tipo: string; valor: number }[]>(
-          `/puntajes/?materia_id=${materia.id}`
-        ).catch(() => []),
+        api.get<{ alumno_id: number; nombre: string; username: string }[]>(`/inscripciones/materia/${materia.id}`).catch(() => []),
+        api.get<Puntaje[]>(`/puntajes/?materia_id=${materia.id}`).catch(() => []),
       ])
-
       const rows: AlumnoRow[] = alumnosData.map(a => {
         const pts = puntajesData.filter(p => p.user_id === a.alumno_id)
         const find = (tipo: string) => pts.find(p => p.tipo === tipo)
-        const findId = (tipo: string) => find(tipo)?.id ?? 0
-        const findVal = (tipo: string) => {
-          const v = find(tipo)?.valor
-          return v !== undefined ? String(v) : ''
-        }
+        const fid = (tipo: string) => find(tipo)?.id ?? 0
+        const fval = (tipo: string) => { const v = find(tipo)?.valor; return v !== undefined ? String(v) : '' }
         return {
-          alumno_id: a.alumno_id,
-          nombre: a.nombre,
-          username: a.username,
-          ids: { parcial1: findId('parcial1'), parcial2: findId('parcial2'), tp: findId('practico'), final: findId('final') },
-          vals: { parcial1: findVal('parcial1'), parcial2: findVal('parcial2'), tp: findVal('practico'), final: findVal('final') },
+          alumno_id: a.alumno_id, nombre: a.nombre, username: a.username,
+          ids: { parcial1: fid('parcial1'), parcial2: fid('parcial2'), tp: fid('practico'), final: fid('final') },
+          vals: { parcial1: fval('parcial1'), parcial2: fval('parcial2'), tp: fval('practico'), final: fval('final') },
           saving: false,
         }
       })
       setAlumnos(rows)
-    } finally {
-      setLoadingAlumnos(false)
-    }
+    } finally { setLoadingAlumnos(false) }
   }, [])
 
-  useEffect(() => {
-    if (selectedMateria) fetchAlumnos(selectedMateria)
-  }, [selectedMateria, fetchAlumnos])
+  useEffect(() => { if (selectedMateria) fetchAlumnos(selectedMateria) }, [selectedMateria, fetchAlumnos])
 
   function updateVal(alumno_id: number, campo: keyof AlumnoRow['vals'], value: string) {
-    // Allow only numbers 0-10 with 1 decimal
     if (value !== '' && !/^\d{0,2}(\.\d{0,1})?$/.test(value)) return
     const num = parseFloat(value)
     if (value !== '' && !isNaN(num) && (num < 0 || num > 10)) return
-    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id
-      ? { ...a, vals: { ...a.vals, [campo]: value } }
-      : a
-    ))
+    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, vals: { ...a.vals, [campo]: value } } : a))
   }
 
   async function saveRow(alumno_id: number) {
     const row = alumnos.find(a => a.alumno_id === alumno_id)
     if (!row || !selectedMateria) return
     setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, saving: true } : a))
-
     const tiposMap: { campo: keyof AlumnoRow['vals']; tipo: string }[] = [
-      { campo: 'parcial1', tipo: 'parcial1' },
-      { campo: 'parcial2', tipo: 'parcial2' },
-      { campo: 'tp',       tipo: 'practico' },
-      { campo: 'final',    tipo: 'final' },
+      { campo: 'parcial1', tipo: 'parcial1' }, { campo: 'parcial2', tipo: 'parcial2' },
+      { campo: 'tp', tipo: 'practico' }, { campo: 'final', tipo: 'final' },
     ]
-
     let newIds = { ...row.ids }
     try {
       for (const { campo, tipo } of tiposMap) {
@@ -257,626 +315,177 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
       setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, ids: newIds, saving: false } : a))
       emitToast('Notas guardadas correctamente')
     } catch {
-      emitToast('Error al guardar notas')
+      emitToast('Error al guardar notas', 'error')
       setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, saving: false } : a))
     }
   }
 
-  if (loadingMaterias) {
-    return (
-      <>
-        <style>{cssPro}</style>
-        <div className="pro-root">
-          <header className="pro-topbar"><div><h1>Cargar Puntajes</h1><p>Mis materias</p></div></header>
-          <div className="pro-spinner">
-            <svg className="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Cargando materias...
-          </div>
-        </div>
-      </>
-    )
+  function exportCSV() {
+    const rows = [
+      ['Legajo', 'Estudiante', 'Parcial 1', 'Parcial 2', 'Trabajos', 'Final', 'Estado'],
+      ...alumnos.map(a => {
+        const p = proCalcProm(a.vals)
+        return [`#${a.alumno_id}`, a.nombre, a.vals.parcial1 || '-', a.vals.parcial2 || '-', a.vals.tp || '-', a.vals.final || '-', estadoDe(p).label]
+      }),
+    ]
+    const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `calificaciones_${selectedMateria?.nombre ?? 'materia'}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    emitToast('CSV exportado')
   }
+
+  const proms = alumnos.map(a => proCalcProm(a.vals)).filter((p): p is number => p !== null)
+  const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 10) / 10 : 0
+  const nAprob = alumnos.filter(a => { const p = proCalcProm(a.vals); return p !== null && p >= 6 && p < 9 }).length
+  const nReprob = alumnos.filter(a => { const p = proCalcProm(a.vals); return p !== null && p < 6 }).length
+  const nPromo = alumnos.filter(a => { const p = proCalcProm(a.vals); return p !== null && p >= 9 }).length
+  const totalPages = Math.max(1, Math.ceil(alumnos.length / PAGE_SIZE))
+  const pageRows = alumnos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <>
-      <style>{cssPro}</style>
-      <div className="pro-root">
-        <header className="pro-topbar">
-          <div>
-            <h1>Cargar Puntajes</h1>
-            <p>{selectedMateria?.nombre ?? 'Seleccioná una materia'}</p>
-          </div>
-        </header>
-
-        <div className="pro-content">
-          {materias.length === 0 ? (
-            <div className="pro-empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <h3>Sin materias asignadas</h3>
-              <p>El administrador aún no te asignó materias.</p>
-            </div>
-          ) : (
-            <>
-              {/* Tabs materias */}
-              <div className="pro-materia-tabs">
-                {materias.map(m => (
-                  <button
-                    key={m.id}
-                    className={`pro-tab${selectedMateria?.id === m.id ? ' active' : ''}`}
-                    onClick={() => setSelectedMateria(m)}
-                  >
-                    {m.nombre}
-                  </button>
-                ))}
-              </div>
-
-              {loadingAlumnos ? (
-                <div className="pro-spinner">
-                  <svg className="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                  Cargando alumnos...
-                </div>
-              ) : alumnos.length === 0 ? (
-                <div className="pro-empty">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <h3>Sin alumnos inscriptos</h3>
-                  <p>No hay alumnos inscriptos en esta materia aún.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="pro-alumnos-head">
-                    <h2>Alumnos · {selectedMateria?.nombre}</h2>
-                    <span>{alumnos.length} alumno{alumnos.length !== 1 ? 's' : ''}</span>
-                  </div>
-
-                  {/* Desktop table */}
-                  <div className="pro-tbl-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Alumno</th>
-                          <th className="c">Parcial 1</th>
-                          <th className="c">Parcial 2</th>
-                          <th className="c">TP</th>
-                          <th className="c">Final</th>
-                          <th className="c">Promedio</th>
-                          <th className="c">Guardar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {alumnos.map(a => {
-                          const prom = proCalcProm(a.vals)
-                          const chip = proChipStyle(prom)
-                          return (
-                            <tr key={a.alumno_id}>
-                              <td>
-                                <div className="alumno-name">{a.nombre}</div>
-                                <div className="alumno-user">@{a.username}</div>
-                              </td>
-                              {(['parcial1', 'parcial2', 'tp', 'final'] as const).map(campo => (
-                                <td key={campo} className="c">
-                                  <input
-                                    className="nota-input"
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="—"
-                                    value={a.vals[campo]}
-                                    disabled={a.saving}
-                                    onChange={e => updateVal(a.alumno_id, campo, e.target.value)}
-                                  />
-                                </td>
-                              ))}
-                              <td className="c">
-                                <span className="pro-prom-chip" style={{ color: chip.color, background: chip.bg, borderColor: chip.border }}>
-                                  {prom ?? '—'}
-                                </span>
-                              </td>
-                              <td className="c">
-                                <button
-                                  className="btn-save-row"
-                                  disabled={a.saving}
-                                  onClick={() => saveRow(a.alumno_id)}
-                                >
-                                  {a.saving ? (
-                                    <svg className="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                                    </svg>
-                                  ) : (
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                      <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                  )}
-                                  {a.saving ? 'Guardando...' : 'Guardar'}
-                                </button>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile cards */}
-                  <div className="pro-cards">
-                    {alumnos.map(a => {
-                      const prom = proCalcProm(a.vals)
-                      const chip = proChipStyle(prom)
-                      const campos: { campo: keyof AlumnoRow['vals']; label: string }[] = [
-                        { campo: 'parcial1', label: 'P1' },
-                        { campo: 'parcial2', label: 'P2' },
-                        { campo: 'tp',       label: 'TP' },
-                        { campo: 'final',    label: 'FN' },
-                      ]
-                      return (
-                        <div key={a.alumno_id} className="pro-alumno-card">
-                          <div className="pro-alumno-card-head">
-                            <div>
-                              <div className="alumno-name">{a.nombre}</div>
-                              <div className="alumno-user">@{a.username}</div>
-                            </div>
-                            <span className="pro-prom-chip" style={{ color: chip.color, background: chip.bg, borderColor: chip.border }}>
-                              Prom: {prom ?? '—'}
-                            </span>
-                          </div>
-                          <div className="pro-notas-grid">
-                            {campos.map(({ campo, label }) => (
-                              <div key={campo} className="pro-nota-cell">
-                                <div className="pro-nota-lbl">{label}</div>
-                                <input
-                                  className="nota-input"
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="—"
-                                  value={a.vals[campo]}
-                                  disabled={a.saving}
-                                  onChange={e => updateVal(a.alumno_id, campo, e.target.value)}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                          <div className="pro-alumno-card-footer">
-                            <button
-                              className="btn-save-row"
-                              disabled={a.saving}
-                              onClick={() => saveRow(a.alumno_id)}
-                            >
-                              {a.saving ? 'Guardando...' : 'Guardar notas'}
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </>
-          )}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 className="page-title">Gestión de Calificaciones</h1>
+          <p className="page-subtitle">Ciclo Lectivo: {new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Cuatrimestre {new Date().getFullYear()}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn-ghost" onClick={exportCSV}><i className="ti ti-file-spreadsheet" /> Exportar CSV</button>
+          <button className="btn-primary"><i className="ti ti-file-type-pdf" /> Generar Acta PDF</button>
         </div>
       </div>
+
+      {loadingMaterias ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando materias…</div>
+      ) : materias.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 46 }}>
+          <i className="ti ti-books-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>El administrador aún no te asignó materias.</p>
+        </div>
+      ) : (
+        <>
+          <div className="pro-tabs">
+            {materias.map(m => (
+              <button key={m.id} className={`pill-tab${selectedMateria?.id === m.id ? ' active' : ''}`} onClick={() => setSelectedMateria(m)}>
+                {m.nombre}
+              </button>
+            ))}
+          </div>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="pro-filtros">
+              <span className="pro-filtro"><span className="dot" style={{ background: 'var(--success)' }} /> {nAprob} Aprobados</span>
+              <span className="pro-filtro"><span className="dot" style={{ background: 'var(--danger)' }} /> {nReprob} Reprobados</span>
+              <span className="pro-filtro"><span className="dot" style={{ background: 'var(--info)' }} /> {nPromo} Promocionados</span>
+            </div>
+
+            {loadingAlumnos ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando alumnos…</div>
+            ) : alumnos.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin alumnos inscriptos en esta materia.</div>
+            ) : (
+              <>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table-uca">
+                    <thead>
+                      <tr>
+                        <th>Legajo</th><th>Estudiante</th>
+                        <th style={{ textAlign: 'center' }}>Parcial 1</th>
+                        <th style={{ textAlign: 'center' }}>Parcial 2</th>
+                        <th style={{ textAlign: 'center' }}>Trabajos</th>
+                        <th style={{ textAlign: 'center' }}>Final</th>
+                        <th style={{ textAlign: 'center' }}>Estado</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageRows.map(a => {
+                        const p = proCalcProm(a.vals)
+                        const est = estadoDe(p)
+                        return (
+                          <tr key={a.alumno_id}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--accent-bright)' }}>#{String(a.alumno_id).padStart(5, '0')}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>
+                                  {(a.nombre || a.username).slice(0, 2)}
+                                </span>
+                                <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre || `@${a.username}`}</span>
+                              </div>
+                            </td>
+                            {(['parcial1', 'parcial2', 'tp', 'final'] as const).map(campo => (
+                              <td key={campo} style={{ textAlign: 'center' }}>
+                                <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                  value={a.vals[campo]} disabled={a.saving}
+                                  onChange={e => updateVal(a.alumno_id, campo, e.target.value)} />
+                              </td>
+                            ))}
+                            <td style={{ textAlign: 'center' }}>
+                              <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }} disabled={a.saving} onClick={() => saveRow(a.alumno_id)}>
+                                {a.saving ? '…' : <><i className="ti ti-check" /> Guardar</>}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="pagi">
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Mostrando {pageRows.length} de {alumnos.length} estudiantes
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="pagi-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                      <button key={n} className={`pagi-btn${n === page ? ' active' : ''}`} onClick={() => setPage(n)}>{n}</button>
+                    ))}
+                    <button className="pagi-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {alumnos.length > 0 && (
+            <div className="prom-float">
+              <span style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent-muted)', color: 'var(--accent-bright)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="ti ti-chart-bar" />
+              </span>
+              <div>
+                <div className="mono-label">Promedio General</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 800 }}>{promGeneral || '—'}</div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </>
   )
 }
 
-type Materia = {
-  nombre: string
-  profesor: string
-  parcial1: number | null
-  parcial2: number | null
-  tp: number | null
-  final: number | null
-}
+/* ═══ ADMIN — Selector de alumno ════════════════════════════════ */
 
-// Datos por semestre — cuando haya BD, vendrán del API
-const datosPorSemestre: Record<string, Materia[]> = {
-  'Semestre 1 · 2026': [
-    { nombre: 'Análisis Matemático I', profesor: 'Carlos Méndez', parcial1: 7.5, parcial2: 8, tp: 9, final: null },
-    { nombre: 'Física I', profesor: 'Ana Torres', parcial1: 6, parcial2: 7.5, tp: 8.5, final: null },
-    { nombre: 'Matemática Discreta', profesor: 'Carlos Méndez', parcial1: 9, parcial2: null, tp: 8, final: null },
-    { nombre: 'Programación I', profesor: 'Luis Paredes', parcial1: 10, parcial2: 9.5, tp: 10, final: null },
-    { nombre: 'Historia y Filosofía', profesor: 'Pedro Rojas', parcial1: 7, parcial2: 6.5, tp: 8, final: null },
-  ],
-  'Semestre 2 · 2025': [
-    { nombre: 'Cálculo II', profesor: 'Carlos Méndez', parcial1: 8, parcial2: 8.5, tp: 9, final: 7.5 },
-    { nombre: 'Álgebra Lineal', profesor: 'Ana Torres', parcial1: 7, parcial2: 7, tp: 8, final: 6.5 },
-    { nombre: 'Física II', profesor: 'Luis Paredes', parcial1: 6.5, parcial2: 7, tp: 7.5, final: null },
-  ],
-  'Semestre 1 · 2025': [
-    { nombre: 'Cálculo I', profesor: 'Carlos Méndez', parcial1: 9, parcial2: 8.5, tp: 9.5, final: 9 },
-    { nombre: 'Química General', profesor: 'María Ruiz', parcial1: 7.5, parcial2: 8, tp: 8, final: 7 },
-  ],
-}
-
-const semestres = Object.keys(datosPorSemestre)
-
-function calcProm(m: Materia): number | null {
-  const ns = [m.parcial1, m.parcial2, m.tp, m.final].filter(n => n !== null) as number[]
-  if (!ns.length) return null
-  return Math.round((ns.reduce((a, b) => a + b, 0) / ns.length) * 10) / 10
-}
-function notaColor(n: number | null) {
-  if (n === null) return '#2a3a55'
-  if (n >= 9) return '#22c55e'
-  if (n >= 7.5) return 'var(--accent)'
-  if (n >= 6) return '#f59e0b'
-  return '#ef4444'
-}
-function chipStyle(p: number | null) {
-  if (p === null) return { color: '#506070', bg: '#1e2d3d18', border: '#1e2d3d' }
-  if (p >= 9) return { color: '#22c55e', bg: '#22c55e15', border: '#22c55e40' }
-  if (p >= 7.5) return { color: 'var(--accent)', bg: 'var(--accent-muted)', border: 'var(--accent-hover)' }
-  if (p >= 6) return { color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40' }
-  return { color: '#ef4444', bg: '#ef444415', border: '#ef444440' }
-}
-function estadoChip(m: Materia) {
-  const p = calcProm(m)
-  if (m.final !== null) return { label: 'Aprobado', color: '#22c55e', bg: '#22c55e15' }
-  if (p === null) return { label: 'Sin notas', color: '#506070', bg: '#1e2d3d18' }
-  if (p < 6) return { label: 'En riesgo', color: '#ef4444', bg: '#ef444415' }
-  return { label: 'En curso', color: '#f59e0b', bg: '#f59e0b15' }
-}
-
-// Exportar a PDF con jsPDF
-async function exportarPDF(materias: Materia[], semestre: string, promGeneral: number) {
-  const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const W = 210, margin = 14
-
-  // Header
-  doc.setFillColor(11, 15, 20)
-  doc.rect(0, 0, W, 30, 'F')
-  doc.setTextColor(0, 180, 216)
-  doc.setFontSize(16)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Sistema Académico UCA', margin, 12)
-  doc.setTextColor(240, 244, 248)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'normal')
-  doc.text('Registro de Puntajes — ' + semestre, margin, 20)
-  doc.setTextColor(80, 96, 112)
-  doc.setFontSize(9)
-  doc.text('Generado el ' + new Date().toLocaleDateString('es-PY'), margin, 27)
-
-  let y = 38
-
-  // KPI row
-  const kpis = [
-    { l: 'Materias', v: String(materias.length) },
-    { l: 'Promedio', v: String(promGeneral) },
-    { l: 'Mejor nota', v: String(Math.max(...materias.flatMap(m => [m.parcial1, m.parcial2, m.tp, m.final]).filter(n => n !== null) as number[])) },
-    { l: 'Finales pend.', v: String(materias.filter(m => m.final === null).length) },
-  ]
-  const kW = (W - margin * 2) / 4 - 2
-  kpis.forEach((k, i) => {
-    const x = margin + i * (kW + 2)
-    doc.setFillColor(19, 25, 32)
-    doc.roundedRect(x, y, kW, 16, 2, 2, 'F')
-    doc.setTextColor(80, 96, 112)
-    doc.setFontSize(7)
-    doc.setFont('helvetica', 'normal')
-    doc.text(k.l.toUpperCase(), x + 3, y + 6)
-    doc.setTextColor(0, 180, 216)
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text(k.v, x + 3, y + 13)
-  })
-  y += 22
-
-  // Tabla header
-  const cols = ['Materia', 'Profesor', 'P1', 'P2', 'TP', 'Final', 'Prom.', 'Estado']
-  const colW = [52, 36, 12, 12, 12, 12, 14, 22]
-  doc.setFillColor(13, 17, 23)
-  doc.rect(margin, y, W - margin * 2, 8, 'F')
-  doc.setTextColor(80, 96, 112)
-  doc.setFontSize(7.5)
-  doc.setFont('helvetica', 'bold')
-  let cx = margin
-  cols.forEach((c, i) => { doc.text(c, cx + 2, y + 5.5); cx += colW[i] })
-  y += 8
-
-  // Filas
-  materias.forEach((m, idx) => {
-    const p = calcProm(m)
-    const est = m.final !== null ? 'Aprobado' : p === null ? 'Sin notas' : p < 6 ? 'En riesgo' : 'En curso'
-    const bg = idx % 2 === 0 ? [19, 25, 32] : [15, 20, 27]
-    doc.setFillColor(bg[0], bg[1], bg[2])
-    doc.rect(margin, y, W - margin * 2, 9, 'F')
-
-    doc.setTextColor(240, 244, 248)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-
-    const vals = [
-      m.nombre, m.profesor,
-      m.parcial1 != null ? String(m.parcial1) : '—',
-      m.parcial2 != null ? String(m.parcial2) : '—',
-      m.tp != null ? String(m.tp) : '—',
-      m.final != null ? String(m.final) : '—',
-      p != null ? String(p) : '—',
-      est,
-    ]
-    cx = margin
-    vals.forEach((v, i) => {
-      if (i === 0) {
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(240, 244, 248)
-      } else {
-        doc.setFont('helvetica', 'normal')
-        // color nota
-        if (i >= 2 && i <= 6) {
-          const n = parseFloat(v)
-          if (!isNaN(n)) {
-            if (n >= 9) doc.setTextColor(34, 197, 94)
-            else if (n >= 7.5) doc.setTextColor(0, 180, 216)
-            else if (n >= 6) doc.setTextColor(245, 158, 11)
-            else doc.setTextColor(239, 68, 68)
-          } else doc.setTextColor(143, 163, 184)
-        }
-        // truncar texto largo
-        const maxW = colW[i] - 3
-        let txt = v
-        while (doc.getTextWidth(txt) > maxW && txt.length > 1) txt = txt.slice(0, -1)
-        doc.text(txt, cx + 2, y + 6)
-        cx += colW[i]
-      }
-    })
-    y += 9
-    if (y > 270) { doc.addPage(); y = 14 }
-  })
-
-  // Footer
-  const totalPages = doc.getNumberOfPages()
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i)
-    doc.setTextColor(42, 58, 85)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'normal')
-    doc.text('Universidad Católica Caacupé · Sistema Académico · ' + semestre, margin, 290)
-    doc.text('Pág. ' + i + '/' + totalPages, W - margin, 290, { align: 'right' })
-  }
-
-  doc.save('puntajes_' + semestre.replace(/[·\s]/g, '_') + '.pdf')
-}
-
-function exportarCSV(materias: Materia[], semestre: string) {
-  const rows = [
-    ['Materia', 'Parcial 1', 'Parcial 2', 'Trabajo Práctico', 'Examen Final', 'Promedio', 'Progreso', 'Estado'],
-    ...materias.map(m => {
-      const p = calcProm(m)
-      const st = estadoChip(m).label
-      const completadas = [m.parcial1, m.parcial2, m.tp, m.final].filter(n => n !== null).length
-      return [
-        m.nombre, m.parcial1 ?? '-', m.parcial2 ?? '-', m.tp ?? '-', m.final ?? '-',
-        p !== null ? p.toFixed(1) : '-', Math.round((completadas / 4) * 100) + '%', st
-      ]
-    })
-  ]
-  const csv = rows.map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `puntajes_${semestre.replace(/[·\s]/g, '_')}.csv`
-  a.click()
-  URL.revokeObjectURL(a.href)
-  import('../lib/api').then(m => m.emitToast('Archivo CSV descargado'))
-}
-
-const css = `
-  *, *::before, *::after { box-sizing:border-box; }
-  .puntajes-root { display:flex; flex-direction:column; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; min-height:100%; }
-
-  .topbar {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:0 24px; height:56px;
-    border-bottom:1px solid #1e2d3d; background:#0b0f14;
-    position:sticky; top:0; z-index:20; flex-shrink:0;
-  }
-  .topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
-  .topbar p  { font-size:11px; color:#506070; margin-top:1px; }
-
-  .content { padding:20px 24px 60px; flex:1; }
-
-  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
-  .kpi { background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:14px 16px; }
-  .kpi-lbl { font-size:10px; color:#506070; text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; }
-  .kpi-val { font-size:22px; font-weight:800; line-height:1; }
-
-  .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px; flex-wrap:wrap; }
-  .toolbar-left { font-size:12px; color:#8fa3b8; }
-  .toolbar-left strong { color:var(--accent); font-weight:700; }
-  .toolbar-right { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-
-  .search-box {
-    display:flex; align-items:center; gap:7px;
-    background:#131920; border:1px solid #1e2d3d;
-    border-radius:8px; padding:0 11px; height:34px; transition:border-color .15s;
-  }
-  .search-box:focus-within { border-color:var(--accent); }
-  .search-box svg { width:13px; height:13px; color:#506070; flex-shrink:0; }
-  .search-box input {
-    background:none; border:none; outline:none;
-    color:#f0f4f8; font-size:12px; font-family:inherit; width:130px;
-  }
-  .search-box input::placeholder { color:#3a4f6a; }
-
-  .custom-select-wrap { position:relative; }
-  .custom-select-btn {
-    display:flex; align-items:center; gap:8px;
-    background:#131920; border:1px solid #1e2d3d;
-    border-radius:8px; padding:0 10px; height:34px;
-    color:#f0f4f8; font-size:12px; font-family:inherit;
-    cursor:pointer; transition:border-color .15s; white-space:nowrap;
-    min-width:160px; justify-content:space-between;
-  }
-  .custom-select-btn:hover, .custom-select-btn.open { border-color:var(--accent); }
-  .custom-select-btn svg { width:12px; height:12px; color:#506070; flex-shrink:0; transition:transform .2s; }
-  .custom-select-btn.open svg { transform:rotate(180deg); }
-  .custom-select-dropdown {
-    position:absolute; top:calc(100% + 6px); left:0; right:0;
-    background:#131920; border:1px solid #1e2d3d;
-    border-radius:10px; overflow:hidden;
-    box-shadow:0 12px 32px rgba(0,0,0,.5); z-index:100;
-  }
-  .custom-select-opt {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:10px 14px; font-size:13px; color:#8fa3b8;
-    cursor:pointer; transition:background .12s;
-    border:none; background:none; width:100%; text-align:left;
-    font-family:inherit;
-  }
-  .custom-select-opt:hover { background:#1a2230; color:#f0f4f8; }
-  .custom-select-opt.selected { color:var(--accent); background:var(--accent-muted); }
-  .custom-select-opt svg { width:14px; height:14px; color:var(--accent); flex-shrink:0; }
-
-  .btn-export {
-    display:flex; align-items:center; gap:6px;
-    padding:0 14px; height:34px;
-    background:#131920; border:1px solid #1e2d3d;
-    border-radius:8px; color:#8fa3b8;
-    font-size:12px; font-family:inherit; cursor:pointer;
-    transition:border-color .15s, color .15s, background .15s;
-    white-space:nowrap;
-  }
-  .btn-export:hover { border-color:var(--accent); color:#f0f4f8; background:var(--accent-muted); }
-  .btn-export:active { background:var(--accent-muted); }
-  .btn-export svg { width:13px; height:13px; }
-
-  .tbl-wrap { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
-  table { width:100%; border-collapse:collapse; }
-  thead tr { background:#0d1117; }
-  th {
-    padding:9px 16px; font-size:10px; font-weight:600;
-    color:#506070; text-transform:uppercase; letter-spacing:.07em;
-    text-align:left; border-bottom:1px solid #1e2d3d; white-space:nowrap;
-  }
-  th.c { text-align:center; }
-  tbody tr { border-bottom:1px solid #1e2d3d1a; transition:background .12s; }
-  tbody tr:last-child { border-bottom:none; }
-  tbody tr:hover { background:#1a2230; }
-  td { padding:12px 16px; vertical-align:middle; }
-  td.c { text-align:center; }
-  .mat-name { font-weight:600; color:#f0f4f8; font-size:13px; margin-bottom:1px; }
-  .mat-prof { font-size:11px; color:#506070; }
-  .nota { font-size:15px; font-weight:800; }
-  .prom-chip { display:inline-flex; align-items:center; padding:3px 10px; border-radius:20px; font-size:13px; font-weight:800; border:1px solid; }
-  .estado-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:6px; font-size:10px; font-weight:600; }
-  .prog-track { height:4px; background:#1e2d3d; border-radius:4px; overflow:hidden; margin-bottom:3px; min-width:80px; }
-  .prog-fill  { height:100%; border-radius:4px; }
-  .prog-lbl   { font-size:10px; color:#506070; white-space:nowrap; }
-
-  .cards-list { display:none; }
-  .mat-card { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; margin-bottom:12px; }
-  .mat-card-head { display:flex; align-items:flex-start; justify-content:space-between; padding:14px 16px 12px; border-bottom:1px solid #1e2d3d; }
-  .mat-card-notas { display:grid; grid-template-columns:repeat(4,1fr); }
-  .nota-cell { padding:14px 8px; text-align:center; border-right:1px solid #1e2d3d; }
-  .nota-cell:last-child { border-right:none; }
-  .nota-lbl { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
-  .nota-num { font-size:20px; font-weight:800; }
-  .mat-card-footer { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-top:1px solid #1e2d3d; background:#0d1117; gap:12px; }
-
-  @media(max-width:768px){
-    .tbl-wrap  { display:none; }
-    .cards-list { display:block; }
-    .toolbar { flex-direction:column; align-items:flex-start; }
-    .toolbar-right { width:100%; flex-wrap:wrap; }
-    .search-box { flex:1; }
-    .search-box input { width:100%; }
-    .kpi-row { grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:14px; }
-    .kpi-val { font-size:20px; }
-    .content { padding:14px 14px 80px; }
-    .topbar  { padding:0 14px; }
-    .custom-select-dropdown { position:fixed; left:14px; right:14px; top:auto; }
-  }
-`
-
-export default function Puntajes() {
-  const token = sessionStorage.getItem('token')
-  const currentUser = token ? decodeToken(token) : null
-  if (currentUser?.role === 'profesor') {
-    return <ProfesorView profesorId={Number(currentUser.user_id)} />
-  }
-  if (currentUser?.role === 'admin') {
-    return <AdminView />
-  }
-  return <AlumnoAdminView />
-}
-
-/* ─── ADMIN VIEW ─────────────────────────────── */
 type AlumnoOpt = { id: number; nombre: string; username: string }
-
-const cssAdmin = `
-  .adm-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:#f0f4f8; min-height:100%; }
-  .adm-topbar { display:flex; align-items:center; padding:0 24px; height:56px; border-bottom:1px solid #1e2d3d; background:#0b0f14; position:sticky; top:0; z-index:20; }
-  .adm-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; }
-  .adm-content { padding:20px 24px 60px; flex:1; }
-
-  .adm-sel-bar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
-  .adm-sel-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:220px; }
-  .adm-sel-group label { font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
-  .adm-sel-wrap { position:relative; }
-  .adm-search { width:100%; background:#131920; border:1px solid #1e2d3d; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; outline:none; padding:9px 14px; transition:border-color .15s; }
-  .adm-search:focus { border-color:var(--accent); }
-  .adm-search::placeholder { color:#506070; }
-  .adm-drop { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#131920; border:1px solid #1e2d3d; border-radius:10px; z-index:50; max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,.5); }
-  .adm-opt { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; transition:background .12s; }
-  .adm-opt:hover { background:#1a2230; }
-  .adm-av { width:30px; height:30px; border-radius:50%; background:#1e2d3d; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--accent); flex-shrink:0; }
-  .adm-opt-name { font-size:13px; font-weight:600; color:#f0f4f8; }
-  .adm-opt-user { font-size:11px; color:#506070; }
-  .adm-chip { display:inline-flex; align-items:center; gap:8px; background:var(--accent-muted); border:1px solid var(--accent-hover); border-radius:9px; padding:7px 12px; font-size:13px; color:#f0f4f8; font-weight:600; }
-  .adm-chip-clear { background:none; border:none; cursor:pointer; color:#506070; padding:0; display:flex; margin-left:4px; }
-  .adm-chip-clear:hover { color:#ef4444; }
-  .adm-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 24px; text-align:center; gap:14px; }
-  .adm-empty svg { width:52px; height:52px; color:#1e2d3d; }
-  .adm-empty h3 { font-size:16px; font-weight:600; color:#506070; margin:0; }
-  .adm-empty p { font-size:13px; color:#3a4a5a; margin:0; }
-  .adm-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
-  .adm-kpi { background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:14px 16px; }
-  .adm-kpi-lbl { font-size:10px; color:#506070; font-weight:600; text-transform:uppercase; letter-spacing:.07em; margin-bottom:6px; }
-  .adm-kpi-val { font-size:22px; font-weight:800; letter-spacing:-.02em; }
-  .adm-tbl-wrap { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
-  .adm-tbl-wrap table { width:100%; border-collapse:collapse; }
-  .adm-tbl-wrap thead th { padding:10px 16px; font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; text-align:center; border-bottom:1px solid #1e2d3d; background:#0d1117; }
-  .adm-tbl-wrap thead th:first-child { text-align:left; }
-  .adm-tbl-wrap tbody td { padding:12px 16px; border-bottom:1px solid #1e2d3d18; text-align:center; vertical-align:middle; }
-  .adm-tbl-wrap tbody tr:last-child td { border-bottom:none; }
-  .adm-tbl-wrap tbody tr:hover { background:#1a2230; }
-  .adm-m-name { font-size:13px; font-weight:600; color:#f0f4f8; text-align:left; }
-  .adm-m-prof { font-size:11px; color:#506070; text-align:left; margin-top:2px; }
-  .adm-nota { font-size:13px; font-weight:700; }
-  .adm-prom { display:inline-flex; align-items:center; justify-content:center; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; border:1px solid; }
-  .adm-cards { display:none; flex-direction:column; gap:10px; }
-  .adm-card { background:#131920; border:1px solid #1e2d3d; border-radius:14px; padding:14px 16px; }
-  .adm-card-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
-  .adm-card-notas { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-  .adm-nota-cell { background:#0d1117; border-radius:8px; padding:8px; text-align:center; }
-  .adm-nota-lbl { font-size:9px; color:#506070; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
-  .adm-nota-num { font-size:15px; font-weight:700; }
-  @media(max-width:768px) {
-    .adm-content { padding:14px; }
-    .adm-kpi-row { grid-template-columns:repeat(2,1fr); }
-    .adm-tbl-wrap { display:none; }
-    .adm-cards { display:flex; }
-  }
-`
+type MateriaAdm = { nombre: string; profesor: string; p1: number | null; p2: number | null; tp: number | null; final: number | null }
 
 function AdminView() {
-  const [alumnos,    setAlumnos]    = useState<AlumnoOpt[]>([])
-  const [search,     setSearch]     = useState('')
-  const [dropOpen,   setDropOpen]   = useState(false)
-  const [selected,   setSelected]   = useState<AlumnoOpt | null>(null)
-  const [materias,   setMaterias]   = useState<Materia[]>([])
-  const [loading,    setLoading]    = useState(false)
+  const [alumnos, setAlumnos] = useState<AlumnoOpt[]>([])
+  const [search, setSearch] = useState('')
+  const [dropOpen, setDropOpen] = useState(false)
+  const [selected, setSelected] = useState<AlumnoOpt | null>(null)
+  const [materias, setMaterias] = useState<MateriaAdm[]>([])
+  const [loading, setLoading] = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    api.get<{ id: number; nombre: string; username: string; role: string }[]>('/users/').then(data => {
+    api.get<(AlumnoOpt & { role: string })[]>('/users/').then(data => {
       setAlumnos(data.filter(u => u.role === 'alumno'))
     }).catch(() => {})
   }, [])
@@ -890,20 +499,15 @@ function AdminView() {
   }, [])
 
   function selectAlumno(a: AlumnoOpt) {
-    setSelected(a); setSearch(''); setDropOpen(false)
-    setLoading(true)
+    setSelected(a); setSearch(''); setDropOpen(false); setLoading(true)
     Promise.all([
-      api.get<{ id: number; nombre: string; profesor_nombre?: string | null }[]>('/materias/'),
-      api.get<{ materia_id: number; tipo: string; valor: number }[]>(`/puntajes/?user_id=${a.id}`),
+      api.get<MateriaApi[]>('/materias/'),
+      api.get<Puntaje[]>(`/puntajes/?user_id=${a.id}`),
     ]).then(([mats, pts]) => {
-      const rows: Materia[] = mats.map(m => ({
-        nombre: m.nombre,
-        profesor: m.profesor_nombre || '—',
-        parcial1: pts.find(p => p.materia_id === m.id && p.tipo === 'parcial1')?.valor ?? null,
-        parcial2: pts.find(p => p.materia_id === m.id && p.tipo === 'parcial2')?.valor ?? null,
-        tp:       pts.find(p => p.materia_id === m.id && p.tipo === 'practico')?.valor  ?? null,
-        final:    pts.find(p => p.materia_id === m.id && p.tipo === 'final')?.valor     ?? null,
-      })).filter(m => m.parcial1 !== null || m.parcial2 !== null || m.tp !== null || m.final !== null)
+      const rows: MateriaAdm[] = mats.map(m => {
+        const de = (tipo: string) => pts.find(p => p.materia_id === m.id && p.tipo === tipo)?.valor ?? null
+        return { nombre: m.nombre, profesor: m.profesor_nombre || '—', p1: de('parcial1'), p2: de('parcial2'), tp: de('practico'), final: de('final') }
+      }).filter(m => m.p1 !== null || m.p2 !== null || m.tp !== null || m.final !== null)
       setMaterias(rows)
     }).finally(() => setLoading(false))
   }
@@ -913,401 +517,108 @@ function AdminView() {
     a.username.toLowerCase().includes(search.toLowerCase())
   )
 
-  const promGeneral = (() => {
-    const ps = materias.map(calcProm).filter((p): p is number => p !== null)
-    return ps.length ? Math.round((ps.reduce((a, b) => a + b, 0) / ps.length) * 10) / 10 : 0
-  })()
-
-  function notaClr(n: number | null) {
-    if (n === null) return '#3a4a5a'
-    return n >= 7 ? '#22c55e' : n >= 5 ? '#f59e0b' : '#ef4444'
-  }
-  function promStyle(p: number | null) {
-    if (p === null) return { color: '#506070', bg: '#1e2d3d', border: '#1e2d3d' }
-    return p >= 7 ? { color: '#22c55e', bg: '#22c55e12', border: '#22c55e30' }
-         : p >= 5 ? { color: '#f59e0b', bg: '#f59e0b12', border: '#f59e0b30' }
-         :          { color: '#ef4444', bg: '#ef444412', border: '#ef444430' }
+  const calc = (m: MateriaAdm) => {
+    const ns = [m.p1, m.p2, m.tp, m.final].filter((n): n is number => n !== null)
+    return ns.length ? Math.round(ns.reduce((a, b) => a + b, 0) / ns.length * 10) / 10 : null
   }
 
   return (
     <>
-      <style>{css}</style>
-      <style>{cssAdmin}</style>
-      <div className="adm-root">
-        <header className="adm-topbar">
-          <h1>Puntajes — Vista Administrador</h1>
-        </header>
-        <div className="adm-content">
-
-          {/* Selector alumno */}
-          <div className="adm-sel-bar">
-            <div className="adm-sel-group">
-              <label>Alumno</label>
-              {selected ? (
-                <div className="adm-chip">
-                  <div className="adm-av">{(selected.nombre || selected.username)[0].toUpperCase()}</div>
-                  <span>{selected.nombre || selected.username}</span>
-                  <button className="adm-chip-clear" onClick={() => { setSelected(null); setMaterias([]) }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-              ) : (
-                <div className="adm-sel-wrap" ref={dropRef}>
-                  <input
-                    className="adm-search"
-                    placeholder="Buscar alumno..."
-                    value={search}
-                    onChange={e => { setSearch(e.target.value); setDropOpen(true) }}
-                    onFocus={() => setDropOpen(true)}
-                  />
-                  {dropOpen && filtered.length > 0 && (
-                    <div className="adm-drop">
-                      {filtered.map(a => (
-                        <div key={a.id} className="adm-opt" onClick={() => selectAlumno(a)}>
-                          <div className="adm-av">{(a.nombre || a.username)[0].toUpperCase()}</div>
-                          <div>
-                            <div className="adm-opt-name">{a.nombre || a.username}</div>
-                            <div className="adm-opt-user">@{a.username}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Empty state */}
-          {!selected && (
-            <div className="adm-empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              <h3>Selecciona un alumno</h3>
-              <p>Elige un alumno del selector para ver sus puntajes</p>
-            </div>
-          )}
-
-          {selected && loading && (
-            <div className="adm-empty"><p style={{color:'#506070'}}>Cargando puntajes...</p></div>
-          )}
-
-          {selected && !loading && materias.length === 0 && (
-            <div className="adm-empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              <h3>Sin puntajes registrados</h3>
-              <p>Este alumno no tiene notas cargadas aún</p>
-            </div>
-          )}
-
-          {selected && !loading && materias.length > 0 && (
-            <>
-              {/* KPIs */}
-              <div className="adm-kpi-row">
-                <div className="adm-kpi">
-                  <div className="adm-kpi-lbl">Materias</div>
-                  <div className="adm-kpi-val" style={{color:'var(--accent)'}}>{materias.length}</div>
-                </div>
-                <div className="adm-kpi">
-                  <div className="adm-kpi-lbl">Promedio</div>
-                  <div className="adm-kpi-val" style={{color: promGeneral >= 7 ? '#22c55e' : promGeneral >= 5 ? '#f59e0b' : '#ef4444'}}>{promGeneral}</div>
-                </div>
-                <div className="adm-kpi">
-                  <div className="adm-kpi-lbl">Mejor nota</div>
-                  <div className="adm-kpi-val" style={{color:'#22c55e'}}>
-                    {(() => { const ns = materias.flatMap(m => [m.parcial1,m.parcial2,m.tp,m.final]).filter((n): n is number => n !== null); return ns.length ? Math.max(...ns) : '—' })()}
-                  </div>
-                </div>
-                <div className="adm-kpi">
-                  <div className="adm-kpi-lbl">Finales pendientes</div>
-                  <div className="adm-kpi-val" style={{color:'#f59e0b'}}>{materias.filter(m => m.final === null).length}</div>
-                </div>
-              </div>
-
-              {/* Tabla desktop */}
-              <div className="adm-tbl-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{textAlign:'left'}}>Materia</th>
-                      <th>Parc. 1</th><th>Parc. 2</th><th>TP</th><th>Final</th><th>Promedio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {materias.map(m => {
-                      const p = calcProm(m)
-                      const ps = promStyle(p)
-                      return (
-                        <tr key={m.nombre}>
-                          <td>
-                            <div className="adm-m-name">{m.nombre}</div>
-                            <div className="adm-m-prof">{m.profesor}</div>
-                          </td>
-                          {[m.parcial1, m.parcial2, m.tp, m.final].map((n, i) => (
-                            <td key={i}><span className="adm-nota" style={{color: notaClr(n)}}>{n ?? '—'}</span></td>
-                          ))}
-                          <td>
-                            <span className="adm-prom" style={{color:ps.color, background:ps.bg, borderColor:ps.border}}>{p ?? '—'}</span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Cards mobile */}
-              <div className="adm-cards">
-                {materias.map(m => {
-                  const p = calcProm(m)
-                  const ps = promStyle(p)
-                  return (
-                    <div key={m.nombre} className="adm-card">
-                      <div className="adm-card-head">
-                        <div>
-                          <div className="adm-m-name">{m.nombre}</div>
-                          <div className="adm-m-prof">{m.profesor}</div>
-                        </div>
-                        <span className="adm-prom" style={{color:ps.color, background:ps.bg, borderColor:ps.border}}>{p ?? '—'}</span>
-                      </div>
-                      <div className="adm-card-notas">
-                        {[m.parcial1, m.parcial2, m.tp, m.final].map((n, i) => (
-                          <div key={i} className="adm-nota-cell">
-                            <div className="adm-nota-lbl">{['P1','P2','TP','FN'][i]}</div>
-                            <div className="adm-nota-num" style={{color: notaClr(n)}}>{n ?? '—'}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
+      <div style={{ marginBottom: 18 }}>
+        <h1 className="page-title">Calificaciones — Administrador</h1>
+        <p className="page-subtitle">Consultá el expediente de cualquier alumno</p>
       </div>
+
+      <div style={{ maxWidth: 420, marginBottom: 22 }}>
+        <div className="mono-label" style={{ marginBottom: 6 }}>Alumno</div>
+        {selected ? (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'var(--accent-muted)', border: '1px solid var(--accent-hover)', borderRadius: 10, padding: '8px 14px' }}>
+            <span className="avatar-initials" style={{ width: 26, height: 26, fontSize: 10 }}>{(selected.nombre || selected.username).slice(0, 2)}</span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{selected.nombre || selected.username}</span>
+            <button onClick={() => { setSelected(null); setMaterias([]) }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
+              <i className="ti ti-x" />
+            </button>
+          </div>
+        ) : (
+          <div ref={dropRef} style={{ position: 'relative' }}>
+            <input className="input-uca" placeholder="Buscar alumno…" value={search}
+              onChange={e => { setSearch(e.target.value); setDropOpen(true) }} onFocus={() => setDropOpen(true)} />
+            {dropOpen && filtered.length > 0 && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', borderRadius: 12, zIndex: 50, maxHeight: 230, overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,.5)' }}>
+                {filtered.map(a => (
+                  <div key={a.id} onClick={() => selectAlumno(a)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                    <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(a.nombre || a.username).slice(0, 2)}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{a.nombre || a.username}</div>
+                      <div className="mono-label" style={{ fontSize: 9 }}>@{a.username}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {!selected ? (
+        <div className="card" style={{ textAlign: 'center', padding: 60 }}>
+          <i className="ti ti-user-search" style={{ fontSize: 40, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 13 }}>Seleccioná un alumno para ver sus calificaciones.</p>
+        </div>
+      ) : loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando…</div>
+      ) : materias.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 46 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Este alumno no tiene notas cargadas aún.</p>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="table-uca">
+            <thead>
+              <tr><th>Materia</th><th style={{ textAlign: 'center' }}>P1</th><th style={{ textAlign: 'center' }}>P2</th><th style={{ textAlign: 'center' }}>Trabajos</th><th style={{ textAlign: 'center' }}>Final</th><th style={{ textAlign: 'right' }}>Estado</th></tr>
+            </thead>
+            <tbody>
+              {materias.map(m => {
+                const p = calc(m)
+                const est = estadoDe(p)
+                return (
+                  <tr key={m.nombre}>
+                    <td>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{m.nombre}</div>
+                      <div className="mono-label" style={{ fontSize: 9 }}>{m.profesor}</div>
+                    </td>
+                    {[m.p1, m.p2, m.tp, m.final].map((n, i) => (
+                      <td key={i} style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700, color: notaColor(n) }}>{n ?? '—'}</td>
+                    ))}
+                    <td style={{ textAlign: 'right' }}><span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   )
 }
 
-function AlumnoAdminView() {
-  const [semestre, setSemestre] = useState(semestres[0])
-  const [dropOpen, setDropOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [materias, setMaterias] = useState<Materia[]>([])
-  const dropRef = useRef<HTMLDivElement>(null)
+/* ═══ Router por rol ════════════════════════════════════════════ */
 
-  useEffect(() => {
-    const token = sessionStorage.getItem('token')
-    const user = token ? decodeToken(token) : null
-    if (!user) return
-    const isAlumno = user.role === 'alumno'
-    const uid = Number(user.user_id)
-    const puntajesUrl = isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/'
-    Promise.all([
-      api.get<{ id: number; nombre: string; profesor_id: number; profesor_nombre?: string | null }[]>('/materias/').catch(() => []),
-      api.get<{ id: number; user_id: number; materia_id: number; tipo: string; valor: number }[]>(puntajesUrl).catch(() => []),
-    ]).then(([materiasData, puntajesData]) => {
-      const grouped: Materia[] = materiasData.map(m => {
-        const pts = puntajesData.filter(p => p.materia_id === m.id)
-        return {
-          nombre: m.nombre,
-          profesor: m.profesor_nombre || (m.profesor_id ? `Prof. #${m.profesor_id}` : '—'),
-          parcial1: pts.find(p => p.tipo === 'parcial1')?.valor ?? null,
-          parcial2: pts.find(p => p.tipo === 'parcial2')?.valor ?? null,
-          tp: pts.find(p => p.tipo === 'practico')?.valor ?? null,
-          final: pts.find(p => p.tipo === 'final')?.valor ?? null,
-        }
-      })
-      if (grouped.length > 0) setMaterias(grouped)
-    }).catch(() => {})
-  }, [])
-
-  const materiasActuales = materias.length > 0 ? materias : (datosPorSemestre[semestre] ?? [])
-  const filtered = materiasActuales.filter(m => m.nombre.toLowerCase().includes(search.toLowerCase()))
-  const promGeneral = (() => {
-    const ps = materiasActuales.map(calcProm).filter(p => p !== null) as number[]
-    if (!ps.length) return 0
-    return Math.round((ps.reduce((a, b) => a + b, 0) / ps.length) * 10) / 10
-  })()
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setDropOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+export default function Puntajes() {
+  const token = sessionStorage.getItem('token')
+  const currentUser = token ? decodeToken(token) : null
 
   return (
     <>
       <style>{css}</style>
-      <div className="puntajes-root">
-        <header className="topbar">
-          <div>
-            <h1>Mis puntajes</h1>
-            <p>{semestre}</p>
-          </div>
-        </header>
-        <div className="content">
-          <div className="kpi-row">
-            <div className="kpi">
-              <div className="kpi-lbl">Materias</div>
-              <div className="kpi-val" style={{ color: 'var(--accent)' }}>{materiasActuales.length}</div>
-            </div>
-            <div className="kpi">
-              <div className="kpi-lbl">Promedio general</div>
-              <div className="kpi-val" style={{ color: '#22c55e' }}>{promGeneral}</div>
-            </div>
-            <div className="kpi">
-              <div className="kpi-lbl">Mejor nota</div>
-              <div className="kpi-val" style={{ color: '#22c55e' }}>
-                {(() => { const ns = materiasActuales.flatMap(m => [m.parcial1,m.parcial2,m.tp,m.final]).filter(n=>n!==null) as number[]; return ns.length ? Math.max(...ns) : '—' })()}
-              </div>
-            </div>
-            <div className="kpi">
-              <div className="kpi-lbl">Finales pendientes</div>
-              <div className="kpi-val" style={{ color: '#f59e0b' }}>{materiasActuales.filter(m => m.final === null).length}</div>
-            </div>
-          </div>
-
-          <div className="toolbar">
-            <div className="toolbar-left">
-              {materiasActuales.length} materias · Promedio: <strong>{promGeneral}</strong>
-            </div>
-            <div className="toolbar-right">
-              <div className="search-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input placeholder="Buscar materia..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
-              <div className="custom-select-wrap" ref={dropRef}>
-                <button className={`custom-select-btn${dropOpen ? ' open' : ''}`} onClick={() => setDropOpen(!dropOpen)}>
-                  <span>{semestre}</span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
-                </button>
-                {dropOpen && (
-                  <div className="custom-select-dropdown">
-                    {semestres.map(s => (
-                      <button key={s} className={`custom-select-opt${s===semestre?' selected':''}`}
-                        onClick={() => { setSemestre(s); setDropOpen(false); setSearch('') }}>
-                        <span>{s}</span>
-                        {s === semestre && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div style={{ display:'flex', gap:8 }}>
-                <button className="btn-export" onClick={() => exportarCSV(filtered, semestre)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Exportar CSV
-                </button>
-                <button className="btn-export" onClick={() => exportarPDF(filtered, semestre, promGeneral)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Exportar PDF
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabla desktop */}
-          <div className="tbl-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Materia</th>
-                  <th className="c">Parc. 1</th><th className="c">Parc. 2</th>
-                  <th className="c">TP</th><th className="c">Final</th>
-                  <th className="c">Promedio</th><th>Progreso</th><th className="c">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(m => {
-                  const p = calcProm(m)
-                  const chip = chipStyle(p)
-                  const est = estadoChip(m)
-                  const prog = [m.parcial1,m.parcial2,m.tp,m.final].filter(n=>n!==null).length
-                  return (
-                    <tr key={m.nombre}>
-                      <td>
-                        <div className="mat-name">{m.nombre}</div>
-                        <div className="mat-prof">{m.profesor}</div>
-                      </td>
-                      {[m.parcial1,m.parcial2,m.tp,m.final].map((n,i) => (
-                        <td key={i} className="c"><span className="nota" style={{color:notaColor(n)}}>{n??'—'}</span></td>
-                      ))}
-                      <td className="c">
-                        <span className="prom-chip" style={{color:chip.color,background:chip.bg,borderColor:chip.border}}>{p??'—'}</span>
-                      </td>
-                      <td style={{minWidth:100}}>
-                        <div className="prog-track">
-                          <div className="prog-fill" style={{width:`${(prog/4)*100}%`,background:prog>=3?'#22c55e':prog>=2?'var(--accent)':'#f59e0b'}}/>
-                        </div>
-                        <div className="prog-lbl">{prog}/4 notas</div>
-                      </td>
-                      <td className="c">
-                        <span className="estado-chip" style={{color:est.color,background:est.bg}}>{est.label}</span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Cards mobile */}
-          <div className="cards-list">
-            {filtered.map(m => {
-              const p = calcProm(m)
-              const chip = chipStyle(p)
-              const est = estadoChip(m)
-              const prog = [m.parcial1,m.parcial2,m.tp,m.final].filter(n=>n!==null).length
-              return (
-                <div key={m.nombre} className="mat-card">
-                  <div className="mat-card-head">
-                    <div>
-                      <div className="mat-name">{m.nombre}</div>
-                      <div className="mat-prof">{m.profesor}</div>
-                    </div>
-                    <span className="estado-chip" style={{color:est.color,background:est.bg}}>{est.label}</span>
-                  </div>
-                  <div className="mat-card-notas">
-                    {[m.parcial1,m.parcial2,m.tp,m.final].map((n,i) => (
-                      <div key={i} className="nota-cell">
-                        <div className="nota-lbl">{['P1','P2','TP','FN'][i]}</div>
-                        <div className="nota-num" style={{color:notaColor(n)}}>{n??'—'}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mat-card-footer">
-                    <span className="prom-chip" style={{color:chip.color,background:chip.bg,borderColor:chip.border}}>{p??'—'}</span>
-                    <div>
-                      <div className="prog-track">
-                        <div className="prog-fill" style={{width:`${(prog/4)*100}%`,background:prog>=3?'#22c55e':prog>=2?'var(--accent)':'#f59e0b'}}/>
-                      </div>
-                      <div className="prog-lbl">{prog}/4 notas</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+      {currentUser?.role === 'profesor'
+        ? <ProfesorView profesorId={Number(currentUser.user_id)} />
+        : currentUser?.role === 'admin'
+          ? <AdminView />
+          : <AlumnoView userId={Number(currentUser?.user_id ?? 0)} />}
     </>
   )
 }
