@@ -10,10 +10,11 @@ SECURITY_HEADERS = {
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; "
-        "font-src 'self' data:"
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "font-src 'self' data: https://cdn.jsdelivr.net; "
+        "connect-src 'self' https://cdn.jsdelivr.net"
     ),
     # Strict-Transport-Security intentionally omitted until HTTPS is confirmed.
 }
