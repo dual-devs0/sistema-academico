@@ -35,7 +35,7 @@ const rolesPermitidos: Record<string, string[]> = {
   '/boleta':    ['admin', 'profesor', 'alumno'],
   '/miscursos':      ['profesor'],
   '/estadisticas':   ['admin', 'profesor'],
-  '/inscripciones':  ['admin'],
+  '/inscripciones':  ['admin', 'alumno'],
 }
 
 function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
