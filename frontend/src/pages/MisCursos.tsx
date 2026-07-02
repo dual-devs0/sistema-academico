@@ -36,7 +36,7 @@ const TIPO_COLOR: Record<string, string> = {
   parcial:   '#a855f7',
   final:     '#ef4444',
   entrega:   '#f59e0b',
-  actividad: '#00b4d8',
+  actividad: 'var(--accent)',
   asueto:    '#506070',
   feriado:   '#506070',
 }
@@ -83,7 +83,7 @@ const css = `
     background:transparent; color:#506070; font-size:12px; font-weight:600;
     font-family:inherit; cursor:pointer; transition:all .15s;
   }
-  .mc-tab.active { background:#00b4d818; border-color:#00b4d850; color:#00b4d8; }
+  .mc-tab.active { background:var(--accent-muted); border-color:var(--accent-hover); color:var(--accent); }
   .mc-tab:hover:not(.active) { border-color:#243447; color:#8fa3b8; }
 
   .mc-content { padding:20px 24px; flex:1; overflow-y:auto; }
@@ -97,7 +97,7 @@ const css = `
     background:#0d1117; border:1px solid #1e2d3d; border-radius:8px;
     color:#f0f4f8; font-size:12px; font-family:inherit; padding:6px 10px; outline:none;
   }
-  .mc-input:focus { border-color:#00b4d850; }
+  .mc-input:focus { border-color:var(--accent-hover); }
   .mc-select {
     background:#0d1117; border:1px solid #1e2d3d; border-radius:8px;
     color:#f0f4f8; font-size:12px; font-family:inherit; padding:6px 10px;
@@ -125,8 +125,8 @@ const css = `
     background:transparent; color:#8fa3b8; font-size:11px; font-weight:600;
     font-family:inherit; cursor:pointer; white-space:nowrap; transition:all .15s;
   }
-  .mc-btn:hover { border-color:#00b4d850; color:#00b4d8; }
-  .mc-btn.accent { background:#00b4d8; border-color:#00b4d8; color:#000; font-weight:700; }
+  .mc-btn:hover { border-color:var(--accent-hover); color:var(--accent); }
+  .mc-btn.accent { background:var(--accent); border-color:var(--accent); color:#000; font-weight:700; }
   .mc-btn.accent:hover { opacity:.85; }
   .mc-btn:disabled { opacity:.4; cursor:not-allowed; }
 
@@ -281,7 +281,7 @@ export default function MisCursos() {
                             <td style={{ fontWeight:600, color:'#f0f4f8' }}>{m.nombre}</td>
                             <td className="c" style={{ color:'#8fa3b8' }}>{m.anio ?? '—'}</td>
                             <td className="c" style={{ color:'#8fa3b8' }}>{m.semestre ?? '—'}</td>
-                            <td className="c" style={{ color:'#00b4d8', fontWeight:700 }}>{alumnosMap[m.id] ?? 0}</td>
+                            <td className="c" style={{ color:'var(--accent)', fontWeight:700 }}>{alumnosMap[m.id] ?? 0}</td>
                             <td style={{ color:'#8fa3b8' }}>{periodo(m.anio, m.semestre)}</td>
                             <td>
                               <div style={{ display:'flex', gap:5 }}>
@@ -347,7 +347,7 @@ export default function MisCursos() {
                             <td style={{ fontWeight:600, color:'#f0f4f8' }}>{m.nombre}</td>
                             <td className="c" style={{ color:'#8fa3b8' }}>{m.anio ?? '—'}</td>
                             <td className="c" style={{ color:'#8fa3b8' }}>{m.semestre ?? '—'}</td>
-                            <td className="c" style={{ color:'#00b4d8', fontWeight:700 }}>{alumnosMap[m.id] ?? 0}</td>
+                            <td className="c" style={{ color:'var(--accent)', fontWeight:700 }}>{alumnosMap[m.id] ?? 0}</td>
                             <td style={{ color:'#8fa3b8' }}>{periodo(m.anio, m.semestre)}</td>
                           </tr>
                         ))

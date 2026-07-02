@@ -517,7 +517,7 @@ export default function AcademicoLogin() {
               <span className="hero-dot" />{semestreActual}
             </div>
             <h1 className="hero-title" style={{ textShadow:'0 2px 12px rgba(0,0,0,.9)' }}>
-              Tu academia,<br /><span>en un solo lugar</span>
+              Tu ecosistema académico,<br /><span>unificado.</span>
             </h1>
             <p className="hero-desc" style={{ textShadow:'0 2px 8px rgba(0,0,0,.9)' }}>
               Accedé a tus calificaciones, asistencia, calendario y boletas desde cualquier dispositivo.

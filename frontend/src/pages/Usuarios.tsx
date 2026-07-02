@@ -23,7 +23,7 @@ const usuariosIniciales: Usuario[] = [
 
 const rolCfg: Record<Rol,{color:string;bg:string;label:string}> = {
   profesor: { color:'#3b82f6', bg:'#3b82f618', label:'Profesor' },
-  alumno:   { color:'#00b4d8', bg:'#00b4d818', label:'Alumno'   },
+  alumno:   { color:'var(--accent)', bg:'var(--accent-muted)', label:'Alumno'   },
   admin:    { color:'#f59e0b', bg:'#f59e0b18', label:'Admin'    },
 }
 function getRolCfg(rol: string) {
@@ -34,7 +34,7 @@ const carreras = ['Ing. Informática','Ing. Civil','Ing. Electrónica','Administ
 
 function initials(n:string){ return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase() }
 function avatarColor(n:string){
-  const cols = ['#00b4d8','#a855f7','#3b82f6','#f59e0b','#22c55e','#ec4899']
+  const cols = ['var(--accent)','#a855f7','#3b82f6','#f59e0b','#22c55e','#ec4899']
   let h = 0; for(const c of n) h += c.charCodeAt(0)
   return cols[h % cols.length]
 }
@@ -62,7 +62,7 @@ const css = `
   .toolbar-sub { font-size:12px; color:#506070; }
   .btn-primary {
     display:inline-flex; align-items:center; gap:6px;
-    padding:9px 16px; background:#00b4d8; border:none;
+    padding:9px 16px; background:var(--accent); border:none;
     border-radius:9px; color:#000; font-size:13px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap;
   }
@@ -87,7 +87,7 @@ const css = `
     border-radius:9px; color:#f0f4f8; font-size:13px;
     font-family:inherit; outline:none; padding:8px 14px 8px 34px; transition:border-color .15s;
   }
-  .search-input:focus { border-color:#00b4d8; }
+  .search-input:focus { border-color:var(--accent); }
   .search-input::placeholder { color:#506070; }
 
   /* Custom dropdown */
@@ -100,7 +100,7 @@ const css = `
     cursor:pointer; white-space:nowrap; min-width:140px;
     justify-content:space-between; transition:border-color .15s;
   }
-  .csel-btn:hover,.csel-btn.open { border-color:#00b4d8; }
+  .csel-btn:hover,.csel-btn.open { border-color:var(--accent); }
   .csel-btn svg { width:11px; height:11px; color:#506070; flex-shrink:0; transition:transform .2s; }
   .csel-btn.open svg { transform:rotate(180deg); }
   .csel-drop {
@@ -117,8 +117,8 @@ const css = `
     transition:background .12s; white-space:nowrap; gap:12px;
   }
   .csel-opt:hover { background:#1a2230; color:#f0f4f8; }
-  .csel-opt.sel { color:#00b4d8; background:#00b4d808; }
-  .csel-opt svg { width:13px; height:13px; color:#00b4d8; flex-shrink:0; }
+  .csel-opt.sel { color:var(--accent); background:var(--accent-muted); }
+  .csel-opt svg { width:13px; height:13px; color:var(--accent); flex-shrink:0; }
 
   /* Tabla desktop */
   .table-wrap { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
@@ -164,11 +164,11 @@ const css = `
   .u-card-footer { display:flex; align-items:center; gap:8px; padding:10px 16px 14px; border-top:1px solid #1e2d3d33; }
   .btn-edit-card {
     flex:1; padding:8px; background:#1a2230; border:1px solid #243447;
-    border-radius:8px; color:#00b4d8; font-size:12px; font-weight:600;
+    border-radius:8px; color:var(--accent); font-size:12px; font-weight:600;
     font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;
     transition:border-color .15s;
   }
-  .btn-edit-card:hover { border-color:#00b4d8; }
+  .btn-edit-card:hover { border-color:var(--accent); }
   .btn-edit-card svg { width:12px; height:12px; }
 
   /* Modal */
@@ -211,7 +211,7 @@ const css = `
     border-radius:8px; color:#f0f4f8; font-size:13px;
     font-family:inherit; outline:none; padding:9px 12px; width:100%; transition:border-color .15s;
   }
-  .fg input:focus, .fg select:focus { border-color:#00b4d8; }
+  .fg input:focus, .fg select:focus { border-color:var(--accent); }
   .fg select {
     appearance:none; cursor:pointer;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23506070' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
@@ -224,7 +224,7 @@ const css = `
     padding:10px 13px; background:#0d1117; border:1px solid #1e2d3d;
     border-radius:8px; cursor:pointer;
   }
-  .check-row input[type=checkbox] { width:15px; height:15px; accent-color:#00b4d8; cursor:pointer; }
+  .check-row input[type=checkbox] { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
   .check-row span { font-size:13px; color:#f0f4f8; }
 
   /* Modal confirmación */
@@ -497,7 +497,7 @@ export default function Usuarios() {
           {/* Stats */}
           <div className="stats-row">
             {[
-              { lbl:'Total',      val:totales.total,   color:'#00b4d8', bg:'#00b4d818', icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
+              { lbl:'Total',      val:totales.total,   color:'var(--accent)', bg:'var(--accent-muted)', icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
               { lbl:'Alumnos',    val:totales.alumnos, color:'#a855f7', bg:'#a855f718', icon:<><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></> },
               { lbl:'Profesores', val:totales.profes,  color:'#3b82f6', bg:'#3b82f618', icon:<><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></> },
               { lbl:'Activos',    val:totales.activos, color:'#22c55e', bg:'#22c55e18', icon:<><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></> },

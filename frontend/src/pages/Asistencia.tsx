@@ -29,9 +29,9 @@ const css = `
     background: #0e131a; display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 14px; cursor: pointer; transition: all 0.2s; margin: 0 auto;
   }
-  .as-scan-btn:hover { border-color: #00b4d8; background: #00b4d808; }
+  .as-scan-btn:hover { border-color: var(--accent); background: var(--accent-muted); }
   .as-scan-btn:active { transform: scale(0.97); }
-  .as-scan-icon { width: 48px; height: 48px; color: #00b4d8; }
+  .as-scan-icon { width: 48px; height: 48px; color: var(--accent); }
   .as-scan-label { font-size: 15px; font-weight: 600; color: #f0f4f8; }
   .as-scan-sub { font-size: 12px; color: #506070; text-align: center; max-width: 200px; }
 
@@ -58,7 +58,7 @@ const css = `
     background: #0e131a; border: 1px solid #1e2d3d; border-radius: 12px;
     padding: 18px; cursor: pointer; transition: all 0.15s;
   }
-  .sel-card:hover { border-color: #00b4d8; background: #00b4d808; }
+  .sel-card:hover { border-color: var(--accent); background: var(--accent-muted); }
   .sel-card:active { transform: scale(0.98); }
   .sel-card-nom { font-size: 14px; font-weight: 600; color: #f0f4f8; }
   .sel-card-sub { font-size: 11px; color: #506070; margin-top: 3px; }
@@ -72,8 +72,8 @@ const css = `
     cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px;
     transition: all 0.15s;
   }
-  .as-btn:hover { border-color: #00b4d8; }
-  .as-btn-primary { background: #00b4d8; border-color: #00b4d8; color: #000; font-weight: 600; }
+  .as-btn:hover { border-color: var(--accent); }
+  .as-btn-primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
   .as-btn-primary:hover { opacity: 0.88; }
 
   .as-table-wrap { overflow-x: auto; border: 1px solid #1e2d3d; border-radius: 12px; }
@@ -116,12 +116,12 @@ const css = `
     padding: 28px 24px; max-width: 480px; margin: 0 auto;
   }
   .qr-instruc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-  .qr-instruc-icon { width: 44px; height: 44px; border-radius: 12px; background: #00b4d815; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .qr-instruc-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .qr-instruc-title { font-size: 16px; font-weight: 700; color: #f0f4f8; }
   .qr-instruc-sub { font-size: 12px; color: #506070; margin-top: 2px; }
   .qr-steps { display: flex; flex-direction: column; gap: 12px; }
   .qr-step { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #131920; border: 1px solid #1a2230; border-radius: 10px; }
-  .qr-step-num { width: 24px; height: 24px; border-radius: 50%; background: #00b4d815; border: 1px solid #00b4d830; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #00b4d8; flex-shrink: 0; margin-top: 1px; }
+  .qr-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-muted); border: 1px solid var(--accent-hover); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
   .qr-step-title { font-size: 13px; font-weight: 600; color: #f0f4f8; margin-bottom: 2px; }
   .qr-step-desc { font-size: 12px; color: #506070; line-height: 1.5; }
   .qr-tip { display: flex; align-items: flex-start; gap: 8px; margin-top: 20px; padding: 12px 14px; background: #f59e0b08; border: 1px solid #f59e0b20; border-radius: 8px; font-size: 12px; color: #f59e0b; line-height: 1.5; }
@@ -197,7 +197,7 @@ function AlumnoView() {
           <div className="qr-instruc-card">
             <div className="qr-instruc-header">
               <div className="qr-instruc-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="1.8">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8">
                   <path d="M3 7V5a2 2 0 012-2h2M3 17v2a2 2 0 002 2h2M17 3h2a2 2 0 012 2v2M17 21h2a2 2 0 002-2v-2"/>
                   <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/>
                   <rect x="7" y="13" width="4" height="4" rx="1"/><rect x="13" y="13" width="4" height="4" rx="1"/>
@@ -399,7 +399,7 @@ function ProfesorView() {
   const total     = alumnos.length
   const qrMin = Math.floor(qrSeg / 60)
   const qrS   = qrSeg % 60
-  const qrClr = qrSeg > 300 ? '#00b4d8' : qrSeg > 60 ? '#f59e0b' : '#ef4444'
+  const qrClr = qrSeg > 300 ? 'var(--accent)' : qrSeg > 60 ? '#f59e0b' : '#ef4444'
 
   return (
     <>
@@ -637,7 +637,7 @@ function AdminView() {
         {/* KPI cards */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12, marginBottom:24 }}>
           {[
-            { lbl:'Total registros', val:totalRegistros, color:'#00b4d8', bg:'#00b4d818' },
+            { lbl:'Total registros', val:totalRegistros, color:'var(--accent)', bg:'var(--accent-muted)' },
             { lbl:'Presencias',      val:totalPresentes, color:'#22c55e', bg:'#22c55e18' },
             { lbl:'Ausencias',       val:totalRegistros-totalPresentes, color:'#ef4444', bg:'#ef444418' },
             { lbl:'% Global',        val:`${pctGlobal}%`, color: pctGlobal>=75?'#22c55e':pctGlobal>=50?'#f59e0b':'#ef4444', bg:'#1a2230' },

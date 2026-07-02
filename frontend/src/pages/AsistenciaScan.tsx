@@ -70,17 +70,17 @@ export default function AsistenciaScan() {
     <div className="min-h-screen bg-[#0b0f14] flex items-center justify-center p-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <p className="text-[#00b4d8] text-xs font-semibold uppercase tracking-widest">Sistema Académico UCA</p>
+          <p className="text-[var(--accent)] text-xs font-semibold uppercase tracking-widest">Sistema Académico UCA</p>
           <p className="text-white/30 text-xs mt-1">Registro de asistencia</p>
         </div>
 
         <div className="bg-[#111820] border border-white/10 rounded-2xl p-8 flex flex-col items-center gap-6 text-center shadow-2xl">
           {estado === 'verificando' && (
             <>
-              <div className="w-16 h-16 rounded-full bg-[#00b4d8]/10 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-[var(--accent)]/10 flex items-center justify-center">
                 <svg className="animate-spin" width="30" height="30" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" className="text-[#00b4d8]"/>
-                  <path d="M12 2a10 10 0 0110 10" stroke="#00b4d8" strokeWidth="3" strokeLinecap="round"/>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" className="text-[var(--accent)]"/>
+                  <path d="M12 2a10 10 0 0110 10" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"/>
                 </svg>
               </div>
               <div>
@@ -114,7 +114,7 @@ export default function AsistenciaScan() {
                 ))}
               </div>
               <button onClick={() => navigate('/asistencia')}
-                className="w-full py-3 rounded-xl bg-[#00b4d8]/15 text-[#00b4d8] font-medium text-sm hover:bg-[#00b4d8]/25 transition-colors">
+                className="w-full py-3 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] font-medium text-sm hover:bg-[var(--accent)]/25 transition-colors">
                 Ver mis asistencias
               </button>
             </>

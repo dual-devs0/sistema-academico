@@ -37,7 +37,7 @@ const tipoEstilo: Record<TipoEvento,{color:string;bg:string;border:string;label:
   feriado:   { color:'#94a3b8', bg:'#1e2d3d',   border:'#2d3f52',   label:'Feriado'   },
   asueto:    { color:'#22c55e', bg:'#22c55e15', border:'#22c55e30', label:'Asueto'    },
   entrega:   { color:'#f59e0b', bg:'#f59e0b15', border:'#f59e0b30', label:'Entrega'   },
-  actividad: { color:'#00b4d8', bg:'#00b4d815', border:'#00b4d830', label:'Actividad' },
+  actividad: { color:'var(--accent)', bg:'var(--accent-muted)', border:'var(--accent-hover)', label:'Actividad' },
 }
 
 function dateKey(y:number, m:number, d:number) {
@@ -95,14 +95,14 @@ const css = `
     border-radius:8px; color:#8fa3b8; font-size:12px; font-weight:600;
     font-family:inherit; cursor:pointer; transition:border-color .15s, color .15s;
   }
-  .nav-btn:hover { border-color:#00b4d8; color:#f0f4f8; }
+  .nav-btn:hover { border-color:var(--accent); color:#f0f4f8; }
   .nav-btn svg { width:12px; height:12px; }
   .btn-hoy {
-    padding:6px 12px; background:#00b4d810; border:1px solid #00b4d830;
-    border-radius:8px; color:#00b4d8; font-size:12px; font-weight:700;
+    padding:6px 12px; background:var(--accent-muted); border:1px solid var(--accent-hover);
+    border-radius:8px; color:var(--accent); font-size:12px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:background .15s;
   }
-  .btn-hoy:hover { background:#00b4d820; }
+  .btn-hoy:hover { background:var(--accent-muted); }
 
   /* Cabecera días */
   .dias-header {
@@ -128,7 +128,7 @@ const css = `
   }
   .dia-cell:hover { background:#1a2230; border-color:#1e2d3d88; }
   .dia-cell.fuera-mes { opacity:.25; pointer-events:none; }
-  .dia-cell.hoy     { border-color:#00b4d8 !important; background:#00b4d80a; }
+  .dia-cell.hoy     { border-color:var(--accent) !important; background:var(--accent-muted); }
   .dia-cell.sel     { border-color:#a855f7 !important; background:#a855f70a; }
   .dia-cell.tiene-ev { border-color:#1e2d3d55; }
 
@@ -142,7 +142,7 @@ const css = `
   .hoy-ring {
     display:inline-flex; align-items:center; justify-content:center;
     width:20px; height:20px; border-radius:50%;
-    background:#00b4d8; color:#000; font-size:11px; font-weight:800;
+    background:var(--accent); color:#000; font-size:11px; font-weight:800;
   }
   .sel-ring {
     display:inline-flex; align-items:center; justify-content:center;

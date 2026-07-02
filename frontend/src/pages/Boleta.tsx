@@ -168,7 +168,7 @@ const css = `
     border-radius:9px; color:#f0f4f8; font-size:13px;
     font-family:inherit; outline:none; padding:8px 14px 8px 34px; transition:border-color .15s;
   }
-  .sel-search:focus { border-color:#00b4d8; }
+  .sel-search:focus { border-color:var(--accent); }
   .sel-search::placeholder { color:#506070; }
   .sel-dropdown {
     position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:50;
@@ -184,17 +184,17 @@ const css = `
   .sel-avatar {
     width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:10px; font-weight:700; color:#000; flex-shrink:0;
-    background:linear-gradient(135deg,#00b4d8,#0ea5e9);
+    background:linear-gradient(135deg,var(--accent),#0ea5e9);
   }
   .sel-info { flex:1; min-width:0; }
   .sel-name { font-size:13px; font-weight:600; color:#f0f4f8; }
   .sel-email { font-size:11px; color:#506070; }
   .sel-selected-chip {
     display:inline-flex; align-items:center; gap:8px;
-    background:#00b4d818; border:1px solid #00b4d830;
-    border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:#00b4d8;
+    background:var(--accent-muted); border:1px solid var(--accent-hover);
+    border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--accent);
   }
-  .sel-selected-chip button { background:none; border:none; color:#00b4d8; cursor:pointer; padding:0; display:flex; line-height:1; }
+  .sel-selected-chip button { background:none; border:none; color:var(--accent); cursor:pointer; padding:0; display:flex; line-height:1; }
   .sel-selected-chip button:hover { color:#f0f4f8; }
 
   /* ── Empty state ── */
@@ -209,7 +209,7 @@ const css = `
   .actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
   .btn-primary {
     display:inline-flex; align-items:center; gap:6px;
-    padding:9px 16px; background:#00b4d8; border:none;
+    padding:9px 16px; background:var(--accent); border:none;
     border-radius:9px; color:#000; font-size:13px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap;
   }
@@ -221,16 +221,16 @@ const css = `
     border-radius:9px; color:#8fa3b8; font-size:13px; font-weight:600;
     font-family:inherit; cursor:pointer; white-space:nowrap; transition:border-color .15s, color .15s;
   }
-  .btn-secondary:hover { border-color:#00b4d8; color:#f0f4f8; }
+  .btn-secondary:hover { border-color:var(--accent); color:#f0f4f8; }
   .btn-secondary svg { width:13px; height:13px; flex-shrink:0; }
 
   /* Boleta dark preview */
   .boleta { max-width:820px; margin:0 auto; background:#131920; border:1px solid #1e2d3d; border-radius:16px; overflow:hidden; }
 
   /* Header */
-  .bol-hdr { padding:20px 24px 18px; border-bottom:3px solid #00b4d8; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .bol-hdr { padding:20px 24px 18px; border-bottom:3px solid var(--accent); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
   .bol-hdr-left { display:flex; align-items:center; gap:12px; }
-  .bol-logo { width:44px; height:44px; background:linear-gradient(135deg,#00b4d8,#0ea5e9); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .bol-logo { width:44px; height:44px; background:linear-gradient(135deg,var(--accent),#0ea5e9); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .bol-logo svg { width:22px; height:22px; }
   .bol-inst { font-size:15px; font-weight:800; color:#f0f4f8; }
   .bol-isub { font-size:11px; color:#506070; margin-top:2px; }
@@ -244,7 +244,7 @@ const css = `
   .mc:nth-child(3n) { border-right:none; }
   .ml { font-size:9px; color:#506070; text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; font-weight:600; }
   .mv { font-size:13px; font-weight:600; color:#f0f4f8; }
-  .mc-cy { font-size:13px; font-weight:700; color:#00b4d8; }
+  .mc-cy { font-size:13px; font-weight:700; color:var(--accent); }
   .beca-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; background:#15803d18; color:#22c55e; font-size:11px; font-weight:700; }
 
   /* Sección */
@@ -262,8 +262,8 @@ const css = `
   td.c { text-align:center; font-weight:700; }
 
   /* Total */
-  .bol-total { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-top:2px solid #00b4d8; background:#00b4d808; }
-  .bol-total-lbl { font-size:14px; font-weight:700; color:#00b4d8; }
+  .bol-total { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-top:2px solid var(--accent); background:var(--accent-muted); }
+  .bol-total-lbl { font-size:14px; font-weight:700; color:var(--accent); }
   .bol-total-val { font-size:28px; font-weight:900; line-height:1; }
 
   /* Footer */
@@ -339,7 +339,7 @@ function BoletaPreview({ alumno, materias }: { alumno: AlumnoData; materias: Mat
               return (
                 <tr key={m.nombre}>
                   <td style={{fontWeight:600,color:'#f0f4f8',fontSize:13}}>{m.nombre}</td>
-                  <td style={{color:'#00b4d8',fontSize:12}}>{m.profesor}</td>
+                  <td style={{color:'var(--accent)',fontSize:12}}>{m.profesor}</td>
                   <td className="c" style={{color:colorNota(m.parcial1)}}>{m.parcial1??'—'}</td>
                   <td className="c" style={{color:colorNota(m.parcial2)}}>{m.parcial2??'—'}</td>
                   <td className="c" style={{color:colorNota(m.tp)}}>{m.tp??'—'}</td>
@@ -536,7 +536,7 @@ function AdminBoletaView() {
             </div>
           ) : loading ? (
             <div className="bol-empty">
-              <div style={{color:'#00b4d8',fontSize:13}}>Cargando boleta…</div>
+              <div style={{color:'var(--accent)',fontSize:13}}>Cargando boleta…</div>
             </div>
           ) : (
             <>

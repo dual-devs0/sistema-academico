@@ -39,8 +39,8 @@ const cssPro = `
     background:#131920; color:#8fa3b8; font-size:12px; font-weight:600;
     cursor:pointer; transition:all .15s; font-family:inherit;
   }
-  .pro-tab:hover { border-color:#00b4d8; color:#f0f4f8; }
-  .pro-tab.active { background:#00b4d818; border-color:#00b4d8; color:#00b4d8; }
+  .pro-tab:hover { border-color:var(--accent); color:#f0f4f8; }
+  .pro-tab.active { background:var(--accent-muted); border-color:var(--accent); color:var(--accent); }
 
   .pro-empty {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -81,18 +81,18 @@ const cssPro = `
     border-radius:7px; color:#f0f4f8; font-size:13px; font-weight:700;
     font-family:inherit; outline:none; transition:border-color .15s;
   }
-  .nota-input:focus { border-color:#00b4d8; }
+  .nota-input:focus { border-color:var(--accent); }
   .nota-input:disabled { opacity:.4; cursor:not-allowed; }
 
   .btn-save-row {
     display:inline-flex; align-items:center; gap:5px;
     padding:5px 12px; border-radius:7px;
-    background:#00b4d818; border:1px solid #00b4d840;
-    color:#00b4d8; font-size:11px; font-weight:700;
+    background:var(--accent-muted); border:1px solid var(--accent-hover);
+    color:var(--accent); font-size:11px; font-weight:700;
     font-family:inherit; cursor:pointer;
     transition:all .15s; white-space:nowrap;
   }
-  .btn-save-row:hover:not(:disabled) { background:#00b4d830; border-color:#00b4d8; }
+  .btn-save-row:hover:not(:disabled) { background:var(--accent-hover); border-color:var(--accent); }
   .btn-save-row:disabled { opacity:.5; cursor:not-allowed; }
   .btn-save-row svg { width:12px; height:12px; }
 
@@ -145,7 +145,7 @@ const cssPro = `
 function proChipStyle(n: number | null) {
   if (n === null) return { color: '#506070', bg: '#1e2d3d18', border: '#1e2d3d' }
   if (n >= 9)  return { color: '#22c55e', bg: '#22c55e15', border: '#22c55e40' }
-  if (n >= 7.5) return { color: '#00b4d8', bg: '#00b4d815', border: '#00b4d840' }
+  if (n >= 7.5) return { color: 'var(--accent)', bg: 'var(--accent-muted)', border: 'var(--accent-hover)' }
   if (n >= 6)  return { color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40' }
   return { color: '#ef4444', bg: '#ef444415', border: '#ef444440' }
 }
@@ -503,14 +503,14 @@ function calcProm(m: Materia): number | null {
 function notaColor(n: number | null) {
   if (n === null) return '#2a3a55'
   if (n >= 9) return '#22c55e'
-  if (n >= 7.5) return '#00b4d8'
+  if (n >= 7.5) return 'var(--accent)'
   if (n >= 6) return '#f59e0b'
   return '#ef4444'
 }
 function chipStyle(p: number | null) {
   if (p === null) return { color: '#506070', bg: '#1e2d3d18', border: '#1e2d3d' }
   if (p >= 9) return { color: '#22c55e', bg: '#22c55e15', border: '#22c55e40' }
-  if (p >= 7.5) return { color: '#00b4d8', bg: '#00b4d815', border: '#00b4d840' }
+  if (p >= 7.5) return { color: 'var(--accent)', bg: 'var(--accent-muted)', border: 'var(--accent-hover)' }
   if (p >= 6) return { color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40' }
   return { color: '#ef4444', bg: '#ef444415', border: '#ef444440' }
 }
@@ -689,7 +689,7 @@ const css = `
 
   .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px; flex-wrap:wrap; }
   .toolbar-left { font-size:12px; color:#8fa3b8; }
-  .toolbar-left strong { color:#00b4d8; font-weight:700; }
+  .toolbar-left strong { color:var(--accent); font-weight:700; }
   .toolbar-right { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
   .search-box {
@@ -697,7 +697,7 @@ const css = `
     background:#131920; border:1px solid #1e2d3d;
     border-radius:8px; padding:0 11px; height:34px; transition:border-color .15s;
   }
-  .search-box:focus-within { border-color:#00b4d8; }
+  .search-box:focus-within { border-color:var(--accent); }
   .search-box svg { width:13px; height:13px; color:#506070; flex-shrink:0; }
   .search-box input {
     background:none; border:none; outline:none;
@@ -714,7 +714,7 @@ const css = `
     cursor:pointer; transition:border-color .15s; white-space:nowrap;
     min-width:160px; justify-content:space-between;
   }
-  .custom-select-btn:hover, .custom-select-btn.open { border-color:#00b4d8; }
+  .custom-select-btn:hover, .custom-select-btn.open { border-color:var(--accent); }
   .custom-select-btn svg { width:12px; height:12px; color:#506070; flex-shrink:0; transition:transform .2s; }
   .custom-select-btn.open svg { transform:rotate(180deg); }
   .custom-select-dropdown {
@@ -731,8 +731,8 @@ const css = `
     font-family:inherit;
   }
   .custom-select-opt:hover { background:#1a2230; color:#f0f4f8; }
-  .custom-select-opt.selected { color:#00b4d8; background:#00b4d808; }
-  .custom-select-opt svg { width:14px; height:14px; color:#00b4d8; flex-shrink:0; }
+  .custom-select-opt.selected { color:var(--accent); background:var(--accent-muted); }
+  .custom-select-opt svg { width:14px; height:14px; color:var(--accent); flex-shrink:0; }
 
   .btn-export {
     display:flex; align-items:center; gap:6px;
@@ -743,8 +743,8 @@ const css = `
     transition:border-color .15s, color .15s, background .15s;
     white-space:nowrap;
   }
-  .btn-export:hover { border-color:#00b4d8; color:#f0f4f8; background:#00b4d808; }
-  .btn-export:active { background:#00b4d815; }
+  .btn-export:hover { border-color:var(--accent); color:#f0f4f8; background:var(--accent-muted); }
+  .btn-export:active { background:var(--accent-muted); }
   .btn-export svg { width:13px; height:13px; }
 
   .tbl-wrap { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
@@ -821,15 +821,15 @@ const cssAdmin = `
   .adm-sel-group label { font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
   .adm-sel-wrap { position:relative; }
   .adm-search { width:100%; background:#131920; border:1px solid #1e2d3d; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; outline:none; padding:9px 14px; transition:border-color .15s; }
-  .adm-search:focus { border-color:#00b4d8; }
+  .adm-search:focus { border-color:var(--accent); }
   .adm-search::placeholder { color:#506070; }
   .adm-drop { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#131920; border:1px solid #1e2d3d; border-radius:10px; z-index:50; max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,.5); }
   .adm-opt { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; transition:background .12s; }
   .adm-opt:hover { background:#1a2230; }
-  .adm-av { width:30px; height:30px; border-radius:50%; background:#1e2d3d; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#00b4d8; flex-shrink:0; }
+  .adm-av { width:30px; height:30px; border-radius:50%; background:#1e2d3d; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--accent); flex-shrink:0; }
   .adm-opt-name { font-size:13px; font-weight:600; color:#f0f4f8; }
   .adm-opt-user { font-size:11px; color:#506070; }
-  .adm-chip { display:inline-flex; align-items:center; gap:8px; background:#00b4d812; border:1px solid #00b4d830; border-radius:9px; padding:7px 12px; font-size:13px; color:#f0f4f8; font-weight:600; }
+  .adm-chip { display:inline-flex; align-items:center; gap:8px; background:var(--accent-muted); border:1px solid var(--accent-hover); border-radius:9px; padding:7px 12px; font-size:13px; color:#f0f4f8; font-weight:600; }
   .adm-chip-clear { background:none; border:none; cursor:pointer; color:#506070; padding:0; display:flex; margin-left:4px; }
   .adm-chip-clear:hover { color:#ef4444; }
   .adm-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 24px; text-align:center; gap:14px; }
@@ -1014,7 +1014,7 @@ function AdminView() {
               <div className="adm-kpi-row">
                 <div className="adm-kpi">
                   <div className="adm-kpi-lbl">Materias</div>
-                  <div className="adm-kpi-val" style={{color:'#00b4d8'}}>{materias.length}</div>
+                  <div className="adm-kpi-val" style={{color:'var(--accent)'}}>{materias.length}</div>
                 </div>
                 <div className="adm-kpi">
                   <div className="adm-kpi-lbl">Promedio</div>
@@ -1161,7 +1161,7 @@ function AlumnoAdminView() {
           <div className="kpi-row">
             <div className="kpi">
               <div className="kpi-lbl">Materias</div>
-              <div className="kpi-val" style={{ color: '#00b4d8' }}>{materiasActuales.length}</div>
+              <div className="kpi-val" style={{ color: 'var(--accent)' }}>{materiasActuales.length}</div>
             </div>
             <div className="kpi">
               <div className="kpi-lbl">Promedio general</div>
@@ -1255,7 +1255,7 @@ function AlumnoAdminView() {
                       </td>
                       <td style={{minWidth:100}}>
                         <div className="prog-track">
-                          <div className="prog-fill" style={{width:`${(prog/4)*100}%`,background:prog>=3?'#22c55e':prog>=2?'#00b4d8':'#f59e0b'}}/>
+                          <div className="prog-fill" style={{width:`${(prog/4)*100}%`,background:prog>=3?'#22c55e':prog>=2?'var(--accent)':'#f59e0b'}}/>
                         </div>
                         <div className="prog-lbl">{prog}/4 notas</div>
                       </td>
@@ -1297,7 +1297,7 @@ function AlumnoAdminView() {
                     <span className="prom-chip" style={{color:chip.color,background:chip.bg,borderColor:chip.border}}>{p??'—'}</span>
                     <div>
                       <div className="prog-track">
-                        <div className="prog-fill" style={{width:`${(prog/4)*100}%`,background:prog>=3?'#22c55e':prog>=2?'#00b4d8':'#f59e0b'}}/>
+                        <div className="prog-fill" style={{width:`${(prog/4)*100}%`,background:prog>=3?'#22c55e':prog>=2?'var(--accent)':'#f59e0b'}}/>
                       </div>
                       <div className="prog-lbl">{prog}/4 notas</div>
                     </div>

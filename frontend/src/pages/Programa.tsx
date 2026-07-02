@@ -68,7 +68,7 @@ const css = `
   .global-lbl { font-size:12px; color:#8fa3b8; }
   .global-val { font-size:12px; font-weight:800; }
   .global-bar-track { height:5px; background:#1e2d3d; border-radius:3px; overflow:hidden; margin-top:12px; }
-  .global-bar-fill  { height:100%; border-radius:3px; background:linear-gradient(90deg,#00b4d8,#a855f7); transition:width .6s ease; }
+  .global-bar-fill  { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--accent),#a855f7); transition:width .6s ease; }
 
   /* Dropdown mobile */
   .mob-drop-wrap { display:none; margin-bottom:14px; position:relative; }
@@ -78,14 +78,14 @@ const css = `
     border-radius:10px; padding:11px 14px; color:#f0f4f8;
     font-size:13px; font-family:inherit; cursor:pointer; transition:border-color .15s;
   }
-  .mob-drop-btn.open { border-color:#00b4d8; }
+  .mob-drop-btn.open { border-color:var(--accent); }
   .mob-drop-btn svg { width:13px; height:13px; color:#506070; transition:transform .2s; }
   .mob-drop-btn.open svg { transform:rotate(180deg); }
   .mob-drop-menu { position:absolute; top:calc(100% + 5px); left:0; right:0; background:#131920; border:1px solid #1e2d3d; border-radius:10px; overflow:hidden; box-shadow:0 12px 32px rgba(0,0,0,.5); z-index:40; }
   .mob-drop-opt { display:flex; align-items:center; justify-content:space-between; padding:11px 14px; font-size:13px; color:#8fa3b8; cursor:pointer; border:none; background:none; width:100%; font-family:inherit; transition:background .12s; gap:10px; }
   .mob-drop-opt:hover { background:#1a2230; color:#f0f4f8; }
-  .mob-drop-opt.sel { color:#00b4d8; background:#00b4d808; }
-  .mob-drop-opt svg { width:13px; height:13px; color:#00b4d8; flex-shrink:0; }
+  .mob-drop-opt.sel { color:var(--accent); background:var(--accent-muted); }
+  .mob-drop-opt svg { width:13px; height:13px; color:var(--accent); flex-shrink:0; }
   .mob-color-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
   /* Contenido */
@@ -146,21 +146,21 @@ const css = `
     background:#131920; border:1px solid #1e2d3d;
     font-size:12px; color:#f0f4f8; font-weight:600;
   }
-  .det-fecha-chip svg { width:13px; height:13px; color:#00b4d8; }
+  .det-fecha-chip svg { width:13px; height:13px; color:var(--accent); }
   .det-bib {
     display:flex; align-items:flex-start; gap:8px;
     padding:10px 13px; background:#0d1117; border:1px solid #1e2d3d;
     border-radius:8px; font-size:12px; color:#8fa3b8; line-height:1.5;
   }
-  .det-bib svg { width:13px; height:13px; color:#00b4d8; flex-shrink:0; margin-top:1px; }
+  .det-bib svg { width:13px; height:13px; color:var(--accent); flex-shrink:0; margin-top:1px; }
   .det-apunte-btn {
     display:inline-flex; align-items:center; gap:6px;
-    padding:7px 14px; background:#00b4d810; border:1px solid #00b4d830;
-    border-radius:8px; color:#00b4d8; font-size:12px; font-weight:600;
+    padding:7px 14px; background:var(--accent-muted); border:1px solid var(--accent-hover);
+    border-radius:8px; color:var(--accent); font-size:12px; font-weight:600;
     cursor:pointer; font-family:inherit; transition:background .15s;
     text-decoration:none;
   }
-  .det-apunte-btn:hover { background:#00b4d820; }
+  .det-apunte-btn:hover { background:var(--accent-muted); }
   .det-apunte-btn svg { width:13px; height:13px; }
   .det-no-apunte { font-size:12px; color:#2a3a55; font-style:italic; }
   .det-eval-block {
@@ -187,7 +187,7 @@ const css = `
     font-family:inherit; outline:none; padding:9px 12px; width:100%;
     transition:border-color .15s; resize:vertical;
   }
-  .fg input:focus, .fg textarea:focus, .fg select:focus { border-color:#00b4d8; }
+  .fg input:focus, .fg textarea:focus, .fg select:focus { border-color:var(--accent); }
   .fg select { appearance:none; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23506070' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; background-color:#0d1117; padding-right:30px; }
   .fg select option { background:#131920; }
   .editor-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
@@ -203,7 +203,7 @@ const css = `
   .btn-completar svg { width:12px; height:12px; }
   .btn-guardar {
     display:inline-flex; align-items:center; gap:6px;
-    padding:8px 14px; background:#00b4d8; border:none;
+    padding:8px 14px; background:var(--accent); border:none;
     border-radius:8px; color:#000; font-size:12px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s;
   }
@@ -390,30 +390,30 @@ const cssProg = `
   .pp-mat-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:220px; }
   .pp-mat-group label { font-size:10px; font-weight:600; color:#506070; text-transform:uppercase; letter-spacing:.07em; }
   .pp-sel { background:#131920; border:1px solid #1e2d3d; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; padding:9px 12px; outline:none; appearance:none; cursor:pointer; transition:border-color .15s; }
-  .pp-sel:focus { border-color:#00b4d8; }
+  .pp-sel:focus { border-color:var(--accent); }
   .pp-sel option { background:#131920; }
 
   .pp-units { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
   .pp-unit { background:#131920; border:1px solid #1e2d3d; border-radius:12px; padding:16px; position:relative; }
   .pp-unit-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-  .pp-unit-num { width:28px; height:28px; border-radius:8px; background:#00b4d815; border:1px solid #00b4d830; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#00b4d8; flex-shrink:0; }
+  .pp-unit-num { width:28px; height:28px; border-radius:8px; background:var(--accent-muted); border:1px solid var(--accent-hover); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:var(--accent); flex-shrink:0; }
   .pp-unit-titulo { flex:1; background:#0d1117; border:1px solid #243447; border-radius:8px; color:#f0f4f8; font-size:13px; font-family:inherit; padding:7px 10px; outline:none; transition:border-color .15s; }
-  .pp-unit-titulo:focus { border-color:#00b4d8; }
+  .pp-unit-titulo:focus { border-color:var(--accent); }
   .pp-unit-titulo::placeholder { color:#3a4a5a; }
   .pp-unit-desc { width:100%; background:#0d1117; border:1px solid #243447; border-radius:8px; color:#f0f4f8; font-size:12px; font-family:inherit; padding:7px 10px; outline:none; resize:vertical; min-height:60px; transition:border-color .15s; }
-  .pp-unit-desc:focus { border-color:#00b4d8; }
+  .pp-unit-desc:focus { border-color:var(--accent); }
   .pp-unit-desc::placeholder { color:#3a4a5a; }
   .pp-del-btn { background:none; border:none; cursor:pointer; color:#3a4a5a; padding:4px; border-radius:6px; display:flex; transition:color .12s,background .12s; }
   .pp-del-btn:hover { color:#ef4444; background:#ef444418; }
   .pp-del-btn svg { width:14px; height:14px; }
 
   .pp-add-btn { display:flex; align-items:center; gap:8px; padding:10px 16px; background:#131920; border:1px dashed #1e2d3d; border-radius:10px; color:#506070; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .15s; width:100%; justify-content:center; }
-  .pp-add-btn:hover { border-color:#00b4d8; color:#00b4d8; background:#00b4d808; }
+  .pp-add-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-muted); }
   .pp-add-btn svg { width:14px; height:14px; }
 
   .pp-save-bar { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid #1e2d3d; margin-top:16px; gap:10px; flex-wrap:wrap; }
   .pp-save-info { font-size:12px; color:#506070; }
-  .pp-save-btn { display:inline-flex; align-items:center; gap:7px; padding:10px 20px; background:#00b4d8; border:none; border-radius:10px; color:#000; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; }
+  .pp-save-btn { display:inline-flex; align-items:center; gap:7px; padding:10px 20px; background:var(--accent); border:none; border-radius:10px; color:#000; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; }
   .pp-save-btn:hover { opacity:.85; }
   .pp-save-btn:disabled { opacity:.4; cursor:not-allowed; }
   .pp-save-btn svg { width:14px; height:14px; }
@@ -627,8 +627,8 @@ export default function Programa() {
             grouped[key] = {
               materia: key,
               profesor: m ? `Prof. ${m.nombre}` : '—',
-              color: '#00b4d8',
-              bg: '#00b4d818',
+              color: 'var(--accent)',
+              bg: 'var(--accent-muted)',
               clases: [],
             }
           }
@@ -691,9 +691,9 @@ export default function Programa() {
 
   if (cargando) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#0b0f14', color:'#506070', fontFamily:'Inter,system-ui,sans-serif', flexDirection:'column', gap:12 }}>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" style={{ animation:'spin 1s linear infinite' }}>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation:'spin 1s linear infinite' }}>
         <circle cx="12" cy="12" r="10" stroke="#1e2d3d" strokeWidth="3"/>
-        <path d="M12 2a10 10 0 0110 10" stroke="#00b4d8" strokeWidth="3" strokeLinecap="round"/>
+        <path d="M12 2a10 10 0 0110 10" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"/>
       </svg>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <span style={{ fontSize:13 }}>Cargando programa…</span>
@@ -726,7 +726,7 @@ export default function Programa() {
           <div className="rol-badge" style={
             ROL==='profesor'
               ? {background:'#3b82f615',color:'#3b82f6',border:'1px solid #3b82f630'}
-              : {background:'#00b4d815',color:'#00b4d8',border:'1px solid #00b4d830'}
+              : {background:'var(--accent-muted)',color:'var(--accent)',border:'1px solid var(--accent-hover)'}
           }>
             {ROL==='profesor'
               ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Modo Profesor</>
@@ -757,7 +757,7 @@ export default function Programa() {
                       <div style={{display:'flex',alignItems:'center',gap:8}}>
                         <div className="mob-color-dot" style={{background:t.color}}/>
                         <div>
-                          <div style={{fontWeight:600,color:sel?'#00b4d8':'#f0f4f8',fontSize:13}}>{t.materia}</div>
+                          <div style={{fontWeight:600,color:sel?'var(--accent)':'#f0f4f8',fontSize:13}}>{t.materia}</div>
                           <div style={{fontSize:11,color:'#506070',marginTop:1}}>{pct}% completado</div>
                         </div>
                       </div>
@@ -800,7 +800,7 @@ export default function Programa() {
                 <div className="global-title">Resumen general</div>
                 <div className="global-row"><span className="global-lbl">Completadas</span><span className="global-val" style={{color:'#22c55e'}}>{totalComp}/{totalClases}</span></div>
                 <div className="global-row"><span className="global-lbl">Materias</span><span className="global-val">{data.length}</span></div>
-                <div className="global-row"><span className="global-lbl">Progreso</span><span className="global-val" style={{color:'#00b4d8'}}>{progresoGlob}%</span></div>
+                <div className="global-row"><span className="global-lbl">Progreso</span><span className="global-val" style={{color:'var(--accent)'}}>{progresoGlob}%</span></div>
                 <div className="global-bar-track"><div className="global-bar-fill" style={{width:`${progresoGlob}%`}}/></div>
               </div>
             </div>

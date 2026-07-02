@@ -16,12 +16,6 @@ const eventosMock = [
   { tipo: 'entrega', titulo: 'TP — Programación I',   sub: 'Luis Paredes',  fecha: '28 Jul' },
 ]
 
-const notificacionesMock = [
-  { icon: 'ti-chart-bar', color: '#22c55e', bg: '#15803d18', titulo: 'Nueva nota cargada',     sub: 'Parcial 2 — Programación I: 9.5', tiempo: 'Hace 10 min', path: '/puntajes' },
-  { icon: 'ti-calendar',  color: '#00b4d8', bg: '#00b4d818', titulo: 'Evento próximo',          sub: 'Final Física I — 5 de agosto',    tiempo: 'Hace 1 h',   path: '/calendario' },
-  { icon: 'ti-checkbox',  color: '#f59e0b', bg: '#f59e0b18', titulo: 'Asistencia actualizada', sub: 'Análisis Matemático I: 75%',       tiempo: 'Ayer',        path: '/asistencia' },
-]
-
 const asistenciasMock = [
   { nombre: 'Análisis Matemático I', pct: 75,  clase: 'warn' },
   { nombre: 'Física I',              pct: 83,  clase: 'ok' },
@@ -39,8 +33,8 @@ type AsistenciaRow = { nombre: string; pct: number; clase: string }
 type TpRow = { nombre: string; materia: string; fecha: string }
 
 const dotColor: Record<string, string> = { final: '#ef4444', entrega: '#f59e0b', parcial: '#a855f7', asueto: '#22c55e' }
-const gradeColor: Record<string, string> = { high: '#22c55e', mid: '#00b4d8', low: '#f59e0b', empty: '#506070' }
-const avgBg:      Record<string, string> = { high: '#15803d18', mid: '#00b4d818', low: '#f59e0b18' }
+const gradeColor: Record<string, string> = { high: '#22c55e', mid: 'var(--accent)', low: '#f59e0b', empty: '#506070' }
+const avgBg:      Record<string, string> = { high: '#15803d18', mid: 'var(--accent-muted)', low: '#f59e0b18' }
 
 function gradeClass(n: number | null) {
   if (n === null) return 'empty'
@@ -72,7 +66,7 @@ const css = `
     transition:border-color .15s, width .2s;
     width:160px; overflow:hidden;
   }
-  .search-wrap:focus-within { border-color:#00b4d8; width:220px; }
+  .search-wrap:focus-within { border-color:var(--accent); width:220px; }
   .search-wrap svg { width:14px; height:14px; color:#506070; flex-shrink:0; }
   .search-input {
     background:none; border:none; outline:none;
@@ -89,7 +83,7 @@ const css = `
     transition:border-color .15s, color .15s; flex-shrink:0;
   }
   .topbar-btn svg { width:15px; height:15px; }
-  .topbar-btn:hover { border-color:#00b4d8; color:#f0f4f8; }
+  .topbar-btn:hover { border-color:var(--accent); color:#f0f4f8; }
   .notif-dot {
     position:absolute; top:6px; right:6px;
     width:7px; height:7px;
@@ -99,7 +93,7 @@ const css = `
   /* Avatar */
   .avatar {
     width:34px; height:34px;
-    background:linear-gradient(135deg,#00b4d8,#0ea5e9);
+    background:linear-gradient(135deg,var(--accent),#0ea5e9);
     border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:12px; font-weight:700; color:#000;
     cursor:pointer; flex-shrink:0; transition:opacity .15s;
@@ -119,7 +113,7 @@ const css = `
     padding:12px 16px; border-bottom:1px solid #1e2d3d;
   }
   .notif-header span { font-size:13px; font-weight:700; color:#f0f4f8; }
-  .notif-clear { font-size:11px; color:#00b4d8; background:none; border:none; cursor:pointer; font-family:inherit; }
+  .notif-clear { font-size:11px; color:var(--accent); background:none; border:none; cursor:pointer; font-family:inherit; }
   .notif-item {
     display:flex; align-items:flex-start; gap:10px;
     padding:11px 16px; border-bottom:1px solid #1e2d3d33;
@@ -160,7 +154,7 @@ const css = `
   }
 
   /* ── CONTENT ── */
-  .content { padding:20px 24px; flex:1; overflow-y:auto; }
+  .content { padding:0; flex:1; }
 
   .welcome-banner {
     background:#131920; border:1px solid #1e2d3d;
@@ -171,16 +165,16 @@ const css = `
   .welcome-banner::before {
     content:''; position:absolute; right:-40px; top:-40px;
     width:180px; height:180px; border-radius:50%;
-    background:radial-gradient(circle,#00b4d814,transparent 70%);
+    background:radial-gradient(circle,var(--accent-muted),transparent 70%);
     pointer-events:none;
   }
   .welcome-text h2 { font-size:16px; font-weight:700; color:#f0f4f8; margin-bottom:3px; }
   .welcome-text p  { font-size:11px; color:#8fa3b8; }
   .semester-badge {
     display:flex; align-items:center; gap:7px;
-    background:#00b4d818; border:1px solid #00b4d830;
+    background:var(--accent-muted); border:1px solid var(--accent-hover);
     border-radius:8px; padding:8px 14px;
-    font-size:12px; font-weight:600; color:#00b4d8; flex-shrink:0;
+    font-size:12px; font-weight:600; color:var(--accent); flex-shrink:0;
   }
   .semester-badge svg { width:13px; height:13px; }
 
@@ -199,7 +193,7 @@ const css = `
   .stat-card-top { display:flex; align-items:center; justify-content:space-between; }
   .stat-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; }
   .stat-icon svg { width:16px; height:16px; }
-  .stat-icon.cyan   { background:#00b4d818; color:#00b4d8; }
+  .stat-icon.cyan   { background:var(--accent-muted); color:var(--accent); }
   .stat-icon.green  { background:#15803d18; color:#22c55e; }
   .stat-icon.yellow { background:#f59e0b18; color:#f59e0b; }
   .stat-icon.purple { background:#a855f718; color:#a855f7; }
@@ -221,11 +215,11 @@ const css = `
   .card-header h3 { font-size:13px; font-weight:700; color:#f0f4f8; }
   .card-header p  { font-size:11px; color:#506070; margin-top:1px; }
   .card-action {
-    font-size:11px; color:#00b4d8; background:none; border:none;
+    font-size:11px; color:var(--accent); background:none; border:none;
     cursor:pointer; font-family:inherit; padding:4px 8px;
     border-radius:6px; transition:background .12s;
   }
-  .card-action:hover { background:#00b4d818; }
+  .card-action:hover { background:var(--accent-muted); }
 
   table { width:100%; border-collapse:collapse; }
   thead th {
@@ -279,7 +273,7 @@ const css = `
   @media(max-width:768px){
     .topbar { padding:0 14px; height:52px; }
     .topbar-left h1 { font-size:15px; }
-    .content { padding:14px; }
+    .content { padding:0; }
     .stats-grid { grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px; }
     .stat-value { font-size:22px; }
     .welcome-banner { flex-direction:column; align-items:flex-start; gap:10px; padding:14px 16px; }
@@ -290,8 +284,6 @@ const css = `
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [showNotif, setShowNotif] = useState(false)
-  const [searchVal, setSearchVal] = useState('')
   const [user, setUser] = useState(() => {
     const token = sessionStorage.getItem('token')
     return token ? decodeToken(token) : null
@@ -374,123 +366,10 @@ export default function Dashboard() {
     })()
   }, [])
 
-  function handleNotifClick(path: string) {
-    setShowNotif(false)
-    navigate(path)
-  }
-
   return (
     <>
       <style>{css}</style>
       <div className="dash-wrap">
-
-        {/* ── TOPBAR ── */}
-        <header className="topbar">
-          <div className="topbar-left">
-            <h1>Dashboard</h1>
-            <p>Semestre 1 — 2026</p>
-          </div>
-
-          <div className="topbar-right">
-
-            {/* Búsqueda — oculta en mobile via CSS */}
-            <div className="search-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input
-                className="search-input"
-                placeholder="Buscar..."
-                value={searchVal}
-                onChange={e => setSearchVal(e.target.value)}
-              />
-            </div>
-
-            {/* Notificaciones */}
-            <div className="notif-wrap">
-              <button
-                className="topbar-btn"
-                onClick={() => setShowNotif(!showNotif)}
-                aria-label="Notificaciones"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 01-3.46 0"/>
-                </svg>
-                <span className="notif-dot" />
-              </button>
-
-              {showNotif && (
-                <>
-                  {/* Overlay cierre — desktop */}
-                  <div
-                    style={{ position:'fixed', inset:0, zIndex:40 }}
-                    onClick={() => setShowNotif(false)}
-                  />
-                  <div className="notif-dropdown">
-                    <div className="notif-header">
-                      <span>Notificaciones</span>
-                      <button className="notif-clear" onClick={() => setShowNotif(false)}>
-                        Marcar todo como leído
-                      </button>
-                    </div>
-
-                    {/* Body scrolleable en mobile */}
-                    <div className="notif-body">
-                      {(notificacionesMock as typeof notificacionesMock).map((n, i) => (
-                        <div
-                          key={i}
-                          className="notif-item"
-                          onClick={() => handleNotifClick(n.path)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={e => e.key === 'Enter' && handleNotifClick(n.path)}
-                        >
-                          <div className="notif-icon" style={{ background: n.bg }}>
-                            <i className={`ti ${n.icon}`} style={{ color: n.color }} aria-hidden="true" />
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div className="notif-title">{n.titulo}</div>
-                            <div className="notif-sub">{n.sub}</div>
-                          </div>
-                          <div className="notif-time">{n.tiempo}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Footer solo mobile — botón cerrar */}
-                    <div className="notif-footer" style={{ display:'none' }}>
-                      <style>{`@media(max-width:768px){ .notif-footer { display:block !important; } }`}</style>
-                      <button
-                        onClick={() => setShowNotif(false)}
-                        style={{
-                          width:'100%', padding:'12px', background:'#1a2230',
-                          border:'1px solid #243447', borderRadius:10,
-                          color:'#f0f4f8', fontSize:13, fontWeight:600,
-                          fontFamily:'inherit', cursor:'pointer',
-                        }}
-                      >
-                        Cerrar
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Avatar → perfil */}
-            <div
-              className="avatar"
-              onClick={() => navigate('/perfil')}
-              role="button"
-              tabIndex={0}
-              aria-label="Ir al perfil"
-              onKeyDown={e => e.key === 'Enter' && navigate('/perfil')}
-            >
-              {user?.username?.charAt(0).toUpperCase() || 'U'}
-            </div>
-          </div>
-        </header>
 
         {/* ── CONTENT ── */}
         <div className="content">
@@ -498,8 +377,8 @@ export default function Dashboard() {
           {/* Welcome */}
           <div className="welcome-banner">
             <div className="welcome-text">
-              <h2>¡Bienvenido/a, {user?.username || 'Usuario'}! 👋</h2>
-              <p>Rol: {user?.role || '—'} · Sistema Académico UCA</p>
+              <h2>¡Hola, {user?.username || 'Usuario'}! 👋</h2>
+              <p>Buen día para seguir aprendiendo. Tenés {eventos.length} eventos próximos.</p>
             </div>
             <div className="semester-badge">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -563,8 +442,8 @@ export default function Dashboard() {
                       {materias.map(m => (
                         <tr key={m.nombre}>
                           <td><div className="subject-name">{m.nombre}</div></td>
-                          <td style={{textAlign:'center'}}><div className="grade" style={{color:'#00b4d8'}}>—</div></td>
-                          <td style={{textAlign:'center'}}><div className="grade" style={{color:'#00b4d8'}}>—</div></td>
+                          <td style={{textAlign:'center'}}><div className="grade" style={{color:'var(--accent)'}}>—</div></td>
+                          <td style={{textAlign:'center'}}><div className="grade" style={{color:'var(--accent)'}}>—</div></td>
                         </tr>
                       ))}
                     </tbody>

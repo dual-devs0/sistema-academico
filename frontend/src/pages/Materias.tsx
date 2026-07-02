@@ -21,7 +21,7 @@ const materiasIniciales: Materia[] = [
 ]
 
 const carrerasCfg = [
-  { nombre: 'Ing. Informática', color: '#00b4d8', bg: '#00b4d812', icon: '💻' },
+  { nombre: 'Ing. Informática', color: 'var(--accent)', bg: 'var(--accent-muted)', icon: '💻' },
   { nombre: 'Ing. Civil',       color: '#f59e0b', bg: '#f59e0b12', icon: '🏗️' },
 ]
 
@@ -54,7 +54,7 @@ const css = `
   /* Toolbar */
   .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:12px; flex-wrap:wrap; }
   .toolbar-sub { font-size:12px; color:#506070; }
-  .btn-primary { display:inline-flex; align-items:center; gap:6px; padding:9px 16px; background:#00b4d8; border:none; border-radius:9px; color:#000; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
+  .btn-primary { display:inline-flex; align-items:center; gap:6px; padding:9px 16px; background:var(--accent); border:none; border-radius:9px; color:#000; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
   .btn-primary:hover { opacity:.85; }
   .btn-primary svg { width:13px; height:13px; flex-shrink:0; }
 
@@ -73,7 +73,7 @@ const css = `
   .search-wrap { flex:1; min-width:180px; position:relative; }
   .search-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:#506070; pointer-events:none; }
   .search-input { width:100%; background:#131920; border:1px solid #1e2d3d; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; outline:none; padding:8px 14px 8px 34px; transition:border-color .15s; }
-  .search-input:focus { border-color:#00b4d8; }
+  .search-input:focus { border-color:var(--accent); }
   .search-input::placeholder { color:#506070; }
   .sel-wrap { position:relative; }
   .sel-wrap svg { position:absolute; right:9px; top:50%; transform:translateY(-50%); width:12px; height:12px; color:#506070; pointer-events:none; }
@@ -92,7 +92,7 @@ const css = `
   .anio-badge { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; font-size:12px; font-weight:700; background:#1e2d3d; color:#8fa3b8; }
   .alumnos-val { font-size:13px; font-weight:700; color:#f0f4f8; }
   .alumnos-bar { width:56px; height:3px; background:#1e2d3d; border-radius:2px; margin-top:4px; overflow:hidden; }
-  .alumnos-fill { height:100%; border-radius:2px; background:#00b4d8; }
+  .alumnos-fill { height:100%; border-radius:2px; background:var(--accent); }
   .prof-chip { display:inline-flex; align-items:center; gap:6px; }
   .prof-dot { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#000; flex-shrink:0; }
   .icon-btn { background:none; border:none; cursor:pointer; color:#8fa3b8; padding:5px; border-radius:6px; display:flex; align-items:center; transition:background .12s,color .12s; }
@@ -114,9 +114,9 @@ const css = `
   .m-card-lbl { color:#506070; }
   .m-card-val { color:#f0f4f8; font-weight:500; }
   .m-card-actions { display:flex; gap:8px; margin-top:12px; }
-  .m-btn-edit { flex:1; padding:9px; background:#1a2230; border:1px solid #243447; border-radius:9px; color:#00b4d8; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; }
+  .m-btn-edit { flex:1; padding:9px; background:#1a2230; border:1px solid #243447; border-radius:9px; color:var(--accent); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; }
   .m-btn-edit svg { width:12px; height:12px; }
-  .m-btn-edit:hover { border-color:#00b4d8; }
+  .m-btn-edit:hover { border-color:var(--accent); }
   .m-btn-del { padding:9px 14px; background:#ef444410; border:1px solid #ef444430; border-radius:9px; color:#ef4444; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; }
   .m-btn-del:hover { background:#ef444420; }
 
@@ -133,7 +133,7 @@ const css = `
   .fg { display:flex; flex-direction:column; gap:5px; }
   .fg label { font-size:10px; color:#506070; text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
   .fg input, .fg select { background:#0d1117; border:1px solid #243447; border-radius:8px; color:#f0f4f8; font-size:13px; font-family:inherit; outline:none; padding:9px 12px; width:100%; transition:border-color .15s; appearance:none; }
-  .fg input:focus, .fg select:focus { border-color:#00b4d8; }
+  .fg input:focus, .fg select:focus { border-color:var(--accent); }
   .fg select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23506070' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; background-color:#0d1117; padding-right:30px; }
   .fg select option { background:#131920; }
   .modal-ftr { display:flex; gap:8px; padding:0 22px 20px; }
@@ -166,7 +166,7 @@ const css = `
   }
   .confirm-materia {
     text-align:center; font-size:13px; font-weight:600;
-    color:#00b4d8; background:#00b4d810; border:1px solid #00b4d820;
+    color:var(--accent); background:var(--accent-muted); border:1px solid var(--accent-muted);
     border-radius:8px; padding:8px 14px; margin-bottom:10px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
@@ -401,7 +401,7 @@ export default function Materias() {
                     </td></tr>
                   : filtradas.map(m => {
                       const cc = carrerasCfg.find(c => c.nombre === m.carrera)
-                      const pc = profColors[m.profesor] ?? '#00b4d8'
+                      const pc = profColors[m.profesor] ?? 'var(--accent)'
                       return (
                         <tr key={m.id}>
                           <td><div className="m-nombre">{m.nombre}</div></td>
@@ -412,7 +412,7 @@ export default function Materias() {
                             <span className="anio-badge">{m.anio}°</span>
                           </td>
                           <td style={{textAlign:'center'}}>
-                            <span className="badge" style={{color:'#00b4d8',background:'#00b4d818'}}>Sem. {m.semestre}</span>
+                            <span className="badge" style={{color:'var(--accent)',background:'var(--accent-muted)'}}>Sem. {m.semestre}</span>
                           </td>
                           <td>
                             <div className="prof-chip">
@@ -457,7 +457,7 @@ export default function Materias() {
                 </div>
               : filtradas.map(m => {
                   const cc = carrerasCfg.find(c => c.nombre === m.carrera)
-                  const pc = profColors[m.profesor] ?? '#00b4d8'
+                  const pc = profColors[m.profesor] ?? 'var(--accent)'
                   return (
                     <div className="m-card" key={m.id}>
                       <div className="m-card-top">
@@ -465,7 +465,7 @@ export default function Materias() {
                           <div className="m-card-nombre">{m.nombre}</div>
                           <div className="m-card-badges">
                             <span className="badge" style={{color:cc?.color??'#8fa3b8',background:cc?.bg??'#1e2d3d'}}>{m.carrera}</span>
-                            <span className="badge" style={{color:'#00b4d8',background:'#00b4d818'}}>Sem. {m.semestre}</span>
+                            <span className="badge" style={{color:'var(--accent)',background:'var(--accent-muted)'}}>Sem. {m.semestre}</span>
                           </div>
                         </div>
                         <button className="icon-btn del" onClick={() => pedirEliminar(m)}>

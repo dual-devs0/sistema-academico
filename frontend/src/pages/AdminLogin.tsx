@@ -47,8 +47,8 @@ export default function AdminLogin() {
     :root {
       --bg: #07090d; --surface: #0e131a; --surface-glass: rgba(14, 19, 26, 0.6);
       --border: #1e2d3d; --border-glass: rgba(30, 45, 61, 0.5);
-      --cyan: #00b4d8; --cyan-glow: rgba(0, 180, 216, 0.15);
-      --cyan-bright: #48cae4;
+      --cyan: #2563eb; --cyan-glow: rgba(37, 99, 235, 0.18);
+      --cyan-bright: #60a5fa;
       --text-1: #ffffff; --text-2: #94a3b8; --text-3: #64748b;
       --danger: rgba(239, 68, 68, 0.1); --danger-border: rgba(239, 68, 68, 0.3);
     }
@@ -105,7 +105,7 @@ export default function AdminLogin() {
       line-height: 1.1; color: #fff; letter-spacing: -0.03em;
     }
     .hero-title span { 
-      background: linear-gradient(135deg, #00b4d8, #90e0ef);
+      background: linear-gradient(135deg, #2563eb, #93c5fd);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -168,7 +168,7 @@ export default function AdminLogin() {
     .btn-submit {
       width: 100%; height: 48px; margin-top: 10px;
       background: var(--cyan); border: none; border-radius: 10px;
-      color: #000; font-size: 15px; font-weight: 700; cursor: pointer;
+      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 8px;
       transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,180,216,0.3);
     }
@@ -285,7 +285,7 @@ export default function AdminLogin() {
                       </svg>
                       Ingresando...
                     </>
-                  ) : 'Acceder al panel'}
+                  ) : 'Acceder al panel →'}
                 </button>
               </form>
             </motion.div>

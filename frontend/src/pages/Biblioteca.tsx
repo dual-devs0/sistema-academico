@@ -24,7 +24,7 @@ const apuntesMock: Apunte[] = [
 ]
 
 const materiaColor: Record<string,{color:string;bg:string}> = {
-  'Análisis Matemático I':   { color:'#00b4d8', bg:'#00b4d815' },
+  'Análisis Matemático I':   { color:'var(--accent)', bg:'var(--accent-muted)' },
   'Física I':                { color:'#a855f7', bg:'#a855f715' },
   'Programación I':          { color:'#22c55e', bg:'#22c55e15' },
   'Matemática Discreta':     { color:'#f59e0b', bg:'#f59e0b15' },
@@ -33,7 +33,7 @@ const materiaColor: Record<string,{color:string;bg:string}> = {
 function getMC(m:string){ return materiaColor[m] ?? {color:'#8fa3b8',bg:'#1e2d3d'} }
 
 const tipoCfg: Record<string,{label:string;color:string;bg:string}> = {
-  resumen:    { label:'Resumen',    color:'#00b4d8', bg:'#00b4d815' },
+  resumen:    { label:'Resumen',    color:'var(--accent)', bg:'var(--accent-muted)' },
   ejercicios: { label:'Ejercicios', color:'#a855f7', bg:'#a855f715' },
   guia:       { label:'Guía',       color:'#22c55e', bg:'#22c55e15' },
   apuntes:    { label:'Apuntes',    color:'#f59e0b', bg:'#f59e0b15' },
@@ -64,7 +64,7 @@ const css = `
   .toolbar-sub { font-size:12px; color:#506070; }
   .btn-primary {
     display:inline-flex; align-items:center; gap:6px;
-    padding:9px 16px; background:#00b4d8; border:none;
+    padding:9px 16px; background:var(--accent); border:none;
     border-radius:9px; color:#000; font-size:13px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap;
   }
@@ -101,7 +101,7 @@ const css = `
     border-radius:9px; color:#f0f4f8; font-size:13px;
     font-family:inherit; outline:none; padding:8px 14px 8px 34px; transition:border-color .15s;
   }
-  .search-input:focus { border-color:#00b4d8; }
+  .search-input:focus { border-color:var(--accent); }
   .search-input::placeholder { color:#506070; }
 
   /* Custom dropdown */
@@ -114,7 +114,7 @@ const css = `
     cursor:pointer; white-space:nowrap; min-width:140px;
     justify-content:space-between; transition:border-color .15s;
   }
-  .csel-btn:hover, .csel-btn.open { border-color:#00b4d8; }
+  .csel-btn:hover, .csel-btn.open { border-color:var(--accent); }
   .csel-btn svg { width:11px; height:11px; color:#506070; flex-shrink:0; transition:transform .2s; }
   .csel-btn.open svg { transform:rotate(180deg); }
   .csel-drop {
@@ -131,8 +131,8 @@ const css = `
     transition:background .12s; gap:12px; white-space:nowrap;
   }
   .csel-opt:hover { background:#1a2230; color:#f0f4f8; }
-  .csel-opt.sel { color:#00b4d8; background:#00b4d808; }
-  .csel-opt svg { width:13px; height:13px; color:#00b4d8; flex-shrink:0; }
+  .csel-opt.sel { color:var(--accent); background:var(--accent-muted); }
+  .csel-opt svg { width:13px; height:13px; color:var(--accent); flex-shrink:0; }
 
   /* Grid de cards */
   .cards-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
@@ -162,12 +162,12 @@ const css = `
   .a-foot { padding:10px 15px 13px; display:flex; gap:7px; border-top:1px solid #1e2d3d22; margin-top:auto; }
   .btn-ver {
     flex:1; padding:8px; background:#1a2230; border:1px solid #243447;
-    border-radius:8px; color:#00b4d8; font-size:12px; font-weight:700;
+    border-radius:8px; color:var(--accent); font-size:12px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:border-color .15s, background .15s;
     display:flex; align-items:center; justify-content:center; gap:5px;
   }
   .btn-ver svg { width:12px; height:12px; }
-  .btn-ver:hover { border-color:#00b4d8; background:#00b4d810; }
+  .btn-ver:hover { border-color:var(--accent); background:var(--accent-muted); }
   .btn-fav {
     width:34px; height:34px; background:#1a2230; border:1px solid #243447;
     border-radius:8px; display:flex; align-items:center; justify-content:center;
@@ -219,7 +219,7 @@ const css = `
     border-radius:8px; color:#f0f4f8; font-size:13px;
     font-family:inherit; outline:none; padding:9px 12px; width:100%; transition:border-color .15s;
   }
-  .fg input:focus, .fg select:focus { border-color:#00b4d8; }
+  .fg input:focus, .fg select:focus { border-color:var(--accent); }
   .fg select {
     appearance:none; cursor:pointer;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23506070' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
@@ -234,7 +234,7 @@ const css = `
     padding:24px; text-align:center; cursor:pointer;
     transition:border-color .15s, background .15s;
   }
-  .upload-zone:hover { border-color:#00b4d8; background:#00b4d808; }
+  .upload-zone:hover { border-color:var(--accent); background:var(--accent-muted); }
   .upload-zone svg { width:28px; height:28px; color:#506070; margin:0 auto 8px; display:block; }
   .upload-zone p { font-size:12px; color:#506070; margin:0; }
   .upload-zone span { font-size:11px; color:#3a4f6a; }
@@ -267,7 +267,7 @@ const css = `
   .preview-foot { display:flex; gap:8px; padding:0 22px 18px; }
   .btn-download {
     flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;
-    padding:10px; background:#00b4d8; border:none;
+    padding:10px; background:var(--accent); border:none;
     border-radius:9px; color:#000; font-size:13px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s;
   }
@@ -293,7 +293,7 @@ const css = `
   .preview-doc .doc-formula {
     font-family:'Courier New',monospace; font-size:13px;
     background:#0b0f14; padding:10px 14px; border-radius:6px;
-    color:#00b4d8; margin:8px 0; text-align:center;
+    color:var(--accent); margin:8px 0; text-align:center;
   }
 
   /* Toast */
@@ -457,7 +457,7 @@ export default function Biblioteca() {
           {/* Stats */}
           <div className="stats-row">
             {[
-              { val:stats.total,   lbl:'Total apuntes', color:'#00b4d8', bg:'#00b4d815', icon:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></> },
+              { val:stats.total,   lbl:'Total apuntes', color:'var(--accent)', bg:'var(--accent-muted)', icon:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></> },
               { val:stats.materias,lbl:'Materias',       color:'#a855f7', bg:'#a855f715', icon:<><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></> },
               { val:stats.autores, lbl:'Autores',        color:'#22c55e', bg:'#22c55e15', icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></> },
               { val:stats.favs,    lbl:'Guardados',      color:'#f59e0b', bg:'#f59e0b15', icon:<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/> },
@@ -821,8 +821,8 @@ export default function Biblioteca() {
                             <p>Próxima clase: aplicaciones en ingeniería eléctrica.</p>
                           </>
                         )}
-                        <div style={{textAlign:'center',marginTop:14,padding:'10px',background:'#00b4d808',borderRadius:8,border:'1px dashed #00b4d840',fontSize:12,color:'#8fa3b8'}}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" style={{width:20,height:20,display:'inline',verticalAlign:'middle',marginRight:6}}>
+                        <div style={{textAlign:'center',marginTop:14,padding:'10px',background:'var(--accent-muted)',borderRadius:8,border:'1px dashed var(--accent-hover)',fontSize:12,color:'#8fa3b8'}}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{width:20,height:20,display:'inline',verticalAlign:'middle',marginRight:6}}>
                             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>

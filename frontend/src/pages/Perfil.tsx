@@ -24,11 +24,11 @@ const css = `
     color:#8fa3b8; cursor:pointer; transition:border-color .15s; flex-shrink:0;
   }
   .topbar-btn svg { width:15px; height:15px; }
-  .topbar-btn:hover { border-color:#00b4d8; color:#f0f4f8; }
+  .topbar-btn:hover { border-color:var(--accent); color:#f0f4f8; }
   .notif-dot { position:absolute; top:6px; right:6px; width:7px; height:7px; background:#ef4444; border-radius:50%; border:2px solid #0b0f14; }
   .topbar-avatar {
     width:34px; height:34px;
-    background:linear-gradient(135deg,#00b4d8,#0ea5e9);
+    background:linear-gradient(135deg,var(--accent),#0ea5e9);
     border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:12px; font-weight:700; color:#000; cursor:pointer; overflow:hidden; flex-shrink:0;
   }
@@ -44,13 +44,13 @@ const css = `
   }
   .hero-banner {
     height:80px;
-    background:linear-gradient(135deg,#0ea5e915 0%,#00b4d820 50%,#0b0f14 100%);
+    background:linear-gradient(135deg,#0ea5e915 0%,var(--accent-muted) 50%,#0b0f14 100%);
     position:relative;
   }
   .hero-banner::after {
     content:''; position:absolute; inset:0;
-    background:repeating-linear-gradient(90deg,#00b4d808 0,#00b4d808 1px,transparent 1px,transparent 40px),
-               repeating-linear-gradient(0deg,#00b4d808 0,#00b4d808 1px,transparent 1px,transparent 40px);
+    background:repeating-linear-gradient(90deg,var(--accent-muted) 0,var(--accent-muted) 1px,transparent 1px,transparent 40px),
+               repeating-linear-gradient(0deg,var(--accent-muted) 0,var(--accent-muted) 1px,transparent 1px,transparent 40px);
   }
   /* Desktop: hero-body = banner colapsado + contenido en fila */
   .hero-body {
@@ -69,7 +69,7 @@ const css = `
   .avatar-wrap { position:relative; flex-shrink:0; }
   .avatar-big {
     width:80px; height:80px;
-    background:linear-gradient(135deg,#00b4d8,#0ea5e9);
+    background:linear-gradient(135deg,var(--accent),#0ea5e9);
     border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:26px; font-weight:800; color:#000;
     border:3px solid #131920; overflow:hidden;
@@ -77,7 +77,7 @@ const css = `
   .avatar-big img { width:100%; height:100%; object-fit:cover; }
   .avatar-cam {
     position:absolute; bottom:1px; right:1px;
-    width:24px; height:24px; background:#00b4d8;
+    width:24px; height:24px; background:var(--accent);
     border-radius:50%; border:2px solid #131920;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; transition:background .15s;
@@ -100,7 +100,7 @@ const css = `
   /* Buttons */
   .btn-primary {
     display:inline-flex; align-items:center; gap:6px;
-    padding:8px 16px; background:#00b4d8; border:none;
+    padding:8px 16px; background:var(--accent); border:none;
     border-radius:8px; color:#000; font-size:13px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s;
   }
@@ -113,7 +113,7 @@ const css = `
     border-radius:8px; color:#8fa3b8; font-size:13px; font-weight:500;
     font-family:inherit; cursor:pointer; transition:border-color .15s, color .15s;
   }
-  .btn-secondary:hover { border-color:#00b4d8; color:#f0f4f8; }
+  .btn-secondary:hover { border-color:var(--accent); color:#f0f4f8; }
   .btn-secondary svg { width:13px; height:13px; flex-shrink:0; }
 
   /* ── GRID ── */
@@ -124,15 +124,15 @@ const css = `
   .card { background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden; }
   .card-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px 12px; border-bottom:1px solid #1e2d3d; }
   .card-header h3 { font-size:13px; font-weight:700; color:#f0f4f8; }
-  .card-edit { font-size:11px; color:#00b4d8; background:none; border:none; cursor:pointer; font-family:inherit; }
+  .card-edit { font-size:11px; color:var(--accent); background:none; border:none; cursor:pointer; font-family:inherit; }
   .card-edit:hover { opacity:.7; }
 
   /* Field list */
   .field-list {}
   .field-item { display:flex; align-items:flex-start; gap:12px; padding:12px 18px; border-bottom:1px solid #1e2d3d33; }
   .field-item:last-child { border-bottom:none; }
-  .field-icon { width:30px; height:30px; background:#00b4d810; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
-  .field-icon svg { width:13px; height:13px; color:#00b4d8; }
+  .field-icon { width:30px; height:30px; background:var(--accent-muted); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+  .field-icon svg { width:13px; height:13px; color:var(--accent); }
   .field-label { font-size:10px; color:#506070; text-transform:uppercase; letter-spacing:.07em; margin-bottom:3px; }
   .field-val   { font-size:13px; font-weight:600; color:#f0f4f8; }
   .field-val.muted { color:#8fa3b8; font-weight:400; }
@@ -187,7 +187,7 @@ const css = `
   .modal-avatar-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; }
   .modal-avatar {
     width:72px; height:72px;
-    background:linear-gradient(135deg,#00b4d8,#0ea5e9);
+    background:linear-gradient(135deg,var(--accent),#0ea5e9);
     border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:22px; font-weight:800; color:#000; overflow:hidden;
     position:relative; cursor:pointer; border:2px solid #243447;
@@ -212,7 +212,7 @@ const css = `
     font-family:inherit; outline:none; padding:9px 12px; width:100%;
     transition:border-color .15s;
   }
-  .form-input:focus { border-color:#00b4d8; }
+  .form-input:focus { border-color:var(--accent); }
   .form-input:disabled { opacity:.4; cursor:not-allowed; }
   .form-hint { font-size:11px; color:#506070; }
   .form-row  { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -440,7 +440,7 @@ export default function Perfil() {
             {[
               { val:'8.4', label:'Promedio',   color:'#22c55e', bg:'#22c55e18', icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
               { val:'92%', label:'Asistencia', color:'#f59e0b', bg:'#f59e0b18', icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> },
-              { val:'5',   label:'Materias',   color:'#00b4d8', bg:'#00b4d818', icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg> },
+              { val:'5',   label:'Materias',   color:'var(--accent)', bg:'var(--accent-muted)', icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg> },
             ].map(s => (
               <div key={s.label} className="stat-mini-card">
                 <div className="stat-mini-icon" style={{background:s.bg, color:s.color}}>{s.icon}</div>
@@ -467,11 +467,11 @@ export default function Perfil() {
                   <>
                     <div className="fg-cell">
                       <div className="field-label">Rol</div>
-                      <div className="field-val" style={{color:'#00b4d8'}}>Docente</div>
+                      <div className="field-val" style={{color:'var(--accent)'}}>Docente</div>
                     </div>
                     <div className="fg-cell">
                       <div className="field-label">ID Docente</div>
-                      <div className="field-val" style={{color:'#00b4d8'}}>#{user?.user_id ?? '—'}</div>
+                      <div className="field-val" style={{color:'var(--accent)'}}>#{user?.user_id ?? '—'}</div>
                     </div>
                     <div className="fg-cell">
                       <div className="field-label">Departamento</div>
@@ -505,7 +505,7 @@ export default function Perfil() {
                   <>
                     {([
                       { l:'Carrera',   v:'Ingeniería Informática' },
-                      { l:'Legajo',    v:'2024-0123', color:'#00b4d8' },
+                      { l:'Legajo',    v:'2024-0123', color:'var(--accent)' },
                       { l:'Año',       v:'2° año' },
                       { l:'Semestre',  v:'Semestre 1 · 2026' },
                     ] as { l: string; v: string; color?: string }[]).map(f => (

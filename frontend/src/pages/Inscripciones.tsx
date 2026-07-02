@@ -33,7 +33,7 @@ const css = `
     background-repeat:no-repeat; background-position:right 12px center; padding-right:32px;
     transition:border-color .15s;
   }
-  .mat-select:focus { border-color:#00b4d8; }
+  .mat-select:focus { border-color:var(--accent); }
   .mat-select option { background:#131920; }
 
   /* Toolbar */
@@ -41,7 +41,7 @@ const css = `
   .toolbar-info { font-size:12px; color:#506070; }
   .btn-primary {
     display:inline-flex; align-items:center; gap:6px;
-    padding:9px 16px; background:#00b4d8; border:none;
+    padding:9px 16px; background:var(--accent); border:none;
     border-radius:9px; color:#000; font-size:13px; font-weight:700;
     font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap;
   }
@@ -56,7 +56,7 @@ const css = `
     border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit;
     outline:none; padding:8px 14px 8px 34px; transition:border-color .15s;
   }
-  .search-input:focus { border-color:#00b4d8; }
+  .search-input:focus { border-color:var(--accent); }
   .search-input::placeholder { color:#506070; }
 
   /* Tabla */
@@ -66,7 +66,7 @@ const css = `
   tbody td { padding:13px 16px; border-bottom:1px solid #1e2d3d18; vertical-align:middle; }
   tbody tr:last-child td { border-bottom:none; }
   tbody tr:hover { background:#1a2230; }
-  .u-av { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#000; flex-shrink:0; background:linear-gradient(135deg,#00b4d8,#0ea5e9); }
+  .u-av { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#000; flex-shrink:0; background:linear-gradient(135deg,var(--accent),#0ea5e9); }
   .u-nombre { font-size:13px; font-weight:600; color:#f0f4f8; }
   .u-email  { font-size:11px; color:#8fa3b8; margin-top:1px; }
   .icon-btn { background:none; border:none; cursor:pointer; color:#8fa3b8; padding:5px; border-radius:6px; display:flex; align-items:center; transition:background .12s,color .12s; }
@@ -108,16 +108,16 @@ const css = `
   .al-search-wrap { position:relative; }
   .al-search-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:#506070; pointer-events:none; }
   .al-search { width:100%; background:#0d1117; border:1px solid #243447; border-radius:9px; color:#f0f4f8; font-size:13px; font-family:inherit; outline:none; padding:9px 14px 9px 34px; transition:border-color .15s; }
-  .al-search:focus { border-color:#00b4d8; }
+  .al-search:focus { border-color:var(--accent); }
   .al-search::placeholder { color:#506070; }
   .al-dropdown { background:#0d1117; border:1px solid #1e2d3d; border-radius:9px; max-height:180px; overflow-y:auto; margin-top:4px; }
   .al-opt { padding:10px 14px; cursor:pointer; font-size:13px; color:#8fa3b8; background:none; border:none; width:100%; text-align:left; font-family:inherit; display:flex; align-items:center; gap:10px; transition:background .12s; }
   .al-opt:hover, .al-opt.sel { background:#1a2230; color:#f0f4f8; }
-  .al-opt-av { width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#00b4d8,#0ea5e9); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; flex-shrink:0; }
+  .al-opt-av { width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--accent),#0ea5e9); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; flex-shrink:0; }
   .al-opt-nm { font-size:13px; font-weight:600; color:#f0f4f8; }
   .al-opt-em { font-size:11px; color:#506070; }
-  .al-selected { display:inline-flex; align-items:center; gap:8px; background:#00b4d818; border:1px solid #00b4d830; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:#00b4d8; }
-  .al-selected button { background:none; border:none; color:#00b4d8; cursor:pointer; padding:0; display:flex; line-height:1; }
+  .al-selected { display:inline-flex; align-items:center; gap:8px; background:var(--accent-muted); border:1px solid var(--accent-hover); border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--accent); }
+  .al-selected button { background:none; border:none; color:var(--accent); cursor:pointer; padding:0; display:flex; line-height:1; }
   .al-selected button:hover { color:#f0f4f8; }
 
   /* Toast */
@@ -397,7 +397,7 @@ export default function Inscripciones() {
               <div className="modal-body">
 
                 <div style={{fontSize:12,color:'#506070'}}>
-                  Materia: <strong style={{color:'#00b4d8'}}>{matSelected?.nombre}</strong>
+                  Materia: <strong style={{color:'var(--accent)'}}>{matSelected?.nombre}</strong>
                 </div>
 
                 {alSelId ? (
@@ -467,7 +467,7 @@ export default function Inscripciones() {
                 </div>
                 <div style={{fontSize:15,fontWeight:700,color:'#f0f4f8',marginBottom:6}}>¿Dar de baja?</div>
                 <div style={{fontSize:13,color:'#8fa3b8',lineHeight:1.5,marginBottom:20}}>
-                  Se eliminará la inscripción de <strong style={{color:'#f0f4f8'}}>{delTarget.nombre}</strong> en <strong style={{color:'#00b4d8'}}>{matSelected?.nombre}</strong>. Esta acción no se puede deshacer.
+                  Se eliminará la inscripción de <strong style={{color:'#f0f4f8'}}>{delTarget.nombre}</strong> en <strong style={{color:'var(--accent)'}}>{matSelected?.nombre}</strong>. Esta acción no se puede deshacer.
                 </div>
                 <div style={{display:'flex',gap:8}}>
                   <button className="btn-cancel" onClick={()=>setDelTarget(null)}>Cancelar</button>

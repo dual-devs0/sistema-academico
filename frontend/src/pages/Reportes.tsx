@@ -32,7 +32,7 @@ const MOCK_CARRERAS: CarreraStats[] = [
   { carrera:'Arquitectura',     total_alumnos:40,  asistencia_pct:91, aprobados_pct:94, en_riesgo:3  },
 ]
 
-const CYAN   = '#00b4d8'
+const CYAN   = 'var(--accent)'
 const GREEN  = '#22c55e'
 const YELLOW = '#f59e0b'
 const RED    = '#ef4444'
@@ -112,7 +112,7 @@ function buildReportePdfHtml(tipo: string, carrerasData: CarreraStats[], res: Re
   <div class="mi"><div class="ml">Generado</div><div class="mv">${new Date(r.generado+'T00:00:00').toLocaleDateString('es-PY')}</div></div>
 </div>
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-v" style="color:#00b4d8;">${res.total_alumnos}</div><div class="kpi-l">Total alumnos</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:var(--accent);">${res.total_alumnos}</div><div class="kpi-l">Total alumnos</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#22c55e;">${res.total_becados}</div><div class="kpi-l">Becados</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#a855f7;">${res.total_materias}</div><div class="kpi-l">Materias</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#f59e0b;">${res.total_profesores}</div><div class="kpi-l">Docentes</div></div>
@@ -180,14 +180,14 @@ const css = `
   .card-hdr p  { font-size:11px; color:#506070; margin-top:2px; }
 
   /* Botones */
-  .btn-primary { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:#00b4d8; border:none; border-radius:9px; color:#000; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
+  .btn-primary { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:var(--accent); border:none; border-radius:9px; color:#000; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
   .btn-primary:hover { opacity:.85; }
   .btn-primary svg { width:12px; height:12px; }
   .btn-ghost  { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; background:transparent; border:1px solid #243447; border-radius:8px; color:#8fa3b8; font-size:11px; font-weight:600; font-family:inherit; cursor:pointer; white-space:nowrap; transition:border-color .15s,color .15s; }
   .btn-ghost:hover { border-color:#506070; color:#f0f4f8; }
   .btn-ghost svg { width:11px; height:11px; }
-  .btn-export { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; background:#00b4d812; border:1px solid #00b4d830; border-radius:8px; color:#00b4d8; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer; white-space:nowrap; transition:background .15s; }
-  .btn-export:hover { background:#00b4d820; }
+  .btn-export { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; background:var(--accent-muted); border:1px solid var(--accent-hover); border-radius:8px; color:var(--accent); font-size:11px; font-weight:700; font-family:inherit; cursor:pointer; white-space:nowrap; transition:background .15s; }
+  .btn-export:hover { background:var(--accent-muted); }
   .btn-export svg { width:11px; height:11px; }
 
   /* Reporte item desktop */
@@ -220,7 +220,7 @@ const css = `
   .distrib-lbl { font-size:12px; color:#8fa3b8; width:110px; flex-shrink:0; }
   .distrib-bar { flex:1; height:6px; background:#1e2d3d; border-radius:3px; overflow:hidden; }
   .distrib-fill { height:100%; border-radius:3px; }
-  .distrib-pct { font-size:12px; font-weight:700; color:#00b4d8; width:36px; text-align:right; }
+  .distrib-pct { font-size:12px; font-weight:700; color:var(--accent); width:36px; text-align:right; }
 
   /* Mobile cards */
   .rep-cards { display:none; flex-direction:column; gap:8px; padding:12px; }
@@ -375,7 +375,7 @@ export default function Reportes() {
 
   const becadosPct = resumen.total_alumnos > 0 ? Math.round(resumen.total_becados / resumen.total_alumnos * 100) : 0
   const kpis = [
-    { value: loading ? '—' : String(resumen.total_alumnos),   label:'Total alumnos',   color:CYAN,   bg:'#00b4d815', bar:100,        trend:'alumnos',        trendBg:'#22c55e18', trendColor:'#22c55e',
+    { value: loading ? '—' : String(resumen.total_alumnos),   label:'Total alumnos',   color:CYAN,   bg:'var(--accent-muted)', bar:100,        trend:'alumnos',        trendBg:'#22c55e18', trendColor:'#22c55e',
       icon:<svg viewBox="0 0 24 24" fill="none" stroke={CYAN}  strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> },
     { value: loading ? '—' : String(resumen.total_becados),   label:'Alumnos becados', color:GREEN,  bg:'#22c55e15', bar:becadosPct, trend:`${becadosPct}%`, trendBg:'#22c55e18', trendColor:'#22c55e',
       icon:<svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },

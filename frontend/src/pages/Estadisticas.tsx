@@ -36,7 +36,7 @@ const MOCK_ASISTENCIAS: Asistencia[] = [
   { id:8, user_id:5, materia_id:3, fecha:'2026-03-08', presente:false },
 ]
 
-const CYAN   = '#00b4d8'
+const CYAN   = 'var(--accent)'
 const GREEN  = '#22c55e'
 const YELLOW = '#f59e0b'
 const RED    = '#ef4444'
@@ -197,7 +197,7 @@ export default function Estadisticas() {
       label: 'Promedio general',
       value: loading ? '—' : String(kpis.promedio),
       color: CYAN,
-      bg:    '#00b4d815',
+      bg:    'var(--accent-muted)',
       bar:   Math.min(kpis.promedio / 10 * 100, 100),
       icon: <svg viewBox="0 0 24 24" fill="none" stroke={CYAN} strokeWidth="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
