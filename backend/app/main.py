@@ -1,13 +1,16 @@
-# Run: alembic upgrade head before starting the server
 import os
 import sqlite3
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.database import Base, engine
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
-    carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta,
+    carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno,
 )
+
+# Ensure all tables exist on startup (dev convenience; use alembic in production)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Sistema Academico",
@@ -39,6 +42,7 @@ app.include_router(eventos.router)
 app.include_router(programas.router)
 app.include_router(reportes.router)
 app.include_router(boleta.router)
+app.include_router(alumno.router)
 app.include_router(test_router.router)
 
 
