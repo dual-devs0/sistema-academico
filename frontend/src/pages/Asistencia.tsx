@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, decodeToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 import QRModal from '../components/QRModal'
@@ -165,108 +166,201 @@ export default function Asistencia() {
   return <AdminView />
 }
 
-/* ─── ALUMNO: solo escanear QR ─── */
+/* ─── ALUMNO: Control de Asistencia (rediseño) ─── */
+type MateriaAsistRow = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
+type SesionRow = { materia_id: number; materia_nombre: string; fecha: string; presente: boolean }
+
+const cssAlumno = `
+  .aa-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+  .aa-alerta { background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius); padding:14px 16px; }
+  .aa-grid { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+  .aa-mat-row { padding:12px 0; border-bottom:1px solid var(--border-subtle); }
+  .aa-mat-row:last-child { border-bottom:none; }
+  .aa-fab-qr {
+    position:fixed; bottom:26px; right:26px; z-index:60;
+    display:flex; align-items:center; gap:8px;
+    background:var(--accent); color:#fff; border:none; border-radius:999px;
+    padding:13px 22px; font-family:var(--font-sans); font-weight:700; font-size:13px;
+    cursor:pointer; box-shadow:0 10px 30px var(--accent-hover); transition:transform .15s;
+  }
+  .aa-fab-qr:hover { transform:scale(1.05); }
+  @media(max-width:1024px){ .aa-grid { grid-template-columns:1fr; } }
+  @media(max-width:768px){ .aa-kpis { grid-template-columns:1fr 1fr; } .aa-fab-qr { bottom:80px; } }
+`
+
 function AlumnoView() {
-  const [historial, setHistorial] = useState<{ materia: string; fecha: string; presente: boolean }[]>([])
+  const navigate = useNavigate()
+  const uid = Number(decodeToken(sessionStorage.getItem('token') || '')?.user_id || 0)
+  const [porMateria, setPorMateria] = useState<MateriaAsistRow[]>([])
+  const [sesiones, setSesiones] = useState<SesionRow[]>([])
+  const [carreraNombre, setCarreraNombre] = useState('')
+  const [loading, setLoading] = useState(true)
+  const LIMITE = 80
 
   useEffect(() => {
-    api.get<any[]>('/asistencias/?user_id=' + (decodeToken(sessionStorage.getItem('token') || '')?.user_id || ''))
-      .then(data => {
-        if (data && data.length > 0) {
-          setHistorial(data.slice(-10).reverse().map((a: any) => ({
-            materia: a.materia_nombre || `Materia #${a.materia_id}`,
-            fecha: a.fecha,
-            presente: a.presente,
-          })))
-        }
-      }).catch(() => {})
-  }, [])
+    Promise.all([
+      api.get<MateriaAsistRow[]>('/alumno/mi-asistencia').catch(() => [] as MateriaAsistRow[]),
+      api.get<any[]>(`/asistencias/?user_id=${uid}`).catch(() => [] as any[]),
+      api.get<{ carrera_id: number | null }>('/users/me').catch(() => null),
+      api.get<{ id: number; nombre: string }[]>('/carreras/').catch(() => [] as { id: number; nombre: string }[]),
+    ]).then(([porMat, asis, me, carreras]) => {
+      setPorMateria(porMat)
+      setSesiones(
+        asis.slice(-12).reverse().map((a: any) => ({
+          materia_id: a.materia_id, materia_nombre: a.materia_nombre || `Materia #${a.materia_id}`,
+          fecha: a.fecha, presente: a.presente,
+        }))
+      )
+      if (me?.carrera_id) {
+        const c = carreras.find(c => c.id === me.carrera_id)
+        if (c) setCarreraNombre(c.nombre)
+      }
+    }).finally(() => setLoading(false))
+  }, [uid])
+
+  const totalClases = porMateria.reduce((s, m) => s + m.total_clases, 0)
+  const totalPresentes = porMateria.reduce((s, m) => s + m.presentes, 0)
+  const promedioTotal = totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : 0
+  const inasistencias = totalClases - totalPresentes
+  const critica = porMateria.filter(m => m.porcentaje < LIMITE).sort((a, b) => a.porcentaje - b.porcentaje)[0]
 
   return (
     <>
-      <style>{css}</style>
-      <div className="as-root">
-        <div className="as-header">
-          <div className="as-title">Asistencia</div>
-          <div className="as-sub">Registrá tu presencia escaneando el código QR de tu profesor</div>
+      <style>{cssAlumno}</style>
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 className="page-title">Control de Asistencia</h1>
+          <p className="page-subtitle">
+            {carreraNombre || 'Visualiza tu registro de asistencia por materia y semestre.'} Mantén un seguimiento preciso para cumplir con los requisitos académicos.
+          </p>
         </div>
+        <span className="badge" style={{ background: promedioTotal >= LIMITE ? 'var(--success-subtle)' : 'var(--danger-subtle)', color: promedioTotal >= LIMITE ? 'var(--success)' : 'var(--danger)' }}>
+          <i className="ti ti-shield-check" /> Estado: {promedioTotal >= LIMITE ? 'Alumno Regular' : 'En Riesgo'}
+        </span>
+      </div>
 
-        <div className="alumno-layout">
-
-          {/* Col 1 — Instrucciones QR */}
-          <div className="qr-instruc-card">
-            <div className="qr-instruc-header">
-              <div className="qr-instruc-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8">
-                  <path d="M3 7V5a2 2 0 012-2h2M3 17v2a2 2 0 002 2h2M17 3h2a2 2 0 012 2v2M17 21h2a2 2 0 002-2v-2"/>
-                  <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/>
-                  <rect x="7" y="13" width="4" height="4" rx="1"/><rect x="13" y="13" width="4" height="4" rx="1"/>
-                </svg>
+      {loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando asistencia…</div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="aa-kpis">
+            <div className="kpi-card">
+              <div className="mono-label" style={{ marginBottom: 8 }}>Promedio Total</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="kpi-value" style={{ fontSize: 26, color: promedioTotal >= LIMITE ? 'var(--accent-bright)' : 'var(--danger)' }}>{promedioTotal}%</span>
+                <i className="ti ti-trending-up" style={{ color: 'var(--success)', fontSize: 15 }} />
               </div>
-              <div>
-                <div className="qr-instruc-title">Cómo registrar tu asistencia</div>
-                <div className="qr-instruc-sub">Tu profesor generará un código QR en clase</div>
+              <div className="progress-track" style={{ marginTop: 8 }}>
+                <div className="progress-fill" style={{ width: `${promedioTotal}%`, background: promedioTotal >= LIMITE ? undefined : 'var(--danger)' }} />
               </div>
             </div>
-            <div className="qr-steps">
-              {[
-                { n:1, title:'Abrí la cámara de tu teléfono', desc:'Usá la app de cámara nativa o un lector QR. No necesitás ninguna app extra.' },
-                { n:2, title:'Enfocá el QR del profesor', desc:'El código aparece en la pantalla del profesor o proyector al inicio de la clase.' },
-                { n:3, title:'¡Listo! Tu asistencia se registra', desc:'El sistema confirma tu presencia automáticamente cuando escaneás el código.' },
-              ].map(s => (
-                <div key={s.n} className="qr-step">
-                  <div className="qr-step-num">{s.n}</div>
-                  <div>
-                    <div className="qr-step-title">{s.title}</div>
-                    <div className="qr-step-desc">{s.desc}</div>
-                  </div>
+            <div className="kpi-card">
+              <div className="mono-label" style={{ marginBottom: 8 }}>Clases Totales</div>
+              <span className="kpi-value" style={{ fontSize: 26 }}>{totalClases}</span>
+              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Sesiones registradas</div>
+            </div>
+            <div className="kpi-card">
+              <div className="mono-label" style={{ marginBottom: 8 }}>Inasistencias</div>
+              <span className="kpi-value" style={{ fontSize: 26, color: 'var(--danger)' }}>{inasistencias}</span>
+              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Días no asistidos</div>
+            </div>
+            {critica ? (
+              <div className="aa-alerta">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span className="mono-label" style={{ color: 'var(--danger)' }}>Alerta Crítica</span>
+                  <i className="ti ti-alert-triangle" style={{ color: 'var(--danger)' }} />
                 </div>
-              ))}
-            </div>
-            <div className="qr-tip">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              <div>
-                El QR es válido por <strong>15 minutos</strong>.<br />
-                Si ya lo escaneaste hoy, tu asistencia ya está registrada.
-              </div>
-            </div>
-          </div>
-
-          {/* Col 2 — Historial */}
-          <div>
-            <div className="as-hist-title" style={{ marginBottom: 14, fontWeight: 700, color: 'var(--text-secondary)', fontSize: 14 }}>
-              Últimos registros
-            </div>
-            {historial.length > 0 ? (
-              <div className="as-hist-grid">
-                {historial.map((h, i) => (
-                  <div key={i} className="as-hist-item">
-                    <div className="as-hist-left">
-                      <div className="as-hist-mat">{h.materia}</div>
-                      <div className="as-hist-fec">
-                        {new Date(h.fecha + 'T12:00:00').toLocaleDateString('es-PY', { weekday:'short', day:'numeric', month:'short', year:'numeric' })}
-                      </div>
-                    </div>
-                    <span className={`as-hist-badge ${h.presente ? 'presente' : 'ausente'}`}>
-                      {h.presente ? '✓ Presente' : '✗ Ausente'}
-                    </span>
-                  </div>
-                ))}
+                <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>A {Math.max(0, Math.ceil((LIMITE - critica.porcentaje) / 100 * critica.total_clases))} faltas del límite permitido ({LIMITE}% req.)</div>
               </div>
             ) : (
-              <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text-muted)', fontSize:13, background:'var(--bg-input)', border:'1px solid #2a3040', borderRadius:12 }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin:'0 auto 12px', opacity:0.25, display:'block' }}>
-                  <path d="M9 12l2 2 4-4M7.86 2h8.28M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"/>
-                </svg>
-                Todavía no tenés registros de asistencia
+              <div className="kpi-card">
+                <div className="mono-label" style={{ marginBottom: 8 }}>Alertas</div>
+                <span className="kpi-value" style={{ fontSize: 26, color: 'var(--success)' }}>0</span>
+                <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Todo en regla</div>
               </div>
             )}
           </div>
 
-        </div>
-      </div>
+          <div className="aa-grid">
+            <div>
+              {/* Cumplimiento por materia */}
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}><i className="ti ti-list-check" style={{ color: 'var(--accent-bright)' }} /> Cumplimiento por Materia</h3>
+                {porMateria.length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Sin registros de asistencia aún.</p>
+                ) : porMateria.map(m => {
+                  const ok = m.porcentaje >= LIMITE
+                  return (
+                    <div key={m.materia_id} className="aa-mat-row">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.materia_nombre}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13, color: ok ? 'var(--accent-bright)' : 'var(--danger)' }}>{m.porcentaje}%</span>
+                      </div>
+                      <div className="progress-track">
+                        <div className="progress-fill" style={{ width: `${m.porcentaje}%`, background: ok ? undefined : 'var(--danger)' }} />
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5 }}>{m.presentes}/{m.total_clases} Sesiones</div>
+                    </div>
+                  )
+                })}
+                <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 10.5, color: 'var(--text-secondary)' }}>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', marginRight: 5 }} />Asistencia actual</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)', marginRight: 5 }} />Límite crítico ({LIMITE}%)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Filtros de consulta */}
+              <div className="card">
+                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-filter" style={{ color: 'var(--accent-bright)' }} /> Filtros de Consulta</h3>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Periodo Académico</div>
+                <select className="input-uca">
+                  <option>{new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre {new Date().getFullYear()}</option>
+                </select>
+              </div>
+
+              {/* Resumen de alertas */}
+              <div className="card">
+                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-alert-triangle" style={{ color: 'var(--danger)' }} /> Resumen de Alertas</h3>
+                {critica ? (
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--danger-subtle)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
+                    <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                      Riesgo de pérdida de regularidad. Se requieren asistencias consecutivas para salir de zona crítica.
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Sin alertas activas.</p>
+                )}
+              </div>
+
+              {/* Bitácora de sesiones */}
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Bitácora de Sesiones</h3>
+                  <i className="ti ti-code" style={{ color: 'var(--text-muted)' }} />
+                </div>
+                {sesiones.length === 0 ? (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin sesiones registradas.</p>
+                ) : sesiones.slice(0, 6).map((s, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--border-subtle)' : 'none', fontSize: 11.5 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{s.materia_nombre}</span>
+                    <span style={{ color: s.presente ? 'var(--success)' : 'var(--danger)', fontWeight: 700, flexShrink: 0 }}>{s.presente ? 'Presente' : 'Ausente'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <button className="aa-fab-qr" onClick={() => navigate('/asistencia/scan')}>
+        <i className="ti ti-qrcode" style={{ fontSize: 18 }} /> Escanear QR
+      </button>
     </>
   )
 }

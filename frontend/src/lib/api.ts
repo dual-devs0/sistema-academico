@@ -5,6 +5,11 @@ export function emitToast(msg: string, type: 'success'|'error'|'warning' = 'succ
   window.dispatchEvent(new CustomEvent('uca:toast', { detail: { msg, type } }))
 }
 
+// Evento global para abrir el modal de Centro de Ayuda desde cualquier lugar
+export function emitHelp() {
+  window.dispatchEvent(new CustomEvent('uca:help'))
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('token')
   const res = await fetch(`${BASE}${path}`, {

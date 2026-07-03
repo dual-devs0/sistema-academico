@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api, emitToast, decodeToken } from '../lib/api'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -56,7 +56,37 @@ export default function Calendario() {
   const [modalOpen, setModalOpen] = useState(false)
   const [draft, setDraft] = useState<Evento>({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '' })
   const [saving, setSaving] = useState(false)
+  const [cargandoPdf, setCargandoPdf] = useState(false)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
   const role = decodeToken(sessionStorage.getItem('token') || '')?.role
+
+  function onPdfSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.type !== 'application/pdf') { emitToast('Seleccioná un archivo PDF', 'warning'); return }
+    setCargandoPdf(true)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const base64 = String(reader.result).split(',')[1]
+        const res = await api.post<{ procesados: number; errores: string[] }>('/eventos/cargar-pdf', {
+          pdf_base64: base64,
+          nombre_archivo: file.name,
+          anio: y,
+          semestre: m < 6 ? 1 : 2,
+        })
+        emitToast(`${res.procesados} eventos cargados desde el PDF`)
+        if (res.errores?.length) emitToast(`${res.errores.length} eventos con error`, 'warning')
+        cargar()
+      } catch (err) {
+        emitToast(err instanceof Error ? err.message : 'Error al procesar el PDF (verificá GEMINI_API_KEY)', 'error')
+      } finally {
+        setCargandoPdf(false)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   function cargar() {
     api.get<Evento[]>('/eventos/').then(setEventos).catch(() => {})
@@ -227,9 +257,15 @@ export default function Calendario() {
           {(role === 'admin' || role === 'profesor') && (
             <div className="card" style={{ padding: '14px 16px' }}>
               <div className="mono-label" style={{ marginBottom: 6 }}>Carga automática (PDF)</div>
-              <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Subí el PDF del semestre vía <code style={{ color: 'var(--accent-bright)' }}>POST /eventos/cargar-pdf</code> (requiere GEMINI_API_KEY en backend/.env).
+              <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>
+                Subí el calendario del semestre en PDF. Gemini extrae los eventos automáticamente.
               </p>
+              <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={onPdfSelected} />
+              <button className="btn-ghost" style={{ width: '100%' }} disabled={cargandoPdf} onClick={() => pdfInputRef.current?.click()}>
+                <i className={`ti ${cargandoPdf ? 'ti-loader-2' : 'ti-file-upload'}`} style={cargandoPdf ? { animation: 'spin 1s linear infinite' } : undefined} />
+                {cargandoPdf ? 'Procesando…' : 'Subir PDF del semestre'}
+              </button>
+              <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
             </div>
           )}
         </div>

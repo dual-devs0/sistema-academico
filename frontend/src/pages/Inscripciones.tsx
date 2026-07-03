@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, decodeToken, emitToast } from '../lib/api'
 
-type Materia = { id: number; nombre: string; profesor_nombre?: string | null; creditos?: number | null; cupos?: number | null; horario?: string | null; secciones?: number | null }
+type Materia = { id: number; nombre: string; profesor_nombre?: string | null; creditos?: number | null; cupos?: number | null; horario?: string | null; secciones?: number | null; inscritos?: number | null }
 type Inscripcion = { id: number; alumno_id: number; materia_id: number }
 type UserApi = { id: number; username: string; role: string; nombre: string }
 
@@ -95,8 +95,8 @@ function AlumnoView({ userId }: { userId: number }) {
 
   const cupoDe = (m: Materia) => {
     const total = m.cupos ?? 38
-    const ocup = (m.id * 7) % total // ocupación real requiere conteo de inscripciones por materia
-    return { ocup, total, lleno: ocup > total * 0.8 }
+    const ocup = m.inscritos ?? 0
+    return { ocup, total, lleno: ocup >= total * 0.8 }
   }
 
   return (

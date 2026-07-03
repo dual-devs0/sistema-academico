@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { decodeToken, api } from '../lib/api'
+import { decodeToken, api, emitHelp } from '../lib/api'
 
 /* ── Tipos y datos ─────────────────────────────────────────────── */
 type MateriaRow = { nombre: string; profesor: string; ultimaNota: number | null; estado: string }
@@ -200,7 +200,7 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia }:
         </div>
       </div>
 
-      <button className="fab" onClick={() => navigate('/asistencia/scan')} aria-label="Escanear QR">
+      <button className="fab" onClick={() => emitHelp()} aria-label="Centro de Ayuda">
         <i className="ti ti-plus" />
       </button>
     </>

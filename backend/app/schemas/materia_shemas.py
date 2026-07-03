@@ -13,6 +13,17 @@ class MateriaCreate(MateriaBase):
     horario: str | None = None
     secciones: int | None = None
 
+class MateriaUpdate(BaseModel):
+    nombre: str | None = None
+    profesor_id: int | None = None
+    carrera_id: int | None = None
+    anio: int | None = None
+    semestre: int | None = None
+    creditos: int | None = None
+    cupos: int | None = None
+    horario: str | None = None
+    secciones: int | None = None
+
 class MateriaOut(MateriaBase):
     id: int
     profesor_id: int
@@ -23,6 +34,7 @@ class MateriaOut(MateriaBase):
     cupos: int | None = None
     horario: str | None = None
     secciones: int | None = None
+    inscritos: int | None = None
     profesor_nombre: str | None = None
     carrera_nombre: str | None = None
 

@@ -21,6 +21,10 @@ def _enrich(m, db: Session) -> dict:
         if carrera:
             carrera_nombre = carrera.nombre
 
+    inscritos = db.query(models.inscripcion.Inscripcion).filter(
+        models.inscripcion.Inscripcion.materia_id == m.id
+    ).count()
+
     return {
         "id": m.id,
         "nombre": m.nombre,
@@ -32,6 +36,7 @@ def _enrich(m, db: Session) -> dict:
         "cupos": getattr(m, "cupos", None) or 40,
         "horario": getattr(m, "horario", None),
         "secciones": getattr(m, "secciones", None) or 1,
+        "inscritos": inscritos,
         "profesor_nombre": prof_nombre,
         "carrera_nombre": carrera_nombre,
     }
@@ -84,4 +89,23 @@ def get_materia(materia_id: int, db: Session = Depends(database.get_db)):
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
+    return _enrich(materia, db)
+
+
+@router.patch("/{materia_id}")
+def update_materia(
+    materia_id: int,
+    data: schemas.materia.MateriaUpdate,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
+    if not materia:
+        raise HTTPException(status_code=404, detail="Materia no encontrada")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(materia, key, value)
+    db.commit()
+    db.refresh(materia)
     return _enrich(materia, db)

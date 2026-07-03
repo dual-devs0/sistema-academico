@@ -8,23 +8,24 @@ import Puntajes from './pages/Puntajes'
 import Asistencia from './pages/Asistencia'
 import Perfil from './pages/Perfil'
 import Usuarios from './pages/Usuarios'
-import Materias from './pages/Materias'
 import Calendario from './pages/Calendario'
 import Biblioteca from './pages/Biblioteca'
 import Programa from './pages/Programa'
 import Boleta from './pages/Boleta' 
 import Reportes from './pages/Reportes'
 import MisCursos from './pages/MisCursos'
+import MisMaterias from './pages/MisMaterias'
+import GestionAsignaciones from './pages/GestionAsignaciones'
 import Estadisticas from './pages/Estadisticas'
 import AsistenciaScan from './pages/AsistenciaScan'
 import Inscripciones from './pages/Inscripciones'
 import NotFound from './pages/NotFound'
+import Foro from './pages/Foro'
 import { decodeToken } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
   '/usuarios':  ['admin'],
   '/reportes':  ['admin'],
-  '/materias':  ['admin', 'profesor'],
   '/programa':   ['admin', 'profesor', 'alumno'],
   '/puntajes':  ['admin', 'profesor', 'alumno'],
   '/asistencia':['admin', 'profesor', 'alumno'],
@@ -35,7 +36,10 @@ const rolesPermitidos: Record<string, string[]> = {
   '/boleta':    ['admin', 'profesor', 'alumno'],
   '/miscursos':      ['profesor'],
   '/estadisticas':   ['admin', 'profesor'],
-  '/inscripciones':  ['admin', 'alumno'],
+  '/inscripciones':      ['admin', 'alumno'],
+  '/mismaterias':        ['profesor'],
+  '/gestion-asignaciones': ['admin'],
+  '/foro':               ['admin', 'profesor', 'alumno'],
 }
 
 function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
@@ -62,7 +66,6 @@ function App() {
         <Route path="/asistencia" element={<Layout><RutaProtegida path="/asistencia"><Asistencia /></RutaProtegida></Layout>} />
         <Route path="/perfil" element={<Layout><RutaProtegida path="/perfil"><Perfil /></RutaProtegida></Layout>} />
         <Route path="/usuarios" element={<Layout><RutaProtegida path="/usuarios"><Usuarios /></RutaProtegida></Layout>} />
-        <Route path="/materias" element={<Layout><RutaProtegida path="/materias"><Materias /></RutaProtegida></Layout>} />
         <Route path="/calendario" element={<Layout><RutaProtegida path="/calendario"><Calendario /></RutaProtegida></Layout>} />
         <Route path="/biblioteca" element={<Layout><RutaProtegida path="/biblioteca"><Biblioteca /></RutaProtegida></Layout>} />
         <Route path="/programa" element={<Layout><RutaProtegida path="/programa"><Programa /></RutaProtegida></Layout>} />
@@ -71,6 +74,9 @@ function App() {
         <Route path="/miscursos"    element={<Layout><RutaProtegida path="/miscursos"><MisCursos /></RutaProtegida></Layout>} />
         <Route path="/estadisticas" element={<Layout><RutaProtegida path="/estadisticas"><Estadisticas /></RutaProtegida></Layout>} />
         <Route path="/inscripciones" element={<Layout><RutaProtegida path="/inscripciones"><Inscripciones /></RutaProtegida></Layout>} />
+        <Route path="/mismaterias" element={<Layout><RutaProtegida path="/mismaterias"><MisMaterias /></RutaProtegida></Layout>} />
+        <Route path="/gestion-asignaciones" element={<Layout><RutaProtegida path="/gestion-asignaciones"><GestionAsignaciones /></RutaProtegida></Layout>} />
+        <Route path="/foro" element={<Layout><RutaProtegida path="/foro"><Foro /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><AsistenciaScan /></Layout>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getRole, getUsername } from '../hooks/useRole'
+import { api } from '../lib/api'
 
 type MenuItem = { label: string; path: string; icon: string }
 
@@ -15,30 +16,33 @@ const menuAlumno: MenuItem[] = [
   { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
+  { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
 const menuProfesor: MenuItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
   { label: 'Cursos', path: '/miscursos', icon: 'ti-school' },
+  { label: 'Mis Materias', path: '/mismaterias', icon: 'ti-book-2' },
   { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
   { label: 'Asistencia', path: '/asistencia', icon: 'ti-qrcode' },
-  { label: 'Materias', path: '/materias', icon: 'ti-book' },
   { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-pie' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
+  { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
 const menuAdmin: MenuItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
-  { label: 'Gestión Académica', path: '/materias', icon: 'ti-school' },
   { label: 'Usuarios & Roles', path: '/usuarios', icon: 'ti-users' },
+  { label: 'Asignaciones', path: '/gestion-asignaciones', icon: 'ti-binary-tree' },
   { label: 'Inscripciones', path: '/inscripciones', icon: 'ti-clipboard-list' },
   { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
   { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
   { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-bar' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
+  { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Ajustes Globales', path: '/perfil', icon: 'ti-settings' },
 ]
 
@@ -53,6 +57,7 @@ const bottomNavByRole: Record<string, MenuItem[]> = {
   profesor: [
     { label: 'Inicio', path: '/dashboard', icon: 'ti-layout-dashboard' },
     { label: 'Cursos', path: '/miscursos', icon: 'ti-school' },
+    { label: 'Materias', path: '/mismaterias', icon: 'ti-book-2' },
     { label: 'QR', path: '/asistencia', icon: 'ti-qrcode' },
     { label: 'Notas', path: '/puntajes', icon: 'ti-certificate' },
     { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
@@ -60,7 +65,7 @@ const bottomNavByRole: Record<string, MenuItem[]> = {
   admin: [
     { label: 'Inicio', path: '/dashboard', icon: 'ti-layout-dashboard' },
     { label: 'Usuarios', path: '/usuarios', icon: 'ti-users' },
-    { label: 'Materias', path: '/materias', icon: 'ti-book' },
+    { label: 'Asignaciones', path: '/gestion-asignaciones', icon: 'ti-binary-tree' },
     { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
     { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
   ],
@@ -78,8 +83,16 @@ function getMenuPorRol(rol: string | null): MenuItem[] {
   return menuAlumno
 }
 
+type EventoNotif = { id?: number; titulo: string; tipo: string; fecha: string }
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [appsOpen, setAppsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [proximos, setProximos] = useState<EventoNotif[]>([])
+  const notifRef = useRef<HTMLDivElement>(null)
+  const appsRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -91,6 +104,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.title = 'Universidad Católica Caacupé'
   }, [])
+
+  useEffect(() => {
+    window.addEventListener('uca:help', () => setHelpOpen(true))
+    return () => window.removeEventListener('uca:help', () => setHelpOpen(true))
+  }, [])
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false)
+      if (appsRef.current && !appsRef.current.contains(e.target as Node)) setAppsOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  function abrirNotif() {
+    setNotifOpen(v => !v)
+    setAppsOpen(false)
+    if (!notifOpen) {
+      const hoy = new Date().toISOString().slice(0, 10)
+      api.get<EventoNotif[]>('/eventos/').then(evs => {
+        setProximos(evs.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 4))
+      }).catch(() => {})
+    }
+  }
 
   useEffect(() => {
     if (role) document.body.setAttribute('data-role', role)
@@ -221,7 +259,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Footer */}
           <div style={{ padding: '12px', flexShrink: 0 }}>
-            <button className="btn-ghost" style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, background: 'var(--accent-muted)', color: 'var(--accent-bright)', border: '1px solid transparent' }}>
+            <button onClick={() => setHelpOpen(true)} className="btn-ghost" style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, background: 'var(--accent-muted)', color: 'var(--accent-bright)', border: '1px solid transparent' }}>
               <i className="ti ti-help" style={{ fontSize: 14 }} />
               Centro de Ayuda
             </button>
@@ -257,12 +295,54 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button className="btn-ghost" style={{ padding: '7px 9px', borderRadius: 10, background: 'transparent', border: 'none' }} aria-label="Notificaciones">
-                <i className="ti ti-bell" style={{ fontSize: 17 }} />
-              </button>
-              <button className="btn-ghost" style={{ padding: '7px 9px', borderRadius: 10, background: 'transparent', border: 'none' }} aria-label="Aplicaciones">
-                <i className="ti ti-grid-dots" style={{ fontSize: 17 }} />
-              </button>
+              <div ref={notifRef} style={{ position: 'relative' }}>
+                <button className="btn-ghost" style={{ padding: '7px 9px', borderRadius: 10, background: 'transparent', border: 'none' }} aria-label="Notificaciones" onClick={abrirNotif}>
+                  <i className="ti ti-bell" style={{ fontSize: 17 }} />
+                </button>
+                {notifOpen && (
+                  <div className="card card-elevated" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 300, padding: 0, overflow: 'hidden', zIndex: 300 }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, fontWeight: 800 }}>Próximos eventos</div>
+                    {proximos.length === 0 ? (
+                      <div style={{ padding: 16, fontSize: 12.5, color: 'var(--text-secondary)' }}>Sin eventos próximos.</div>
+                    ) : proximos.map((e, i) => (
+                      <button key={i} onClick={() => { setNotifOpen(false); navigate('/calendario') }}
+                        style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: 10, padding: '10px 16px', border: 'none', borderBottom: i < proximos.length - 1 ? '1px solid var(--border-subtle)' : 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}
+                        onMouseEnter={ev => { ev.currentTarget.style.background = 'var(--bg-hover)' }}
+                        onMouseLeave={ev => { ev.currentTarget.style.background = 'transparent' }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600 }}>{e.titulo}</span>
+                        <span className="mono-label" style={{ fontSize: 9, flexShrink: 0 }}>{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
+                      </button>
+                    ))}
+                    <button onClick={() => { setNotifOpen(false); navigate('/calendario') }}
+                      style={{ width: '100%', padding: '10px 16px', border: 'none', borderTop: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
+                      Ver calendario completo →
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div ref={appsRef} style={{ position: 'relative' }}>
+                <button className="btn-ghost" style={{ padding: '7px 9px', borderRadius: 10, background: 'transparent', border: 'none' }} aria-label="Aplicaciones" onClick={() => { setAppsOpen(v => !v); setNotifOpen(false) }}>
+                  <i className="ti ti-grid-dots" style={{ fontSize: 17 }} />
+                </button>
+                {appsOpen && (
+                  <div className="card card-elevated" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 240, padding: 14, zIndex: 300 }}>
+                    <div className="mono-label" style={{ marginBottom: 10 }}>Acceso rápido</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                      {menuItems.map(item => (
+                        <button key={item.path} onClick={() => { navigate(item.path); setAppsOpen(false) }}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 4px', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                          onMouseEnter={ev => { ev.currentTarget.style.color = 'var(--accent-bright)'; ev.currentTarget.style.borderColor = 'var(--accent-hover)' }}
+                          onMouseLeave={ev => { ev.currentTarget.style.color = 'var(--text-secondary)'; ev.currentTarget.style.borderColor = 'var(--border-subtle)' }}>
+                          <i className={`ti ${item.icon}`} style={{ fontSize: 18 }} />
+                          <span style={{ fontSize: 9, fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button onClick={() => navigate('/perfil')} aria-label="Perfil"
                 className="avatar-initials"
                 style={{ width: 34, height: 34, fontSize: 12, border: '1px solid var(--border-light)', cursor: 'pointer' }}>
@@ -295,6 +375,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </div>
+
+      {/* Modal Centro de Ayuda — global, invocable via emitHelp() */}
+      {helpOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setHelpOpen(false)}>
+          <div className="card card-elevated" style={{ width: '100%', maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800 }}>Centro de Ayuda</h3>
+              <button onClick={() => setHelpOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Universidad Católica — Unidad Pedagógica de Caacupé
+            </p>
+            <a href="https://wa.me/595512435838" target="_blank" rel="noopener noreferrer" className="btn-primary"
+              style={{ width: '100%', background: '#25D366', marginBottom: 10, textDecoration: 'none' }}>
+              <i className="ti ti-brand-whatsapp" /> Contactar por WhatsApp
+            </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                <i className="ti ti-phone" style={{ color: 'var(--accent-bright)' }} />
+                <a href="tel:+59521243583" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>0511 24 35 83</a>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                <i className="ti ti-mail" style={{ color: 'var(--accent-bright)' }} />
+                <a href="mailto:soporte@uca.edu.py" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>soporte@uca.edu.py</a>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                <i className="ti ti-clock" /> Lun–Vie 07:00–20:00
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
