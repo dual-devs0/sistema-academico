@@ -254,7 +254,7 @@ export default function Calendario() {
             <div style={{ fontSize: 11.5, marginTop: 3 }}>Presiona para crear un nuevo recordatorio</div>
           </button>
 
-          {(role === 'admin' || role === 'profesor') && (
+          {role === 'admin' && (
             <div className="card" style={{ padding: '14px 16px' }}>
               <div className="mono-label" style={{ marginBottom: 6 }}>Carga automática (PDF)</div>
               <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>

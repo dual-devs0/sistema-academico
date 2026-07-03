@@ -160,9 +160,44 @@ export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive 
           )}
         </div>
 
-        {estado === 'listo' && (
-          <div className="px-6 pb-5">
+        {estado === 'listo' && qrData && (
+          <div className="px-6 pb-5 flex flex-col gap-2">
             <p className="text-center text-white/25 text-xs">Los alumnos escanean con la cámara del celular o desde la app</p>
+            <div className="flex gap-2 w-full" style={{ display: 'flex', gap: 8, width: '100%' }}>
+              <button onClick={() => {
+                const a = document.createElement('a')
+                a.href = `data:image/png;base64,${qrData.qr_base64}`
+                a.download = `QR-${qrData.materia.nombre.replace(/\s+/g, '-')}.png`
+                a.click()
+              }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white/8 text-white/70 text-xs font-semibold hover:bg-white/15 transition-colors"
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Descargar QR
+              </button>
+              <button onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: `QR Asistencia - ${qrData.materia.nombre}`,
+                    text: `Escaneá este código QR para registrar tu asistencia a ${qrData.materia.nombre}`,
+                    url: qrData.scan_url,
+                  }).catch(() => {})
+                } else {
+                  navigator.clipboard.writeText(qrData.scan_url).then(() => {
+                    const el = document.createElement('div')
+                    el.textContent = '¡Link copiado! Compartilo en tu grupo de WhatsApp'
+                    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#00b4d8;color:#000;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:999;font-family:sans-serif'
+                    document.body.appendChild(el)
+                    setTimeout(() => el.remove(), 3000)
+                  }).catch(() => {})
+                }
+              }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#00b4d8]/15 text-[#00b4d8] text-xs font-semibold hover:bg-[#00b4d8]/25 transition-colors"
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, background: 'rgba(0,180,216,0.15)', color: '#00b4d8', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Compartir QR
+              </button>
+            </div>
           </div>
         )}
       </div>

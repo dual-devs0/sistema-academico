@@ -435,15 +435,17 @@ function ProfesorView() {
 
   // QR inline (panel REGISTRO EN TIEMPO REAL)
   const [qrImg, setQrImg] = useState<string | null>(null)
+  const [qrToken, setQrToken] = useState<string | null>(null)
   const [qrCargando, setQrCargando] = useState(false)
   async function generarQrInline() {
     if (!selMat) return
     setQrCargando(true)
     try {
-      const data = await api.get<{ qr_base64: string; expira_en: number }>(`/asistencias/qr/${selMat.id}`)
+      const data = await api.get<{ qr_base64: string; token: string; scan_url: string; expira_en: number }>(`/asistencias/qr/${selMat.id}`)
       setQrImg(data.qr_base64)
+      setQrToken(data.token)
       startQrTimer(data.expira_en)
-    } catch { setQrImg(null) }
+    } catch { setQrImg(null); setQrToken(null) }
     finally { setQrCargando(false) }
   }
 
@@ -589,9 +591,43 @@ function ProfesorView() {
                 <div className="mono-label" style={{ marginBottom: 14 }}>
                   {qrActive ? (qrSeg <= 60 ? 'CÓDIGO EXPIRA PRONTO' : 'CÓDIGO ACTIVO') : 'SIN CÓDIGO ACTIVO'}
                 </div>
-                <button className="btn-primary" style={{ width: '100%' }} disabled={qrCargando} onClick={generarQrInline}>
-                  <i className="ti ti-refresh" /> {qrCargando ? 'Generando…' : qrActive ? 'Regenerar QR' : 'Generar QR'}
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+                  <button className="btn-primary" style={{ width: '100%' }} disabled={qrCargando} onClick={generarQrInline}>
+                    <i className="ti ti-refresh" /> {qrCargando ? 'Generando…' : qrActive ? 'Regenerar QR' : 'Generar QR'}
+                  </button>
+                  {qrActive && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => {
+                        const a = document.createElement('a')
+                        a.href = `data:image/png;base64,${qrImg}`
+                        a.download = `QR-${selMat?.nombre.replace(/\s+/g, '-') || 'asistencia'}.png`
+                        a.click()
+                      }}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Descargar
+                      </button>
+                      <button onClick={() => {
+                        const url = `${window.location.origin}/asistencia/scan?token=${encodeURIComponent(qrToken || '')}`
+                        if (navigator.share) {
+                          navigator.share({ title: `QR Asistencia - ${selMat?.nombre}`, text: `Escaneá este QR para registrar asistencia a ${selMat?.nombre}`, url }).catch(() => {})
+                        } else {
+                          navigator.clipboard.writeText(url).then(() => {
+                            const el = document.createElement('div')
+                            el.textContent = '¡Link copiado! Compartilo en tu grupo de WhatsApp'
+                            el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:999;font-family:sans-serif'
+                            document.body.appendChild(el)
+                            setTimeout(() => el.remove(), 3000)
+                          }).catch(() => {})
+                        }
+                      }}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 8, background: 'rgba(0,180,216,0.15)', color: '#00b4d8', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        Compartir
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div style={{ marginTop: 14 }}>
                   <div className="progress-track"><div className="progress-fill" style={{ width: `${total ? presentes / total * 100 : 0}%` }} /></div>
                   <div className="mono-label" style={{ marginTop: 6 }}>Escaneos detectados: {presentes}/{total} alumnos</div>

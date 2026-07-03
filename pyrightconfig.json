@@ -1,0 +1,12 @@
+{
+    "venvPath": "backend",
+    "venv": "venv",
+    "extraPaths": ["backend"],
+    "include": ["backend"],
+    "reportAttributeAccessIssue": false,
+    "reportGeneralTypeIssues": false,
+    "reportArgumentType": false,
+    "reportMissingModuleSource": false,
+    "reportAssignmentType": false,
+    "reportCallIssue": false
+}

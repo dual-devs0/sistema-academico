@@ -171,7 +171,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           display: flex; flex-direction: column; align-items: center; gap: 8px;
           padding: 20px 16px 16px; flex-shrink: 0;
         }
-        .sidebar-logo { width: 56px; height: auto; object-fit: contain; display: block; }
+        .sidebar-logo { width: 160px; height: auto; object-fit: contain; display: block; }
         .sidebar-title {
           font-size: 15px; font-weight: 700; color: #fff;
           text-align: center; line-height: 1.2; letter-spacing: -0.01em;
@@ -215,7 +215,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           .topbar-search { display: none; }
           .topbar-menu-btn { display: flex !important; }
           .sidebar-header { padding: 16px 12px 12px; }
-          .sidebar-logo { width: 44px; }
+          .sidebar-logo { width: 140px; }
           .sidebar-title { font-size: 13px; }
 
           .layout-sidebar {

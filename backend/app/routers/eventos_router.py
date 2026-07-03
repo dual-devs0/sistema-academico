@@ -184,8 +184,8 @@ def cargar_pdf(
     current_user = Depends(get_current_user),
 ):
     """Carga un PDF del calendario académico, lo parsea con Gemini y crea los eventos."""
-    if current_user["role"] not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden cargar calendarios PDF")
 
     try:
         pdf_bytes = base64.b64decode(payload.pdf_base64)
