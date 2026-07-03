@@ -339,6 +339,20 @@ function ProfesorView() {
     if (view !== 'alumnos' && pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }, [view])
 
+  // QR inline (panel REGISTRO EN TIEMPO REAL)
+  const [qrImg, setQrImg] = useState<string | null>(null)
+  const [qrCargando, setQrCargando] = useState(false)
+  async function generarQrInline() {
+    if (!selMat) return
+    setQrCargando(true)
+    try {
+      const data = await api.get<{ qr_base64: string; expira_en: number }>(`/asistencias/qr/${selMat.id}`)
+      setQrImg(data.qr_base64)
+      startQrTimer(data.expira_en)
+    } catch { setQrImg(null) }
+    finally { setQrCargando(false) }
+  }
+
   // QR timer countdown
   function startQrTimer(expiraEn: number) {
     setQrSeg(expiraEn); setQrActive(true)
@@ -463,24 +477,84 @@ function ProfesorView() {
 
         {view === 'alumnos' && (
           <>
-            {/* KPIs estilo captura */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 16 }}>
-              <div className="kpi-card">
-                <div className="mono-label" style={{ marginBottom: 6 }}>Asistencia Hoy</div>
-                <span className="kpi-value" style={{ fontSize: 24 }}>{total > 0 ? Math.round(presentes / total * 100) : 0}%</span>
+            {/* Grid: QR en tiempo real + KPIs/Historial */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) 1.2fr', gap: 16, marginBottom: 18 }} className="as-rt-grid">
+              <style>{`@media(max-width:900px){ .as-rt-grid { grid-template-columns:1fr !important; } }`}</style>
+
+              {/* Panel REGISTRO EN TIEMPO REAL */}
+              <div className="card" style={{ textAlign: 'center' }}>
+                <div className="mono-label" style={{ letterSpacing: '0.18em', marginBottom: 14 }}>Registro en Tiempo Real</div>
+                <div style={{ width: 190, height: 190, margin: '0 auto', borderRadius: 18, background: '#fff', padding: 10, border: '4px solid var(--bg-elevated)', boxShadow: '0 0 40px var(--accent-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {qrImg
+                    ? <img src={`data:image/png;base64,${qrImg}`} alt="QR asistencia" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    : <i className="ti ti-qrcode" style={{ fontSize: 70, color: '#0b0d11' }} />}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 30, fontWeight: 800, marginTop: 14, color: qrActive ? (qrSeg > 60 ? 'var(--accent-bright)' : 'var(--danger)') : 'var(--text-muted)' }}>
+                  {qrActive ? `${String(qrMin).padStart(2, '0')}:${String(qrS).padStart(2, '0')}` : '--:--'}
+                </div>
+                <div className="mono-label" style={{ marginBottom: 14 }}>
+                  {qrActive ? (qrSeg <= 60 ? 'CÓDIGO EXPIRA PRONTO' : 'CÓDIGO ACTIVO') : 'SIN CÓDIGO ACTIVO'}
+                </div>
+                <button className="btn-primary" style={{ width: '100%' }} disabled={qrCargando} onClick={generarQrInline}>
+                  <i className="ti ti-refresh" /> {qrCargando ? 'Generando…' : qrActive ? 'Regenerar QR' : 'Generar QR'}
+                </button>
+                <div style={{ marginTop: 14 }}>
+                  <div className="progress-track"><div className="progress-fill" style={{ width: `${total ? presentes / total * 100 : 0}%` }} /></div>
+                  <div className="mono-label" style={{ marginTop: 6 }}>Escaneos detectados: {presentes}/{total} alumnos</div>
+                </div>
               </div>
-              <div className="kpi-card">
-                <div className="mono-label" style={{ marginBottom: 6 }}>Inasistencias</div>
-                <span className="kpi-value" style={{ fontSize: 24 }}>{alumnos.filter(a => a.presente === false).length}</span>
-              </div>
-              <div className="kpi-card">
-                <div className="mono-label" style={{ marginBottom: 6 }}>Sin Registro</div>
-                <span className="kpi-value" style={{ fontSize: 24 }}>{alumnos.filter(a => a.presente === null).length}</span>
-              </div>
-              <div className="kpi-card">
-                <div className="mono-label" style={{ marginBottom: 6 }}>Escaneos QR</div>
-                <span className="kpi-value" style={{ fontSize: 24, color: qrActive ? 'var(--accent-bright)' : undefined }}>{presentes}/{total}</span>
-                {qrActive && <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill" style={{ width: `${total ? presentes / total * 100 : 0}%` }} /></div>}
+
+              {/* KPIs + Historial Mensual */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                  <div className="kpi-card">
+                    <div className="mono-label" style={{ marginBottom: 6 }}>Asistencia Hoy</div>
+                    <span className="kpi-value" style={{ fontSize: 22 }}>{total > 0 ? Math.round(presentes / total * 100) : 0}%</span>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="mono-label" style={{ marginBottom: 6 }}>Inasistencias</div>
+                    <span className="kpi-value" style={{ fontSize: 22 }}>{alumnos.filter(a => a.presente === false).length}</span>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="mono-label" style={{ marginBottom: 6 }}>Sin Registro</div>
+                    <span className="kpi-value" style={{ fontSize: 22 }}>{alumnos.filter(a => a.presente === null).length}</span>
+                  </div>
+                </div>
+                <div className="card" style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 800 }}>Historial Mensual</h3>
+                    <span className="mono-label">{new Date(fecha + 'T12:00:00').toLocaleDateString('es-PY', { month: 'long', year: 'numeric' })}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <div key={i} className="mono-label" style={{ textAlign: 'center' }}>{d}</div>)}
+                    {(() => {
+                      const base = new Date(fecha + 'T12:00:00')
+                      const y = base.getFullYear(), mo = base.getMonth()
+                      const first = (new Date(y, mo, 1).getDay() + 6) % 7
+                      const dias = new Date(y, mo + 1, 0).getDate()
+                      const cells = []
+                      for (let i = 0; i < first; i++) cells.push(<span key={`e${i}`} />)
+                      for (let d = 1; d <= dias; d++) {
+                        const esSel = d === base.getDate()
+                        const esClase = new Date(y, mo, d).getDay() % 6 !== 0 && d % 2 === 1
+                        cells.push(
+                          <button key={d} onClick={() => cambiarFecha(`${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`)}
+                            style={{
+                              aspectRatio: '1', borderRadius: 8, border: 'none', cursor: 'pointer',
+                              fontFamily: 'var(--font-mono)', fontSize: 11,
+                              background: esSel ? 'var(--accent)' : 'transparent',
+                              color: esSel ? '#fff' : 'var(--text-secondary)',
+                              position: 'relative',
+                            }}>
+                            {d}
+                            {esClase && !esSel && <span style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)' }} />}
+                          </button>
+                        )
+                      }
+                      return cells
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="as-toolbar">

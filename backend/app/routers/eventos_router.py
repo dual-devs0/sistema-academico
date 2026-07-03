@@ -115,19 +115,18 @@ def list_eventos(
     if hasta is not None:
         query = query.filter(models.evento.EventoCalendario.fecha <= date.fromisoformat(hasta))
 
-    # Alumno ve eventos globales + de sus carreras/materias
+    # Alumno ve eventos globales + de sus materias inscriptas
     if current_user["role"] == "alumno":
-        user = db.query(models.user.User).filter(models.user.User.id == current_user["user_id"]).first()
+        from sqlalchemy import or_
         inscripciones = db.query(models.inscripcion.Inscripcion).filter(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
         materia_ids = {i.materia_id for i in inscripciones}
-        query = query.filter(
-            models.evento.EventoCalendario.materia_id.is_(None),
-            models.evento.EventoCalendario.carrera_id.is_(None),
-        )
+        es_global = models.evento.EventoCalendario.materia_id.is_(None)
         if materia_ids:
-            query = query.filter(models.evento.EventoCalendario.materia_id.in_(materia_ids))
+            query = query.filter(or_(es_global, models.evento.EventoCalendario.materia_id.in_(materia_ids)))
+        else:
+            query = query.filter(es_global)
 
     return query.order_by(models.evento.EventoCalendario.fecha).all()
 

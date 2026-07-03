@@ -1,598 +1,271 @@
 import { useState, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, emitToast, decodeToken } from '../lib/api'
 
-const MESES   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const DIAS_L  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
-const DIAS_S  = ['D','L','M','M','J','V','S']
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 type TipoEvento = 'parcial' | 'final' | 'feriado' | 'asueto' | 'entrega' | 'actividad'
+type Evento = { id?: number; titulo: string; tipo: TipoEvento; fecha: string; fecha_fin?: string | null; descripcion?: string | null; materia_id?: number | null }
 
-interface Evento {
-  date: string
-  tipo: TipoEvento
-  nombre: string
-  materia: string
-}
-
-const mockEventos: Evento[] = [
-  { date:'2026-03-10', tipo:'actividad', nombre:'Inicio del semestre',      materia:'General'               },
-  { date:'2026-03-20', tipo:'entrega',   nombre:'TP Nº1 — Cálculo',         materia:'Análisis Matemático I' },
-  { date:'2026-04-02', tipo:'feriado',   nombre:'Semana Santa',             materia:'General'               },
-  { date:'2026-04-15', tipo:'parcial',   nombre:'Parcial 1 — Física I',     materia:'Física I'              },
-  { date:'2026-04-17', tipo:'parcial',   nombre:'Parcial 1 — Mat. Discreta',materia:'Matemática Discreta'   },
-  { date:'2026-04-22', tipo:'parcial',   nombre:'Parcial 1 — Análisis',     materia:'Análisis Matemático I' },
-  { date:'2026-05-01', tipo:'asueto',    nombre:'Día del Trabajador',       materia:'General'               },
-  { date:'2026-05-14', tipo:'asueto',    nombre:'Independencia PY',         materia:'General'               },
-  { date:'2026-06-10', tipo:'parcial',   nombre:'Parcial 2 — Física I',     materia:'Física I'              },
-  { date:'2026-06-18', tipo:'entrega',   nombre:'TP Nº2 — Cálculo',         materia:'Análisis Matemático I' },
-  { date:'2026-06-25', tipo:'parcial',   nombre:'Parcial 2 — Análisis',     materia:'Análisis Matemático I' },
-  { date:'2026-08-05', tipo:'final',     nombre:'Final — Física I',         materia:'Física I'              },
-  { date:'2026-08-07', tipo:'final',     nombre:'Final — Mat. Discreta',    materia:'Matemática Discreta'   },
-  { date:'2026-08-12', tipo:'final',     nombre:'Final — Análisis',         materia:'Análisis Matemático I' },
-]
-
-const tipoEstilo: Record<TipoEvento,{color:string;bg:string;border:string;label:string}> = {
-  parcial:   { color:'#a855f7', bg:'#a855f715', border:'#a855f730', label:'Parcial'   },
-  final:     { color:'#ef4444', bg:'#ef444415', border:'#ef444430', label:'Final'     },
-  feriado:   { color:'#94a3b8', bg:'#2a3040',   border:'#2d3f52',   label:'Feriado'   },
-  asueto:    { color:'#22c55e', bg:'#22c55e15', border:'#22c55e30', label:'Asueto'    },
-  entrega:   { color:'#f59e0b', bg:'#f59e0b15', border:'#f59e0b30', label:'Entrega'   },
-  actividad: { color:'var(--accent)', bg:'var(--accent-muted)', border:'var(--accent-hover)', label:'Actividad' },
-}
-
-function dateKey(y:number, m:number, d:number) {
-  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-}
-function fmtFecha(dateStr:string) {
-  const f = new Date(dateStr+'T00:00:00')
-  return `${f.getDate()} ${MESES[f.getMonth()].slice(0,3)}`
-}
-function fmtFechaLarga(dateStr:string) {
-  const f = new Date(dateStr+'T00:00:00')
-  return `${f.getDate()} de ${MESES[f.getMonth()]} ${f.getFullYear()}`
+const tipoCfg: Record<TipoEvento, { color: string; bg: string; label: string; badge: string }> = {
+  parcial:   { color: '#f87171', bg: 'rgba(239,68,68,0.15)', label: 'Parcial', badge: 'URGENTE' },
+  final:     { color: '#ef4444', bg: 'rgba(239,68,68,0.20)', label: 'Final', badge: 'URGENTE' },
+  entrega:   { color: '#fbbf24', bg: 'rgba(245,158,11,0.15)', label: 'Entrega', badge: 'ENTREGA' },
+  feriado:   { color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', label: 'Feriado', badge: 'FERIADO' },
+  asueto:    { color: '#34d399', bg: 'rgba(16,185,129,0.15)', label: 'Asueto', badge: 'SOCIAL' },
+  actividad: { color: 'var(--accent-bright)', bg: 'var(--accent-muted)', label: 'Clase', badge: 'CLASE' },
 }
 
 const css = `
-  *, *::before, *::after { box-sizing:border-box; }
-  .cal-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:var(--text-primary); }
-
-  /* Topbar — solo título */
-  .topbar {
-    display:flex; align-items:center; padding:0 24px; height:56px;
-    border-bottom:1px solid #2a3040; background:var(--bg-base);
-    position:sticky; top:0; z-index:20; flex-shrink:0;
+  .cal-grid-page { display:grid; grid-template-columns:1fr 280px; gap:18px; align-items:start; }
+  .cal-month { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-dia-lbl { text-align:center; font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; padding:6px 0; }
+  .cal-cell {
+    min-height:86px; border-radius:10px; padding:6px; cursor:pointer;
+    background:var(--bg-input); border:1px solid transparent; transition:all .12s;
+    display:flex; flex-direction:column; gap:3px; overflow:hidden;
   }
-  .topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; }
-
-  .content { padding:20px 24px; flex:1; overflow-y:auto; }
-
-  /* Layout */
-  .main-grid { display:grid; grid-template-columns:1fr 270px; gap:16px; align-items:start; }
-
-  /* Card base */
-  .card { background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; overflow:hidden; }
-
-  /* Leyenda */
-  .leyenda-bar {
-    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
-    padding:10px 16px; border-bottom:1px solid #2a3040;
+  .cal-cell:hover { border-color:var(--border-light); }
+  .cal-cell.fuera { opacity:.28; pointer-events:none; }
+  .cal-cell.hoy { border-color:var(--accent); }
+  .cal-cell.sel { background:var(--bg-elevated); border-color:var(--accent-bright); }
+  .cal-num { font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--text-secondary); }
+  .cal-chip {
+    font-size:9px; font-weight:700; border-radius:4px; padding:2px 5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    border-left:2px solid;
   }
-  .ley-chip {
-    display:inline-flex; align-items:center; gap:4px;
-    padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600;
-  }
-  .ley-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-
-  /* Nav mes */
-  .nav-bar {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:12px 16px; border-bottom:1px solid #2a3040;
-  }
-  .nav-mes { font-size:15px; font-weight:800; color:var(--text-primary); letter-spacing:-.01em; }
-  .nav-btn {
-    display:inline-flex; align-items:center; gap:4px;
-    padding:6px 12px; background:var(--bg-base); border:1px solid var(--border-light);
-    border-radius:8px; color:var(--text-secondary); font-size:12px; font-weight:600;
-    font-family:inherit; cursor:pointer; transition:border-color .15s, color .15s;
-  }
-  .nav-btn:hover { border-color:var(--accent); color:var(--text-primary); }
-  .nav-btn svg { width:12px; height:12px; }
-  .btn-hoy {
-    padding:6px 12px; background:var(--accent-muted); border:1px solid var(--accent-hover);
-    border-radius:8px; color:var(--accent); font-size:12px; font-weight:700;
-    font-family:inherit; cursor:pointer; transition:background .15s;
-  }
-  .btn-hoy:hover { background:var(--accent-muted); }
-
-  /* Cabecera días */
-  .dias-header {
-    display:grid; grid-template-columns:repeat(7,1fr);
-    padding:8px 12px 4px; gap:3px;
-  }
-  .dia-lbl {
-    text-align:center; font-size:10px; font-weight:700;
-    color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;
-    padding:4px 0;
-  }
-
-  /* Grid días */
-  .cal-grid {
-    display:grid; grid-template-columns:repeat(7,1fr);
-    padding:4px 12px 12px; gap:3px;
-  }
-  .dia-cell {
-    min-height:80px; border:1px solid #2a304022; border-radius:9px;
-    padding:6px 5px 5px; cursor:pointer;
-    transition:background .12s, border-color .12s;
-    background:var(--bg-input); position:relative;
-  }
-  .dia-cell:hover { background:var(--bg-hover); border-color:#2a304088; }
-  .dia-cell.fuera-mes { opacity:.25; pointer-events:none; }
-  .dia-cell.hoy     { border-color:var(--accent) !important; background:var(--accent-muted); }
-  .dia-cell.sel     { border-color:#a855f7 !important; background:#a855f70a; }
-  .dia-cell.tiene-ev { border-color:#2a304055; }
-
-  /* Número del día */
-  .dia-num {
-    font-size:11.5px; font-weight:500; color:#3a4f6a;
-    line-height:1; margin-bottom:4px;
-  }
-  .dia-num.tiene-ev { color:var(--text-secondary); font-weight:700; }
-  .dia-num.es-hoy   { font-weight:800; }
-  .hoy-ring {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:20px; height:20px; border-radius:50%;
-    background:var(--accent); color:#000; font-size:11px; font-weight:800;
-  }
-  .sel-ring {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:20px; height:20px; border-radius:50%;
-    background:#a855f720; color:#a855f7; font-size:11px; font-weight:800;
-    border:1px solid #a855f740;
-  }
-
-  /* Chips en celda (desktop) */
-  .ev-chips { display:flex; flex-direction:column; gap:2px; }
-  .ev-chip {
-    border-radius:4px; padding:2px 4px;
-    font-size:9px; font-weight:700;
-    overflow:hidden; white-space:nowrap; text-overflow:ellipsis; line-height:1.4;
-    border:1px solid;
-  }
-  .ev-mas { font-size:9px; color:var(--text-muted); font-weight:600; margin-top:1px; padding-left:2px; }
-
-  /* Dots (mobile) */
-  .ev-dots { display:none; gap:3px; margin-top:3px; flex-wrap:wrap; }
-  .ev-dot  { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-
-  /* Panel derecho */
-  .right-col { display:flex; flex-direction:column; gap:12px; }
-  .card-hdr {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:13px 16px 11px; border-bottom:1px solid #2a3040;
-  }
-  .card-hdr h3 { font-size:13px; font-weight:700; color:var(--text-primary); }
-  .card-hdr-sub { font-size:11px; color:var(--text-muted); }
-
-  /* Próximos */
-  .prox-item {
-    display:flex; align-items:flex-start; gap:10px;
-    padding:11px 16px; border-bottom:1px solid #2a304022;
-    transition:background .12s;
-  }
-  .prox-item:last-child { border-bottom:none; }
-  .prox-item:hover { background:var(--bg-hover); }
-  .prox-bar { width:3px; border-radius:2px; flex-shrink:0; align-self:stretch; min-height:32px; }
-  .prox-tipo   { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-  .prox-nombre { font-size:12px; font-weight:600; color:var(--text-primary); margin-top:1px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-  .prox-mat    { font-size:11px; color:var(--text-muted); margin-top:1px; }
-  .prox-fecha  { font-size:10px; font-weight:700; color:var(--text-muted); white-space:nowrap; background:var(--bg-hover); padding:3px 7px; border-radius:6px; flex-shrink:0; }
-
-  /* Día seleccionado */
-  .sel-empty {
-    padding:24px 16px; text-align:center;
-    font-size:12px; color:var(--text-muted); line-height:1.7;
-  }
-  .sel-empty svg { width:28px; height:28px; margin:0 auto 10px; display:block; opacity:.25; }
-  .sel-ev-item {
-    display:flex; align-items:flex-start; gap:10px;
-    padding:12px 16px; border-bottom:1px solid #2a304022;
-  }
-  .sel-ev-item:last-child { border-bottom:none; }
-  .sel-ev-bar { width:3px; border-radius:2px; flex-shrink:0; align-self:stretch; min-height:36px; }
-  .sel-ev-tipo   { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-  .sel-ev-nombre { font-size:13px; font-weight:600; color:var(--text-primary); margin-top:2px; }
-  .sel-ev-mat    { font-size:11px; color:var(--text-muted); margin-top:2px; }
-
-  /* Modal mobile */
-  .modal-overlay {
-    position:fixed; inset:0; background:rgba(0,0,0,.65);
-    backdrop-filter:blur(4px); z-index:100;
-    display:flex; align-items:flex-end; justify-content:center;
-  }
-  .day-modal {
-    background:var(--bg-surface); border:1px solid #2a3040;
-    border-radius:20px 20px 0 0; width:100%;
-    max-height:75dvh; overflow-y:auto;
-    padding-bottom:env(safe-area-inset-bottom,16px);
-    box-shadow:0 -8px 40px rgba(0,0,0,.5);
-  }
-  .day-modal-hdr {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:16px 20px 12px; border-bottom:1px solid #2a3040;
-    position:sticky; top:0; background:var(--bg-surface);
-  }
-  .day-modal-hdr h3 { font-size:15px; font-weight:700; color:var(--text-primary); }
-  .day-modal-hdr span { font-size:11px; color:var(--text-muted); }
-  .modal-close {
-    background:none; border:none; color:var(--text-muted); cursor:pointer;
-    padding:4px; border-radius:6px; display:flex; transition:color .15s;
-  }
-  .modal-close:hover { color:var(--text-primary); }
-  .modal-close svg { width:18px; height:18px; }
-
-  /* Panel mobile — solo celular */
-  .panel-mobile { display:none; flex-direction:column; gap:12px; margin-top:14px; }
-
-  /* Responsive */
-  @media(max-width:960px){
-    .main-grid { grid-template-columns:1fr; }
-    .right-col { display:none; }
-    .panel-mobile { display:flex; }
-    .ev-chips { display:none; }
-    .ev-dots  { display:flex; }
-    .dia-cell { min-height:52px; padding:5px 4px; }
-  }
+  .prox-item { border-radius:12px; background:var(--bg-elevated); padding:11px 13px; margin-bottom:10px; }
+  .cal-timeline { display:none; }
+  @media(max-width:1024px){ .cal-grid-page { grid-template-columns:1fr; } }
   @media(max-width:768px){
-    .topbar  { padding:0 14px; }
-    .content { padding:14px; }
-    .cal-grid { padding:3px 8px 10px; gap:2px; }
-    .dias-header { padding:6px 8px 2px; gap:2px; }
-    .leyenda-bar { gap:4px; padding:8px 12px; }
-    .nav-bar { padding:10px 12px; }
-    .nav-mes { font-size:14px; }
-  }
-  @media(max-width:400px){
-    .dia-lbl .lbl-l { display:none; }
-    .dia-lbl .lbl-s { display:inline; }
-    .hoy-ring, .sel-ring { width:18px; height:18px; font-size:10px; }
+    .cal-month-card { display:none; }
+    .cal-timeline { display:block; }
   }
 `
 
+function dateKey(y: number, m: number, d: number) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
 export default function Calendario() {
-  const [eventos, setEventos] = useState<Evento[]>(mockEventos)
   const hoy = new Date()
-  const [actual,    setActual]    = useState(new Date(2026, 3, 1))
-  const [selDia,    setSelDia]    = useState<number|null>(null)
+  const [actual, setActual] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+  const [eventos, setEventos] = useState<Evento[]>([])
+  const [selDia, setSelDia] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [draft, setDraft] = useState<Evento>({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '' })
+  const [saving, setSaving] = useState(false)
+  const role = decodeToken(sessionStorage.getItem('token') || '')?.role
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [data, materiasData] = await Promise.all([
-          api.get<any[]>('/eventos/').catch(() => [] as any[]),
-          api.get<any[]>('/materias/').catch(() => [] as any[]),
-        ])
-        const mMap: Record<number, string> = {}
-        materiasData.forEach((m: any) => { mMap[m.id] = m.nombre })
-        if (data.length > 0) {
-          setEventos(data.map((e: any) => ({
-            date: e.fecha,
-            tipo: e.tipo || 'actividad',
-            nombre: e.titulo || e.descripcion || '',
-            materia: e.materia_id ? (mMap[e.materia_id] || `Materia #${e.materia_id}`) : 'General',
-          })))
-        }
-      } catch { /* fallback to mock */ }
-    })()
-  }, [])
-
-  function eventosDelDia(y:number, m:number, d:number) {
-    return eventos.filter(e => e.date === dateKey(y,m,d))
+  function cargar() {
+    api.get<Evento[]>('/eventos/').then(setEventos).catch(() => {})
   }
+  useEffect(cargar, [])
 
-  const y = actual.getFullYear()
-  const m = actual.getMonth()
-  const primerDia = new Date(y, m, 1).getDay()
-  const diasEnMes = new Date(y, m+1, 0).getDate()
+  const y = actual.getFullYear(), m = actual.getMonth()
+  const primerDia = (new Date(y, m, 1).getDay() + 6) % 7 // lunes=0
+  const diasMes = new Date(y, m + 1, 0).getDate()
+  const celdas: { d: number; fuera: boolean; key: string }[] = []
+  const prevDias = new Date(y, m, 0).getDate()
+  for (let i = primerDia - 1; i >= 0; i--) celdas.push({ d: prevDias - i, fuera: true, key: '' })
+  for (let d = 1; d <= diasMes; d++) celdas.push({ d, fuera: false, key: dateKey(y, m, d) })
+  while (celdas.length % 7 !== 0) celdas.push({ d: celdas.length, fuera: true, key: '' })
 
-  const hoyEsMesActual = hoy.getFullYear()===y && hoy.getMonth()===m
+  const porDia = (k: string) => eventos.filter(e => e.fecha === k)
+  const hoyKey = dateKey(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  const proximos = [...eventos].filter(e => e.fecha >= hoyKey).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 5)
+  const delMes = eventos.filter(e => e.fecha.startsWith(`${y}-${String(m + 1).padStart(2, '0')}`)).sort((a, b) => a.fecha.localeCompare(b.fecha))
 
-  const proximosEventos = eventos
-    .filter(e => new Date(e.date+'T00:00:00') >= new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))
-    .sort((a,b) => a.date.localeCompare(b.date))
-    .slice(0, 6)
-
-  const selEvs = selDia ? eventosDelDia(y,m,selDia) : []
-  const selLabel = selDia
-    ? `${selDia} de ${MESES[m]} ${y}`
-    : 'Seleccioná un día'
-
-  function irHoy() {
-    setActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
-    setSelDia(hoy.getDate())
-  }
-
-  function handleDia(d: number) {
-    const evs = eventosDelDia(y,m,d)
-    setSelDia(d)
-    if (evs.length > 0) setModalOpen(true)
+  async function guardarEvento() {
+    if (!draft.titulo || !draft.fecha) { emitToast('Completá título y fecha', 'warning'); return }
+    setSaving(true)
+    try {
+      await api.post('/eventos/', { titulo: draft.titulo, tipo: draft.tipo, fecha: draft.fecha, descripcion: draft.descripcion || null })
+      emitToast('Evento agendado')
+      setModalOpen(false)
+      setDraft({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '' })
+      cargar()
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al crear evento', 'error')
+    } finally { setSaving(false) }
   }
 
   return (
     <>
       <style>{css}</style>
-      <div className="cal-root">
 
-        {/* Topbar — solo título */}
-        <header className="topbar">
-          <h1>Calendario académico</h1>
-        </header>
-
-        <div className="content">
-          <div className="main-grid">
-
-            {/* ── CALENDARIO ── */}
-            <div className="card">
-
-              {/* Leyenda tipos */}
-              <div className="leyenda-bar">
-                {(Object.entries(tipoEstilo) as [TipoEvento, typeof tipoEstilo[TipoEvento]][]).map(([tipo,s]) => (
-                  <div key={tipo} className="ley-chip" style={{background:s.bg, border:`1px solid ${s.border}`}}>
-                    <div className="ley-dot" style={{background:s.color}}/>
-                    <span style={{color:s.color}}>{s.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Nav mes */}
-              <div className="nav-bar">
-                <button className="nav-btn" onClick={()=>{setActual(new Date(y,m-1,1));setSelDia(null)}}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                  Ant.
-                </button>
-                <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <span className="nav-mes">{MESES[m]} {y}</span>
-                  {!hoyEsMesActual && (
-                    <button className="btn-hoy" onClick={irHoy}>Hoy</button>
-                  )}
-                </div>
-                <button className="nav-btn" onClick={()=>{setActual(new Date(y,m+1,1));setSelDia(null)}}>
-                  Sig.
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </div>
-
-              {/* Cabecera días semana */}
-              <div className="dias-header">
-                {DIAS_L.map((dl,i) => (
-                  <div key={dl} className="dia-lbl">
-                    <span className="lbl-l">{dl}</span>
-                    <span className="lbl-s" style={{display:'none'}}>{DIAS_S[i]}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Grid */}
-              <div className="cal-grid">
-                {/* Celdas vacías inicio */}
-                {Array.from({length:primerDia}).map((_,i) => <div key={`v${i}`}/>)}
-
-                {/* Días del mes */}
-                {Array.from({length:diasEnMes}).map((_,i) => {
-                  const d     = i+1
-                  const evs   = eventosDelDia(y,m,d)
-                  const esHoy = hoy.getFullYear()===y && hoy.getMonth()===m && hoy.getDate()===d
-                  const esSel = selDia===d
-                  const tieneEvs = evs.length>0
-
-                  return (
-                    <div
-                      key={d}
-                      className={`dia-cell${esHoy?' hoy':''}${esSel?' sel':''}${tieneEvs?' tiene-ev':''}`}
-                      onClick={() => handleDia(d)}
-                    >
-                      {/* Número */}
-                      <div className={`dia-num${esHoy?' es-hoy':tieneEvs?' tiene-ev':''}`}>
-                        {esHoy
-                          ? <span className="hoy-ring">{d}</span>
-                          : esSel
-                            ? <span className="sel-ring">{d}</span>
-                            : <span>{d}</span>
-                        }
-                      </div>
-
-                      {/* Chips desktop */}
-                      <div className="ev-chips">
-                        {evs.slice(0,2).map((e,idx) => (
-                          <div key={idx} className="ev-chip" style={{color:tipoEstilo[e.tipo].color, background:tipoEstilo[e.tipo].bg, borderColor:tipoEstilo[e.tipo].border}}>
-                            {e.nombre}
-                          </div>
-                        ))}
-                        {evs.length>2 && <div className="ev-mas">+{evs.length-2}</div>}
-                      </div>
-
-                      {/* Dots mobile */}
-                      <div className="ev-dots">
-                        {evs.slice(0,3).map((e,idx) => (
-                          <div key={idx} className="ev-dot" style={{background:tipoEstilo[e.tipo].color}}/>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* ── PANEL DERECHO ── */}
-            <div className="right-col">
-
-              {/* Próximos eventos */}
-              <div className="card">
-                <div className="card-hdr">
-                  <h3>Próximos eventos</h3>
-                  <span className="card-hdr-sub">{proximosEventos.length} pendientes</span>
-                </div>
-                {proximosEventos.length===0
-                  ? <div className="sel-empty" style={{padding:'16px'}}>Sin eventos próximos</div>
-                  : proximosEventos.map((e,i) => {
-                    const s = tipoEstilo[e.tipo]
-                    return (
-                      <div key={i} className="prox-item">
-                        <div className="prox-bar" style={{background:s.color}}/>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div className="prox-tipo" style={{color:s.color}}>{s.label}</div>
-                          <div className="prox-nombre">{e.nombre}</div>
-                          <div className="prox-mat">{e.materia}</div>
-                        </div>
-                        <div className="prox-fecha">{fmtFecha(e.date)}</div>
-                      </div>
-                    )
-                  })
-                }
-              </div>
-
-              {/* Detalle día seleccionado */}
-              <div className="card">
-                <div className="card-hdr">
-                  <h3>{selDia ? selLabel : 'Día seleccionado'}</h3>
-                  {selEvs.length>0 && <span className="card-hdr-sub">{selEvs.length} evento{selEvs.length>1?'s':''}</span>}
-                </div>
-                {selEvs.length===0
-                  ? <div className="sel-empty">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <rect x="3" y="4" width="18" height="18" rx="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/>
-                        <line x1="8"  y1="2" x2="8"  y2="6"/>
-                        <line x1="3"  y1="10" x2="21" y2="10"/>
-                      </svg>
-                      {selDia
-                        ? 'Sin eventos este día.'
-                        : 'Hacé click en un día\npara ver sus eventos.'
-                      }
-                    </div>
-                  : selEvs.map((e,i) => {
-                      const s = tipoEstilo[e.tipo]
-                      return (
-                        <div key={i} className="sel-ev-item">
-                          <div className="sel-ev-bar" style={{background:s.color}}/>
-                          <div>
-                            <div className="sel-ev-tipo" style={{color:s.color}}>{s.label}</div>
-                            <div className="sel-ev-nombre">{e.nombre}</div>
-                            <div className="sel-ev-mat">{e.materia}</div>
-                          </div>
-                        </div>
-                      )
-                    })
-                }
-              </div>
-
-            </div>
-          </div>
-
-          {/* ── PANEL MOBILE — Próximos + Día seleccionado (solo celular) ── */}
-          <div className="panel-mobile">
-
-            {/* Próximos eventos */}
-            <div className="card">
-              <div className="card-hdr">
-                <h3>Próximos eventos</h3>
-                <span className="card-hdr-sub">{proximosEventos.length} pendientes</span>
-              </div>
-              {proximosEventos.length===0
-                ? <div className="sel-empty" style={{padding:'16px'}}>Sin eventos próximos</div>
-                : proximosEventos.map((e,i) => {
-                  const s = tipoEstilo[e.tipo]
-                  return (
-                    <div key={i} className="prox-item">
-                      <div className="prox-bar" style={{background:s.color}}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div className="prox-tipo" style={{color:s.color}}>{s.label}</div>
-                        <div className="prox-nombre">{e.nombre}</div>
-                        <div className="prox-mat">{e.materia}</div>
-                      </div>
-                      <div className="prox-fecha">{fmtFecha(e.date)}</div>
-                    </div>
-                  )
-                })
-              }
-            </div>
-
-            {/* Día seleccionado */}
-            <div className="card">
-              <div className="card-hdr">
-                <h3>{selDia ? selLabel : 'Día seleccionado'}</h3>
-                {selEvs.length>0 && <span className="card-hdr-sub">{selEvs.length} evento{selEvs.length>1?'s':''}</span>}
-              </div>
-              {selEvs.length===0
-                ? <div className="sel-empty">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="4" width="18" height="18" rx="2"/>
-                      <line x1="16" y1="2" x2="16" y2="6"/>
-                      <line x1="8"  y1="2" x2="8"  y2="6"/>
-                      <line x1="3"  y1="10" x2="21" y2="10"/>
-                    </svg>
-                    {selDia ? 'Sin eventos este día.' : 'Tocá un día para ver sus eventos.'}
-                  </div>
-                : selEvs.map((e,i) => {
-                    const s = tipoEstilo[e.tipo]
-                    return (
-                      <div key={i} className="sel-ev-item">
-                        <div className="sel-ev-bar" style={{background:s.color}}/>
-                        <div>
-                          <div className="sel-ev-tipo" style={{color:s.color}}>{s.label}</div>
-                          <div className="sel-ev-nombre">{e.nombre}</div>
-                          <div className="sel-ev-mat">{e.materia}</div>
-                        </div>
-                      </div>
-                    )
-                  })
-              }
-            </div>
-
-          </div>
-
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <h1 className="page-title">{MESES[m]} {y}</h1>
+          <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
+            <i className="ti ti-sparkles" /> {delMes.length} eventos este mes
+          </span>
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-ghost" onClick={() => setActual(new Date(y, m - 1, 1))} aria-label="Mes anterior"><i className="ti ti-chevron-left" /></button>
+          <button className="btn-ghost" onClick={() => setActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}>Hoy</button>
+          <button className="btn-ghost" onClick={() => setActual(new Date(y, m + 1, 1))} aria-label="Mes siguiente"><i className="ti ti-chevron-right" /></button>
+          <button className="btn-ghost" onClick={() => emitToast('Sincronización — próximamente', 'warning')}><i className="ti ti-refresh" /> Sincronizar</button>
+        </div>
+      </div>
 
-        {/* ── MODAL MOBILE — detalle día ── */}
-        {modalOpen && selDia && (
-          <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)setModalOpen(false)}}>
-            <div className="day-modal">
-              <div className="day-modal-hdr">
-                <div>
-                  <h3>{selDia} de {MESES[m]}</h3>
-                  <span>{selEvs.length} evento{selEvs.length>1?'s':''}</span>
-                </div>
-                <button className="modal-close" onClick={()=>setModalOpen(false)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6"  y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-              {selEvs.map((e,i) => {
-                const s = tipoEstilo[e.tipo]
+      <div className="cal-grid-page">
+        <div>
+          {/* Grid mensual desktop */}
+          <div className="card cal-month-card" style={{ padding: 14 }}>
+            <div className="cal-month" style={{ marginBottom: 4 }}>
+              {DIAS.map(d => <div key={d} className="cal-dia-lbl">{d}</div>)}
+            </div>
+            <div className="cal-month">
+              {celdas.map((c, i) => {
+                const evs = c.key ? porDia(c.key) : []
                 return (
-                  <div key={i} className="sel-ev-item" style={{padding:'14px 20px'}}>
-                    <div className="sel-ev-bar" style={{background:s.color}}/>
-                    <div style={{flex:1}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-                        <div className="sel-ev-tipo" style={{color:s.color}}>{s.label}</div>
-                        <span style={{fontSize:11,color:'var(--text-muted)',background:'var(--bg-hover)',padding:'2px 8px',borderRadius:6}}>
-                          {fmtFechaLarga(e.date)}
-                        </span>
-                      </div>
-                      <div className="sel-ev-nombre">{e.nombre}</div>
-                      <div className="sel-ev-mat">{e.materia}</div>
-                    </div>
+                  <div key={i}
+                    className={`cal-cell${c.fuera ? ' fuera' : ''}${c.key === hoyKey ? ' hoy' : ''}${c.key === selDia ? ' sel' : ''}`}
+                    onClick={() => !c.fuera && setSelDia(c.key === selDia ? null : c.key)}>
+                    <span className="cal-num" style={c.key === hoyKey ? { color: 'var(--accent-bright)' } : undefined}>{c.d}</span>
+                    {evs.slice(0, 2).map(e => {
+                      const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
+                      return <span key={e.id} className="cal-chip" style={{ background: cfg.bg, color: cfg.color, borderLeftColor: cfg.color }}>{cfg.label}: {e.titulo}</span>
+                    })}
+                    {evs.length > 2 && <span className="mono-label" style={{ fontSize: 8.5 }}>+{evs.length - 2} más</span>}
                   </div>
                 )
               })}
             </div>
           </div>
-        )}
 
+          {/* Timeline mobile */}
+          <div className="cal-timeline">
+            {delMes.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin eventos este mes.</div>
+            ) : delMes.map(e => {
+              const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
+              return (
+                <div key={e.id} className="card" style={{ padding: '12px 16px', marginBottom: 10, borderLeft: `3px solid ${cfg.color}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.badge}</span>
+                    <span className="mono-label">{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{e.titulo}</div>
+                  {e.descripcion && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{e.descripcion}</div>}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Detalle día seleccionado */}
+          {selDia && (
+            <div className="card" style={{ marginTop: 14 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>
+                Eventos del {selDia.slice(8, 10)}/{selDia.slice(5, 7)}
+              </h3>
+              {porDia(selDia).length === 0 ? (
+                <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Sin eventos. Usá "Agendar Evento" para crear uno.</p>
+              ) : porDia(selDia).map(e => {
+                const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
+                return (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{e.titulo}</div>
+                      {e.descripcion && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{e.descripcion}</div>}
+                    </div>
+                    <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Panel derecho */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="card">
+            <div className="mono-label" style={{ marginBottom: 10 }}>Sincronización <i className="ti ti-refresh" style={{ float: 'right' }} /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                <i className="ti ti-brand-google" style={{ color: 'var(--accent-bright)' }} />
+              </span>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>Google Calendar</div>
+                <div className="mono-label" style={{ fontSize: 9 }}>Última sinc: —</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800 }}>Próximos</h3>
+              <span className="mono-label" style={{ color: 'var(--accent-bright)', cursor: 'pointer' }}>Ver todo</span>
+            </div>
+            {proximos.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Sin eventos próximos.</p>
+            ) : proximos.map(e => {
+              const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
+              return (
+                <div key={e.id} className="prox-item">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.badge}</span>
+                    <span className="mono-label" style={{ fontSize: 9 }}>{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{e.titulo}</div>
+                  {e.descripcion && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>{e.descripcion}</div>}
+                </div>
+              )
+            })}
+          </div>
+
+          <button className="card" onClick={() => setModalOpen(true)}
+            style={{ cursor: 'pointer', textAlign: 'center', borderStyle: 'dashed', color: 'var(--text-secondary)' }}>
+            <i className="ti ti-circle-plus" style={{ fontSize: 24, display: 'block', marginBottom: 6, color: 'var(--accent-bright)' }} />
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Agendar Evento</span>
+            <div style={{ fontSize: 11.5, marginTop: 3 }}>Presiona para crear un nuevo recordatorio</div>
+          </button>
+
+          {(role === 'admin' || role === 'profesor') && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div className="mono-label" style={{ marginBottom: 6 }}>Carga automática (PDF)</div>
+              <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Subí el PDF del semestre vía <code style={{ color: 'var(--accent-bright)' }}>POST /eventos/cargar-pdf</code> (requiere GEMINI_API_KEY en backend/.env).
+              </p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Modal agendar */}
+      {modalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className="card card-elevated" style={{ width: '100%', maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800 }}>Agendar Evento</h3>
+              <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
+            </div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>Título</div>
+            <input className="input-uca" value={draft.titulo} onChange={e => setDraft(d => ({ ...d, titulo: e.target.value }))} style={{ marginBottom: 12 }} autoFocus />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Tipo</div>
+                <select className="input-uca" value={draft.tipo} onChange={e => setDraft(d => ({ ...d, tipo: e.target.value as TipoEvento }))}>
+                  {Object.entries(tipoCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Fecha</div>
+                <input className="input-uca" type="date" value={draft.fecha} onChange={e => setDraft(d => ({ ...d, fecha: e.target.value }))} />
+              </div>
+            </div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>Descripción</div>
+            <input className="input-uca" value={draft.descripcion ?? ''} onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value }))} style={{ marginBottom: 18 }} placeholder="Aula, materia, detalle…" />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
+              <button className="btn-primary" disabled={saving} onClick={guardarEvento}>{saving ? 'Guardando…' : 'Agendar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

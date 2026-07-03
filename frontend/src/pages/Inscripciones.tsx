@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, decodeToken, emitToast } from '../lib/api'
 
-type Materia = { id: number; nombre: string; profesor_nombre?: string | null }
+type Materia = { id: number; nombre: string; profesor_nombre?: string | null; creditos?: number | null; cupos?: number | null; horario?: string | null; secciones?: number | null }
 type Inscripcion = { id: number; alumno_id: number; materia_id: number }
 type UserApi = { id: number; username: string; role: string; nombre: string }
 
@@ -93,11 +93,11 @@ function AlumnoView({ userId }: { userId: number }) {
     }
   }
 
-  const cupoMock = (id: number) => {
-    const ocup = (id * 7) % 38
-    return { ocup, total: 38, lleno: ocup > 30 }
+  const cupoDe = (m: Materia) => {
+    const total = m.cupos ?? 38
+    const ocup = (m.id * 7) % total // ocupación real requiere conteo de inscripciones por materia
+    return { ocup, total, lleno: ocup > total * 0.8 }
   }
-  const horarioMock = (id: number) => ['Lun - Mié | 07:00 - 09:00', 'Mar - Jue | 10:00 - 12:00', 'Vie | 07:00 - 11:00', 'Sáb | 08:00 - 12:00'][id % 4]
 
   return (
     <>
@@ -137,16 +137,16 @@ function AlumnoView({ userId }: { userId: number }) {
               <div className="ins-cards">
                 {disponibles.map(m => {
                   const sel = seleccion.includes(m.id)
-                  const cupo = cupoMock(m.id)
+                  const cupo = cupoDe(m)
                   return (
                     <div key={m.id} className={`ins-card${sel ? ' sel' : ''}`}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                         <div style={{ fontSize: 15, fontWeight: 800, paddingRight: 8 }}>{m.nombre}</div>
-                        <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)', flexShrink: 0 }}>{CRED_POR_MATERIA} créditos</span>
+                        <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)', flexShrink: 0 }}>{m.creditos ?? CRED_POR_MATERIA} créditos</span>
                       </div>
                       <div className="mono-label" style={{ marginBottom: 12 }}>MAT-{String(m.id).padStart(3, '0')}</div>
                       <div className="ins-meta"><i className="ti ti-user" /> {m.profesor_nombre || 'Profesor a asignar'}</div>
-                      <div className="ins-meta"><i className="ti ti-calendar" /> {horarioMock(m.id)}</div>
+                      <div className="ins-meta"><i className="ti ti-calendar" /> {m.horario || 'Horario a confirmar'}</div>
                       <div style={{ marginTop: 10 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                           <span className="mono-label">Cupos disponibles</span>

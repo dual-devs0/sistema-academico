@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, emitToast } from '../lib/api'
 
-type MateriaRaw = { id: number; nombre: string; profesor_id: number | null; carrera_id: number | null; anio: number | null; semestre: number | null; profesor_nombre?: string | null; carrera_nombre?: string | null }
+type MateriaRaw = { id: number; nombre: string; profesor_id: number | null; carrera_id: number | null; anio: number | null; semestre: number | null; creditos?: number | null; cupos?: number | null; horario?: string | null; secciones?: number | null; profesor_nombre?: string | null; carrera_nombre?: string | null }
 type Profe = { id: number; username: string; nombre: string; role: string }
 
 const facultadCfg = [
@@ -31,7 +31,7 @@ export default function Materias() {
   const [insActiva, setInsActiva] = useState(true)
   const [modActiva, setModActiva] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const [draft, setDraft] = useState({ nombre: '', profesorId: '', anio: new Date().getFullYear(), semestre: 1 })
+  const [draft, setDraft] = useState({ nombre: '', profesorId: '', anio: new Date().getFullYear(), semestre: 1, creditos: 4, cupos: 40, horario: '', secciones: 1 })
   const [saving, setSaving] = useState(false)
 
   function cargar() {
@@ -49,15 +49,20 @@ export default function Materias() {
     if (!draft.nombre) { emitToast('Ingresá el nombre de la materia', 'warning'); return }
     setSaving(true)
     try {
+      if (!draft.profesorId) { emitToast('Asigná un profesor', 'warning'); setSaving(false); return }
       await api.post('/materias/', {
         nombre: draft.nombre,
-        profesor_id: draft.profesorId ? Number(draft.profesorId) : null,
+        profesor_id: Number(draft.profesorId),
         anio: draft.anio,
         semestre: draft.semestre,
+        creditos: draft.creditos,
+        cupos: draft.cupos,
+        horario: draft.horario || null,
+        secciones: draft.secciones,
       })
       emitToast('Materia creada')
       setModalOpen(false)
-      setDraft({ nombre: '', profesorId: '', anio: new Date().getFullYear(), semestre: 1 })
+      setDraft({ nombre: '', profesorId: '', anio: new Date().getFullYear(), semestre: 1, creditos: 4, cupos: 40, horario: '', secciones: 1 })
       cargar()
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al crear materia', 'error')
@@ -65,7 +70,7 @@ export default function Materias() {
   }
 
   const fac = (id: number) => facultadCfg[id % facultadCfg.length]
-  const cupo = (id: number) => { const o = (id * 13) % 120; const t = 120; return { o, t, pct: Math.round(o / t * 100) } }
+  const cupo = (m: MateriaRaw) => { const t = m.cupos ?? 120; const o = (m.id * 13) % t; return { o, t, pct: Math.round(o / t * 100) } }
 
   const filtradas = filtro === 'Todos' ? materias : materias.filter(m => fac(m.id).label.toLowerCase().startsWith(filtro.toLowerCase().slice(0, 4)))
 
@@ -146,7 +151,7 @@ export default function Materias() {
               <tbody>
                 {filtradas.map(m => {
                   const f = fac(m.id)
-                  const c = cupo(m.id)
+                  const c = cupo(m)
                   return (
                     <tr key={m.id}>
                       <td>
@@ -155,8 +160,10 @@ export default function Materias() {
                       </td>
                       <td><span className="badge" style={{ background: f.bg, color: f.color }}>{f.label}</span></td>
                       <td>
-                        <span className="sec-chip">S1</span><span className="sec-chip">S2</span>
-                        {m.id % 3 === 0 && <span className="sec-chip" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>+1</span>}
+                        {Array.from({ length: Math.min(m.secciones ?? 1, 4) }, (_, i) => (
+                          <span key={i} className="sec-chip">S{i + 1}</span>
+                        ))}
+                        {(m.secciones ?? 1) > 4 && <span className="sec-chip" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>+{(m.secciones ?? 1) - 4}</span>}
                       </td>
                       <td style={{ minWidth: 160 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -196,7 +203,7 @@ export default function Materias() {
               <option value="">Sin asignar</option>
               {profes.map(p => <option key={p.id} value={p.id}>{p.nombre || p.username}</option>)}
             </select>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <div className="mono-label" style={{ marginBottom: 6 }}>Año</div>
                 <input className="input-uca" type="number" value={draft.anio} onChange={e => setDraft(d => ({ ...d, anio: Number(e.target.value) }))} />
@@ -206,6 +213,22 @@ export default function Materias() {
                 <select className="input-uca" value={draft.semestre} onChange={e => setDraft(d => ({ ...d, semestre: Number(e.target.value) }))}>
                   <option value={1}>1</option><option value={2}>2</option>
                 </select>
+              </div>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Créditos</div>
+                <input className="input-uca" type="number" value={draft.creditos} onChange={e => setDraft(d => ({ ...d, creditos: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Cupos</div>
+                <input className="input-uca" type="number" value={draft.cupos} onChange={e => setDraft(d => ({ ...d, cupos: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Secciones</div>
+                <input className="input-uca" type="number" value={draft.secciones} onChange={e => setDraft(d => ({ ...d, secciones: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Horario</div>
+                <input className="input-uca" placeholder="Lun - Mié | 07:00" value={draft.horario} onChange={e => setDraft(d => ({ ...d, horario: e.target.value }))} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
