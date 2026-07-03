@@ -1,10 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+import os
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.security import hash_password
 from app.dependencias import require_role, get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+AVATAR_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "static", "avatars")
+AVATAR_DIR = os.path.abspath(AVATAR_DIR)
+ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 
 @router.post("/", response_model=schemas.user.UserOut)
 def create_user(user: schemas.user.UserCreate, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
@@ -30,6 +36,34 @@ def get_me(db: Session = Depends(database.get_db), current_user = Depends(get_cu
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
+
+@router.post("/me/foto", response_model=schemas.user.UserOut)
+def subir_foto_perfil(
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
+):
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(status_code=400, detail="Formato no soportado. Usá PNG, JPG o WEBP.")
+
+    contents = file.file.read()
+    if len(contents) > 3 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="La imagen supera el límite de 3MB.")
+
+    os.makedirs(AVATAR_DIR, exist_ok=True)
+    filename = f"user{current_user['user_id']}_{uuid.uuid4().hex[:8]}{ext}"
+    with open(os.path.join(AVATAR_DIR, filename), "wb") as f:
+        f.write(contents)
+
+    user = db.query(models.user.User).filter(models.user.User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    user.foto_url = f"/static/avatars/{filename}"
+    db.commit()
+    db.refresh(user)
+    return user
+
 
 @router.get("/", response_model=list[schemas.user.UserOut])
 def list_users(db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):

@@ -10,6 +10,11 @@ export function emitHelp() {
   window.dispatchEvent(new CustomEvent('uca:help'))
 }
 
+// Evento global para avisar que la foto de perfil cambió (Layout la escucha)
+export function emitAvatarUpdated(url: string) {
+  window.dispatchEvent(new CustomEvent('uca:avatar', { detail: { url } }))
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('token')
   const res = await fetch(`${BASE}${path}`, {

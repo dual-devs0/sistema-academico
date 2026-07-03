@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { api, decodeToken, emitToast } from '../lib/api'
+import { useState, useEffect, useRef } from 'react'
+import { api, decodeToken, emitToast, emitAvatarUpdated } from '../lib/api'
 
 type Tab = 'info' | 'seguridad' | 'preferencias'
 
@@ -44,10 +44,13 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
   const [asistencia, setAsistencia] = useState<number | null>(null)
   const [pwNew, setPwNew] = useState('')
   const [pwConf, setPwConf] = useState('')
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const fotoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    api.get<{ nombre: string; email: string | null }>('/users/me')
-      .then(d => { if (d.nombre) setNombre(d.nombre); if (d.email) setEmail(d.email) })
+    api.get<{ nombre: string; email: string | null; foto_url: string | null }>('/users/me')
+      .then(d => { if (d.nombre) setNombre(d.nombre); if (d.email) setEmail(d.email); if (d.foto_url) setFotoUrl(d.foto_url) })
       .catch(() => {})
     if (role === 'alumno' && userId) {
       api.get<any[]>(`/puntajes/?user_id=${userId}`).then(pts => {
@@ -65,6 +68,27 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
     emitToast('Cambios guardados')
   }
 
+  async function subirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) { emitToast('La imagen supera 3MB', 'warning'); return }
+    setSubiendoFoto(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const token = sessionStorage.getItem('token')
+      const res = await fetch('/api/users/me/foto', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Error al subir la foto')
+      const data = await res.json()
+      setFotoUrl(data.foto_url)
+      emitAvatarUpdated(data.foto_url)
+      emitToast('Foto de perfil actualizada')
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al subir la foto', 'error')
+    } finally { setSubiendoFoto(false) }
+  }
+
   const roleBadge = role === 'admin' ? 'Administrador' : 'Alumno'
 
   return (
@@ -72,13 +96,19 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
       {/* Hero */}
       <div className="card pf-hero" style={{ marginBottom: 20 }}>
         <div style={{ position: 'relative' }}>
-          <div className="avatar-initials" style={{ width: 96, height: 96, borderRadius: 22, fontSize: 32 }}>
-            {(nombre || '?').slice(0, 2)}
-          </div>
-          <button onClick={() => setEditing(true)} aria-label="Editar foto"
+          {fotoUrl ? (
+            <img src={fotoUrl} alt={nombre} style={{ width: 96, height: 96, borderRadius: 22, objectFit: 'cover', display: 'block' }} />
+          ) : (
+            <div className="avatar-initials" style={{ width: 96, height: 96, borderRadius: 22, fontSize: 32 }}>
+              {(nombre || '?').slice(0, 2)}
+            </div>
+          )}
+          <input ref={fotoInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={subirFoto} />
+          <button onClick={() => fotoInputRef.current?.click()} disabled={subiendoFoto} aria-label="Editar foto"
             style={{ position: 'absolute', bottom: -6, right: -6, width: 30, height: 30, borderRadius: 9, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className="ti ti-pencil" style={{ fontSize: 14 }} />
+            <i className={`ti ${subiendoFoto ? 'ti-loader-2' : 'ti-pencil'}`} style={subiendoFoto ? { fontSize: 14, animation: 'spin 1s linear infinite' } : { fontSize: 14 }} />
           </button>
+          <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
         </div>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -196,11 +226,35 @@ function PerfilProfesor({ userId }: { userId: number }) {
   const [tab, setTab] = useState<'academico' | 'seguridad' | 'ajustes'>('academico')
   const [nombre, setNombre] = useState('')
   const [materias, setMaterias] = useState<{ id: number; nombre: string }[]>([])
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const fotoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    api.get<{ nombre: string }>('/users/me').then(d => { if (d.nombre) setNombre(d.nombre) }).catch(() => {})
+    api.get<{ nombre: string; foto_url: string | null }>('/users/me').then(d => { if (d.nombre) setNombre(d.nombre); if (d.foto_url) setFotoUrl(d.foto_url) }).catch(() => {})
     api.get<{ id: number; nombre: string }[]>(`/materias/?profesor_id=${userId}`).then(setMaterias).catch(() => {})
   }, [userId])
+
+  async function subirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) { emitToast('La imagen supera 3MB', 'warning'); return }
+    setSubiendoFoto(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const token = sessionStorage.getItem('token')
+      const res = await fetch('/api/users/me/foto', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Error al subir la foto')
+      const data = await res.json()
+      setFotoUrl(data.foto_url)
+      emitAvatarUpdated(data.foto_url)
+      emitToast('Foto de perfil actualizada')
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al subir la foto', 'error')
+    } finally { setSubiendoFoto(false) }
+  }
 
   const horarios = ['LUN-MIÉ 09:00', 'MAR-JUE 11:30', 'VIERNES 18:00', 'SÁB 08:00']
 
@@ -208,8 +262,19 @@ function PerfilProfesor({ userId }: { userId: number }) {
     <>
       {/* Hero */}
       <div className="card pf-hero" style={{ marginBottom: 20 }}>
-        <div className="avatar-initials" style={{ width: 104, height: 104, borderRadius: 24, fontSize: 34, border: '2px solid var(--accent-hover)' }}>
-          {(nombre || '?').slice(0, 2)}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {fotoUrl ? (
+            <img src={fotoUrl} alt={nombre} style={{ width: 104, height: 104, borderRadius: 24, objectFit: 'cover', border: '2px solid var(--accent-hover)', display: 'block' }} />
+          ) : (
+            <div className="avatar-initials" style={{ width: 104, height: 104, borderRadius: 24, fontSize: 34, border: '2px solid var(--accent-hover)' }}>
+              {(nombre || '?').slice(0, 2)}
+            </div>
+          )}
+          <input ref={fotoInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={subirFoto} />
+          <button onClick={() => fotoInputRef.current?.click()} disabled={subiendoFoto} aria-label="Editar foto"
+            style={{ position: 'absolute', bottom: -6, right: -6, width: 30, height: 30, borderRadius: 9, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className={`ti ${subiendoFoto ? 'ti-loader-2' : 'ti-pencil'}`} style={subiendoFoto ? { fontSize: 14, animation: 'spin 1s linear infinite' } : { fontSize: 14 }} />
+          </button>
         </div>
         <div style={{ flex: 1, minWidth: 260 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>

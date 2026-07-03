@@ -35,6 +35,7 @@ class UserOut(BaseModel):
     email: str | None = None
     carrera_id: int | None = None
     es_becado: bool | None = None
+    foto_url: str | None = None
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}

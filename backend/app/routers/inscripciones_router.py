@@ -57,6 +57,34 @@ def alumnos_por_materia(materia_id: int, db: Session = Depends(database.get_db),
     return result
 
 
+@router.get("/carrera/{carrera_id}")
+def alumnos_por_carrera(carrera_id: int, db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
+    materias = db.query(models.materia.Materia).filter(
+        models.materia.Materia.carrera_id == carrera_id
+    ).all()
+    result = []
+    for m in materias:
+        inscripciones = db.query(models.inscripcion.Inscripcion).filter(
+            models.inscripcion.Inscripcion.materia_id == m.id
+        ).all()
+        alumnos = []
+        for i in inscripciones:
+            alumno = db.query(models.user.User).filter(models.user.User.id == i.alumno_id).first()
+            if alumno:
+                alumnos.append({
+                    "inscripcion_id": i.id,
+                    "alumno_id": alumno.id,
+                    "nombre": alumno.nombre or alumno.username,
+                    "username": alumno.username,
+                })
+        result.append({
+            "materia_id": m.id,
+            "materia_nombre": m.nombre,
+            "alumnos": alumnos,
+        })
+    return result
+
+
 @router.get("/")
 def list_inscripciones(db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
     if current_user["role"] == "alumno":

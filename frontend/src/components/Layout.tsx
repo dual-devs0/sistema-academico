@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { getRole, getUsername } from '../hooks/useRole'
 import { api } from '../lib/api'
+import logoUCA from '../assets/uc_logo_sist_academico.png'
 
 type MenuItem = { label: string; path: string; icon: string }
 
@@ -91,6 +92,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [appsOpen, setAppsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [proximos, setProximos] = useState<EventoNotif[]>([])
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const notifRef = useRef<HTMLDivElement>(null)
   const appsRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -108,6 +110,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     window.addEventListener('uca:help', () => setHelpOpen(true))
     return () => window.removeEventListener('uca:help', () => setHelpOpen(true))
+  }, [])
+
+  useEffect(() => {
+    api.get<{ foto_url: string | null }>('/users/me').then(d => { if (d.foto_url) setFotoUrl(d.foto_url) }).catch(() => {})
+    const onAvatar = (e: Event) => setFotoUrl((e as CustomEvent).detail?.url ?? null)
+    window.addEventListener('uca:avatar', onAvatar)
+    return () => window.removeEventListener('uca:avatar', onAvatar)
   }, [])
 
   useEffect(() => {
@@ -158,6 +167,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         .nav-scroll:hover::-webkit-scrollbar-thumb { background: var(--bg-hover); }
         .layout-content-scroll { overscroll-behavior: contain; }
 
+        .sidebar-header {
+          display: flex; flex-direction: column; align-items: center; gap: 8px;
+          padding: 20px 16px 16px; flex-shrink: 0;
+        }
+        .sidebar-logo { width: 56px; height: auto; object-fit: contain; display: block; }
+        .sidebar-title {
+          font-size: 15px; font-weight: 700; color: #fff;
+          text-align: center; line-height: 1.2; letter-spacing: -0.01em;
+        }
+
         .layout-sidebar {
           width: 216px; height: 100%;
           background: #0e1015; border-right: 1px solid var(--border-subtle);
@@ -195,6 +214,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           .layout-main main { padding: 16px 12px 84px !important; width: 100% !important; box-sizing: border-box; }
           .topbar-search { display: none; }
           .topbar-menu-btn { display: flex !important; }
+          .sidebar-header { padding: 16px 12px 12px; }
+          .sidebar-logo { width: 44px; }
+          .sidebar-title { font-size: 13px; }
 
           .layout-sidebar {
             position: fixed; top: 0; bottom: 0; left: 0;
@@ -224,17 +246,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* ── Sidebar ── */}
         <div className={`layout-sidebar${mobileOpen ? ' mobile-open' : ''}`}>
           {/* Logo */}
-          <div style={{ padding: '20px 18px 16px' }}>
-            <span style={{ fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>
-              UCA V2
-            </span>
+          <div className="sidebar-header">
+            <img src={logoUCA} alt="Universidad Católica - Unidad Pedagógica de Caacupé" className="sidebar-logo" />
+            <span className="sidebar-title">Sistema Académico</span>
           </div>
 
           {/* Usuario chip */}
           <div style={{ margin: '0 12px 14px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
-            <div className="avatar-initials" style={{ width: 34, height: 34, fontSize: 13 }}>
-              {(username || '?').slice(0, 2)}
-            </div>
+            {fotoUrl ? (
+              <img src={fotoUrl} alt={username} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+              <div className="avatar-initials" style={{ width: 34, height: 34, fontSize: 13 }}>
+                {(username || '?').slice(0, 2)}
+              </div>
+            )}
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {username || 'Usuario'}
@@ -344,9 +369,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
 
               <button onClick={() => navigate('/perfil')} aria-label="Perfil"
-                className="avatar-initials"
-                style={{ width: 34, height: 34, fontSize: 12, border: '1px solid var(--border-light)', cursor: 'pointer' }}>
-                {(username || '?').slice(0, 2)}
+                className={fotoUrl ? '' : 'avatar-initials'}
+                style={{ width: 34, height: 34, fontSize: 12, border: '1px solid var(--border-light)', cursor: 'pointer', borderRadius: '50%', overflow: 'hidden', padding: 0, background: 'none' }}>
+                {fotoUrl ? <img src={fotoUrl} alt={username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (username || '?').slice(0, 2)}
               </button>
             </div>
           </div>

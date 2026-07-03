@@ -236,42 +236,47 @@ function AlumnoView({ userId }: { userId: number }) {
 
 type AlumnoInscripto = { inscripcion_id: number; alumno_id: number; nombre: string; username: string }
 
+type CarreraData = { id: number; nombre: string }
+
+type MateriaConAlumnos = {
+  materia_id: number
+  materia_nombre: string
+  alumnos: AlumnoInscripto[]
+}
+
 function AdminView() {
-  const [materias, setMaterias] = useState<Materia[]>([])
+  const [carreras, setCarreras] = useState<CarreraData[]>([])
   const [alumnos, setAlumnos] = useState<UserApi[]>([])
-  const [matSelId, setMatSelId] = useState<number | null>(null)
-  const [inscriptos, setInscriptos] = useState<AlumnoInscripto[]>([])
+  const [carSelId, setCarSelId] = useState<number | null>(null)
+  const [materiasConAlumnos, setMateriasConAlumnos] = useState<MateriaConAlumnos[]>([])
   const [loading, setLoading] = useState(false)
   const [alSearch, setAlSearch] = useState('')
-  const [addOpen, setAddOpen] = useState(false)
+  const [addOpenForMateria, setAddOpenForMateria] = useState<number | null>(null)
 
   useEffect(() => {
     Promise.all([
-      api.get<Materia[]>('/materias/').catch(() => [] as Materia[]),
+      api.get<CarreraData[]>('/carreras/').catch(() => [] as CarreraData[]),
       api.get<UserApi[]>('/users/').catch(() => [] as UserApi[]),
-    ]).then(([mats, users]) => {
-      setMaterias(mats)
+    ]).then(([cars, users]) => {
+      setCarreras(cars)
       setAlumnos(users.filter(u => u.role === 'alumno'))
     })
   }, [])
 
-  function cargar(matId: number) {
+  function cargar(carreraId: number) {
     setLoading(true)
-    api.get<any[]>(`/inscripciones/materia/${matId}`)
-      .then(rows => setInscriptos(rows.map(r => ({
-        inscripcion_id: r.inscripcion_id ?? r.id, alumno_id: r.alumno_id, nombre: r.nombre, username: r.username,
-      }))))
-      .catch(() => setInscriptos([]))
+    api.get<MateriaConAlumnos[]>(`/inscripciones/carrera/${carreraId}`)
+      .then(rows => setMateriasConAlumnos(rows))
+      .catch(() => setMateriasConAlumnos([]))
       .finally(() => setLoading(false))
   }
 
-  async function inscribir(alumnoId: number) {
-    if (!matSelId) return
+  async function inscribir(alumnoId: number, materiaId: number) {
     try {
-      await api.post('/inscripciones/', { alumno_id: alumnoId, materia_id: matSelId })
+      await api.post('/inscripciones/', { alumno_id: alumnoId, materia_id: materiaId })
       emitToast('Alumno inscripto')
-      cargar(matSelId)
-      setAddOpen(false)
+      if (carSelId) cargar(carSelId)
+      setAddOpenForMateria(null)
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al inscribir', 'error')
     }
@@ -281,99 +286,114 @@ function AdminView() {
     try {
       await api.delete(`/inscripciones/${inscripcionId}`)
       emitToast('Inscripción eliminada')
-      if (matSelId) cargar(matSelId)
+      if (carSelId) cargar(carSelId)
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al eliminar', 'error')
     }
   }
 
-  const noInscriptos = alumnos.filter(a =>
-    !inscriptos.some(i => i.alumno_id === a.id) &&
-    (a.nombre || a.username).toLowerCase().includes(alSearch.toLowerCase())
-  )
-
   return (
     <>
       <div style={{ marginBottom: 18 }}>
         <h1 className="page-title">Gestión de Inscripciones</h1>
-        <p className="page-subtitle">Inscribí o dá de baja alumnos por materia</p>
+        <p className="page-subtitle">Inscribí o dá de baja alumnos por carrera</p>
       </div>
 
       <div style={{ maxWidth: 420, marginBottom: 20 }}>
-        <div className="mono-label" style={{ marginBottom: 6 }}>Materia</div>
-        <select className="input-uca" value={matSelId ?? ''} onChange={e => { const id = Number(e.target.value); setMatSelId(id || null); if (id) cargar(id) }}>
-          <option value="">Seleccioná una materia…</option>
-          {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+        <div className="mono-label" style={{ marginBottom: 6 }}>Carrera</div>
+        <select className="input-uca" value={carSelId ?? ''} onChange={e => { const id = Number(e.target.value); setCarSelId(id || null); if (id) cargar(id) }}>
+          <option value="">Seleccioná una carrera…</option>
+          {carreras.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
 
-      {!matSelId ? (
+      {!carSelId ? (
         <div className="card" style={{ textAlign: 'center', padding: 56 }}>
           <i className="ti ti-clipboard-list" style={{ fontSize: 38, color: 'var(--text-muted)' }} />
-          <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 13 }}>Seleccioná una materia para gestionar sus inscripciones.</p>
+          <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 13 }}>Seleccioná una carrera para gestionar sus inscripciones.</p>
         </div>
       ) : loading ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando…</div>
-      ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }}>
-            <span style={{ fontSize: 14, fontWeight: 800 }}>{inscriptos.length} inscriptos</span>
-            <button className="btn-primary" style={{ padding: '7px 14px', fontSize: 12 }} onClick={() => { setAddOpen(true); setAlSearch('') }}>
-              <i className="ti ti-user-plus" /> Inscribir alumno
-            </button>
-          </div>
-          {inscriptos.length === 0 ? (
-            <div style={{ padding: 36, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin alumnos inscriptos.</div>
-          ) : (
-            <table className="table-uca">
-              <thead><tr><th>Alumno</th><th>Usuario</th><th style={{ textAlign: 'right' }}>Acciones</th></tr></thead>
-              <tbody>
-                {inscriptos.map(i => (
-                  <tr key={i.inscripcion_id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(i.nombre || i.username).slice(0, 2)}</span>
-                        <span style={{ fontWeight: 700, fontSize: 13 }}>{i.nombre || i.username}</span>
-                      </div>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>@{i.username}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11, color: 'var(--danger)' }} onClick={() => darBaja(i.inscripcion_id)}>
-                        <i className="ti ti-trash" /> Dar de baja
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      ) : materiasConAlumnos.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 36 }}>
+          <i className="ti ti-book-off" style={{ fontSize: 32, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Esta carrera no tiene materias o inscripciones.</p>
         </div>
-      )}
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {materiasConAlumnos.map(mca => (
+            <div key={mca.materia_id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }}>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 800 }}>{mca.materia_nombre}</span>
+                  <span className="badge" style={{ marginLeft: 10, background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>{mca.alumnos.length} inscriptos</span>
+                </div>
+                <button className="btn-primary" style={{ padding: '7px 14px', fontSize: 12 }} onClick={() => { setAddOpenForMateria(mca.materia_id); setAlSearch('') }}>
+                  <i className="ti ti-user-plus" /> Inscribir alumno
+                </button>
+              </div>
+              {mca.alumnos.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin alumnos inscriptos.</div>
+              ) : (
+                <table className="table-uca">
+                  <thead><tr><th>Alumno</th><th>Usuario</th><th style={{ textAlign: 'right' }}>Acciones</th></tr></thead>
+                  <tbody>
+                    {mca.alumnos.map(i => (
+                      <tr key={i.inscripcion_id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(i.nombre || i.username).slice(0, 2)}</span>
+                            <span style={{ fontWeight: 700, fontSize: 13 }}>{i.nombre || i.username}</span>
+                          </div>
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>@{i.username}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11, color: 'var(--danger)' }} onClick={() => darBaja(i.inscripcion_id)}>
+                            <i className="ti ti-trash" /> Dar de baja
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
 
-      {addOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div className="card card-elevated" style={{ width: '100%', maxWidth: 400 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 800 }}>Inscribir alumno</h3>
-              <button onClick={() => setAddOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
-            </div>
-            <input className="input-uca" autoFocus placeholder="Buscar alumno…" value={alSearch} onChange={e => setAlSearch(e.target.value)} style={{ marginBottom: 10 }} />
-            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-              {noInscriptos.map(a => (
-                <div key={a.id} onClick={() => inscribir(a.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                  <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(a.nombre || a.username).slice(0, 2)}</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.nombre || a.username}</div>
-                    <div className="mono-label" style={{ fontSize: 9 }}>@{a.username}</div>
+              {addOpenForMateria === mca.materia_id && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', padding: '14px 18px', background: 'var(--bg-elevated)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span className="mono-label">Inscribir alumno a {mca.materia_nombre}</span>
+                    <button onClick={() => setAddOpenForMateria(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
+                  </div>
+                  <input className="input-uca" autoFocus placeholder="Buscar alumno…" value={alSearch} onChange={e => setAlSearch(e.target.value)} style={{ marginBottom: 10 }} />
+                  <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                    {(() => {
+                      const idsInscriptos = new Set(mca.alumnos.map(a => a.alumno_id))
+                      const noInscriptos = alumnos.filter(a =>
+                        !idsInscriptos.has(a.id) &&
+                        (a.nombre || a.username).toLowerCase().includes(alSearch.toLowerCase())
+                      )
+                      return noInscriptos.map(a => (
+                        <div key={a.id} onClick={() => inscribir(a.id, mca.materia_id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                          <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(a.nombre || a.username).slice(0, 2)}</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{a.nombre || a.username}</div>
+                            <div className="mono-label" style={{ fontSize: 9 }}>@{a.username}</div>
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                    {alumnos.filter(a =>
+                      !new Set(mca.alumnos.map(x => x.alumno_id)).has(a.id) &&
+                      (a.nombre || a.username).toLowerCase().includes(alSearch.toLowerCase())
+                    ).length === 0 && <p style={{ fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center', padding: 14 }}>Sin resultados.</p>}
                   </div>
                 </div>
-              ))}
-              {noInscriptos.length === 0 && <p style={{ fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center', padding: 14 }}>Sin resultados.</p>}
+              )}
             </div>
-          </div>
+          ))}
         </div>
       )}
     </>

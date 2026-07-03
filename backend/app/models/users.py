@@ -15,4 +15,5 @@ class User(Base):
     email = Column(String(200), unique=True, nullable=True)
     carrera_id = Column(Integer, ForeignKey("carreras.id"), nullable=True)
     es_becado = Column(Boolean, default=False)
+    foto_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

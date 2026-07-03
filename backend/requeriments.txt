@@ -33,3 +33,4 @@ email-validator
 # Pruebas
 pytest
 httpx
+python-multipart

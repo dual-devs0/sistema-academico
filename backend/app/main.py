@@ -2,6 +2,7 @@ import os
 import sqlite3
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.database import Base, engine
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
@@ -11,6 +12,9 @@ from app.routers import (
 
 # Ensure all tables exist on startup (dev convenience; use alembic in production)
 Base.metadata.create_all(bind=engine)
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
+os.makedirs(os.path.join(STATIC_DIR, "avatars"), exist_ok=True)
 
 app = FastAPI(
     title="Sistema Academico",
@@ -29,6 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(users.router)
 app.include_router(auth.router)
@@ -81,6 +87,9 @@ def _apply_db_migrations():
             ("cupos", "INTEGER DEFAULT 40"),
             ("horario", "VARCHAR"),
             ("secciones", "INTEGER DEFAULT 1"),
+        ],
+        "users": [
+            ("foto_url", "VARCHAR"),
         ],
     }
     try:

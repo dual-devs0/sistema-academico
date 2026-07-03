@@ -48,3 +48,7 @@ mark.txt
 # Venv de Python (backend)
 backend/venv/
 venv/
+
+# uploaded avatars (runtime user content)
+backend/static/avatars/*
+!backend/static/avatars/.gitkeep
