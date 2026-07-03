@@ -12,7 +12,7 @@ def auth(token: str) -> dict:
 def test_root(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "API Sistema Académico funcionando"}
+    assert response.json() == {"message": "API Sistema Academico funcionando"}
 
 
 def test_user_flow(client, seed, tokens):

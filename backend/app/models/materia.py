@@ -11,6 +11,10 @@ class Materia(Base):
     carrera_id = Column(Integer, ForeignKey("carreras.id"), nullable=True)
     anio = Column(Integer, default=1)
     semestre = Column(Integer, default=1)
+    creditos = Column(Integer, default=4)
+    cupos = Column(Integer, default=40)
+    horario = Column(String, nullable=True)
+    secciones = Column(Integer, default=1)
 
     profesor = relationship("User", foreign_keys=[profesor_id])
 

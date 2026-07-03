@@ -28,6 +28,10 @@ def _enrich(m, db: Session) -> dict:
         "carrera_id": m.carrera_id,
         "anio": m.anio,
         "semestre": m.semestre,
+        "creditos": getattr(m, "creditos", None) or 4,
+        "cupos": getattr(m, "cupos", None) or 40,
+        "horario": getattr(m, "horario", None),
+        "secciones": getattr(m, "secciones", None) or 1,
         "profesor_nombre": prof_nombre,
         "carrera_nombre": carrera_nombre,
     }
@@ -50,6 +54,10 @@ def create_materia(materia: schemas.materia.MateriaCreate, db: Session = Depends
         carrera_id=materia.carrera_id,
         anio=materia.anio or 1,
         semestre=materia.semestre or 1,
+        creditos=materia.creditos or 4,
+        cupos=materia.cupos or 40,
+        horario=materia.horario,
+        secciones=materia.secciones or 1,
     )
     db.add(new_materia)
     db.commit()

@@ -1,13 +1,16 @@
-# Run: alembic upgrade head before starting the server
 import os
 import sqlite3
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.database import Base, engine
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
-    carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta,
+    carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno, foro,
 )
+
+# Ensure all tables exist on startup (dev convenience; use alembic in production)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Sistema Academico",
@@ -39,6 +42,8 @@ app.include_router(eventos.router)
 app.include_router(programas.router)
 app.include_router(reportes.router)
 app.include_router(boleta.router)
+app.include_router(alumno.router)
+app.include_router(foro.router)
 app.include_router(test_router.router)
 
 
@@ -50,15 +55,47 @@ def _apply_db_migrations():
     db_path = db_url.replace("sqlite:///", "")
     if not os.path.exists(db_path):
         return
+    pending = {
+        "asistencias": [
+            ("motivo", "VARCHAR"),
+        ],
+        "apuntes": [
+            ("descripcion", "TEXT"),
+            ("tipo_contenido", "VARCHAR(50) DEFAULT 'pdf'"),
+            ("likes", "INTEGER DEFAULT 0"),
+            ("descargas", "INTEGER DEFAULT 0"),
+            ("visibilidad", "VARCHAR(20) DEFAULT 'publico'"),
+            ("fecha_subida", "DATETIME"),
+        ],
+        "temarios": [
+            ("bibliografia", "JSON"),
+        ],
+        "eventos_calendario": [
+            ("fecha_fin", "DATE"),
+            ("anio", "INTEGER"),
+            ("semestre", "INTEGER"),
+            ("archivo_pdf", "TEXT"),
+        ],
+        "materias": [
+            ("creditos", "INTEGER DEFAULT 4"),
+            ("cupos", "INTEGER DEFAULT 40"),
+            ("horario", "VARCHAR"),
+            ("secciones", "INTEGER DEFAULT 1"),
+        ],
+    }
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("PRAGMA table_info(asistencias)")
-        cols = {row[1] for row in c.fetchall()}
-        if "motivo" not in cols:
-            conn.execute("ALTER TABLE asistencias ADD COLUMN motivo VARCHAR")
-            conn.commit()
-            print("[migration] Added column: asistencias.motivo")
+        for table, columns in pending.items():
+            c.execute(f"PRAGMA table_info({table})")
+            existing = {row[1] for row in c.fetchall()}
+            if not existing:
+                continue  # table doesn't exist yet; create_all handles it
+            for col, coltype in columns:
+                if col not in existing:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {coltype}")
+                    print(f"[migration] Added column: {table}.{col}")
+        conn.commit()
         conn.close()
     except Exception as e:
         print(f"[migration] Warning: {e}")

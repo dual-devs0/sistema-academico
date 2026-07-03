@@ -99,7 +99,7 @@ for m in materias_data:
 # ─────────────────────────────────────────
 # 4. INSCRIPCIONES
 # ─────────────────────────────────────────
-alumnos_keys = [u["username"] for u in usuarios_data if u["role"] == "alumno"]
+alumnos_keys: list[str] = [str(u["username"]) for u in usuarios_data if u["role"] == "alumno"]
 for username in alumnos_keys:
     alumno = users_map[username]
     for materia in materias_map.values():

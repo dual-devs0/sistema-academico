@@ -1,5 +1,5 @@
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -140,7 +140,7 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
     aprobado_txt  = "APROBADO" if prom_gral is not None and prom_gral >= 6 else ("DESAPROBADO" if prom_gral is not None else "—")
     aprobado_color= "#16a34a" if (prom_gral is not None and prom_gral >= 6) else "#dc2626"
 
-    fecha_txt = datetime.utcnow().strftime("%d/%m/%Y %H:%M") + " UTC"
+    fecha_txt = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M") + " UTC"
 
     footer_data = [[
         Paragraph(f"Promedio general: <font color='{aprobado_color}'><b>{prom_gral_txt}</b></font> — <font color='{aprobado_color}'><b>{aprobado_txt}</b></font>",
