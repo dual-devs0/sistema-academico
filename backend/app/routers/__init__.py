@@ -13,5 +13,6 @@ from . import reportes_router as reportes
 from . import boleta_router as boleta
 from . import alumno_router as alumno
 from . import foro_router as foro
+from . import horarios_router as horarios
 
-__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro"]
+__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro", "horarios"]

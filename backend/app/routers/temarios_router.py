@@ -29,6 +29,7 @@ def create_temario(
 def list_temarios(
     materia_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     query = db.query(models.temario.Temario)
     if materia_id is not None:
@@ -40,6 +41,7 @@ def list_temarios(
 def get_temario(
     temario_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     temario = db.query(models.temario.Temario).filter(models.temario.Temario.id == temario_id).first()
     if not temario:

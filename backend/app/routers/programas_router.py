@@ -24,7 +24,7 @@ def create_programa(programa: schemas.programa.ProgramaCreate, db: Session = Dep
 
 
 @router.get("/")
-def list_programas(materia_id: Optional[int] = Query(None), db: Session = Depends(database.get_db)):
+def list_programas(materia_id: Optional[int] = Query(None), db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
     query = db.query(models.programa.Programa)
     if materia_id is not None:
         query = query.filter(models.programa.Programa.materia_id == materia_id)
@@ -32,7 +32,7 @@ def list_programas(materia_id: Optional[int] = Query(None), db: Session = Depend
 
 
 @router.get("/{materia_id}")
-def get_programa_por_materia(materia_id: int, db: Session = Depends(database.get_db)):
+def get_programa_por_materia(materia_id: int, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
     return db.query(models.programa.Programa).filter(models.programa.Programa.materia_id == materia_id).order_by(models.programa.Programa.semana).all()
 
 

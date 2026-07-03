@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, UniqueConstraint
 from datetime import datetime
 from app.database import Base
 
@@ -12,3 +12,7 @@ class Puntaje(Base):
     valor = Column(Numeric(5,2), nullable=False)
     editado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
     editado_en = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "materia_id", "tipo", name="uq_puntaje_user_materia_tipo"),
+    )

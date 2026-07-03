@@ -122,12 +122,16 @@ def list_eventos(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
         materia_ids = {i.materia_id for i in inscripciones}
-        query = query.filter(
-            models.evento.EventoCalendario.materia_id.is_(None),
-            models.evento.EventoCalendario.carrera_id.is_(None),
-        )
+        from sqlalchemy import or_
         if materia_ids:
-            query = query.filter(models.evento.EventoCalendario.materia_id.in_(materia_ids))
+            query = query.filter(
+                or_(
+                    models.evento.EventoCalendario.materia_id.is_(None),
+                    models.evento.EventoCalendario.materia_id.in_(materia_ids),
+                )
+            )
+        else:
+            query = query.filter(models.evento.EventoCalendario.materia_id.is_(None))
 
     return query.order_by(models.evento.EventoCalendario.fecha).all()
 
@@ -136,6 +140,7 @@ def list_eventos(
 def get_evento(
     evento_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     evento = db.query(models.evento.EventoCalendario).filter(models.evento.EventoCalendario.id == evento_id).first()
     if not evento:

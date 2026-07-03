@@ -14,7 +14,10 @@ def create_apunte(
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
-    new_apunte = models.apunte.Apunte(**apunte.model_dump())
+    data = apunte.model_dump()
+    # Force the creator to be the current user
+    data["user_id"] = current_user["user_id"]
+    new_apunte = models.apunte.Apunte(**data)
     db.add(new_apunte)
     db.commit()
     db.refresh(new_apunte)
@@ -28,6 +31,7 @@ def list_apuntes(
     tipo_contenido: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     query = db.query(models.apunte.Apunte)
     if materia_id is not None:
@@ -51,6 +55,7 @@ def list_apuntes(
 def get_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
     if not apunte:
@@ -103,7 +108,9 @@ def like_apunte(
     apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    apunte.likes = (apunte.likes or 0) + 1
+    db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).update(
+        {models.apunte.Apunte.likes: models.apunte.Apunte.likes + 1}
+    )
     db.commit()
     db.refresh(apunte)
     return apunte
@@ -113,11 +120,14 @@ def like_apunte(
 def descargar_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    apunte.descargas = (apunte.descargas or 0) + 1
+    db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).update(
+        {models.apunte.Apunte.descargas: models.apunte.Apunte.descargas + 1}
+    )
     db.commit()
     db.refresh(apunte)
     return apunte
