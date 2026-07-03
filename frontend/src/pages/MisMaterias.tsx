@@ -1,73 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { api, decodeToken, emitToast } from '../lib/api'
 
+interface MateriaApi { id: number; nombre: string; carrera_id: number | null; carrera_nombre: string | null }
 interface Subject {
+  id: number
   code: string
   name: string
   students: number
   attendance: number
-  program: number
-  sparkPath: string
 }
-
 interface Career {
   name: string
   icon: string
   subjects: Subject[]
-}
-
-const careers: Career[] = [
-  {
-    name: "Ingeniería Informática",
-    icon: "ti-terminal-2",
-    subjects: [
-      {
-        code: "INF-402",
-        name: "Arquitectura de Sistemas",
-        students: 42,
-        attendance: 88,
-        program: 65,
-        sparkPath: "M0,35 Q10,15 20,25 T40,10 T60,30 T80,5 T100,20",
-      },
-      {
-        code: "INF-510",
-        name: "Inteligencia Artificial I",
-        students: 28,
-        attendance: 94,
-        program: 40,
-        sparkPath: "M0,20 Q15,5 30,15 T60,5 T80,15 T100,2",
-      },
-    ],
-  },
-  {
-    name: "Lic. en Administración",
-    icon: "ti-building-bank",
-    subjects: [
-      {
-        code: "ADM-202",
-        name: "Sistemas de Información",
-        students: 56,
-        attendance: 76,
-        program: 92,
-        sparkPath: "M0,10 Q20,30 40,5 T60,25 T100,5",
-      },
-    ],
-  },
-]
-
-function Sparkline({ path }: { path: string }) {
-  return (
-    <div style={{
-      height: 64, width: "100%",
-      background: "var(--accent-muted)", borderRadius: 8,
-      marginBottom: 20, position: "relative", overflow: "hidden",
-      WebkitMaskImage: "linear-gradient(to top, transparent, black)",
-      maskImage: "linear-gradient(to top, transparent, black)"
-    }}>
-      <svg viewBox="0 0 100 40" style={{ width: "100%", height: "100%" }}>
-        <path d={path} fill="none" stroke="var(--accent-bright)" strokeWidth="2" />
-      </svg>
-    </div>
-  )
 }
 
 function SubjectCard({ subject }: { subject: Subject }) {
@@ -101,16 +46,14 @@ function SubjectCard({ subject }: { subject: Subject }) {
         }} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 24 }}>
         {[
           { label: "Alumnos", value: subject.students.toString() },
           { label: "Asistencia", value: `${subject.attendance}%`, border: true },
-          { label: "Programa", value: `${subject.program}%` },
         ].map((stat) => (
           <div key={stat.label} style={{
             textAlign: "center",
             borderLeft: stat.border ? "1px solid var(--border-subtle)" : "none",
-            borderRight: stat.border ? "1px solid var(--border-subtle)" : "none",
             padding: "0 4px"
           }}>
             <p className="mono-label" style={{ marginBottom: 4 }}>{stat.label}</p>
@@ -121,13 +64,13 @@ function SubjectCard({ subject }: { subject: Subject }) {
         ))}
       </div>
 
-      <Sparkline path={subject.sparkPath} />
-
       <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
-        <button className="btn-primary" style={{ flex: 1, fontSize: 13 }}>
+        <button className="btn-primary" style={{ flex: 1, fontSize: 13 }}
+          onClick={() => emitToast(`${subject.students} alumno(s) en ${subject.name}`, 'success')}>
           <i className="ti ti-users" /> Ver Alumnos
         </button>
-        <button className="btn-ghost" style={{ padding: "8px 12px" }}>
+        <button className="btn-ghost" style={{ padding: "8px 12px" }}
+          onClick={() => window.location.assign('/puntajes')}>
           <i className="ti ti-pencil" style={{ fontSize: 16 }} />
         </button>
       </div>
@@ -137,6 +80,38 @@ function SubjectCard({ subject }: { subject: Subject }) {
 
 export default function MisMaterias() {
   const [fabHovered, setFabHovered] = useState(false)
+  const [careers, setCareers] = useState<Career[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const uid = Number(decodeToken(sessionStorage.getItem('token') || '')?.user_id || 0)
+    if (!uid) { setLoading(false); return }
+
+    api.get<MateriaApi[]>(`/materias/?profesor_id=${uid}`).then(async materias => {
+      const bySubject = await Promise.all(materias.map(async m => {
+        const alumnos = await api.get<any[]>(`/asistencias/materia/${m.id}/alumnos`).catch(() => [] as any[])
+        const attendance = alumnos.length
+          ? Math.round(alumnos.reduce((s, a) => s + (a.porcentaje ?? 0), 0) / alumnos.length)
+          : 0
+        return {
+          id: m.id,
+          code: `MAT-${String(m.id).padStart(3, '0')}`,
+          name: m.nombre,
+          students: alumnos.length,
+          attendance,
+          carrera: m.carrera_nombre || 'General',
+        }
+      }))
+
+      const grouped = new Map<string, Subject[]>()
+      for (const s of bySubject) {
+        const list = grouped.get(s.carrera) || []
+        list.push({ id: s.id, code: s.code, name: s.name, students: s.students, attendance: s.attendance })
+        grouped.set(s.carrera, list)
+      }
+      setCareers([...grouped.entries()].map(([name, subjects]) => ({ name, icon: 'ti-terminal-2', subjects })))
+    }).finally(() => setLoading(false))
+  }, [])
 
   return (
     <div style={{ width: "100%", position: "relative" }}>
@@ -147,14 +122,21 @@ export default function MisMaterias() {
         </p>
       </div>
 
-      {careers.map((career) => (
+      {loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando materias…</div>
+      ) : careers.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 46 }}>
+          <i className="ti ti-books-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>El administrador aún no te asignó materias.</p>
+        </div>
+      ) : careers.map((career) => (
         <div key={career.name} style={{ marginBottom: 48 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
             <div style={{
               padding: 8, borderRadius: 8,
               background: "var(--accent-muted)", border: "1px solid var(--accent-muted)"
             }}>
-              <i className={career.icon} style={{ color: "var(--accent-bright)", fontSize: 20, display: "block" }} />
+              <i className={`ti ${career.icon}`} style={{ color: "var(--accent-bright)", fontSize: 20, display: "block" }} />
             </div>
             <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>
               {career.name}
@@ -168,7 +150,7 @@ export default function MisMaterias() {
             gap: 20
           }}>
             {career.subjects.map((subject) => (
-              <SubjectCard key={subject.code} subject={subject} />
+              <SubjectCard key={subject.id} subject={subject} />
             ))}
           </div>
         </div>
@@ -177,6 +159,7 @@ export default function MisMaterias() {
       <button
         onMouseEnter={() => setFabHovered(true)}
         onMouseLeave={() => setFabHovered(false)}
+        onClick={() => emitToast('Contactá al administrador para solicitar una nueva materia', 'warning')}
         className="fab"
         style={{
           transform: fabHovered ? "scale(1.1)" : "scale(1)",
