@@ -27,6 +27,14 @@ def create_asistencia(
     current_user = Depends(get_current_user),
 ):
     _verificar_profesor_materia(db, asistencia.materia_id, current_user)
+    # Check for existing attendance record
+    existing = db.query(models.asistencia.Asistencia).filter(
+        models.asistencia.Asistencia.user_id == asistencia.user_id,
+        models.asistencia.Asistencia.materia_id == asistencia.materia_id,
+        models.asistencia.Asistencia.fecha == asistencia.fecha,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Ya existe un registro de asistencia para este alumno en esta fecha")
     # Snapshot es_becado from user
     alumno = db.query(models.user.User).filter(models.user.User.id == asistencia.user_id).first()
     es_becado = alumno.es_becado if alumno else False

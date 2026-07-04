@@ -7,6 +7,7 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
     carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno, foro,
+    horarios,
 )
 
 # Ensure all tables exist on startup (dev convenience; use alembic in production)
@@ -44,6 +45,7 @@ app.include_router(reportes.router)
 app.include_router(boleta.router)
 app.include_router(alumno.router)
 app.include_router(foro.router)
+app.include_router(horarios.router)
 app.include_router(test_router.router)
 
 

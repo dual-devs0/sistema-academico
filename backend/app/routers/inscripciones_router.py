@@ -10,14 +10,30 @@ router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
 def inscribir(inscripcion: schemas.inscripcion.InscripcionCreate, db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
     if current_user["role"] not in ("alumno", "admin"):
         raise HTTPException(status_code=403, detail="No autorizado")
+    # Force the student to only enroll themselves
+    alumno_id = inscripcion.alumno_id
+    if current_user["role"] == "alumno":
+        alumno_id = current_user["user_id"]
     existente = db.query(models.inscripcion.Inscripcion).filter(
-        models.inscripcion.Inscripcion.alumno_id == inscripcion.alumno_id,
+        models.inscripcion.Inscripcion.alumno_id == alumno_id,
         models.inscripcion.Inscripcion.materia_id == inscripcion.materia_id,
     ).first()
     if existente:
         raise HTTPException(status_code=400, detail="El alumno ya esta inscripto en esta materia")
+    # Validate materia exists
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == inscripcion.materia_id).first()
+    if not materia:
+        raise HTTPException(status_code=404, detail="Materia no encontrada")
+    # Check for schedule overlap
+    try:
+        from app.routers.horarios_router import verificar_solapamiento_inscripcion
+        conflictos = verificar_solapamiento_inscripcion(db, alumno_id, inscripcion.materia_id)
+        if conflictos:
+            raise HTTPException(status_code=409, detail=f"Solapamiento de horario: {', '.join(conflictos)}")
+    except ImportError:
+        pass  # horarios module not yet available
     nueva = models.inscripcion.Inscripcion(
-        alumno_id=inscripcion.alumno_id,
+        alumno_id=alumno_id,
         materia_id=inscripcion.materia_id,
     )
     db.add(nueva)

@@ -62,6 +62,7 @@ def list_materias(
     profesor_id: Optional[int] = Query(None),
     carrera_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     query = db.query(models.materia.Materia)
     if profesor_id is not None:
@@ -72,7 +73,7 @@ def list_materias(
 
 
 @router.get("/{materia_id}")
-def get_materia(materia_id: int, db: Session = Depends(database.get_db)):
+def get_materia(materia_id: int, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")

@@ -16,7 +16,7 @@ SECURITY_HEADERS = {
         "font-src 'self' data: https://cdn.jsdelivr.net; "
         "connect-src 'self' https://cdn.jsdelivr.net"
     ),
-    # Strict-Transport-Security intentionally omitted until HTTPS is confirmed.
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 }
 
 

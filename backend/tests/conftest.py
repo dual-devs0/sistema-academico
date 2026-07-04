@@ -17,6 +17,7 @@ from app.models import (  # noqa: F401
     apunte,
     evento_calendario,
     temario,
+    horario,
 )
 from app.security import hash_password
 from app.auth import create_access_token
@@ -87,6 +88,17 @@ def seed(db):
     db.add(alumno)
     db.flush()
 
+    alumno2 = user_model.User(
+        username="alumno2_test",
+        hashed_password=hash_password("alumno123"),
+        role="alumno",
+        nombre="Alumno Dos Test",
+        email="alumno2@test.com",
+        carrera_id=carrera.id,
+    )
+    db.add(alumno2)
+    db.flush()
+
     materia = materia_model.Materia(
         nombre="Programación I",
         profesor_id=profesor.id,
@@ -97,13 +109,14 @@ def seed(db):
     db.add(materia)
     db.commit()
 
-    for obj in (admin, profesor, alumno, carrera, materia):
+    for obj in (admin, profesor, alumno, alumno2, carrera, materia):
         db.refresh(obj)
 
     return {
         "admin":    admin,
         "profesor": profesor,
         "alumno":   alumno,
+        "alumno2":  alumno2,
         "carrera":  carrera,
         "materia":  materia,
     }
@@ -115,4 +128,5 @@ def tokens(seed):
         "admin":    create_access_token({"sub": seed["admin"].username,    "role": "admin",    "user_id": seed["admin"].id}),
         "profesor": create_access_token({"sub": seed["profesor"].username, "role": "profesor", "user_id": seed["profesor"].id}),
         "alumno":   create_access_token({"sub": seed["alumno"].username,   "role": "alumno",   "user_id": seed["alumno"].id}),
+        "alumno2":  create_access_token({"sub": seed["alumno2"].username,  "role": "alumno",   "user_id": seed["alumno2"].id}),
     }

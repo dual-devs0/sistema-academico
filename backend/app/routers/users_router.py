@@ -54,6 +54,11 @@ def update_user(user_id: int, data: schemas.user.UserUpdate, background_tasks: B
     update_data = data.model_dump(exclude_unset=True)
     new_password = update_data.get("password")
     
+    # Non-admin users cannot change role, carrera_id, or es_becado
+    if current_user["role"] != "admin":
+        for forbidden in ("role", "carrera_id", "es_becado"):
+            update_data.pop(forbidden, None)
+    
     if "password" in update_data:
         user.hashed_password = hash_password(update_data.pop("password"))
         
@@ -77,4 +82,13 @@ def delete_user(user_id: int, db: Session = Depends(database.get_db), current_us
         raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Delete related records first
+    db.query(models.asistencia.Asistencia).filter(models.asistencia.Asistencia.user_id == user_id).delete()
+    db.query(models.puntaje.Puntaje).filter(models.puntaje.Puntaje.user_id == user_id).delete()
+    db.query(models.inscripcion.Inscripcion).filter(models.inscripcion.Inscripcion.alumno_id == user_id).delete()
+    db.query(models.foro.ForoMensaje).filter(models.foro.ForoMensaje.user_id == user_id).delete()
+    db.query(models.apunte.Apunte).filter(models.apunte.Apunte.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+    return {"detail": "Usuario eliminado correctamente"}
