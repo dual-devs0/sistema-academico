@@ -44,7 +44,7 @@ def _set_refresh_cookie(response: Response, raw_token: str) -> None:
         secure=False,  # cambiar a True en producción con HTTPS
         samesite="lax",
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-        path="/auth",
+        path="/",  # "/" para que Vite proxy (/api/auth/refresh) y prod lo envíen
     )
 
 
@@ -132,7 +132,7 @@ def logout(
             rt.revocado = True
             db.commit()
 
-    response.delete_cookie(key="refresh_token", path="/auth")
+    response.delete_cookie(key="refresh_token", path="/")
     return {"detail": "Sesión cerrada"}
 
 
