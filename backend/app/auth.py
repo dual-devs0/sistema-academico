@@ -4,12 +4,12 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 
-# Use a strong default for development; must be configured in production
 _SECRET_KEY_ENV = os.getenv("JWT_SECRET", "")
 if not _SECRET_KEY_ENV:
-    import warnings
-    _SECRET_KEY_ENV = secrets.token_hex(32)
-    warnings.warn("JWT_SECRET no configurado. Usando clave temporal generada. Configurá JWT_SECRET en .env para producción.")
+    raise RuntimeError(
+        "JWT_SECRET no configurado. "
+        "Agregá JWT_SECRET=<clave-de-64-hex> al archivo .env antes de arrancar el servidor."
+    )
 SECRET_KEY = _SECRET_KEY_ENV
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "15"))
