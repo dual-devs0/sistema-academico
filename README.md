@@ -1,6 +1,6 @@
 # Sistema Académico UCA V2
 
-Plataforma de gestión académica para la **Universidad Católica "Nuestra Señora de la Asunción" — Unidad Pedagógica Caacupé**.
+Plataforma de gestión académica para las Universidades.
 
 Tres roles con accesos distintos: **Alumno**, **Profesor**, **Administrador**.
 
