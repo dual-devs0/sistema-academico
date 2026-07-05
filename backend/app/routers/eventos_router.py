@@ -17,7 +17,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 
 def _parsear_pdf_con_gemini(pdf_bytes: bytes, anio: int, semestre: int, instrucciones: str | None = None) -> list[dict]:
-    """Envía PDF a Gemini y devuelve lista de eventos parseados."""
+    """Env\u00eda PDF a Gemini y devuelve lista de eventos parseados."""
     try:
         import google.generativeai as genai
     except ImportError:
@@ -30,8 +30,8 @@ def _parsear_pdf_con_gemini(pdf_bytes: bytes, anio: int, semestre: int, instrucc
     model = genai.GenerativeModel("gemini-2.0-flash")
 
     prompt = f"""
-Eres un asistente que extrae eventos de calendarios académicos en PDF.
-El año es {anio}, el semestre es {semestre}.
+Eres un asistente que extrae eventos de calendarios acad\u00e9micos en PDF.
+El a\u00f1o es {anio}, el semestre es {semestre}.
 { 'Instrucciones adicionales: ' + instrucciones if instrucciones else '' }
 
 Devuelve SOLO un JSON array con objetos con los campos:
@@ -48,23 +48,22 @@ No incluyas markdown ni texto adicional, solo el JSON array.
     response = model.generate_content([prompt, pdf_data])
     text = response.text.strip()
 
-    # Strip markdown code fences if present
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
 
     try:
         eventos = json.loads(text)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Gemini devolvió JSON inválido: " + text[:300])
+        raise HTTPException(status_code=500, detail="Gemini devolvi\u00f3 JSON inv\u00e1lido: " + text[:300])
 
     if not isinstance(eventos, list):
-        raise HTTPException(status_code=500, detail="Gemini no devolvió un array")
+        raise HTTPException(status_code=500, detail="Gemini no devolvi\u00f3 un array")
 
     for ev in eventos:
         ev.setdefault("fecha_fin", None)
         ev.setdefault("descripcion", None)
         ev.setdefault("tipo", "actividad")
-        ev.setdefault("titulo", "Sin título")
+        ev.setdefault("titulo", "Sin t\u00edtulo")
 
     return eventos
 
@@ -115,18 +114,23 @@ def list_eventos(
     if hasta is not None:
         query = query.filter(models.evento.EventoCalendario.fecha <= date.fromisoformat(hasta))
 
-    # Alumno ve eventos globales + de sus materias inscriptas
+    # Alumno ve eventos globales + de sus carreras/materias
     if current_user["role"] == "alumno":
-        from sqlalchemy import or_
+        user = db.query(models.user.User).filter(models.user.User.id == current_user["user_id"]).first()
         inscripciones = db.query(models.inscripcion.Inscripcion).filter(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
         materia_ids = {i.materia_id for i in inscripciones}
-        es_global = models.evento.EventoCalendario.materia_id.is_(None)
+        from sqlalchemy import or_
         if materia_ids:
-            query = query.filter(or_(es_global, models.evento.EventoCalendario.materia_id.in_(materia_ids)))
+            query = query.filter(
+                or_(
+                    models.evento.EventoCalendario.materia_id.is_(None),
+                    models.evento.EventoCalendario.materia_id.in_(materia_ids),
+                )
+            )
         else:
-            query = query.filter(es_global)
+            query = query.filter(models.evento.EventoCalendario.materia_id.is_(None))
 
     return query.order_by(models.evento.EventoCalendario.fecha).all()
 
@@ -135,6 +139,7 @@ def list_eventos(
 def get_evento(
     evento_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     evento = db.query(models.evento.EventoCalendario).filter(models.evento.EventoCalendario.id == evento_id).first()
     if not evento:
@@ -183,14 +188,14 @@ def cargar_pdf(
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
-    """Carga un PDF del calendario académico, lo parsea con Gemini y crea los eventos."""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Solo administradores pueden cargar calendarios PDF")
+    """Carga un PDF del calendario acad\u00e9mico, lo parsea con Gemini y crea los eventos."""
+    if current_user["role"] not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
 
     try:
         pdf_bytes = base64.b64decode(payload.pdf_base64)
     except Exception:
-        raise HTTPException(status_code=400, detail="Base64 inválido")
+        raise HTTPException(status_code=400, detail="Base64 inv\u00e1lido")
 
     eventos_data = _parsear_pdf_con_gemini(pdf_bytes, payload.anio, payload.semestre, payload.instrucciones)
 
@@ -232,7 +237,7 @@ def eventos_mes(
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
-    """Eventos de un mes específico (para vista mensual del alumno)."""
+    """Eventos de un mes espec\u00edfico (para vista mensual del alumno)."""
     primero = date(anio, mes, 1)
     if mes == 12:
         ultimo = date(anio + 1, 1, 1) - timedelta(days=1)
@@ -267,11 +272,11 @@ def eventos_dia(
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
-    """Eventos de un día específico (click en el día en vista mensual)."""
+    """Eventos de un d\u00eda espec\u00edfico (click en el d\u00eda en vista mensual)."""
     try:
         fecha = date.fromisoformat(fecha_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Fecha inválida. Usá YYYY-MM-DD")
+        raise HTTPException(status_code=400, detail="Fecha inv\u00e1lida. Us\u00e1 YYYY-MM-DD")
 
     query = db.query(models.evento.EventoCalendario).filter(
         models.evento.EventoCalendario.fecha == fecha,

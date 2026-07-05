@@ -151,9 +151,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => { document.body.style.overflow = '' }
   }, [mobileOpen])
 
-  const logout = () => {
+  const logout = async () => {
     const wasAdmin = role === 'admin'
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch {
+      // ignorar errores de red — el cliente limpia igual
+    }
     sessionStorage.clear()
+    // Limpiar token en memoria
+    const { setAccessToken } = await import('../lib/api')
+    setAccessToken(null)
     navigate(wasAdmin ? '/admin' : '/login')
   }
 

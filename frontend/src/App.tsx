@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import Layout from './components/Layout'
 import GlobalToast from './components/GlobalToast'
 import AcademicoLogin from './pages/AcademicoLogin'
@@ -11,7 +12,7 @@ import Usuarios from './pages/Usuarios'
 import Calendario from './pages/Calendario'
 import Biblioteca from './pages/Biblioteca'
 import Programa from './pages/Programa'
-import Boleta from './pages/Boleta' 
+import Boleta from './pages/Boleta'
 import Reportes from './pages/Reportes'
 import MisCursos from './pages/MisCursos'
 import MisMaterias from './pages/MisMaterias'
@@ -21,7 +22,7 @@ import AsistenciaScan from './pages/AsistenciaScan'
 import Inscripciones from './pages/Inscripciones'
 import NotFound from './pages/NotFound'
 import Foro from './pages/Foro'
-import { decodeToken } from './lib/api'
+import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
   '/usuarios':  ['admin'],
@@ -43,12 +44,27 @@ const rolesPermitidos: Record<string, string[]> = {
 }
 
 function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
-  const role = user?.role || ''
+  const [status, setStatus] = useState<'loading' | 'ok' | 'denied'>(() =>
+    getCurrentUser() ? 'ok' : sessionStorage.getItem('session_active') ? 'loading' : 'denied'
+  )
+  const [role, setRole] = useState(getCurrentUser()?.role || '')
+
+  useEffect(() => {
+    if (status !== 'loading') return
+    initAuth().then(user => {
+      if (user) {
+        setRole(user.role)
+        setStatus('ok')
+      } else {
+        setStatus('denied')
+      }
+    })
+  }, [status])
+
   const permitidos = rolesPermitidos[path] || []
 
-  if (!token) return <Navigate to="/login" replace />
+  if (status === 'loading') return null  // breve flash mientras refresca token
+  if (status === 'denied') return <Navigate to="/login" replace />
   if (permitidos.length > 0 && !permitidos.includes(role)) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }

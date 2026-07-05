@@ -18,6 +18,17 @@ def crear_hilo(
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == hilo.materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
+    # Check that user is enrolled in or teaches this materia (unless admin)
+    if current_user["role"] == "alumno":
+        insc = db.query(models.inscripcion.Inscripcion).filter(
+            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"],
+            models.inscripcion.Inscripcion.materia_id == hilo.materia_id,
+        ).first()
+        if not insc:
+            raise HTTPException(status_code=403, detail="No estas inscripto en esta materia")
+    elif current_user["role"] == "profesor":
+        if materia.profesor_id != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="No sos el profesor de esta materia")
     nuevo = models.foro.ForoHilo(
         materia_id=hilo.materia_id,
         titulo=hilo.titulo,
@@ -132,7 +143,19 @@ def crear_mensaje(
     if not hilo:
         raise HTTPException(status_code=404, detail="Hilo no encontrado")
     if hilo.cerrado:
-        raise HTTPException(status_code=400, detail="El hilo está cerrado")
+        raise HTTPException(status_code=400, detail="El hilo est\u00e1 cerrado")
+    # Check that user can post (enrolled/teaches/admin)
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == hilo.materia_id).first()
+    if current_user["role"] == "alumno":
+        insc = db.query(models.inscripcion.Inscripcion).filter(
+            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"],
+            models.inscripcion.Inscripcion.materia_id == hilo.materia_id,
+        ).first()
+        if not insc:
+            raise HTTPException(status_code=403, detail="No estas inscripto en esta materia")
+    elif current_user["role"] == "profesor" and materia:
+        if materia.profesor_id != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="No sos el profesor de esta materia")
 
     nuevo = models.foro.ForoMensaje(
         hilo_id=hilo_id,

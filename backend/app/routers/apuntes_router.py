@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
 from app.dependencias import get_current_user
+from app.services.storage import subir_archivo, obtener_url_firmada, eliminar_archivo
 
 router = APIRouter(prefix="/apuntes", tags=["apuntes"])
 
@@ -14,7 +15,9 @@ def create_apunte(
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user),
 ):
-    new_apunte = models.apunte.Apunte(**apunte.model_dump())
+    data = apunte.model_dump()
+    data["user_id"] = current_user["user_id"]
+    new_apunte = models.apunte.Apunte(**data)
     db.add(new_apunte)
     db.commit()
     db.refresh(new_apunte)
@@ -28,6 +31,7 @@ def list_apuntes(
     tipo_contenido: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     query = db.query(models.apunte.Apunte)
     if materia_id is not None:
@@ -51,6 +55,7 @@ def list_apuntes(
 def get_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
     if not apunte:
@@ -103,7 +108,9 @@ def like_apunte(
     apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    apunte.likes = (apunte.likes or 0) + 1
+    db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).update(
+        {models.apunte.Apunte.likes: models.apunte.Apunte.likes + 1}
+    )
     db.commit()
     db.refresh(apunte)
     return apunte
@@ -113,14 +120,62 @@ def like_apunte(
 def descargar_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    apunte.descargas = (apunte.descargas or 0) + 1
+    db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).update(
+        {models.apunte.Apunte.descargas: models.apunte.Apunte.descargas + 1}
+    )
     db.commit()
     db.refresh(apunte)
     return apunte
+
+
+@router.post("/{apunte_id}/archivo")
+async def upload_archivo_apunte(
+    apunte_id: int,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    if not apunte:
+        raise HTTPException(status_code=404, detail="Apunte no encontrado")
+    if current_user["role"] not in ("admin",) and current_user["user_id"] != apunte.user_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    contenido = await archivo.read()
+    try:
+        key = subir_archivo(contenido, archivo.filename or "archivo", "apunte")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    # Eliminar archivo anterior si existía
+    if apunte.storage_key:
+        try:
+            eliminar_archivo(apunte.storage_key)
+        except Exception:
+            pass  # no bloquear si R2 falla al borrar el viejo
+
+    apunte.storage_key = key
+    db.commit()
+    return {"storage_key": key, "url": obtener_url_firmada(key)}
+
+
+@router.get("/{apunte_id}/url-descarga")
+def get_url_descarga(
+    apunte_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    if not apunte:
+        raise HTTPException(status_code=404, detail="Apunte no encontrado")
+    if not apunte.storage_key:
+        raise HTTPException(status_code=404, detail="Este apunte no tiene archivo subido")
+    return {"url": obtener_url_firmada(apunte.storage_key)}
 
 
 @router.delete("/{apunte_id}")

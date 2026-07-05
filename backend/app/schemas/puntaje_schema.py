@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 TipoEvaluacion = Literal["parcial1", "parcial2", "practico", "final"]
@@ -8,7 +8,7 @@ class PuntajeBase(BaseModel):
     user_id: int
     materia_id: int
     tipo: TipoEvaluacion
-    valor: float
+    valor: float = Field(ge=0, le=10)
 
 class PuntajeCreate(PuntajeBase):
     pass

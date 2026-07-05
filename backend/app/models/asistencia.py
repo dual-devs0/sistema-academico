@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Boolean, Date, String, ForeignKey
+from sqlalchemy import Column, Integer, Boolean, Date, String, ForeignKey, UniqueConstraint
 from app.database import Base
 
 class Asistencia(Base):
@@ -11,3 +11,7 @@ class Asistencia(Base):
     presente = Column(Boolean, nullable=False, default=True)
     es_becado = Column(Boolean, default=False)  # snapshot
     motivo = Column(String, nullable=True)       # motivo de ausencia
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "materia_id", "fecha", name="uq_asistencia_user_materia_fecha"),
+    )

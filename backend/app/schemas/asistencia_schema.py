@@ -32,7 +32,7 @@ class AsistenciaLote(BaseModel):
 
 class AsistenciaLoteResponse(BaseModel):
     """Resumen del resultado de la carga masiva."""
-    creados: int
+    guardados: int
     actualizados: int
     total: int
 
@@ -42,8 +42,6 @@ class AlumnoAsistenciaOut(BaseModel):
     nombre: str
     username: str
     es_becado: bool
-    materia_id: int
-    nombre_materia: str
     total_clases: int
     presentes: int
     porcentaje: float

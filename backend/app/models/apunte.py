@@ -10,7 +10,8 @@ class Apunte(Base):
     materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    archivo_url = Column(Text, nullable=False)
+    archivo_url = Column(Text, nullable=True)   # legacy; usar storage_key para archivos nuevos
+    storage_key = Column(Text, nullable=True)   # key en R2, servir con URL firmada
     tags = Column(Text, nullable=True)  # comma-separated
     aprobado = Column(Boolean, default=False)
     tipo_contenido = Column(String(50), default="pdf")

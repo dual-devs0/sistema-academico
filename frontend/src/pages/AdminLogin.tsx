@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.png'
-import { api, decodeToken } from '../lib/api'
+import { api, decodeToken, setAccessToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
 export default function AdminLogin() {
@@ -24,13 +24,13 @@ export default function AdminLogin() {
       const res = await api.post<{ access_token: string; token_type: string }>('/auth/login', {
         username: email, password, role: 'admin',
       })
-      sessionStorage.setItem('token', res.access_token)
+      setAccessToken(res.access_token)
       const decoded = decodeToken(res.access_token)
       sessionStorage.setItem('user_rol', decoded?.role || '')
       sessionStorage.setItem('user_nombre', decoded?.username || '')
       if (decoded?.role !== 'admin') {
         setError('Acceso denegado.')
-        sessionStorage.removeItem('token')
+        setAccessToken(null)
         return
       }
       setDocTitle('admin', decoded?.username || '')

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence, useInView } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.png'
-import { api, decodeToken } from '../lib/api'
+import { api, decodeToken, setAccessToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
 type Rol = 'alumno' | 'profesor'
@@ -79,7 +79,7 @@ export default function AcademicoLogin() {
       const res = await api.post<{ access_token: string; token_type: string }>('/auth/login', {
         username: documento, password, role: rol,
       })
-      sessionStorage.setItem('token', res.access_token)
+      setAccessToken(res.access_token)
       const decoded = decodeToken(res.access_token)
       const rolReal = decoded?.role || ''
       sessionStorage.setItem('user_rol', rolReal)
@@ -87,7 +87,7 @@ export default function AcademicoLogin() {
 
       if (rolReal !== rol) {
         setError('Acceso denegado para este rol.')
-        sessionStorage.removeItem('token')
+        setAccessToken(null)
         return
       }
 

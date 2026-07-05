@@ -21,10 +21,6 @@ def _enrich(m, db: Session) -> dict:
         if carrera:
             carrera_nombre = carrera.nombre
 
-    inscritos = db.query(models.inscripcion.Inscripcion).filter(
-        models.inscripcion.Inscripcion.materia_id == m.id
-    ).count()
-
     return {
         "id": m.id,
         "nombre": m.nombre,
@@ -32,11 +28,6 @@ def _enrich(m, db: Session) -> dict:
         "carrera_id": m.carrera_id,
         "anio": m.anio,
         "semestre": m.semestre,
-        "creditos": getattr(m, "creditos", None) or 4,
-        "cupos": getattr(m, "cupos", None) or 40,
-        "horario": getattr(m, "horario", None),
-        "secciones": getattr(m, "secciones", None) or 1,
-        "inscritos": inscritos,
         "profesor_nombre": prof_nombre,
         "carrera_nombre": carrera_nombre,
     }
@@ -46,7 +37,6 @@ def _enrich(m, db: Session) -> dict:
 def create_materia(materia: schemas.materia.MateriaCreate, db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    # Duplicate check: same nombre + carrera_id
     existing = db.query(models.materia.Materia).filter(
         models.materia.Materia.nombre == materia.nombre,
         models.materia.Materia.carrera_id == materia.carrera_id,
@@ -59,10 +49,6 @@ def create_materia(materia: schemas.materia.MateriaCreate, db: Session = Depends
         carrera_id=materia.carrera_id,
         anio=materia.anio or 1,
         semestre=materia.semestre or 1,
-        creditos=materia.creditos or 4,
-        cupos=materia.cupos or 40,
-        horario=materia.horario,
-        secciones=materia.secciones or 1,
     )
     db.add(new_materia)
     db.commit()
@@ -75,6 +61,7 @@ def list_materias(
     profesor_id: Optional[int] = Query(None),
     carrera_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
 ):
     query = db.query(models.materia.Materia)
     if profesor_id is not None:
@@ -85,27 +72,8 @@ def list_materias(
 
 
 @router.get("/{materia_id}")
-def get_materia(materia_id: int, db: Session = Depends(database.get_db)):
+def get_materia(materia_id: int, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
-    return _enrich(materia, db)
-
-
-@router.patch("/{materia_id}")
-def update_materia(
-    materia_id: int,
-    data: schemas.materia.MateriaUpdate,
-    db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
-):
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
-    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
-    if not materia:
-        raise HTTPException(status_code=404, detail="Materia no encontrada")
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(materia, key, value)
-    db.commit()
-    db.refresh(materia)
     return _enrich(materia, db)

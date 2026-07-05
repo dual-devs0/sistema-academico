@@ -19,17 +19,18 @@ from app.dependencias import get_current_user
 router = APIRouter(prefix="/boleta", tags=["boleta"])
 
 TIPOS = ["parcial1", "parcial2", "practico", "final"]
+PESOS_BOLETA = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
 HEADERS = ["Materia", "Parcial 1", "Parcial 2", "T.P.", "Final", "Promedio"]
 
 
 def _fmt(val) -> str:
     if val is None:
-        return "—"
+        return "\u2014"
     try:
         f = float(val)
         return f"{f:.1f}"
     except Exception:
-        return "—"
+        return "\u2014"
 
 
 def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> bytes:
@@ -55,13 +56,13 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
     story = []
 
     # Header
-    story.append(Paragraph("Universidad Católica de Caacupé", style_title))
-    story.append(Paragraph("Sistema Académico — Boleta de Calificaciones", style_sub))
+    story.append(Paragraph("Universidad Cat\u00f3lica de Caacup\u00e9", style_title))
+    story.append(Paragraph("Sistema Acad\u00e9mico \u2014 Boleta de Calificaciones", style_sub))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
     story.append(Spacer(1, 0.4 * cm))
 
     # Alumno info block
-    becado_txt = "Sí — Con beca activa" if user.es_becado else "No"
+    becado_txt = "S\u00ed \u2014 Con beca activa" if user.es_becado else "No"
     info_data = [
         [Paragraph("Nombre", style_label), Paragraph(user.nombre or user.username, style_value),
          Paragraph("Legajo / Usuario", style_label), Paragraph(user.username, style_value)],
@@ -79,8 +80,8 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
     story.append(Spacer(1, 0.4 * cm))
 
-    # Build per-materia score map: materia_id → {tipo: valor, nombre: str}
-    mat_map: dict[int, dict] = defaultdict(lambda: {"nombre": "—", "parcial1": None, "parcial2": None, "practico": None, "final": None})
+    # Build per-materia score map: materia_id \u2192 {tipo: valor, nombre: str}
+    mat_map: dict[int, dict] = defaultdict(lambda: {"nombre": "\u2014", "parcial1": None, "parcial2": None, "practico": None, "final": None})
     for p in puntajes:
         mat_map[p.materia_id]["nombre"]  = p.materia_nombre
         mat_map[p.materia_id][p.tipo]    = float(p.valor)
@@ -92,9 +93,13 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
 
     promedios_generales = []
     for mid, row in sorted(mat_map.items(), key=lambda x: x[1]["nombre"]):
-        scores = [row["parcial1"], row["parcial2"], row["practico"], row["final"]]
-        existing = [s for s in scores if s is not None]
-        prom = sum(existing) / len(existing) if existing else None
+        scores = {"parcial1": row["parcial1"], "parcial2": row["parcial2"], "practico": row["practico"], "final": row["final"]}
+        existentes = {k: v for k, v in scores.items() if v is not None}
+        if existentes:
+            peso_total = sum(PESOS_BOLETA[k] for k in existentes)
+            prom = round(sum(PESOS_BOLETA[k] * v for k, v in existentes.items()) / peso_total, 2) if peso_total > 0 else None
+        else:
+            prom = None
         if prom is not None:
             promedios_generales.append(prom)
 
@@ -134,18 +139,18 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
     story.append(t)
     story.append(Spacer(1, 0.5 * cm))
 
-    # Footer — promedio general + fecha
+    # Footer \u2014 promedio general + fecha
     prom_gral = sum(promedios_generales) / len(promedios_generales) if promedios_generales else None
     prom_gral_txt = _fmt(prom_gral)
-    aprobado_txt  = "APROBADO" if prom_gral is not None and prom_gral >= 6 else ("DESAPROBADO" if prom_gral is not None else "—")
+    aprobado_txt  = "APROBADO" if prom_gral is not None and prom_gral >= 6 else ("DESAPROBADO" if prom_gral is not None else "\u2014")
     aprobado_color= "#16a34a" if (prom_gral is not None and prom_gral >= 6) else "#dc2626"
 
     fecha_txt = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M") + " UTC"
 
     footer_data = [[
-        Paragraph(f"Promedio general: <font color='{aprobado_color}'><b>{prom_gral_txt}</b></font> — <font color='{aprobado_color}'><b>{aprobado_txt}</b></font>",
+        Paragraph(f"Promedio general: <font color='{aprobado_color}'><b>{prom_gral_txt}</b></font> \u2014 <font color='{aprobado_color}'><b>{aprobado_txt}</b></font>",
                   ParagraphStyle("fg", parent=styles["Normal"], fontSize=11, textColor=colors.HexColor("#0f172a"))),
-        Paragraph(f"Fecha de emisión: {fecha_txt}",
+        Paragraph(f"Fecha de emisi\u00f3n: {fecha_txt}",
                   ParagraphStyle("fd", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#64748b"), alignment=TA_RIGHT)),
     ]]
     ft = Table(footer_data, colWidths=[10 * cm, 7 * cm])
@@ -159,7 +164,7 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#e2e8f0")))
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph(
-        "Documento oficial generado por el Sistema Académico UCA · Solo válido con sello institucional",
+        "Documento oficial generado por el Sistema Acad\u00e9mico UCA \u00b7 Solo v\u00e1lido con sello institucional",
         ParagraphStyle("disc", parent=styles["Normal"], fontSize=7, textColor=colors.HexColor("#94a3b8"), alignment=TA_CENTER)
     ))
 
@@ -181,13 +186,12 @@ def get_boleta(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    carrera_nombre = "—"
+    carrera_nombre = "\u2014"
     if user.carrera_id:
         c = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id == user.carrera_id).first()
         if c:
             carrera_nombre = c.nombre
 
-    # Join puntajes with materia name in one query
     rows = (
         db.query(
             models.puntaje.Puntaje,
