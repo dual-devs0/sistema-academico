@@ -18,8 +18,11 @@ Estados válidos: PENDIENTE / EN_PROGRESO / EN_REVISION / COMPLETA
 
 ### Deuda técnica menor (no bloquea Fase 1)
 
-- **Tests postgres_compat necesitan DB de test separada en Neon** (branch o database aparte).
-  Al correr la suite completa con `TEST_DATABASE_URL` apuntando a la DB de desarrollo,
-  el teardown del fixture `pg_engine` borra todos los datos de desarrollo.
-  Crear una segunda database en Neon (`neondb_test` o branch `test`) y usar esa URL
-  exclusivamente para CI. La DB de desarrollo queda intacta.
+- **Tests postgres_compat necesitan DB de test separada en Neon** — RESUELTA (2026-07-06).
+  Branch `neondb_test` creada en el mismo proyecto Neon. `TEST_DATABASE_URL` vive en
+  `backend/.env.test` (gitignored, nunca commiteado — verificado con
+  `git log --all --full-history`). `tests/conftest.py` carga ese archivo con
+  `load_dotenv` antes de importar `app.main`. Suite completa: 79 passed, incluyendo
+  los 4 tests de `test_postgres_compat.py` (antes skipped) corriendo contra
+  `neondb_test`. Confirmado por conteo de filas antes/después que `neondb`
+  (desarrollo) no fue tocada.
