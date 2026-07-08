@@ -1,10 +1,10 @@
 # Changelog Técnico — Sistema Académico UCA V2
 
-> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2 (backend + frontend, cerradas) y Fase 3 (backend + frontend implementados, en progreso — migración sin aplicar y verificación visual pendientes).
+> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2 y Fase 3 — todas cerradas.
 
 ---
 
-## Fase 3 (backend + frontend) — Expediente académico consolidado (2026-07-08) — EN PROGRESO
+## Fase 3 (backend + frontend) — Expediente académico consolidado (2026-07-08) — COMPLETA
 
 **Qué se hizo:** Registro oficial cerrado de materias cursadas (`ExpedienteMateria`), PPA ponderado por créditos (`calcular_ppa`), clasificador de regularidad del alumno (`calcular_regularidad`: activo/en_riesgo/irregular/de_baja) y 4 endpoints nuevos bajo `/expediente`.
 
@@ -13,7 +13,7 @@
 - `app/services/expediente.py` — `calcular_ppa`, `calcular_regularidad`, constantes `PPA_UMBRAL_RIESGO=7.0`, `ASISTENCIA_UMBRAL_RIESGO=75`, `PLAZO_RECURSAR_PERIODOS=2`, `PERIODOS_INACTIVIDAD_BAJA=3`
 - `app/routers/expediente_router.py` — nuevo, prefix `/expediente`, reutiliza `_calcular_promedio_final`/`PESOS` de `puntajes_router.py`
 - `app/schemas/expediente_schema.py` — nuevo
-- `alembic/versions/r5s6t7u8v9w0_create_expediente_regularidad.py` — nueva migración (head), **escrita pero sin aplicar**
+- `alembic/versions/r5s6t7u8v9w0_create_expediente_regularidad.py` — nueva migración (head), **aplicada en `neondb`** (ver nota de cierre abajo)
 - `alembic/env.py` — agregados imports de modelos Fase 2/3 faltantes (`pensum_materia`, `correlatividad`, `avance_alumno_pensum`, `expediente_*`) para que `--autogenerate` los detecte
 - `tests/test_expediente.py`, `test_expediente_router.py` — nuevos, 20 tests
 
@@ -33,13 +33,15 @@
 
 **Decisiones destacadas** (detalle en `ARQUITECTURA.md`): colisión de nombres con el menú existente resuelta por renombrado; `oferta_materia_id` para cerrar materia se resuelve filtrando `GET /inscripciones/` client-side (sin endpoint nuevo).
 
-**Pendiente de esta tarea:**
-- Migración `r5s6t7u8v9w0` sin aplicar en `neondb_test` ni `neondb` — `neondb_test` inalcanzable en 2 intentos separados esta sesión (`ERROR: The requested endpoint could not be found`). Aplicar cuando el compute de Neon vuelva a responder: primero `neondb_test`, confirmar con `alembic current`, recién después `neondb`.
-- Verificación visual en browser no realizada — sin datos de expediente en `neondb` dev y `neondb_test` caído. `tsc --noEmit` limpio como única verificación de esta sesión.
+**Verificación visual (2026-07-08, sesión de cierre):** login admin y alumno en browser contra `neondb`. `ExpedienteAdmin` — búsqueda de alumno, badge de regularidad, estados vacíos, todo correcto. `ExpedienteAlumno` — PPA `—` (null), badge "ACTIVO", estado vacío correcto. Menú confirma "Calificaciones"/"Expediente" separados. Flujo completo de `cerrar-materia` no ejecutado en vivo (hubiera requerido fabricar datos de alumno sin autorización) — cubierto por los 20 tests de backend.
 
 ### Fix colateral — `test_postgres_compat.py` ya no falla en `ERROR` si Neon está caído
 
 `pg_engine` (fixture module-scope) ahora hace un `SELECT 1` de sondeo antes de `create_all()`; si falla, `pytest.skip()` explícito con motivo en vez de propagar la excepción como `ERROR`. Se re-habilita solo cuando el endpoint vuelva a responder, sin tocar el test.
+
+### Cierre — migración aplicada en `neondb` vía `alembic stamp` (drift de `create_all()`)
+
+Tercer intento de reconexión a `neondb_test` falló (3 sesiones seguidas). Con autorización explícita del usuario se aplicó la migración directo en `neondb`. `alembic upgrade head` chocó con `DuplicateTable` en `expediente_materias` — las 3 tablas ya existían, creadas por el fallback `Base.metadata.create_all()` de `app/main.py` (corre en cada arranque del backend, se disparó en sesiones anteriores al levantar el servidor para verificar Fase 2). Verificado columna por columna y constraint por constraint (`information_schema.columns` + `pg_constraint`) que el schema de `create_all()` coincide exactamente con el de la migración — se usó `alembic stamp head` en vez de recrear tablas. `neondb` confirmado en `r5s6t7u8v9w0`. `neondb_test` sigue sin la migración, pendiente para cuando el compute de Neon responda — ver `ESTADO_FASES.md`.
 
 ---
 

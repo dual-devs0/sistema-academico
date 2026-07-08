@@ -5,7 +5,7 @@
 | Fase 0 — Deuda técnica crítica | COMPLETA | 2026-07-04 | 2026-07-05 | 79 tests ✓ PostgreSQL Neon · Storage R2 · SMTP Gmail · Auth refresh httpOnly cookie |
 | Fase 1 — Quick wins + portal docente | COMPLETA | 2026-07-06 | 2026-07-07 | 96 tests ✓ (sqlite). 1.1 Estadísticas conectada al endpoint real. 1.2 Foro: fijar/cerrar + edición 15min + paginación. 1.3 Usuarios.tsx + TablaPaginada server-side. 1.4 Fusión Mis Materias (Activas/Histórico/Agenda) + mi-historico + mi-agenda + recordatorios_docente. |
 | Fase 2 — Pensum y malla curricular | COMPLETA | 2026-07-07 | 2026-07-07 | Backend: 121 tests ✓ (120 + 1 nuevo, listado de correlatividades; test de pendientes extiende uno existente). 3 tablas nuevas + carreras extendida. 8 endpoints /pensum (7 + GET correlatividades) + integración en POST /inscripciones/. Frontend: MallaAdmin.tsx, MallaAlumno.tsx, Malla.tsx, pensumService.ts, ruta /malla, KPI créditos en Dashboard alumno. |
-| Fase 3 — Expediente académico | EN_PROGRESO | 2026-07-08 | — | Backend: implementado (calcular_ppa, calcular_regularidad, 4 endpoints /expediente, 137 tests ✓ sqlite). Migración r5s6t7u8v9w0 escrita, **pendiente de aplicar** (neondb_test caído, 2do intento fallido). Frontend: implementado (ExpedienteAlumno.tsx, ExpedienteAdmin.tsx, Expediente.tsx, ruta /expediente, menú "Expediente" renombrado de /puntajes a "Calificaciones"). **Verificación visual pendiente.** |
+| Fase 3 — Expediente académico | COMPLETA | 2026-07-08 | 2026-07-08 | Backend: calcular_ppa, calcular_regularidad, 4 endpoints /expediente, 137 tests ✓ sqlite. Migración r5s6t7u8v9w0 aplicada en neondb (`alembic stamp head` tras drift de `create_all()` — ver nota abajo); **neondb_test sigue caído, migración pendiente ahí** para cuando el compute vuelva. Frontend: ExpedienteAlumno.tsx, ExpedienteAdmin.tsx, Expediente.tsx, ruta /expediente, menú renombrado ("Expediente"→/puntajes pasó a "Calificaciones"). Verificado visualmente en browser (admin + alumno). |
 | Fase 4 — Financiero + becas | PENDIENTE | — | — | |
 | Fase 4B — Facturación electrónica | PENDIENTE | — | — | |
 | Fase 5 — Solicitudes/Graduación/Pasantías/Equivalencias | PENDIENTE | — | — | |
@@ -113,8 +113,33 @@ incompatible con SQLite incluso en un archivo descartable). **Antes de tocar
 contra `neondb_test`, confirmar con `alembic current`, recién ahí aplicar
 contra `neondb`.
 
-### Pendiente de próxima sesión — cierre de Fase 3
+### Cierre de Fase 3 (2026-07-08, sesión siguiente)
 
-1. **Reactivar `neondb_test`** en el dashboard de Neon (branch `ep-late-grass-aczm8idk`) — 2 intentos fallidos en esta sesión, no es problema de código.
-2. Aplicar migración `r5s6t7u8v9w0_create_expediente_regularidad` — primero `neondb_test`, confirmar con `alembic current`, recién después `neondb`.
-3. Verificación visual del frontend de Fase 3 (`ExpedienteAlumno.tsx`/`ExpedienteAdmin.tsx`, ruta `/expediente`) en browser — no realizada esta sesión, bloqueada por falta de datos de expediente en `neondb` dev y por el punto 1.
+**Tercer intento de reconexión a `neondb_test`: falló de nuevo** (3 sesiones seguidas,
+mismo error `endpoint could not be found`). Con autorización explícita del usuario se
+aplicó la migración **directo en `neondb`** en vez de esperar más.
+
+Al ejecutar `alembic upgrade head` contra `neondb` saltó `DuplicateTable` en
+`expediente_materias` — las 3 tablas de Fase 3 ya existían, creadas por el fallback
+`Base.metadata.create_all()` de `app/main.py` (corre en cada arranque del backend;
+se disparó al levantar el servidor para las verificaciones visuales de sesiones
+anteriores). Mismo patrón de drift ya documentado para Fase 0 (`materias` vs
+`o2p3q4r5s6t7`). Verificado columna por columna y constraint por constraint
+(`information_schema.columns` + `pg_constraint`) que el schema creado por `create_all()`
+coincide exactamente con el de la migración (mismos nombres de constraint, porque
+ambos vienen del mismo `__table_args__` en los modelos) — se usó `alembic stamp head`
+en vez de recrear las tablas. `neondb` confirmado en `r5s6t7u8v9w0` con `alembic current`.
+
+**`neondb_test` sigue sin la migración** — pendiente para cuando el compute de Neon
+responda. Mientras tanto, cualquier nueva sesión que use `neondb_test` para tests
+Postgres debe correr `alembic upgrade head` ahí antes de asumir que el schema está al día.
+
+Verificación visual completada: login admin (`admin@uca.edu.py`/`Admin1234!`) y alumno
+(`12345678`/`Alumno1234!`) contra `neondb`. `ExpedienteAdmin` — búsqueda de alumno,
+selección de María González, badge "ACTIVO" correcto (sin historial), estado vacío
+correcto. `ExpedienteAlumno` — PPA "—" (null, no cero), "0 créd. computados", badge
+"ACTIVO", estado vacío correcto. Menú confirma "Calificaciones" y "Expediente" como
+items separados (colisión de nombres resuelta). No se probó el flujo completo de
+`cerrar-materia` en vivo — hubiera requerido fabricar una inscripción/nota para María
+sin autorización explícita del usuario; ese flujo ya está cubierto por los 20 tests
+de backend (`test_expediente_router.py`).

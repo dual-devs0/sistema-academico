@@ -5,7 +5,6 @@ load_dotenv()  # carga .env antes de que cualquier módulo lea os.getenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.database import Base, engine
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
@@ -13,8 +12,8 @@ from app.routers import (
     horarios, profesor, pensum, expediente,
 )
 
-# Ensure all tables exist on startup (dev convenience; use alembic in production)
-Base.metadata.create_all(bind=engine)
+# Schema management es exclusivo de Alembic (backend/alembic/versions/) --
+# nunca create_all() acá. Correr `alembic upgrade head` para aplicar migraciones.
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 os.makedirs(os.path.join(STATIC_DIR, "avatars"), exist_ok=True)
