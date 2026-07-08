@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import require_role, get_current_user
 from app.services.pensum import validar_correlatividades
+from app.services.financiero import verificar_deuda_inscripcion, registrar_override_mora
 
 router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
 
@@ -54,6 +55,33 @@ def inscribir(inscripcion: schemas.inscripcion.InscripcionCreate, db: Session = 
         )
 
     oferta = _oferta_activa_o_404(db, inscripcion.materia_id)
+
+    # ── Bloqueo por mora ──────────────────────────────────────────────
+    es_admin = current_user["role"] == "admin"
+    override_mora = inscripcion.override_mora if hasattr(inscripcion, "override_mora") else False
+    estado_deuda = verificar_deuda_inscripcion(alumno_id, db, es_admin=es_admin)
+    if estado_deuda.bloqueado:
+        if es_admin and override_mora:
+            # Admin override — registrar en auditoría
+            registrar_override_mora(
+                alumno_id=alumno_id,
+                admin_id=current_user["user_id"],
+                db=db,
+                oferta_materia_id=oferta.id,
+                motivo=f"Override manual en inscripción. Cuotas vencidas: {estado_deuda.cuotas_vencidas}",
+            )
+        else:
+            detalle_str = "; ".join(
+                f"{d.periodo} (vence {d.fecha_vencimiento}, Gs. {d.monto_a_pagar})"
+                for d in estado_deuda.detalle[:3]
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=f"Alumno bloqueado por mora: {estado_deuda.cuotas_vencidas} cuota(s) vencida(s). "
+                       f"Detalle: {detalle_str}. Admin puede usar override_mora=true.",
+            )
+    # ─────────────────────────────────────────────────────────────────
+
     existente = db.query(models.inscripcion.Inscripcion).filter(
         models.inscripcion.Inscripcion.alumno_id == alumno_id,
         models.inscripcion.Inscripcion.oferta_materia_id == oferta.id,

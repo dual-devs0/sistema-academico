@@ -18,5 +18,6 @@ from . import avance_alumno_pensum
 from . import expediente_materia
 from . import expediente_semestre
 from . import regularidad_alumno
+from . import financiero
 
-__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "refresh_token", "recordatorio_docente", "pensum_materia", "correlatividad", "avance_alumno_pensum", "expediente_materia", "expediente_semestre", "regularidad_alumno"]
+__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "refresh_token", "recordatorio_docente", "pensum_materia", "correlatividad", "avance_alumno_pensum", "expediente_materia", "expediente_semestre", "regularidad_alumno", "financiero"]
