@@ -5,7 +5,7 @@ class InscripcionBase(BaseModel):
     materia_id: int
 
 class InscripcionCreate(InscripcionBase):
-    pass
+    override_mora: bool = False  # solo admin puede usar; se registra en auditoria_override_mora
 
 class InscripcionOut(BaseModel):
     id: int

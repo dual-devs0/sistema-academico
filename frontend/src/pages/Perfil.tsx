@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api, decodeToken, emitToast, emitAvatarUpdated } from '../lib/api'
+import { getBecasActivas, type BecaActiva } from '../services/finanzasService'
 
 type Tab = 'info' | 'seguridad' | 'preferencias'
 
@@ -46,6 +47,7 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
   const [pwConf, setPwConf] = useState('')
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const [becasActivas, setBecasActivas] = useState<BecaActiva[]>([])
   const fotoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -60,6 +62,10 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
       api.get<any[]>(`/asistencias/?user_id=${userId}`).then(as => {
         if (as.length) setAsistencia(Math.round(as.filter(a => a.presente).length / as.length * 100))
       }).catch(() => {})
+      
+      getBecasActivas(userId)
+        .then(setBecasActivas)
+        .catch(() => {})
     }
   }, [role, userId])
 
@@ -114,6 +120,15 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: 24, fontWeight: 900 }}>{nombre || 'Usuario'}</h1>
             <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>{roleBadge}</span>
+            {role === 'alumno' && becasActivas.map(b => (
+              <span key={b.id} className="badge" style={{ 
+                background: b.es_externa ? 'rgba(167,139,250,0.15)' : 'rgba(34,211,238,0.12)', 
+                color: b.es_externa ? '#a78bfa' : '#22d3ee',
+                border: `1px solid ${b.es_externa ? 'rgba(167,139,250,0.3)' : 'rgba(34,211,238,0.3)'}`
+              }}>
+                {b.es_externa ? '🏦 Becado ' : '🎓 Becado '}{b.fuente}
+              </span>
+            ))}
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
             {role === 'admin' ? 'División de Tecnologías — UCA' : 'Ingeniería en Tecnologías de la Información • 6to Semestre'}
@@ -148,6 +163,40 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
         <div style={{ padding: 24 }}>
           {tab === 'info' && (
             <>
+              {becasActivas.length > 0 && (
+                <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-secondary)' }}>
+                    Condiciones de Beca
+                  </h3>
+                  {becasActivas.map(b => (
+                    <div key={b.id} style={{ 
+                      background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', 
+                      borderRadius: 14, padding: '16px 20px', display: 'flex', gap: 16, alignItems: 'center'
+                    }}>
+                      <div style={{ fontSize: 24 }}>{b.es_externa ? '🏦' : '🎓'}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                          {b.beca_nombre} — <span style={{ color: b.es_externa ? '#a78bfa' : '#22d3ee' }}>{b.fuente}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          Vigencia: {b.periodo_inicio} al {b.periodo_fin || 'Presente'} • Descuento: {parseFloat(b.porcentaje_descuento)}%
+                        </div>
+                      </div>
+                      {(b.promedio_minimo_requerido || b.promedio_actual) && (
+                        <div style={{ textAlign: 'right', borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Promedio Req.</div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>
+                            {b.promedio_minimo_requerido || '—'}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 4, color: b.promedio_actual && b.promedio_minimo_requerido && parseFloat(b.promedio_actual) >= parseFloat(b.promedio_minimo_requerido) ? '#10b981' : '#f59e0b' }}>
+                            Actual: {b.promedio_actual || '—'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="pf-form">
                 <div>
                   <div className="mono-label" style={{ marginBottom: 6 }}>Nombre Completo</div>

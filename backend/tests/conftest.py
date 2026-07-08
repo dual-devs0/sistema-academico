@@ -25,6 +25,7 @@ from app.models import (  # noqa: F401
     evento_calendario,
     temario,
     horario,
+    financiero,  # noqa: F401 — registra todas las tablas financieras en Base.metadata
 )
 from app.security import hash_password
 from app.auth import create_access_token

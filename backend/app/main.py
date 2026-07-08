@@ -9,7 +9,7 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
     carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno, foro,
-    horarios, profesor, pensum, expediente,
+    horarios, profesor, pensum, expediente, finanzas, becas,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -56,6 +56,8 @@ app.include_router(horarios.router)
 app.include_router(profesor.router)
 app.include_router(pensum.router)
 app.include_router(expediente.router)
+app.include_router(finanzas.router)
+app.include_router(becas.router)
 app.include_router(test_router.router)
 
 

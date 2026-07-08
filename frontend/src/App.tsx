@@ -23,6 +23,8 @@ import NotFound from './pages/NotFound'
 import Foro from './pages/Foro'
 import Malla from './pages/Malla'
 import Expediente from './pages/Expediente'
+import Finanzas from './pages/Finanzas'
+import MisCuotas from './pages/MisCuotas'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -43,6 +45,8 @@ const rolesPermitidos: Record<string, string[]> = {
   '/foro':               ['admin', 'profesor', 'alumno'],
   '/malla':              ['admin', 'alumno'],
   '/expediente':         ['admin', 'alumno'],
+  '/finanzas':           ['admin'],
+  '/mis-cuotas':         ['alumno'],
 }
 
 function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
@@ -98,6 +102,8 @@ function App() {
         <Route path="/foro" element={<Layout><RutaProtegida path="/foro"><Foro /></RutaProtegida></Layout>} />
         <Route path="/malla" element={<Layout><RutaProtegida path="/malla"><Malla /></RutaProtegida></Layout>} />
         <Route path="/expediente" element={<Layout><RutaProtegida path="/expediente"><Expediente /></RutaProtegida></Layout>} />
+        <Route path="/finanzas" element={<Layout><RutaProtegida path="/finanzas"><Finanzas /></RutaProtegida></Layout>} />
+        <Route path="/mis-cuotas" element={<Layout><RutaProtegida path="/mis-cuotas"><MisCuotas /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><AsistenciaScan /></Layout>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
