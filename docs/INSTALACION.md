@@ -138,6 +138,8 @@ estar corriendo en el puerto 8000** para que el login y todas las páginas funci
 - **`password authentication failed` / `endpoint could not be found` contra Neon**:
   el compute del free tier de Neon se suspende por inactividad. Reactivar desde el
   dashboard de Neon — no es un problema de código ni de configuración local.
+  **Solución permanente:** en el dashboard de Neon, editar el compute → **Auto-suspend**
+  → seleccionar **Never** para que nunca se suspenda.
 
 ## 8. Estructura rápida
 

@@ -13,7 +13,7 @@
 - `app/services/expediente.py` — `calcular_ppa`, `calcular_regularidad`, constantes `PPA_UMBRAL_RIESGO=7.0`, `ASISTENCIA_UMBRAL_RIESGO=75`, `PLAZO_RECURSAR_PERIODOS=2`, `PERIODOS_INACTIVIDAD_BAJA=3`
 - `app/routers/expediente_router.py` — nuevo, prefix `/expediente`, reutiliza `_calcular_promedio_final`/`PESOS` de `puntajes_router.py`
 - `app/schemas/expediente_schema.py` — nuevo
-- `alembic/versions/r5s6t7u8v9w0_create_expediente_regularidad.py` — nueva migración (head), **aplicada en `neondb`** (ver nota de cierre abajo)
+- `alembic/versions/r5s6t7u8v9w0_create_expediente_regularidad.py` — nueva migración (head), **aplicada en `neondb` y `neondb_test2`** (ver nota de cierre abajo)
 - `alembic/env.py` — agregados imports de modelos Fase 2/3 faltantes (`pensum_materia`, `correlatividad`, `avance_alumno_pensum`, `expediente_*`) para que `--autogenerate` los detecte
 - `tests/test_expediente.py`, `test_expediente_router.py` — nuevos, 20 tests
 
@@ -41,7 +41,9 @@
 
 ### Cierre — migración aplicada en `neondb` vía `alembic stamp` (drift de `create_all()`)
 
-Tercer intento de reconexión a `neondb_test` falló (3 sesiones seguidas). Con autorización explícita del usuario se aplicó la migración directo en `neondb`. `alembic upgrade head` chocó con `DuplicateTable` en `expediente_materias` — las 3 tablas ya existían, creadas por el fallback `Base.metadata.create_all()` de `app/main.py` (corre en cada arranque del backend, se disparó en sesiones anteriores al levantar el servidor para verificar Fase 2). Verificado columna por columna y constraint por constraint (`information_schema.columns` + `pg_constraint`) que el schema de `create_all()` coincide exactamente con el de la migración — se usó `alembic stamp head` en vez de recrear tablas. `neondb` confirmado en `r5s6t7u8v9w0`. `neondb_test` sigue sin la migración, pendiente para cuando el compute de Neon responda — ver `ESTADO_FASES.md`.
+Tercer intento de reconexión a `neondb_test` falló (3 sesiones seguidas). Con autorización explícita del usuario se aplicó la migración directo en `neondb`. `alembic upgrade head` chocó con `DuplicateTable` en `expediente_materias` — las 3 tablas ya existían, creadas por el fallback `Base.metadata.create_all()` de `app/main.py` (corre en cada arranque del backend, se disparó en sesiones anteriores al levantar el servidor para verificar Fase 2). Verificado columna por columna y constraint por constraint (`information_schema.columns` + `pg_constraint`) que el schema de `create_all()` coincide exactamente con el de la migración — se usó `alembic stamp head` en vez de recrear tablas. `neondb` confirmado en `r5s6t7u8v9w0`.
+
+**Resolución de infra:** Se creó una nueva branch en Neon (`neondb_test2`) con auto-suspensión desactivada (Never). `TEST_DATABASE_URL` actualizada en `.env.test`. `alembic upgrade head` ejecutado contra la nueva branch — `alembic current` confirma `r5s6t7u8v9w0 (head)`. Tests de compatibilidad Postgres pueden volver a correr contra `neondb_test2` sin restricción.
 
 ---
 
