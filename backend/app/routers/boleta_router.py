@@ -197,7 +197,8 @@ def get_boleta(
             models.puntaje.Puntaje,
             models.materia.Materia.nombre.label("materia_nombre"),
         )
-        .join(models.materia.Materia, models.puntaje.Puntaje.materia_id == models.materia.Materia.id)
+        .join(models.oferta_materia.OfertaMateria, models.puntaje.Puntaje.oferta_materia_id == models.oferta_materia.OfertaMateria.id)
+        .join(models.materia.Materia, models.oferta_materia.OfertaMateria.materia_id == models.materia.Materia.id)
         .filter(models.puntaje.Puntaje.user_id == user_id)
         .all()
     )

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { decodeToken, api, emitHelp } from '../lib/api'
+import { getCurrentUser, api, emitHelp } from '../lib/api'
+import { obtenerCreditosAlumno, type CreditosAlumnoOut } from '../services/pensumService'
 
 /* ── Tipos y datos ─────────────────────────────────────────────── */
 type MateriaRow = { nombre: string; profesor: string; ultimaNota: number | null; estado: string }
@@ -79,10 +80,11 @@ function Ring({ pct, size = 52 }: { pct: number; size?: number }) {
   )
 }
 
-function AlumnoDash({ nombre, materias, eventos, promedio, asistencia }:
-  { nombre: string; materias: MateriaRow[]; eventos: EventoRow[]; promedio: number; asistencia: number }) {
+function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos }:
+  { nombre: string; materias: MateriaRow[]; eventos: EventoRow[]; promedio: number; asistencia: number; creditos: CreditosAlumnoOut | null }) {
   const navigate = useNavigate()
   const enCurso = materias.filter(m => m.estado !== 'SIN CURSAR').length
+  const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
   return (
     <>
       <div className="greet-banner">
@@ -132,6 +134,19 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia }:
           <span className="kpi-value">03</span>
           <span className="kpi-unit" style={{ marginLeft: 8 }}>esta semana</span>
         </div>
+        {creditos && (
+          <div className="kpi-card">
+            <div className="kpi-top">
+              <span className="mono-label">Créditos de Carrera</span>
+              <i className="ti ti-hierarchy-3" style={{ color: 'var(--accent)', fontSize: 15 }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
+              <span className="kpi-value">{creditos.creditos_acumulados}</span>
+              <span className="kpi-unit">/ {creditos.creditos_totales ?? '—'}</span>
+            </div>
+            <div className="progress-track"><div className="progress-fill" style={{ width: `${pctCreditos}%` }} /></div>
+          </div>
+        )}
       </div>
 
       <div className="dash-grid">
@@ -451,15 +466,13 @@ function AdminDash({ nombre, totalUsuarios }: { nombre: string; totalUsuarios: n
 /* ── Contenedor ────────────────────────────────────────────────── */
 
 export default function Dashboard() {
-  const [user] = useState(() => {
-    const token = sessionStorage.getItem('token')
-    return token ? decodeToken(token) : null
-  })
+  const [user] = useState(() => getCurrentUser())
   const [materias, setMaterias] = useState<MateriaRow[]>(materiasMock)
   const [eventos, setEventos] = useState<EventoRow[]>(eventosMock)
   const [promedio, setPromedio] = useState(8.7)
   const [asistencia, setAsistencia] = useState(92)
   const [totalUsuarios, setTotalUsuarios] = useState(0)
+  const [creditos, setCreditos] = useState<CreditosAlumnoOut | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -511,6 +524,9 @@ export default function Dashboard() {
             enVivo: i === 0,
           })))
         }
+        if (isAlumno && !isNaN(uid)) {
+          obtenerCreditosAlumno(uid).then(setCreditos).catch(() => {})
+        }
       } catch { /* mocks quedan */ }
     })()
   }, [user])
@@ -524,7 +540,7 @@ export default function Dashboard() {
         ? <AdminDash nombre={nombre} totalUsuarios={totalUsuarios} />
         : user?.role === 'profesor'
           ? <ProfesorDash nombre={nombre} materias={materias} eventos={eventos} />
-          : <AlumnoDash nombre={nombre} materias={materias} eventos={eventos} promedio={promedio} asistencia={asistencia} />}
+          : <AlumnoDash nombre={nombre} materias={materias} eventos={eventos} promedio={promedio} asistencia={asistencia} creditos={creditos} />}
     </>
   )
 }

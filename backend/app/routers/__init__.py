@@ -14,5 +14,8 @@ from . import boleta_router as boleta
 from . import alumno_router as alumno
 from . import foro_router as foro
 from . import horarios_router as horarios
+from . import profesor_router as profesor
+from . import pensum_router as pensum
+from . import expediente_router as expediente
 
-__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro", "horarios"]
+__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro", "horarios", "profesor", "pensum", "expediente"]

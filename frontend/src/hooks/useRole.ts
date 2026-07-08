@@ -1,11 +1,9 @@
-import { decodeToken } from '../lib/api'
+import { getCurrentUser } from '../lib/api'
 
 export type Role = 'alumno' | 'profesor' | 'admin'
 
 export function getRole(): Role | null {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
-  const r = user?.role
+  const r = getCurrentUser()?.role
   if (r === 'admin' || r === 'administrador') return 'admin'
   if (r === 'profesor') return 'profesor'
   if (r === 'alumno') return 'alumno'
@@ -13,15 +11,11 @@ export function getRole(): Role | null {
 }
 
 export function getUserId(): number | null {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
-  return user?.user_id ?? null
+  return getCurrentUser()?.user_id ?? null
 }
 
 export function getUsername(): string {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
-  return user?.username ?? ''
+  return getCurrentUser()?.username ?? ''
 }
 
 // Hook: rol actual desde JWT (estable durante la sesión de la página)

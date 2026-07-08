@@ -6,3 +6,5 @@ class Carrera(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(150), unique=True, nullable=False)
+    duracion_semestres = Column(Integer, nullable=True)
+    creditos_totales = Column(Integer, nullable=True)

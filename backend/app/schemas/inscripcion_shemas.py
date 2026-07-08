@@ -7,7 +7,10 @@ class InscripcionBase(BaseModel):
 class InscripcionCreate(InscripcionBase):
     pass
 
-class InscripcionOut(InscripcionBase):
+class InscripcionOut(BaseModel):
     id: int
+    alumno_id: int
+    materia_id: int
+    oferta_materia_id: int
 
     model_config = {"from_attributes": True}

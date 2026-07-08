@@ -4,9 +4,18 @@ from typing import Optional
 from datetime import date
 from app import models, schemas, database
 from app.dependencias import get_current_user
+from app.services.autorizacion import es_profesor_de_materia
 
 
 router = APIRouter(prefix="/asistencias", tags=["asistencias"])
+
+
+def _oferta_activa_id(db: Session, materia_id: int) -> int | None:
+    oferta = db.query(models.oferta_materia.OfertaMateria).filter(
+        models.oferta_materia.OfertaMateria.materia_id == materia_id,
+        models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
+    ).first()
+    return oferta.id if oferta else None
 
 
 def _verificar_profesor_materia(db: Session, materia_id: int, current_user: dict):
@@ -16,7 +25,7 @@ def _verificar_profesor_materia(db: Session, materia_id: int, current_user: dict
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
-    if materia.profesor_id != current_user["user_id"]:
+    if not es_profesor_de_materia(db, materia_id, current_user["user_id"]):
         raise HTTPException(status_code=403, detail="No sos el profesor titular de esta materia")
 
 
@@ -27,10 +36,13 @@ def create_asistencia(
     current_user = Depends(get_current_user),
 ):
     _verificar_profesor_materia(db, asistencia.materia_id, current_user)
+    oferta_id = _oferta_activa_id(db, asistencia.materia_id)
+    if oferta_id is None:
+        raise HTTPException(status_code=404, detail="No hay oferta activa para esta materia")
     # Check for existing attendance record
     existing = db.query(models.asistencia.Asistencia).filter(
         models.asistencia.Asistencia.user_id == asistencia.user_id,
-        models.asistencia.Asistencia.materia_id == asistencia.materia_id,
+        models.asistencia.Asistencia.oferta_materia_id == oferta_id,
         models.asistencia.Asistencia.fecha == asistencia.fecha,
     ).first()
     if existing:
@@ -40,7 +52,7 @@ def create_asistencia(
     es_becado = alumno.es_becado if alumno else False
     new_asistencia = models.asistencia.Asistencia(
         user_id=asistencia.user_id,
-        materia_id=asistencia.materia_id,
+        oferta_materia_id=oferta_id,
         fecha=asistencia.fecha,
         presente=asistencia.presente,
         es_becado=es_becado,
@@ -67,7 +79,8 @@ def list_asistencias(
         if user_id is not None:
             query = query.filter(models.asistencia.Asistencia.user_id == user_id)
     if materia_id is not None:
-        query = query.filter(models.asistencia.Asistencia.materia_id == materia_id)
+        oferta_id = _oferta_activa_id(db, materia_id)
+        query = query.filter(models.asistencia.Asistencia.oferta_materia_id == oferta_id)
     if fecha is not None:
         query = query.filter(models.asistencia.Asistencia.fecha == fecha)
     return query.all()
@@ -84,7 +97,14 @@ def update_asistencia(
     if not existing:
         raise HTTPException(status_code=404, detail="Asistencia no encontrada")
     _verificar_profesor_materia(db, existing.materia_id, current_user)
-    for key, value in asistencia.model_dump().items():
+    data = asistencia.model_dump()
+    nueva_materia_id = data.pop("materia_id")
+    if nueva_materia_id != existing.materia_id:
+        nuevo_oferta_id = _oferta_activa_id(db, nueva_materia_id)
+        if nuevo_oferta_id is None:
+            raise HTTPException(status_code=404, detail="No hay oferta activa para esta materia")
+        existing.oferta_materia_id = nuevo_oferta_id
+    for key, value in data.items():
         setattr(existing, key, value)
     db.commit()
     db.refresh(existing)
@@ -114,6 +134,9 @@ def cargar_asistencia_lote(
 ):
     """Carga/actualiza asistencia de toda una clase en un solo request."""
     _verificar_profesor_materia(db, lote.materia_id, current_user)
+    oferta_id = _oferta_activa_id(db, lote.materia_id)
+    if oferta_id is None:
+        raise HTTPException(status_code=404, detail="No hay oferta activa para esta materia")
     guardados = 0
     actualizados = 0
 
@@ -125,7 +148,7 @@ def cargar_asistencia_lote(
             db.query(models.asistencia.Asistencia)
             .filter(
                 models.asistencia.Asistencia.user_id == reg.user_id,
-                models.asistencia.Asistencia.materia_id == lote.materia_id,
+                models.asistencia.Asistencia.oferta_materia_id == oferta_id,
                 models.asistencia.Asistencia.fecha == lote.fecha,
             )
             .first()
@@ -137,7 +160,7 @@ def cargar_asistencia_lote(
         else:
             nueva = models.asistencia.Asistencia(
                 user_id=reg.user_id,
-                materia_id=lote.materia_id,
+                oferta_materia_id=oferta_id,
                 fecha=lote.fecha,
                 presente=reg.presente,
                 es_becado=es_becado,
@@ -160,9 +183,14 @@ def alumnos_asistencia(
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
 
+    ofertas_ids = [
+        o.id for o in db.query(models.oferta_materia.OfertaMateria.id)
+        .filter(models.oferta_materia.OfertaMateria.materia_id == materia_id)
+        .all()
+    ]
     inscripciones = (
         db.query(models.inscripcion.Inscripcion)
-        .filter(models.inscripcion.Inscripcion.materia_id == materia_id)
+        .filter(models.inscripcion.Inscripcion.oferta_materia_id.in_(ofertas_ids))
         .all()
     )
     if not inscripciones:
@@ -180,7 +208,7 @@ def alumnos_asistencia(
             db.query(models.asistencia.Asistencia)
             .filter(
                 models.asistencia.Asistencia.user_id == a.id,
-                models.asistencia.Asistencia.materia_id == materia_id,
+                models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
             )
             .count()
         )
@@ -188,7 +216,7 @@ def alumnos_asistencia(
             db.query(models.asistencia.Asistencia)
             .filter(
                 models.asistencia.Asistencia.user_id == a.id,
-                models.asistencia.Asistencia.materia_id == materia_id,
+                models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
                 models.asistencia.Asistencia.presente == True,
             )
             .count()
@@ -217,7 +245,12 @@ def porcentaje_asistencia_alumno(
 
     query = db.query(models.asistencia.Asistencia).filter(models.asistencia.Asistencia.user_id == user_id)
     if materia_id is not None:
-        query = query.filter(models.asistencia.Asistencia.materia_id == materia_id)
+        ofertas_ids = [
+            o.id for o in db.query(models.oferta_materia.OfertaMateria.id)
+            .filter(models.oferta_materia.OfertaMateria.materia_id == materia_id)
+            .all()
+        ]
+        query = query.filter(models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids))
 
     total = query.count()
     presentes = query.filter(models.asistencia.Asistencia.presente == True).count()
@@ -232,11 +265,16 @@ def porcentaje_asistencia_alumno(
 
 @router.get("/{materia_id}/resumen")
 def resumen_asistencia(materia_id: int, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+    ofertas_ids = [
+        o.id for o in db.query(models.oferta_materia.OfertaMateria.id)
+        .filter(models.oferta_materia.OfertaMateria.materia_id == materia_id)
+        .all()
+    ]
     total = db.query(models.asistencia.Asistencia).filter(
-        models.asistencia.Asistencia.materia_id == materia_id
+        models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids)
     ).count()
     presentes = db.query(models.asistencia.Asistencia).filter(
-        models.asistencia.Asistencia.materia_id == materia_id,
+        models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
         models.asistencia.Asistencia.presente == True
     ).count()
     if total == 0:

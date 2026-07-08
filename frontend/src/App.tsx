@@ -14,7 +14,6 @@ import Biblioteca from './pages/Biblioteca'
 import Programa from './pages/Programa'
 import Boleta from './pages/Boleta'
 import Reportes from './pages/Reportes'
-import MisCursos from './pages/MisCursos'
 import MisMaterias from './pages/MisMaterias'
 import GestionAsignaciones from './pages/GestionAsignaciones'
 import Estadisticas from './pages/Estadisticas'
@@ -22,6 +21,8 @@ import AsistenciaScan from './pages/AsistenciaScan'
 import Inscripciones from './pages/Inscripciones'
 import NotFound from './pages/NotFound'
 import Foro from './pages/Foro'
+import Malla from './pages/Malla'
+import Expediente from './pages/Expediente'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -35,12 +36,13 @@ const rolesPermitidos: Record<string, string[]> = {
   '/calendario':['admin', 'profesor', 'alumno'],
   '/biblioteca':['admin', 'profesor', 'alumno'],
   '/boleta':    ['admin', 'profesor', 'alumno'],
-  '/miscursos':      ['profesor'],
   '/estadisticas':   ['admin', 'profesor'],
   '/inscripciones':      ['admin', 'alumno'],
-  '/mismaterias':        ['profesor'],
+  '/mis-materias':        ['profesor'],
   '/gestion-asignaciones': ['admin'],
   '/foro':               ['admin', 'profesor', 'alumno'],
+  '/malla':              ['admin', 'alumno'],
+  '/expediente':         ['admin', 'alumno'],
 }
 
 function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
@@ -87,12 +89,15 @@ function App() {
         <Route path="/programa" element={<Layout><RutaProtegida path="/programa"><Programa /></RutaProtegida></Layout>} />
         <Route path="/boleta" element={<Layout><RutaProtegida path="/boleta"><Boleta /></RutaProtegida></Layout>} />
         <Route path="/reportes"   element={<Layout><RutaProtegida path="/reportes"><Reportes /></RutaProtegida></Layout>} />
-        <Route path="/miscursos"    element={<Layout><RutaProtegida path="/miscursos"><MisCursos /></RutaProtegida></Layout>} />
         <Route path="/estadisticas" element={<Layout><RutaProtegida path="/estadisticas"><Estadisticas /></RutaProtegida></Layout>} />
         <Route path="/inscripciones" element={<Layout><RutaProtegida path="/inscripciones"><Inscripciones /></RutaProtegida></Layout>} />
-        <Route path="/mismaterias" element={<Layout><RutaProtegida path="/mismaterias"><MisMaterias /></RutaProtegida></Layout>} />
+        <Route path="/mis-materias" element={<Layout><RutaProtegida path="/mis-materias"><MisMaterias /></RutaProtegida></Layout>} />
+        <Route path="/miscursos" element={<Navigate to="/mis-materias" replace />} />
+        <Route path="/mismaterias" element={<Navigate to="/mis-materias" replace />} />
         <Route path="/gestion-asignaciones" element={<Layout><RutaProtegida path="/gestion-asignaciones"><GestionAsignaciones /></RutaProtegida></Layout>} />
         <Route path="/foro" element={<Layout><RutaProtegida path="/foro"><Foro /></RutaProtegida></Layout>} />
+        <Route path="/malla" element={<Layout><RutaProtegida path="/malla"><Malla /></RutaProtegida></Layout>} />
+        <Route path="/expediente" element={<Layout><RutaProtegida path="/expediente"><Expediente /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><AsistenciaScan /></Layout>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

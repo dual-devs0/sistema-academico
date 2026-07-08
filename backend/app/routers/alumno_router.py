@@ -57,13 +57,21 @@ def mis_materias(
         .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
         .all()
     )
-    materia_ids = [i.materia_id for i in inscripciones]
+    materia_ids = [i.oferta.materia_id for i in inscripciones]
     if not materia_ids:
         return []
     materias = db.query(models.materia.Materia).filter(models.materia.Materia.id.in_(materia_ids)).all()
     result = []
     for m in materias:
-        profesor = db.query(models.user.User).filter(models.user.User.id == m.profesor_id).first()
+        oferta = (
+            db.query(models.oferta_materia.OfertaMateria)
+            .filter(
+                models.oferta_materia.OfertaMateria.materia_id == m.id,
+                models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
+            )
+            .first()
+        )
+        profesor = db.query(models.user.User).filter(models.user.User.id == oferta.profesor_id).first() if oferta else None
         result.append({
             "id": m.id,
             "nombre": m.nombre,

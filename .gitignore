@@ -46,6 +46,9 @@ postgres_data/
 # Archivos de borrador
 mark.txt
 
+# Backups de DB locales (pueden contener datos sensibles)
+backend/backup_*.json
+
 # Venv de Python (backend)
 backend/venv/
 venv/

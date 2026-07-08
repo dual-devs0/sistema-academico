@@ -16,6 +16,7 @@ from app.database import Base, get_db
 from app.models import (  # noqa: F401
     user as user_model,
     materia as materia_model,
+    oferta_materia as oferta_materia_model,
     inscripcion,
     carrera as carrera_model,
     asistencia,
@@ -107,15 +108,23 @@ def seed(db):
 
     materia = materia_model.Materia(
         nombre="Programaci\u00f3n I",
-        profesor_id=profesor.id,
         carrera_id=carrera.id,
         anio=1,
         semestre=1,
     )
     db.add(materia)
+    db.flush()
+
+    oferta = oferta_materia_model.OfertaMateria(
+        materia_id=materia.id,
+        profesor_id=profesor.id,
+        periodo="2026-1",
+        activa=True,
+    )
+    db.add(oferta)
     db.commit()
 
-    for obj in (admin, profesor, alumno, alumno2, carrera, materia):
+    for obj in (admin, profesor, alumno, alumno2, carrera, materia, oferta):
         db.refresh(obj)
 
     return {
@@ -125,6 +134,7 @@ def seed(db):
         "alumno2":  alumno2,
         "carrera":  carrera,
         "materia":  materia,
+        "oferta":   oferta,
     }
 
 

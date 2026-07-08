@@ -2,8 +2,30 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import require_role, get_current_user
+from app.services.pensum import validar_correlatividades
 
 router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
+
+
+def _oferta_activa_o_404(db: Session, materia_id: int):
+    oferta = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(
+            models.oferta_materia.OfertaMateria.materia_id == materia_id,
+            models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not oferta:
+        raise HTTPException(status_code=404, detail="No hay oferta activa para esta materia")
+    return oferta
+
+
+def _to_out(db: Session, ins: "models.inscripcion.Inscripcion") -> schemas.inscripcion.InscripcionOut:
+    return schemas.inscripcion.InscripcionOut(
+        id=ins.id, alumno_id=ins.alumno_id,
+        materia_id=ins.oferta.materia_id, oferta_materia_id=ins.oferta_materia_id,
+    )
 
 
 @router.post("/", response_model=schemas.inscripcion.InscripcionOut)
@@ -14,16 +36,30 @@ def inscribir(inscripcion: schemas.inscripcion.InscripcionCreate, db: Session = 
     alumno_id = inscripcion.alumno_id
     if current_user["role"] == "alumno":
         alumno_id = current_user["user_id"]
-    existente = db.query(models.inscripcion.Inscripcion).filter(
-        models.inscripcion.Inscripcion.alumno_id == alumno_id,
-        models.inscripcion.Inscripcion.materia_id == inscripcion.materia_id,
-    ).first()
-    if existente:
-        raise HTTPException(status_code=400, detail="El alumno ya esta inscripto en esta materia")
-    # Validate materia exists
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == inscripcion.materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
+
+    resultado = validar_correlatividades(alumno_id, inscripcion.materia_id, db)
+    if not resultado["valido"]:
+        pendientes_nombres = []
+        for p in resultado["pendientes"]:
+            m = db.query(models.materia.Materia).filter(models.materia.Materia.id == p["materia_id"]).first()
+            nombre = m.nombre if m else f"Materia #{p['materia_id']}"
+            accion = "tener aprobada" if p["tipo"] == "aprobada" else "estar cursando"
+            pendientes_nombres.append(f"{nombre} ({accion})")
+        raise HTTPException(
+            status_code=422,
+            detail=f"No cumplís las correlatividades: falta {', '.join(pendientes_nombres)}",
+        )
+
+    oferta = _oferta_activa_o_404(db, inscripcion.materia_id)
+    existente = db.query(models.inscripcion.Inscripcion).filter(
+        models.inscripcion.Inscripcion.alumno_id == alumno_id,
+        models.inscripcion.Inscripcion.oferta_materia_id == oferta.id,
+    ).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="El alumno ya esta inscripto en esta materia")
     # Check for schedule overlap
     try:
         from app.routers.horarios_router import verificar_solapamiento_inscripcion
@@ -34,12 +70,12 @@ def inscribir(inscripcion: schemas.inscripcion.InscripcionCreate, db: Session = 
         pass  # horarios module not yet available
     nueva = models.inscripcion.Inscripcion(
         alumno_id=alumno_id,
-        materia_id=inscripcion.materia_id,
+        oferta_materia_id=oferta.id,
     )
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
-    return nueva
+    return _to_out(db, nueva)
 
 
 @router.delete("/{inscripcion_id}")
@@ -56,8 +92,9 @@ def desinscribir(inscripcion_id: int, db: Session = Depends(database.get_db), cu
 
 @router.get("/materia/{materia_id}")
 def alumnos_por_materia(materia_id: int, db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
+    oferta = _oferta_activa_o_404(db, materia_id)
     inscripciones = db.query(models.inscripcion.Inscripcion).filter(
-        models.inscripcion.Inscripcion.materia_id == materia_id
+        models.inscripcion.Inscripcion.oferta_materia_id == oferta.id
     ).all()
     result = []
     for i in inscripciones:
@@ -76,7 +113,9 @@ def alumnos_por_materia(materia_id: int, db: Session = Depends(database.get_db),
 @router.get("/")
 def list_inscripciones(db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
     if current_user["role"] == "alumno":
-        return db.query(models.inscripcion.Inscripcion).filter(
+        rows = db.query(models.inscripcion.Inscripcion).filter(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
-    return db.query(models.inscripcion.Inscripcion).all()
+    else:
+        rows = db.query(models.inscripcion.Inscripcion).all()
+    return [_to_out(db, i) for i in rows]

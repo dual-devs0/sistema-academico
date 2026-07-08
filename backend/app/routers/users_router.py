@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from typing import Optional
 from app import models, schemas, database
 from app.security import hash_password
 from app.dependencias import require_role, get_current_user
@@ -32,11 +34,30 @@ def get_me(db: Session = Depends(database.get_db), current_user = Depends(get_cu
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
 
-@router.get("/", response_model=list[schemas.user.UserOut])
-def list_users(db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+@router.get("/", response_model=schemas.user.UserListOut)
+def list_users(
+    skip: int = 0,
+    limit: int = 20,
+    q: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user = Depends(get_current_user),
+):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    return db.query(models.user.User).all()
+    query = db.query(models.user.User)
+    if role:
+        query = query.filter(models.user.User.role == role)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(
+            models.user.User.nombre.ilike(like),
+            models.user.User.email.ilike(like),
+            models.user.User.username.ilike(like),
+        ))
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return {"items": items, "total": total}
 
 @router.get("/secure")
 def secure_endpoint(current_user = Depends(get_current_user)):

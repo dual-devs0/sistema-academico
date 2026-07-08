@@ -15,6 +15,9 @@ class ForoHiloUpdate(BaseModel):
 class ForoMensajeCreate(BaseModel):
     contenido: str
 
+class ForoMensajeUpdate(BaseModel):
+    contenido: str
+
 class ForoMensajeOut(BaseModel):
     id: int
     hilo_id: int
@@ -24,6 +27,10 @@ class ForoMensajeOut(BaseModel):
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+class ForoMensajesListOut(BaseModel):
+    items: list[ForoMensajeOut]
+    total: int
 
 class ForoHiloOut(BaseModel):
     id: int

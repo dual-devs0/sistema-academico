@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api, emitToast } from '../lib/api'
+import TablaPaginada, { type ColumnaTabla } from '../components/common/TablaPaginada'
 
 type Rol = 'alumno' | 'profesor' | 'admin'
 type Usuario = { id: number; username: string; role: string; nombre: string; email: string; es_becado: boolean }
@@ -22,9 +23,11 @@ const PAGE_SIZE = 10
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [filtroRol, setFiltroRol] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [busquedaDebounced, setBusquedaDebounced] = useState('')
   const [checks, setChecks] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<Usuario | 'nuevo' | null>(null)
@@ -32,21 +35,81 @@ export default function Usuarios() {
   const [draft, setDraft] = useState({ nombre: '', email: '', rol: 'alumno' as Rol, becado: false })
   const [saving, setSaving] = useState(false)
 
+  // Debounce de búsqueda para no disparar un fetch por cada tecla
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaDebounced(busqueda), 300)
+    return () => clearTimeout(t)
+  }, [busqueda])
+
   function cargar() {
-    api.get<Usuario[]>('/users/')
-      .then(setUsuarios)
+    setLoading(true)
+    const params = new URLSearchParams()
+    params.set('skip', String((page - 1) * PAGE_SIZE))
+    params.set('limit', String(PAGE_SIZE))
+    if (filtroRol) params.set('role', filtroRol)
+    if (busquedaDebounced) params.set('q', busquedaDebounced)
+    api.get<{ items: Usuario[]; total: number }>(`/users/?${params}`)
+      .then(res => { setUsuarios(res.items); setTotal(res.total) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
-  useEffect(cargar, [])
+  useEffect(cargar, [page, filtroRol, busquedaDebounced])
 
-  const filtrados = usuarios.filter(u =>
-    (!filtroRol || u.role === filtroRol) &&
-    ((u.nombre || u.username).toLowerCase().includes(busqueda.toLowerCase()) ||
-      (u.email || '').toLowerCase().includes(busqueda.toLowerCase()))
-  )
-  const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
-  const pageRows = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const columnas: ColumnaTabla<Usuario>[] = [
+    {
+      header: 'Nombre y Email',
+      render: u => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="avatar-initials" style={{ width: 32, height: 32, fontSize: 11 }}>{(u.nombre || u.username).slice(0, 2)}</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{u.nombre || u.username}</div>
+            <div className="mono-label" style={{ fontSize: 9.5, textTransform: 'none' }}>{u.email || `@${u.username}`}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'Rol',
+      render: u => {
+        const cfg = rolCfg[u.role] ?? rolCfg.alumno
+        return <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+      },
+    },
+    {
+      header: 'Estado',
+      render: () => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--success)' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)' }} /> Activo
+        </span>
+      ),
+    },
+    {
+      header: 'ID Institucional',
+      render: u => (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+          #{u.role === 'alumno' ? 'STD' : u.role === 'profesor' ? 'FCL' : 'ADM'}-{String(u.id).padStart(3, '0')}
+        </span>
+      ),
+    },
+    {
+      header: 'Último Acceso',
+      render: () => <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Hoy</span>,
+    },
+    {
+      header: 'Acciones',
+      align: 'right',
+      render: u => (
+        <div style={{ whiteSpace: 'nowrap' }}>
+          <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11, marginRight: 6 }} onClick={() => abrirEditar(u)}>
+            <i className="ti ti-pencil" />
+          </button>
+          <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11, color: 'var(--danger)' }} onClick={() => setConfirmDel(u.id)}>
+            <i className="ti ti-trash" />
+          </button>
+        </div>
+      ),
+    },
+  ]
 
   function abrirNuevo() {
     setDraft({ nombre: '', email: '', rol: 'alumno', becado: false })
@@ -88,7 +151,9 @@ export default function Usuarios() {
   }
 
   function exportCSV() {
-    const rows = [['Nombre', 'Email', 'Rol', 'Becado'], ...filtrados.map(u => [u.nombre || u.username, u.email || '-', u.role, u.es_becado ? 'Sí' : 'No'])]
+    // Limitación aceptada: exporta solo la página actual (usuarios cargados en memoria),
+    // no el total server-side. Exportar todo requeriría un endpoint dedicado sin paginar.
+    const rows = [['Nombre', 'Email', 'Rol', 'Becado'], ...usuarios.map(u => [u.nombre || u.username, u.email || '-', u.role, u.es_becado ? 'Sí' : 'No'])]
     const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -147,78 +212,28 @@ export default function Usuarios() {
       </div>
 
       {/* Tabla */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: 8 }}>
-          {checks.size > 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 800 }}>{checks.size} Usuarios seleccionados</span>
-              <button style={{ background: 'none', border: 'none', color: 'var(--danger)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                <i className="ti ti-ban" /> Bloqueo Masivo
-              </button>
-            </div>
-          ) : (
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
-              {loading ? 'Cargando…' : `Mostrando ${pageRows.length} de ${filtrados.length}`}
-            </span>
-          )}
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="table-uca">
-            <thead>
-              <tr>
-                <th style={{ width: 36 }}></th>
-                <th>Nombre y Email</th><th>Rol</th><th>Estado</th><th>ID Institucional</th><th>Último Acceso</th><th style={{ textAlign: 'right' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map(u => {
-                const cfg = rolCfg[u.role] ?? rolCfg.alumno
-                return (
-                  <tr key={u.id}>
-                    <td>
-                      <input type="checkbox" checked={checks.has(u.id)} onChange={() => toggleCheck(u.id)} style={{ accentColor: 'var(--accent)' }} />
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="avatar-initials" style={{ width: 32, height: 32, fontSize: 11 }}>{(u.nombre || u.username).slice(0, 2)}</span>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 13 }}>{u.nombre || u.username}</div>
-                          <div className="mono-label" style={{ fontSize: 9.5, textTransform: 'none' }}>{u.email || `@${u.username}`}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td><span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span></td>
-                    <td>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--success)' }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)' }} /> Activo
-                      </span>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                      #{u.role === 'alumno' ? 'STD' : u.role === 'profesor' ? 'FCL' : 'ADM'}-{String(u.id).padStart(3, '0')}
-                    </td>
-                    <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Hoy</td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11, marginRight: 6 }} onClick={() => abrirEditar(u)}>
-                        <i className="ti ti-pencil" />
-                      </button>
-                      <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11, color: 'var(--danger)' }} onClick={() => setConfirmDel(u.id)}>
-                        <i className="ti ti-trash" />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', flexWrap: 'wrap', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Mostrando {(page - 1) * PAGE_SIZE + 1} a {Math.min(page * PAGE_SIZE, filtrados.length)} de {filtrados.length} resultados</span>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }} disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
-            <button className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Siguiente</button>
+      <TablaPaginada
+        columnas={columnas}
+        items={usuarios}
+        total={total}
+        page={page}
+        pageSize={PAGE_SIZE}
+        loading={loading}
+        onPageChange={setPage}
+        getRowKey={u => u.id}
+        selectable
+        selectedIds={checks}
+        onToggleSelect={id => toggleCheck(id as number)}
+        emptyMessage="Sin usuarios que coincidan con el filtro."
+        headerExtra={checks.size > 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{ fontSize: 13, fontWeight: 800 }}>{checks.size} Usuarios seleccionados</span>
+            <button style={{ background: 'none', border: 'none', color: 'var(--danger)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              <i className="ti ti-ban" /> Bloqueo Masivo
+            </button>
           </div>
-        </div>
-      </div>
+        ) : undefined}
+      />
 
       {/* Panel inferior */}
       <div className="us-bottom">

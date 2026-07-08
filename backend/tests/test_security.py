@@ -107,7 +107,7 @@ def test_delete_user_actually_removes(client, seed, tokens):
     assert res.status_code == 200
     # Verify user is gone
     res = client.get("/users/", headers=auth(tokens["admin"]))
-    usernames = [u["username"] for u in res.json()]
+    usernames = [u["username"] for u in res.json()["items"]]
     assert "alumno2_test" not in usernames
 
 
@@ -119,10 +119,14 @@ def test_delete_user_non_admin_returns_403(client, seed, tokens):
 # ===================== PROFESSOR GRADE OWNERSHIP =====================
 
 def test_profesor_cannot_create_grade_for_other_materia(client, seed, tokens, db):
-    # Create a materia that belongs to NO profesor (or another profesor)
+    # Create a materia dictada por otro profesor (via oferta)
     from app.models.materia import Materia
-    other_materia = Materia(nombre="Otra Materia", profesor_id=seed["alumno"].id, carrera_id=seed["carrera"].id)
+    from app.models.oferta_materia import OfertaMateria
+    other_materia = Materia(nombre="Otra Materia", carrera_id=seed["carrera"].id)
     db.add(other_materia)
+    db.flush()
+    other_oferta = OfertaMateria(materia_id=other_materia.id, profesor_id=seed["alumno"].id, periodo="2026-1", activa=True)
+    db.add(other_oferta)
     db.commit()
     db.refresh(other_materia)
 
@@ -274,7 +278,7 @@ def test_eventos_get_requires_auth(client, seed):
 
 def test_alumno_cannot_create_thread_in_unenrolled_materia(client, seed, tokens, db):
     from app.models.materia import Materia
-    other = Materia(nombre="Materia Sin Inscripcion", profesor_id=seed["profesor"].id)
+    other = Materia(nombre="Materia Sin Inscripcion")
     db.add(other)
     db.commit()
     db.refresh(other)
@@ -289,7 +293,7 @@ def test_alumno_cannot_create_thread_in_unenrolled_materia(client, seed, tokens,
 
 def test_alumno_can_create_thread_in_enrolled_materia(client, seed, tokens, db):
     from app.models.inscripcion import Inscripcion
-    insc = Inscripcion(alumno_id=seed["alumno"].id, materia_id=seed["materia"].id)
+    insc = Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=seed["oferta"].id)
     db.add(insc)
     db.commit()
 
@@ -316,7 +320,7 @@ def test_alumno_sees_global_and_own_materia_events(client, seed, tokens, db):
     db.commit()
 
     from app.models.inscripcion import Inscripcion
-    insc = Inscripcion(alumno_id=seed["alumno"].id, materia_id=seed["materia"].id)
+    insc = Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=seed["oferta"].id)
     db.add(insc)
     db.commit()
 
@@ -364,20 +368,25 @@ def test_create_horario_alumno_forbidden(client, seed, tokens):
 
 def test_horario_overlap_detection(client, seed, tokens, db):
     from app.models.materia import Materia
+    from app.models.oferta_materia import OfertaMateria
     from app.models.inscripcion import Inscripcion
     from app.models.horario import Horario
 
-    materia2 = Materia(nombre="Base de Datos", profesor_id=seed["profesor"].id, carrera_id=seed["carrera"].id)
+    materia2 = Materia(nombre="Base de Datos", carrera_id=seed["carrera"].id)
     db.add(materia2)
+    db.flush()
+    oferta2 = OfertaMateria(materia_id=materia2.id, profesor_id=seed["profesor"].id, periodo="2026-1", activa=True)
+    db.add(oferta2)
     db.commit()
     db.refresh(materia2)
+    db.refresh(oferta2)
 
     h1 = Horario(materia_id=seed["materia"].id, dia_semana=1, hora_inicio=time(8, 0), hora_fin=time(10, 0))
     h2 = Horario(materia_id=materia2.id, dia_semana=1, hora_inicio=time(9, 0), hora_fin=time(11, 0))
     db.add_all([h1, h2])
     db.commit()
 
-    insc = Inscripcion(alumno_id=seed["alumno"].id, materia_id=materia2.id)
+    insc = Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=oferta2.id)
     db.add(insc)
     db.commit()
 
@@ -415,10 +424,10 @@ def test_alumno_cannot_list_other_users(client, seed, tokens):
 def test_boleta_uses_weighted_average(client, seed, tokens, db):
     """Verify the boleta PDF generation uses weighted average matching puntajes_router."""
     puntajes_data = [
-        {"user_id": seed["alumno"].id, "materia_id": seed["materia"].id, "tipo": "parcial1", "valor": 8.0},
-        {"user_id": seed["alumno"].id, "materia_id": seed["materia"].id, "tipo": "parcial2", "valor": 7.0},
-        {"user_id": seed["alumno"].id, "materia_id": seed["materia"].id, "tipo": "practico", "valor": 9.0},
-        {"user_id": seed["alumno"].id, "materia_id": seed["materia"].id, "tipo": "final", "valor": 6.0},
+        {"user_id": seed["alumno"].id, "oferta_materia_id": seed["oferta"].id, "tipo": "parcial1", "valor": 8.0},
+        {"user_id": seed["alumno"].id, "oferta_materia_id": seed["oferta"].id, "tipo": "parcial2", "valor": 7.0},
+        {"user_id": seed["alumno"].id, "oferta_materia_id": seed["oferta"].id, "tipo": "practico", "valor": 9.0},
+        {"user_id": seed["alumno"].id, "oferta_materia_id": seed["oferta"].id, "tipo": "final", "valor": 6.0},
     ]
     for p in puntajes_data:
         db.add(Puntaje(**p, editado_por=seed["admin"].id))
@@ -434,18 +443,23 @@ def test_schedule_overlap_verification_endpoint(client, seed, tokens, db):
     from app.models.horario import Horario
     from app.models.inscripcion import Inscripcion
     from app.models.materia import Materia
+    from app.models.oferta_materia import OfertaMateria
 
-    materia2 = Materia(nombre="Base de Datos", profesor_id=seed["profesor"].id, carrera_id=seed["carrera"].id)
+    materia2 = Materia(nombre="Base de Datos", carrera_id=seed["carrera"].id)
     db.add(materia2)
+    db.flush()
+    oferta2 = OfertaMateria(materia_id=materia2.id, profesor_id=seed["profesor"].id, periodo="2026-1", activa=True)
+    db.add(oferta2)
     db.commit()
     db.refresh(materia2)
+    db.refresh(oferta2)
 
     h1 = Horario(materia_id=seed["materia"].id, dia_semana=1, hora_inicio=time(8, 0), hora_fin=time(10, 0))
     h2 = Horario(materia_id=materia2.id, dia_semana=1, hora_inicio=time(9, 0), hora_fin=time(11, 0))
     db.add_all([h1, h2])
     db.commit()
 
-    insc = Inscripcion(alumno_id=seed["alumno"].id, materia_id=materia2.id)
+    insc = Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=oferta2.id)
     db.add(insc)
     db.commit()
 

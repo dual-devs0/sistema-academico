@@ -4,37 +4,12 @@ import {
   PieChart, Pie, Cell, Legend,
   LineChart, Line,
 } from 'recharts'
-import { api } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
+import { obtenerEstadisticasMateria, type EstadisticasMateria } from '../services/estadisticasService'
 
 interface Puntaje   { id: number; user_id: number; materia_id: number; tipo: string; valor: number }
-interface Materia   { id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number | null; semestre: number | null }
+interface Materia   { id: number; nombre: string; profesor_id: number | null; carrera_id: number | null; anio: number | null; semestre: number | null }
 interface Asistencia{ id: number; user_id: number; materia_id: number; fecha: string; presente: boolean }
-
-const MOCK_PUNTAJES: Puntaje[] = [
-  { id:1, user_id:1, materia_id:1, tipo:'parcial1', valor:8.5 },
-  { id:2, user_id:1, materia_id:1, tipo:'parcial2', valor:7.0 },
-  { id:3, user_id:2, materia_id:1, tipo:'parcial1', valor:6.0 },
-  { id:4, user_id:2, materia_id:2, tipo:'parcial1', valor:9.5 },
-  { id:5, user_id:3, materia_id:2, tipo:'parcial1', valor:4.5 },
-  { id:6, user_id:3, materia_id:1, tipo:'final',    valor:7.5 },
-  { id:7, user_id:4, materia_id:3, tipo:'parcial1', valor:8.0 },
-  { id:8, user_id:5, materia_id:3, tipo:'parcial1', valor:5.5 },
-]
-const MOCK_MATERIAS: Materia[] = [
-  { id:1, nombre:'Programación I',  profesor_id:1, carrera_id:1, anio:1, semestre:1 },
-  { id:2, nombre:'Matemática',      profesor_id:1, carrera_id:1, anio:1, semestre:1 },
-  { id:3, nombre:'Física',          profesor_id:2, carrera_id:1, anio:1, semestre:1 },
-]
-const MOCK_ASISTENCIAS: Asistencia[] = [
-  { id:1, user_id:1, materia_id:1, fecha:'2026-03-01', presente:true  },
-  { id:2, user_id:1, materia_id:1, fecha:'2026-03-08', presente:true  },
-  { id:3, user_id:2, materia_id:1, fecha:'2026-03-01', presente:false },
-  { id:4, user_id:2, materia_id:2, fecha:'2026-03-01', presente:true  },
-  { id:5, user_id:3, materia_id:2, fecha:'2026-03-01', presente:false },
-  { id:6, user_id:3, materia_id:3, fecha:'2026-03-01', presente:true  },
-  { id:7, user_id:4, materia_id:3, fecha:'2026-03-01', presente:true  },
-  { id:8, user_id:5, materia_id:3, fecha:'2026-03-08', presente:false },
-]
 
 const CYAN   = 'var(--accent)'
 const GREEN  = '#22c55e'
@@ -109,64 +84,90 @@ function SkeletonChart({ h = 200 }: { h?: number }) {
 }
 
 export default function Estadisticas() {
-  const [loading,     setLoading]     = useState(true)
-  const [puntajes,    setPuntajes]    = useState<Puntaje[]>([])
-  const [materias,    setMaterias]    = useState<Materia[]>([])
-  const [asistencias, setAsistencias] = useState<Asistencia[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState<string | null>(null)
+  const [puntajes,     setPuntajes]     = useState<Puntaje[]>([])
+  const [materias,     setMaterias]     = useState<Materia[]>([])
+  const [asistencias,  setAsistencias]  = useState<Asistencia[]>([])
+  const [estadisticas, setEstadisticas] = useState<EstadisticasMateria[]>([])
 
   useEffect(() => {
-    Promise.allSettled([
-      api.get<Puntaje[]>('/puntajes/'),
-      api.get<Materia[]>('/materias/'),
-      api.get<Asistencia[]>('/asistencias/'),
-    ]).then(([pR, mR, aR]) => {
-      setPuntajes(pR.status    === 'fulfilled' && pR.value?.length    ? pR.value    : MOCK_PUNTAJES)
-      setMaterias(mR.status   === 'fulfilled' && mR.value?.length    ? mR.value    : MOCK_MATERIAS)
-      setAsistencias(aR.status === 'fulfilled' && aR.value?.length   ? aR.value    : MOCK_ASISTENCIAS)
-    }).finally(() => setLoading(false))
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const user = getCurrentUser()
+        const materiasUrl = user?.role === 'profesor' ? `/materias/?profesor_id=${user.user_id}` : '/materias/'
+        const [materiasRes, asistenciasRes, puntajesRes] = await Promise.all([
+          api.get<Materia[]>(materiasUrl),
+          api.get<Asistencia[]>('/asistencias/'),
+          api.get<Puntaje[]>('/puntajes/'),
+        ])
+        const statsList = await Promise.all(
+          materiasRes.map(m => obtenerEstadisticasMateria(m.id).catch(() => null))
+        )
+        const stats = statsList.filter((s): s is EstadisticasMateria => s !== null)
+        if (cancelled) return
+        setMaterias(materiasRes)
+        setAsistencias(asistenciasRes)
+        setPuntajes(puntajesRes)
+        setEstadisticas(stats)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar estadísticas')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [])
 
-  // KPI computations
+  const sinDatos = !loading && !error && estadisticas.every(e => (e.total_notas ?? 0) === 0)
+
+  // KPI computations — agregados desde /puntajes/materia/{id}/estadisticas por materia
   const kpis = useMemo(() => {
-    if (!puntajes.length) return { promedio: 0, aprobacion: 0, alumnos: 0 }
-    const vals = puntajes.map(p => Number(p.valor))
+    if (!estadisticas.length) return { promedio: 0, aprobacion: 0, alumnos: 0 }
+    const totalNotas = estadisticas.reduce((a, e) => a + (e.total_notas ?? 0), 0)
+    const sumaPonderada = estadisticas.reduce((a, e) => a + e.promedio_grupo * (e.total_notas ?? 0), 0)
+    const aprobados = estadisticas.reduce((a, e) => a + e.aprobados, 0)
+    const enRiesgo  = estadisticas.reduce((a, e) => a + e.en_riesgo, 0)
     return {
-      promedio:   Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10,
-      aprobacion: Math.round(vals.filter(v => v >= 6).length / vals.length * 100),
-      alumnos:    new Set(puntajes.map(p => p.user_id)).size,
+      promedio:   totalNotas > 0 ? Math.round(sumaPonderada / totalNotas * 10) / 10 : 0,
+      aprobacion: (aprobados + enRiesgo) > 0 ? Math.round(aprobados / (aprobados + enRiesgo) * 100) : 0,
+      // Suma de total_alumnos por materia: el endpoint no expone user_id individual,
+      // así que un alumno inscripto en más de una materia se cuenta más de una vez.
+      // Aproximación conocida y aceptada — no hay forma de deduplicar sin cambiar el endpoint.
+      alumnos: estadisticas.reduce((a, e) => a + e.total_alumnos, 0),
     }
-  }, [puntajes])
+  }, [estadisticas])
 
   const asistenciaPct = useMemo(() => {
     if (!asistencias.length) return 0
     return Math.round(asistencias.filter(a => a.presente).length / asistencias.length * 100)
   }, [asistencias])
 
-  // BarChart: promedio por materia
+  // BarChart: promedio por materia — directo del endpoint de estadísticas, sin recalcular
   const barData = useMemo(() => {
-    const sums: Record<number, { sum: number; n: number }> = {}
-    for (const p of puntajes) {
-      if (!sums[p.materia_id]) sums[p.materia_id] = { sum: 0, n: 0 }
-      sums[p.materia_id].sum += Number(p.valor)
-      sums[p.materia_id].n++
-    }
     const matMap: Record<number, string> = {}
     for (const m of materias) matMap[m.id] = m.nombre
-    return Object.entries(sums).map(([mid, s]) => ({
-      name:     truncate(matMap[Number(mid)] ?? `Mat.${mid}`),
-      promedio: Math.round(s.sum / s.n * 10) / 10,
-    }))
-  }, [puntajes, materias])
+    return estadisticas
+      .filter(e => (e.total_notas ?? 0) > 0)
+      .map(e => ({
+        name:     truncate(matMap[e.materia_id] ?? `Mat.${e.materia_id}`),
+        promedio: e.promedio_grupo,
+      }))
+  }, [estadisticas, materias])
 
-  // PieChart: distribución de notas
+  // PieChart: distribución de notas — suma de distribucion de cada materia
   const pieData = useMemo(() => {
     const b = { excelente: 0, bueno: 0, regular: 0, riesgo: 0 }
-    for (const p of puntajes) {
-      const v = Number(p.valor)
-      if (v >= 9)      b.excelente++
-      else if (v >= 7) b.bueno++
-      else if (v >= 6) b.regular++
-      else             b.riesgo++
+    for (const e of estadisticas) {
+      const d = e.distribucion
+      b.excelente += d['9-10'] ?? 0
+      b.bueno     += d['7-9']  ?? 0
+      b.regular   += d['6-7']  ?? 0
+      b.riesgo    += (d['5-6'] ?? 0) + (d['3-5'] ?? 0) + (d['0-3'] ?? 0)
     }
     return [
       { name: 'Excelente (≥9)', value: b.excelente, color: GREEN  },
@@ -174,7 +175,7 @@ export default function Estadisticas() {
       { name: 'Regular (≥6)',   value: b.regular,   color: YELLOW },
       { name: 'En riesgo (<6)', value: b.riesgo,    color: RED    },
     ].filter(d => d.value > 0)
-  }, [puntajes])
+  }, [estadisticas])
 
   // LineChart: asistencia % por materia
   const lineData = useMemo(() => {
@@ -279,6 +280,18 @@ export default function Estadisticas() {
         </div>
 
         <div className="est-content">
+
+          {error && (
+            <div className="est-card" style={{ padding: 16, borderColor: RED, color: RED, fontSize: 13 }}>
+              No se pudieron cargar las estadísticas: {error}
+            </div>
+          )}
+
+          {sinDatos && (
+            <div className="est-card" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
+              Sin notas cargadas todavía. Las estadísticas aparecerán cuando haya evaluaciones registradas.
+            </div>
+          )}
 
           {/* KPI row */}
           <div className="est-kpi-row">

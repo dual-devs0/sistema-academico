@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
 from app.dependencias import get_current_user
+from app.services.autorizacion import es_profesor_de_materia
 
 router = APIRouter(prefix="/horarios", tags=["horarios"])
 
@@ -22,7 +23,9 @@ def verificar_solapamiento_inscripcion(db: Session, alumno_id: int, materia_id_n
     inscripciones = db.query(models.inscripcion.Inscripcion).filter(
         models.inscripcion.Inscripcion.alumno_id == alumno_id,
     ).all()
-    materia_ids_existentes = [i.materia_id for i in inscripciones if i.materia_id != materia_id_nueva]
+    materia_ids_existentes = [
+        i.oferta.materia_id for i in inscripciones if i.oferta.materia_id != materia_id_nueva
+    ]
 
     for h_nuevo in horario_nuevo:
         horarios_exist = db.query(models.horario.Horario).filter(
@@ -58,7 +61,7 @@ def create_horario(
     materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == horario.materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
-    if current_user["role"] == "profesor" and materia.profesor_id != current_user["user_id"]:
+    if current_user["role"] == "profesor" and not es_profesor_de_materia(db, horario.materia_id, current_user["user_id"]):
         raise HTTPException(status_code=403, detail="No sos el profesor de esta materia")
     # Validate time range
     if horario.hora_inicio >= horario.hora_fin:
@@ -147,8 +150,7 @@ def delete_horario(
     if not horario:
         raise HTTPException(status_code=404, detail="Horario no encontrado")
     if current_user["role"] == "profesor":
-        materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == horario.materia_id).first()
-        if not materia or materia.profesor_id != current_user["user_id"]:
+        if not es_profesor_de_materia(db, horario.materia_id, current_user["user_id"]):
             raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(horario)
     db.commit()

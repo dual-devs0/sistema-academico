@@ -12,12 +12,14 @@ import threading
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 from app.models import (  # noqa: F401
     user as user_model,
     materia as materia_model,
+    oferta_materia as oferta_materia_model,
     inscripcion,
     carrera as carrera_model,
     asistencia,
@@ -35,23 +37,53 @@ _IS_PG = _PG_URL.startswith("postgresql")
 pytestmark = pytest.mark.skipif(not _IS_PG, reason="TEST_DATABASE_URL not set to PostgreSQL")
 
 
+def _host_base(url: str) -> str | None:
+    """Hostname sin el sufijo '-pooler' en el subdominio -- un endpoint pooler
+    de Neon es la MISMA branch fisica que su endpoint directo, solo comparar
+    el FQDN tal cual no detecta el caso real que causo perdida de datos en
+    produccion (ep-x vs ep-x-pooler.<mismo dominio>)."""
+    from urllib.parse import urlparse
+    host = urlparse(url).hostname
+    if not host:
+        return None
+    partes = host.split(".", 1)
+    subdominio = partes[0][:-len("-pooler")] if partes[0].endswith("-pooler") else partes[0]
+    resto = "." + partes[1] if len(partes) > 1 else ""
+    return subdominio + resto
+
+
 @pytest.fixture(scope="module")
 def pg_engine():
+    db_host = _host_base(os.getenv("DATABASE_URL", ""))
+    test_host = _host_base(os.getenv("TEST_DATABASE_URL", ""))
+    if db_host and test_host and db_host == test_host:
+        pytest.skip(
+            f"TEST_DATABASE_URL apunta a la misma branch que DATABASE_URL "
+            f"({test_host}). Abortando para evitar perdida de datos en produccion."
+        )
+
     engine = create_engine(
         _PG_URL,
         pool_size=10,
         max_overflow=20,
         pool_pre_ping=True,
     )
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except OperationalError as e:
+        pytest.skip(f"neondb_test inalcanzable (compute suspendido u otro problema de infra): {e}")
+
     # create_all es no-op si las tablas ya existen (creadas por Alembic)
     Base.metadata.create_all(bind=engine)
     yield engine
     # No drop_all — las tablas pertenecen al schema Alembic.
     # Limpiamos solo los datos de test para no dejar basura.
     _TABLE_CLEANUP_ORDER = [
-        "asistencias", "puntajes", "apuntes", "foro_mensajes",
+        "asistencias", "puntajes", "avance_alumno_pensum", "correlatividades",
+        "apuntes", "foro_mensajes",
         "foro_hilos", "inscripciones", "eventos_calendario",
-        "programas", "temarios", "horarios", "materias",
+        "programas", "temarios", "horarios", "pensum_materias", "ofertas_materia", "materias",
         "refresh_tokens", "users", "carreras",
     ]
     with engine.begin() as conn:
@@ -158,16 +190,20 @@ def test_concurrent_writes_no_lock(pg_engine):
 
     materia = materia_model.Materia(
         nombre="Concurrent Materia",
-        profesor_id=profesor.id,
         carrera_id=carrera.id,
         anio=1,
         semestre=1,
     )
     setup_session.add(materia)
+    setup_session.flush()
+
+    from app.models.oferta_materia import OfertaMateria
+    oferta = OfertaMateria(materia_id=materia.id, profesor_id=profesor.id, periodo="2026-1", activa=True)
+    setup_session.add(oferta)
     setup_session.commit()
 
     alumno_id = alumno.id
-    materia_id = materia.id
+    oferta_id = oferta.id
     setup_session.close()
 
     errors = []
@@ -177,7 +213,7 @@ def test_concurrent_writes_no_lock(pg_engine):
         try:
             a = Asistencia(
                 user_id=alumno_id,
-                materia_id=materia_id,
+                oferta_materia_id=oferta_id,
                 fecha=date(2025, 1, 1) + timedelta(days=day_offset),
                 presente=True,
             )

@@ -120,7 +120,7 @@ def list_eventos(
         inscripciones = db.query(models.inscripcion.Inscripcion).filter(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
-        materia_ids = {i.materia_id for i in inscripciones}
+        materia_ids = {i.oferta.materia_id for i in inscripciones}
         from sqlalchemy import or_
         if materia_ids:
             query = query.filter(
@@ -253,7 +253,7 @@ def eventos_mes(
         inscripciones = db.query(models.inscripcion.Inscripcion).filter(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
-        materia_ids = {i.materia_id for i in inscripciones}
+        materia_ids = {i.oferta.materia_id for i in inscripciones}
 
         from sqlalchemy import or_
         query = query.filter(
@@ -286,7 +286,7 @@ def eventos_dia(
         inscripciones = db.query(models.inscripcion.Inscripcion).filter(
             models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
         ).all()
-        materia_ids = {i.materia_id for i in inscripciones}
+        materia_ids = {i.oferta.materia_id for i in inscripciones}
         from sqlalchemy import or_
         query = query.filter(
             or_(

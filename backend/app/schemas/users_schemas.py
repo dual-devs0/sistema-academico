@@ -39,3 +39,7 @@ class UserOut(BaseModel):
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+class UserListOut(BaseModel):
+    items: list[UserOut]
+    total: int
