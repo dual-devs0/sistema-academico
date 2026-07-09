@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react'
 
-export function toast({ type, title, message }: { type?: string; title?: string; message: string }) {
-  window.dispatchEvent(new CustomEvent('uca:toast', { detail: { msg: `${title ? title + ': ' : ''}${message}`, type: type || 'success' } }))
-}
-
 type ToastType = 'success' | 'error' | 'warning'
 
 interface ToastItem {

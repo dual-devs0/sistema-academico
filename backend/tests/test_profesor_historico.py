@@ -12,15 +12,20 @@ def test_historico_vacio_sin_ofertas(client, seed, tokens, db):
     from app.security import hash_password
 
     otro_profesor = User(
-        username="prof_sin_historico", hashed_password=hash_password("p"),
-        role="profesor", nombre="Sin Historico",
+        username="prof_sin_historico",
+        hashed_password=hash_password("p"),
+        role="profesor",
+        nombre="Sin Historico",
     )
     db.add(otro_profesor)
     db.commit()
     db.refresh(otro_profesor)
 
     from app.auth import create_access_token
-    token = create_access_token({"sub": otro_profesor.username, "role": "profesor", "user_id": otro_profesor.id})
+
+    token = create_access_token(
+        {"sub": otro_profesor.username, "role": "profesor", "user_id": otro_profesor.id}
+    )
 
     res = client.get("/profesor/mi-historico", headers=auth(token))
     assert res.status_code == 200
@@ -29,15 +34,31 @@ def test_historico_vacio_sin_ofertas(client, seed, tokens, db):
 
 def test_historico_agrupa_por_periodo(client, seed, tokens, db):
     oferta2 = OfertaMateria(
-        materia_id=seed["materia"].id, profesor_id=seed["profesor"].id,
-        periodo="2025-2", activa=False,
+        materia_id=seed["materia"].id,
+        profesor_id=seed["profesor"].id,
+        periodo="2025-2",
+        activa=False,
     )
     db.add(oferta2)
     db.commit()
     db.refresh(oferta2)
 
-    db.add(Puntaje(user_id=seed["alumno"].id, oferta_materia_id=seed["oferta"].id, tipo="parcial1", valor=8.0))
-    db.add(Puntaje(user_id=seed["alumno"].id, oferta_materia_id=oferta2.id, tipo="parcial1", valor=5.0))
+    db.add(
+        Puntaje(
+            user_id=seed["alumno"].id,
+            oferta_materia_id=seed["oferta"].id,
+            tipo="parcial1",
+            valor=8.0,
+        )
+    )
+    db.add(
+        Puntaje(
+            user_id=seed["alumno"].id,
+            oferta_materia_id=oferta2.id,
+            tipo="parcial1",
+            valor=5.0,
+        )
+    )
     db.commit()
 
     res = client.get("/profesor/mi-historico", headers=auth(tokens["profesor"]))

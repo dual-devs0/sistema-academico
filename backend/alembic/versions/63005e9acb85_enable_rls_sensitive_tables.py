@@ -17,13 +17,14 @@ Revision ID: 63005e9acb85
 Revises: b948d85238e3
 Create Date: 2026-06-28
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 
 
-revision: str = '63005e9acb85'
-down_revision: Union[str, Sequence[str], None] = 'b948d85238e3'
+revision: str = "63005e9acb85"
+down_revision: Union[str, Sequence[str], None] = "b948d85238e3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -45,9 +46,7 @@ def upgrade() -> None:
     db_user = _db_user()
     for table in TABLES:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
-        op.execute(
-            f"CREATE POLICY app_access ON {table} TO {db_user} USING (true);"
-        )
+        op.execute(f"CREATE POLICY app_access ON {table} TO {db_user} USING (true);")
 
 
 def downgrade() -> None:
@@ -55,7 +54,7 @@ def downgrade() -> None:
     if bind.dialect.name != "postgresql":
         return
 
-    db_user = _db_user()
+    _db_user()  # noqa: F841
     for table in TABLES:
         op.execute(f"DROP POLICY IF EXISTS app_access ON {table};")
         op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;")

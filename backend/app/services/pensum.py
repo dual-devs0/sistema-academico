@@ -8,15 +8,20 @@ PESOS = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
 
 
 def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> bool:
-    """True si el alumno tiene promedio ponderado >= 6 en CUALQUIER oferta de la materia."""
+    """True si el alumno tiene promedio ponderado >= 6 en CUALQUIER oferta de la materia."""  # noqa: E501
     ofertas_ids = [
-        o.id for o in db.query(OfertaMateria.id).filter(OfertaMateria.materia_id == materia_id).all()
+        o.id
+        for o in db.query(OfertaMateria.id)
+        .filter(OfertaMateria.materia_id == materia_id)
+        .all()
     ]
     if not ofertas_ids:
         return False
     puntajes = (
         db.query(Puntaje)
-        .filter(Puntaje.user_id == alumno_id, Puntaje.oferta_materia_id.in_(ofertas_ids))
+        .filter(
+            Puntaje.user_id == alumno_id, Puntaje.oferta_materia_id.in_(ofertas_ids)
+        )
         .all()
     )
     por_oferta: dict[int, dict] = {}
@@ -36,15 +41,21 @@ def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> boo
 
 
 def _tiene_inscripcion(db: Session, alumno_id: int, materia_id: int) -> bool:
-    """True si el alumno tiene (o tuvo) inscripcion activa en cualquier oferta de la materia."""
+    """True si el alumno tiene (o tuvo) inscripcion activa en cualquier oferta de la materia."""  # noqa: E501
     ofertas_ids = [
-        o.id for o in db.query(OfertaMateria.id).filter(OfertaMateria.materia_id == materia_id).all()
+        o.id
+        for o in db.query(OfertaMateria.id)
+        .filter(OfertaMateria.materia_id == materia_id)
+        .all()
     ]
     if not ofertas_ids:
         return False
     return db.query(
         db.query(Inscripcion)
-        .filter(Inscripcion.alumno_id == alumno_id, Inscripcion.oferta_materia_id.in_(ofertas_ids))
+        .filter(
+            Inscripcion.alumno_id == alumno_id,
+            Inscripcion.oferta_materia_id.in_(ofertas_ids),
+        )
         .exists()
     ).scalar()
 
@@ -55,7 +66,9 @@ def validar_correlatividades(alumno_id: int, materia_id: int, db: Session) -> di
     Devuelve {"valido": bool, "pendientes": [{"materia_id", "tipo"}, ...]}
     Evalua TODOS los prerrequisitos, no corta en el primero que falla.
     """
-    prerequisitos = db.query(Correlatividad).filter(Correlatividad.materia_id == materia_id).all()
+    prerequisitos = (
+        db.query(Correlatividad).filter(Correlatividad.materia_id == materia_id).all()
+    )
     if not prerequisitos:
         return {"valido": True, "pendientes": []}
 
@@ -63,9 +76,13 @@ def validar_correlatividades(alumno_id: int, materia_id: int, db: Session) -> di
     for pr in prerequisitos:
         if pr.tipo == "aprobada":
             if not _tiene_nota_aprobatoria(db, alumno_id, pr.prerrequisito_id):
-                pendientes.append({"materia_id": pr.prerrequisito_id, "tipo": "aprobada"})
+                pendientes.append(
+                    {"materia_id": pr.prerrequisito_id, "tipo": "aprobada"}
+                )
         elif pr.tipo == "cursando":
             if not _tiene_inscripcion(db, alumno_id, pr.prerrequisito_id):
-                pendientes.append({"materia_id": pr.prerrequisito_id, "tipo": "cursando"})
+                pendientes.append(
+                    {"materia_id": pr.prerrequisito_id, "tipo": "cursando"}
+                )
 
     return {"valido": len(pendientes) == 0, "pendientes": pendientes}

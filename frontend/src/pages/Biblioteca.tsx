@@ -49,7 +49,6 @@ export default function Biblioteca() {
   const [liked, setLiked] = useState<Set<number>>(new Set())
 
   function cargar(query = '') {
-    setLoading(true)
     api.get<Apunte[]>(`/apuntes/${query ? `?q=${encodeURIComponent(query)}` : ''}`)
       .then(setApuntes)
       .catch(() => {})
@@ -93,7 +92,7 @@ export default function Biblioteca() {
             Explora recursos académicos compartidos por alumnos y profesores: apuntes, guías, resúmenes e investigaciones.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => { setFiltroMat(null); setQ(''); cargar() }}>Explorar Catálogo</button>
+            <button className="btn-primary" onClick={() => { setFiltroMat(null); setQ(''); setLoading(true); cargar() }}>Explorar Catálogo</button>
             <button className="btn-ghost" onClick={() => emitToast('Mis préstamos — próximamente', 'warning')}>Mis Préstamos</button>
           </div>
         </div>

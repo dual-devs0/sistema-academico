@@ -9,32 +9,41 @@ Reglas críticas:
   EXCEPCIÓN: alumno con beca 100% no se bloquea (override implícito).
 - Multi-beca: aplica el MAYOR porcentaje entre las activas y vigentes.
 """
+
 from __future__ import annotations
 
 import io
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import func
 
 from app.models.financiero import (
-    BecaActiva, BecaCatalogo, ConceptoArancel, Cuota,
-    FuenteBeca, Pago, Comprobante, AuditoriaOverrideMora,
+    BecaActiva,
+    BecaCatalogo,
+    ConceptoArancel,
+    Cuota,
+    FuenteBeca,
+    Pago,
+    AuditoriaOverrideMora,
 )
 from app.models.users import User
 from app.models.carrera import Carrera
 from app.schemas.financiero import (
-    BecaActivaOut, CuotaOut, CuotaVencidaDetalle,
-    EstadoDeudaOut, RendicionRow,
+    BecaActivaOut,
+    CuotaOut,
+    CuotaVencidaDetalle,
+    EstadoDeudaOut,
 )
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # BECAS — helpers
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _becas_vigentes(alumno_id: int, db: Session) -> List[BecaActiva]:
     """Retorna todas las BecaActivas con estado_renovacion='vigente' del alumno."""
@@ -48,7 +57,9 @@ def _becas_vigentes(alumno_id: int, db: Session) -> List[BecaActiva]:
     )
 
 
-def calcular_descuento_beca(alumno_id: int, db: Session) -> tuple[Decimal, Optional[BecaActiva]]:
+def calcular_descuento_beca(
+    alumno_id: int, db: Session
+) -> tuple[Decimal, Optional[BecaActiva]]:
     """
     Retorna (porcentaje_descuento, beca_activa_aplicada).
     Aplica el MAYOR porcentaje entre todas las becas vigentes.
@@ -57,26 +68,21 @@ def calcular_descuento_beca(alumno_id: int, db: Session) -> tuple[Decimal, Optio
     becas = _becas_vigentes(alumno_id, db)
     if not becas:
         return Decimal("0"), None
-    mejor = max(becas, key=lambda b: b.beca.porcentaje_descuento if b.beca else Decimal("0"))
+    mejor = max(
+        becas, key=lambda b: b.beca.porcentaje_descuento if b.beca else Decimal("0")
+    )
     return mejor.beca.porcentaje_descuento if mejor.beca else Decimal("0"), mejor
 
 
 def tiene_beca_100(alumno_id: int, db: Session) -> bool:
     """True si el alumno tiene al menos una beca vigente con 100% de descuento."""
     becas = _becas_vigentes(alumno_id, db)
-    return any(
-        b.beca and b.beca.porcentaje_descuento >= Decimal("100")
-        for b in becas
-    )
+    return any(b.beca and b.beca.porcentaje_descuento >= Decimal("100") for b in becas)
 
 
 def get_becas_activas_out(alumno_id: int, db: Session) -> List[BecaActivaOut]:
     """Shape exacto exigido por el enunciado para GET /becas/alumno/{id}/activas."""
-    becas = (
-        db.query(BecaActiva)
-        .filter(BecaActiva.alumno_id == alumno_id)
-        .all()
-    )
+    becas = db.query(BecaActiva).filter(BecaActiva.alumno_id == alumno_id).all()
     result = []
     for ba in becas:
         beca = ba.beca
@@ -87,7 +93,9 @@ def get_becas_activas_out(alumno_id: int, db: Session) -> List[BecaActivaOut]:
                 beca_nombre=beca.nombre if beca else "—",
                 fuente=fuente.nombre if fuente else "—",
                 es_externa=fuente.es_externa if fuente else False,
-                porcentaje_descuento=beca.porcentaje_descuento if beca else Decimal("0"),
+                porcentaje_descuento=beca.porcentaje_descuento
+                if beca
+                else Decimal("0"),
                 periodo_inicio=ba.periodo_inicio,
                 periodo_fin=ba.periodo_fin,
                 promedio_minimo_requerido=ba.promedio_minimo_requerido,
@@ -102,6 +110,7 @@ def get_becas_activas_out(alumno_id: int, db: Session) -> List[BecaActivaOut]:
 # CUOTAS — generación
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def generar_cuotas_alumno(
     alumno_id: int,
     concepto_id: int,
@@ -115,7 +124,9 @@ def generar_cuotas_alumno(
     Descuenta el mayor porcentaje de beca vigente.
     Toda la operación es atómica.
     """
-    concepto = db.query(ConceptoArancel).filter(ConceptoArancel.id == concepto_id).first()
+    concepto = (
+        db.query(ConceptoArancel).filter(ConceptoArancel.id == concepto_id).first()
+    )
     if not concepto:
         raise ValueError(f"Concepto arancel {concepto_id} no existe")
 
@@ -149,9 +160,17 @@ def cuota_to_out(cuota: Cuota) -> CuotaOut:
     fuente_beca = None
     es_beca_externa = None
     if cuota.beca_aplicada:
-        beca_nombre = cuota.beca_aplicada.beca.nombre if cuota.beca_aplicada.beca else None
-        fuente_beca = cuota.beca_aplicada.fuente.nombre if cuota.beca_aplicada.fuente else None
-        es_beca_externa = cuota.beca_aplicada.fuente.es_externa if cuota.beca_aplicada.fuente else None
+        beca_nombre = (
+            cuota.beca_aplicada.beca.nombre if cuota.beca_aplicada.beca else None
+        )
+        fuente_beca = (
+            cuota.beca_aplicada.fuente.nombre if cuota.beca_aplicada.fuente else None
+        )
+        es_beca_externa = (
+            cuota.beca_aplicada.fuente.es_externa
+            if cuota.beca_aplicada.fuente
+            else None
+        )
 
     pago_id = None
     comprobante_estado = None
@@ -185,6 +204,7 @@ def cuota_to_out(cuota: Cuota) -> CuotaOut:
 # ═══════════════════════════════════════════════════════════════════════
 # PAGOS — registro atómico
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def registrar_pago(
     cuota_id: int,
@@ -241,6 +261,7 @@ def registrar_pago(
 # ═══════════════════════════════════════════════════════════════════════
 # BLOQUEO INSCRIPCIÓN POR MORA
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def verificar_deuda_inscripcion(
     alumno_id: int,
@@ -321,6 +342,7 @@ def registrar_override_mora(
 # REPORTE RENDICIÓN — Excel
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def export_rendicion_excel(
     fuente_id: int,
     periodo: Optional[str],
@@ -345,8 +367,10 @@ def export_rendicion_excel(
         .filter(BecaActiva.fuente_id == fuente_id)
     )
     if periodo:
-        query = query.filter(BecaActiva.periodo_inicio <= periodo, 
-                             (BecaActiva.periodo_fin >= periodo) | (BecaActiva.periodo_fin == None))  # noqa: E711
+        query = query.filter(
+            BecaActiva.periodo_inicio <= periodo,
+            (BecaActiva.periodo_fin >= periodo) | (BecaActiva.periodo_fin.is_(None)),
+        )
 
     rows = query.all()
 
@@ -355,7 +379,16 @@ def export_rendicion_excel(
     ws.title = "Rendición Becas"
 
     # Header
-    headers = ["Alumno", "Cédula", "Carrera", "Beca", "Fuente", "% Descuento", "Monto Becado (Gs.)", "Período"]
+    headers = [
+        "Alumno",
+        "Cédula",
+        "Carrera",
+        "Beca",
+        "Fuente",
+        "% Descuento",
+        "Monto Becado (Gs.)",
+        "Período",
+    ]
     header_fill = PatternFill("solid", fgColor="1E40AF")
     header_font = Font(bold=True, color="FFFFFF")
     for col, h in enumerate(headers, 1):
@@ -376,7 +409,9 @@ def export_rendicion_excel(
         monto_becado = cuotas_q.scalar() or Decimal("0")
 
         ws.cell(row=row_idx, column=1, value=user.nombre or user.username)
-        ws.cell(row=row_idx, column=2, value=user.username)          # cedula = username por ahora
+        ws.cell(
+            row=row_idx, column=2, value=user.username
+        )  # cedula = username por ahora
         ws.cell(row=row_idx, column=3, value=carrera.nombre if carrera else "—")
         ws.cell(row=row_idx, column=4, value=beca.nombre)
         ws.cell(row=row_idx, column=5, value=fuente.nombre)

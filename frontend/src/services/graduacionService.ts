@@ -44,4 +44,4 @@ export const actualizarEtapa = (procesoId: number, etapaId: number, estado: stri
   api.put<EtapaTesis>(`/graduacion/procesos/${procesoId}/etapas/${etapaId}`, { estado, observaciones })
 
 export const getSolvencia = (procesoId: number) =>
-  api.get<any[]>(`/graduacion/procesos/${procesoId}/solvencia`)
+  api.get<{id:number;concepto:string;estado:string;observacion:string|null}[]>(`/graduacion/procesos/${procesoId}/solvencia`)

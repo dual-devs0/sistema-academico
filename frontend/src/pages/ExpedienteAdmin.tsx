@@ -34,7 +34,7 @@ export default function ExpedienteAdmin() {
 
   const [expediente, setExpediente] = useState<ExpedienteAlumnoOut | null>(null)
   const [regularidad, setRegularidad] = useState<RegularidadOut | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const t = setTimeout(() => setBusquedaDebounced(busqueda), 300)
@@ -42,10 +42,10 @@ export default function ExpedienteAdmin() {
   }, [busqueda])
 
   useEffect(() => {
-    if (!busquedaDebounced) { setResultados([]); return }
+    if (!busquedaDebounced) return
     api.get<{ items: Alumno[] }>(`/users/?role=alumno&q=${encodeURIComponent(busquedaDebounced)}&limit=8`)
       .then(res => setResultados(res.items))
-      .catch(() => {})
+      .catch(() => setResultados([]))
   }, [busquedaDebounced])
 
   function seleccionarAlumno(a: Alumno) {
@@ -57,7 +57,6 @@ export default function ExpedienteAdmin() {
 
   function cargarDatosAlumno() {
     if (!alumno) return
-    setLoading(true)
     Promise.all([
       api.get<Inscripcion[]>('/inscripciones/'),
       alumno.carrera_id ? api.get<Materia[]>(`/materias/?carrera_id=${alumno.carrera_id}`) : Promise.resolve([] as Materia[]),
@@ -82,7 +81,7 @@ export default function ExpedienteAdmin() {
       await cerrarMateria(alumno.id, Number(ofertaSeleccionada))
       emitToast('Materia cerrada en el expediente')
       setOfertaSeleccionada('')
-      cargarDatosAlumno()
+      setLoading(true); cargarDatosAlumno()
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al cerrar materia', 'error')
     } finally { setCerrando(false) }

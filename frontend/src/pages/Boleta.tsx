@@ -43,7 +43,7 @@ export default function Boleta() {
   const [resumen, setResumen] = useState<Resumen | null>(null)
   const [alumnos, setAlumnos] = useState<AlumnoOpt[]>([])
   const [selId, setSelId] = useState<number | null>(esAlumno ? Number(user?.user_id) : null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(esAlumno)
   const [descargando, setDescargando] = useState(false)
 
   useEffect(() => {
@@ -53,20 +53,19 @@ export default function Boleta() {
   }, [esAlumno])
 
   useEffect(() => {
-    if (!selId) { setLoading(false); return }
-    setLoading(true)
+    if (!selId) return
     if (esAlumno) {
       api.get<Resumen>('/alumno/mi-resumen').then(setResumen).catch(() => {}).finally(() => setLoading(false))
     } else {
       // admin/profesor: armar resumen desde puntajes
       Promise.all([
-        api.get<any[]>('/materias/'),
-        api.get<any[]>(`/puntajes/?user_id=${selId}`),
+        api.get<{id:number;nombre:string}[]>('/materias/'),
+        api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${selId}`),
         api.get<AlumnoOpt[]>('/users/'),
       ]).then(([mats, pts, us]) => {
         const al = us.find(u => u.id === selId)
-        const notas: NotaRow[] = mats.map((m: any) => {
-          const de = (t: string) => pts.find((p: any) => p.materia_id === m.id && p.tipo === t)?.valor ?? null
+        const notas: NotaRow[] = mats.map((m: {id:number;nombre:string}) => {
+          const de = (t: string) => pts.find((p: {materia_id:number;tipo:string;valor:number}) => p.materia_id === m.id && p.tipo === t)?.valor ?? null
           const vals = [de('parcial1'), de('parcial2'), de('practico'), de('final')].filter((v): v is number => v !== null)
           return {
             materia_id: m.id, materia_nombre: m.nombre,
@@ -129,7 +128,7 @@ export default function Boleta() {
       {!esAlumno && (
         <div style={{ maxWidth: 380, marginBottom: 20 }}>
           <div className="mono-label" style={{ marginBottom: 6 }}>Alumno</div>
-          <select className="input-uca" value={selId ?? ''} onChange={e => setSelId(Number(e.target.value) || null)}>
+          <select className="input-uca" value={selId ?? ''} onChange={e => { const id = Number(e.target.value) || null; setSelId(id); if (id) setLoading(true) }}>
             <option value="">Seleccioná un alumno…</option>
             {alumnos.map(a => <option key={a.id} value={a.id}>{a.nombre || a.username}</option>)}
           </select>

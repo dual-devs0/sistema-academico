@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateT
 from sqlalchemy.sql import func
 from app.database import Base
 
+
 class ForoHilo(Base):
     __tablename__ = "foro_hilos"
 
@@ -13,6 +14,7 @@ class ForoHilo(Base):
     fijado = Column(Boolean, default=False)
     cerrado = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
+
 
 class ForoMensaje(Base):
     __tablename__ = "foro_mensajes"

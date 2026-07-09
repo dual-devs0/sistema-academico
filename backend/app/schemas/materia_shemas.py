@@ -1,7 +1,9 @@
 from pydantic import BaseModel
 
+
 class MateriaBase(BaseModel):
     nombre: str
+
 
 class MateriaCreate(MateriaBase):
     carrera_id: int | None = None
@@ -12,6 +14,7 @@ class MateriaCreate(MateriaBase):
     horario: str | None = None
     secciones: int | None = None
 
+
 class MateriaUpdate(BaseModel):
     nombre: str | None = None
     carrera_id: int | None = None
@@ -21,6 +24,7 @@ class MateriaUpdate(BaseModel):
     cupos: int | None = None
     horario: str | None = None
     secciones: int | None = None
+
 
 class MateriaOut(MateriaBase):
     id: int

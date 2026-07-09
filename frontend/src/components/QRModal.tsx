@@ -24,7 +24,6 @@ export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive 
   const intervalRef             = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const generarQR = async () => {
-    setEstado('cargando')
     setQrData(null)
     setErrorMsg('')
     try {
@@ -33,9 +32,9 @@ export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive 
       setSegundos(data.expira_en)
       setEstado('listo')
       if (onQrActive) onQrActive(data.expira_en)
-    } catch (e: any) {
+    } catch {
       setEstado('error')
-      setErrorMsg(e.message || 'Error generando QR')
+      setErrorMsg('Error generando QR')
     }
   }
 
@@ -55,9 +54,17 @@ export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive 
   }, [estado])
 
   useEffect(() => {
-    generarQR()
+    api.get<QRData>(`/asistencias/qr/${materiaId}`).then(data => {
+      setQrData(data)
+      setSegundos(data.expira_en)
+      setEstado('listo')
+      if (onQrActive) onQrActive(data.expira_en)
+    }).catch(() => {
+      setEstado('error')
+      setErrorMsg('Error generando QR')
+    })
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [])
+  }, [materiaId, onQrActive])
 
   const minutos  = Math.floor(segundos / 60)
   const segs     = segundos % 60

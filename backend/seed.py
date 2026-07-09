@@ -1,12 +1,12 @@
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
 
-from app.database import engine, SessionLocal, Base
-from app.models.users import User
-from app.models.carrera import Carrera
-from app.models.materia import Materia
-from app.security import hash_password
-from datetime import date
+sys.stdout.reconfigure(encoding="utf-8")
+
+from app.database import engine, SessionLocal, Base  # noqa: E402
+from app.models.users import User  # noqa: E402
+from app.models.carrera import Carrera  # noqa: E402
+from app.models.materia import Materia  # noqa: E402
+from app.security import hash_password  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
 
@@ -29,9 +29,33 @@ for nombre in carreras_data:
 
 # ── Usuarios ──
 usuarios = [
-    {"username": "admin@uca.edu.py", "password": "Admin1234!", "role": "admin",   "nombre": "Admin UCA",         "email": "admin@uca.edu.py",    "carrera": None,          "becado": False},
-    {"username": "12345678",         "password": "Alumno1234!",  "role": "alumno",  "nombre": "María González",   "email": "maria@uca.edu.py",    "carrera": "Ing. Informática", "becado": True},
-    {"username": "prof@uca.edu.py",  "password": "Profesor1234!","role": "profesor","nombre": "Carlos Méndez",     "email": "carlos@uca.edu.py",   "carrera": "Ing. Informática", "becado": False},
+    {
+        "username": "admin@uca.edu.py",
+        "password": "Admin1234!",
+        "role": "admin",
+        "nombre": "Admin UCA",
+        "email": "admin@uca.edu.py",
+        "carrera": None,
+        "becado": False,
+    },
+    {
+        "username": "12345678",
+        "password": "Alumno1234!",
+        "role": "alumno",
+        "nombre": "María González",
+        "email": "maria@uca.edu.py",
+        "carrera": "Ing. Informática",
+        "becado": True,
+    },
+    {
+        "username": "prof@uca.edu.py",
+        "password": "Profesor1234!",
+        "role": "profesor",
+        "nombre": "Carlos Méndez",
+        "email": "carlos@uca.edu.py",
+        "carrera": "Ing. Informática",
+        "becado": False,
+    },
 ]
 
 users_map = {}
@@ -57,9 +81,27 @@ for u in usuarios:
 
 # ── Materias ──
 materias_data = [
-    {"nombre": "Análisis Matemático I", "profesor": "prof@uca.edu.py", "carrera": "Ing. Informática", "anio": 1, "semestre": 1},
-    {"nombre": "Física I",              "profesor": "prof@uca.edu.py", "carrera": "Ing. Informática", "anio": 1, "semestre": 1},
-    {"nombre": "Programación I",        "profesor": "prof@uca.edu.py", "carrera": "Ing. Informática", "anio": 1, "semestre": 1},
+    {
+        "nombre": "Análisis Matemático I",
+        "profesor": "prof@uca.edu.py",
+        "carrera": "Ing. Informática",
+        "anio": 1,
+        "semestre": 1,
+    },
+    {
+        "nombre": "Física I",
+        "profesor": "prof@uca.edu.py",
+        "carrera": "Ing. Informática",
+        "anio": 1,
+        "semestre": 1,
+    },
+    {
+        "nombre": "Programación I",
+        "profesor": "prof@uca.edu.py",
+        "carrera": "Ing. Informática",
+        "anio": 1,
+        "semestre": 1,
+    },
 ]
 for m in materias_data:
     existe = db.query(Materia).filter(Materia.nombre == m["nombre"]).first()

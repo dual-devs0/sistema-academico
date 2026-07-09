@@ -63,6 +63,18 @@ export default function GestionAsignaciones() {
   const [profSearch, setProfSearch] = useState("")
   const [asignando, setAsignando] = useState(false)
 
+  useEffect(() => {
+    Promise.all([
+      api.get<MateriaApi[]>('/materias/').catch(() => [] as MateriaApi[]),
+      api.get<UserApi[]>('/users/').catch(() => [] as UserApi[]),
+    ]).then(([mats, users]) => {
+      setMaterias(mats)
+      setProfesores(users.filter(u => u.role === 'profesor'))
+      const firstKey = mats[0]?.carrera_nombre || 'General'
+      if (mats[0]) setOpenCareers({ [firstKey]: true })
+    }).finally(() => setLoading(false))
+  }, [])
+
   function cargar() {
     setLoading(true)
     Promise.all([
@@ -75,7 +87,6 @@ export default function GestionAsignaciones() {
       if (mats[0]) setOpenCareers({ [firstKey]: true })
     }).finally(() => setLoading(false))
   }
-  useEffect(cargar, [])
 
   const careers: CareerGroup[] = (() => {
     const grouped = new Map<string, Subject[]>()

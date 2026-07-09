@@ -25,12 +25,18 @@ _PASSWORD_RESET_WINDOW_SECONDS = 15 * 60
 
 def _check_password_reset_rate_limit(key: str):
     import time
+
     now = time.time()
     window_start = now - _PASSWORD_RESET_WINDOW_SECONDS
     if key in _password_reset_attempts:
-        _password_reset_attempts[key] = [t for t in _password_reset_attempts[key] if t > window_start]
+        _password_reset_attempts[key] = [
+            t for t in _password_reset_attempts[key] if t > window_start
+        ]
         if len(_password_reset_attempts[key]) >= _PASSWORD_RESET_MAX_ATTEMPTS:
-            raise HTTPException(status_code=429, detail="Demasiados intentos. Intenta de nuevo en 15 minutos.")
+            raise HTTPException(
+                status_code=429,
+                detail="Demasiados intentos. Intenta de nuevo en 15 minutos.",
+            )
         _password_reset_attempts[key].append(now)
     else:
         _password_reset_attempts[key] = [now]
@@ -54,8 +60,14 @@ def login(
     response: Response,
     db: Session = Depends(database.get_db),
 ):
-    db_user = db.query(models.user.User).filter(models.user.User.username == user.username).first()
-    if not db_user or not security.verify_password(user.password, db_user.hashed_password):
+    db_user = (
+        db.query(models.user.User)
+        .filter(models.user.User.username == user.username)
+        .first()
+    )
+    if not db_user or not security.verify_password(
+        user.password, db_user.hashed_password
+    ):
         raise HTTPException(status_code=400, detail="Credenciales inválidas")
 
     access_token = create_access_token(
@@ -65,7 +77,8 @@ def login(
     rt = RefreshToken(
         usuario_id=db_user.id,
         token_hash=hashed,
-        expira_en=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        expira_en=datetime.now(timezone.utc)
+        + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
     )
     db.add(rt)
     db.commit()
@@ -90,7 +103,7 @@ def refresh(
         db.query(RefreshToken)
         .filter(
             RefreshToken.token_hash == hashed,
-            RefreshToken.revocado == False,
+            not RefreshToken.revocado,
             RefreshToken.expira_en > now,
         )
         .first()
@@ -102,7 +115,9 @@ def refresh(
     rt.revocado = True
     db.flush()
 
-    db_user = db.query(models.user.User).filter(models.user.User.id == rt.usuario_id).first()
+    db_user = (
+        db.query(models.user.User).filter(models.user.User.id == rt.usuario_id).first()
+    )
     access_token = create_access_token(
         {"sub": db_user.username, "role": db_user.role, "user_id": db_user.id}
     )
@@ -144,22 +159,30 @@ def recuperar_contrasena(
 ):
     _check_password_reset_rate_limit(req.username_or_email)
 
-    db_user = db.query(models.user.User).filter(
-        (models.user.User.username == req.username_or_email) |
-        (models.user.User.email == req.username_or_email)
-    ).first()
+    db_user = (
+        db.query(models.user.User)
+        .filter(
+            (models.user.User.username == req.username_or_email)
+            | (models.user.User.email == req.username_or_email)
+        )
+        .first()
+    )
 
     if not db_user:
-        raise HTTPException(status_code=404, detail="No se encontró un usuario con ese dato.")
+        raise HTTPException(
+            status_code=404, detail="No se encontró un usuario con ese dato."
+        )
 
     alphabet = string.ascii_letters + string.digits
-    new_password = ''.join(secrets.choice(alphabet) for _ in range(10))
+    new_password = "".join(secrets.choice(alphabet) for _ in range(10))
     db_user.hashed_password = security.hash_password(new_password)
     db.commit()
 
     user_name = db_user.nombre or db_user.username
     user_email = db_user.email
     if user_email:
-        send_password_reset_email_bg(background_tasks, user_email, user_name, new_password)
+        send_password_reset_email_bg(
+            background_tasks, user_email, user_name, new_password
+        )
 
     return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}

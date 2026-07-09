@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String
 from app.database import Base
 
+
 class Carrera(Base):
     __tablename__ = "carreras"
 

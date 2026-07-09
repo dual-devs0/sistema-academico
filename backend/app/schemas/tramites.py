@@ -1,6 +1,7 @@
 """
 Schemas Pydantic — Fase 5A: Solicitudes y trámites.
 """
+
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional

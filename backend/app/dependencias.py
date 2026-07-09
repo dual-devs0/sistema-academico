@@ -11,8 +11,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        role: str     = payload.get("role")
-        user_id: int  = payload.get("user_id")
+        role: str = payload.get("role")
+        user_id: int = payload.get("user_id")
         if username is None or role is None:
             raise HTTPException(status_code=401, detail="Token inválido")
         return {"username": username, "role": role, "user_id": user_id}

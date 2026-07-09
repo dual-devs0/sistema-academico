@@ -18,4 +18,24 @@ from . import pasantia
 from . import graduacion
 from . import equivalencia
 
-__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "recordatorio", "pensum", "expediente", "financiero", "pasantia", "graduacion", "equivalencia"]
+__all__ = [
+    "user",
+    "materia",
+    "oferta_materia",
+    "inscripcion",
+    "carrera",
+    "asistencia",
+    "puntaje",
+    "apunte",
+    "evento",
+    "programa",
+    "foro",
+    "horario",
+    "recordatorio",
+    "pensum",
+    "expediente",
+    "financiero",
+    "pasantia",
+    "graduacion",
+    "equivalencia",
+]

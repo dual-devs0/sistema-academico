@@ -80,10 +80,10 @@ export default function MisMaterias() {
   const [loadingActivas, setLoadingActivas] = useState(true)
 
   useEffect(() => {
-    if (!user?.user_id) { setLoadingActivas(false); return }
+    if (!user?.user_id) return
     api.get<MateriaApi[]>(`/materias/?profesor_id=${user.user_id}`).then(async materias => {
       const bySubject = await Promise.all(materias.map(async m => {
-        const alumnos = await api.get<any[]>(`/asistencias/materia/${m.id}/alumnos`).catch(() => [] as any[])
+        const alumnos = await api.get<{porcentaje:number}[]>(`/asistencias/materia/${m.id}/alumnos`).catch(() => [] as {porcentaje:number}[])
         const attendance = alumnos.length
           ? Math.round(alumnos.reduce((s, a) => s + (a.porcentaje ?? 0), 0) / alumnos.length)
           : 0
@@ -104,24 +104,22 @@ export default function MisMaterias() {
 
   // ── Histórico ──
   const [historico, setHistorico] = useState<PeriodoHistorico[]>([])
-  const [loadingHistorico, setLoadingHistorico] = useState(false)
+  const [loadingHistorico, setLoadingHistorico] = useState(true)
   useEffect(() => {
     if (tab !== 'historico') return
-    setLoadingHistorico(true)
     obtenerMiHistorico().then(setHistorico).catch(() => setHistorico([])).finally(() => setLoadingHistorico(false))
   }, [tab])
 
   // ── Agenda ──
   const [semanaInicio, setSemanaInicio] = useState(() => inicioSemana(new Date()))
   const [items, setItems] = useState<ItemAgenda[]>([])
-  const [loadingAgenda, setLoadingAgenda] = useState(false)
+  const [loadingAgenda, setLoadingAgenda] = useState(true)
   const [nuevoRecOpen, setNuevoRecOpen] = useState<string | null>(null) // fecha del dia clickeado
   const [recDraft, setRecDraft] = useState({ titulo: '', descripcion: '' })
 
   const semanaFin = useMemo(() => { const f = new Date(semanaInicio); f.setDate(f.getDate() + 6); return f }, [semanaInicio])
 
   function cargarAgenda() {
-    setLoadingAgenda(true)
     obtenerMiAgenda(fmt(semanaInicio), fmt(semanaFin))
       .then(res => setItems(res.items))
       .catch(() => setItems([]))

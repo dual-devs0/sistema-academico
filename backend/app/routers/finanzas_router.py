@@ -11,22 +11,30 @@ Endpoints:
   GET  /finanzas/comprobantes/pendientes
   GET  /finanzas/alumno/{id}/estado-deuda-inscripcion
 """
+
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app import models, database
+from app import database
 from app.dependencias import get_current_user, require_role
 from app.models.financiero import (
-    ConceptoArancel, Cuota, Pago, Comprobante,
+    ConceptoArancel,
+    Cuota,
+    Pago,
+    Comprobante,
 )
 from app.schemas.financiero import (
-    ConceptoArancelCreate, ConceptoArancelOut,
-    GenerarCuotasRequest, CuotaOut,
-    PagoCreate, PagoOut,
-    ComprobanteOut, ComprobantePendienteOut,
+    ConceptoArancelCreate,
+    ConceptoArancelOut,
+    GenerarCuotasRequest,
+    CuotaOut,
+    PagoCreate,
+    PagoOut,
+    ComprobanteOut,
+    ComprobantePendienteOut,
     EstadoDeudaOut,
 )
 from app.services.financiero import (
@@ -41,6 +49,7 @@ router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
 
 # ── Conceptos arancel ─────────────────────────────────────────────────
+
 
 @router.post(
     "/conceptos",
@@ -77,12 +86,14 @@ def listar_conceptos(
     q = db.query(ConceptoArancel).filter(ConceptoArancel.activo == True)  # noqa: E712
     if carrera_id:
         q = q.filter(
-            (ConceptoArancel.carrera_id == carrera_id) | (ConceptoArancel.carrera_id == None)  # noqa: E711
+            (ConceptoArancel.carrera_id == carrera_id)
+            | (ConceptoArancel.carrera_id == None)  # noqa: E711
         )
     return q.all()
 
 
 # ── Generación de cuotas ──────────────────────────────────────────────
+
 
 @router.post(
     "/cuotas/generar",
@@ -114,6 +125,7 @@ def generar_cuotas(
 
 # ── Cuotas por alumno ─────────────────────────────────────────────────
 
+
 @router.get(
     "/alumno/{alumno_id}/cuotas",
     response_model=List[CuotaOut],
@@ -137,6 +149,7 @@ def cuotas_alumno(
 
 
 # ── Pagos ─────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/pagos",
@@ -172,7 +185,9 @@ def crear_pago(
         db.commit()
         db.refresh(pago)
 
-        comprobante = Comprobante(pago_id=pago.id, tipo="factura", estado_emision="pendiente")
+        comprobante = Comprobante(
+            pago_id=pago.id, tipo="factura", estado_emision="pendiente"
+        )
         db.add(comprobante)
         db.commit()
         db.refresh(comprobante)
@@ -252,19 +267,22 @@ def listar_comprobantes_pendientes(
     for c in comps:
         pago = c.pago
         alumno = pago.cuota.alumno if pago and pago.cuota else None
-        out.append(ComprobantePendienteOut(
-            id=c.id,
-            pago_id=c.pago_id,
-            alumno_nombre=alumno.nombre if alumno else "—",
-            monto_pagado=pago.monto_pagado if pago else Decimal("0"),
-            estado_emision=c.estado_emision,
-            intentos=c.intentos,
-            ultimo_error=c.ultimo_error,
-        ))
+        out.append(
+            ComprobantePendienteOut(
+                id=c.id,
+                pago_id=c.pago_id,
+                alumno_nombre=alumno.nombre if alumno else "—",
+                monto_pagado=pago.monto_pagado if pago else Decimal("0"),
+                estado_emision=c.estado_emision,
+                intentos=c.intentos,
+                ultimo_error=c.ultimo_error,
+            )
+        )
     return out
 
 
 # ── Estado deuda para inscripción (endpoint interno) ──────────────────
+
 
 @router.get(
     "/alumno/{alumno_id}/estado-deuda-inscripcion",

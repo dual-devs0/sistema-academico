@@ -2,13 +2,15 @@
 Tests para app/services/storage.py.
 Mockea boto3 — no requiere R2 real.
 """
+
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def mock_env(monkeypatch):
@@ -29,6 +31,7 @@ def mock_boto(mocker):
 # ---------------------------------------------------------------------------
 # subir_archivo
 # ---------------------------------------------------------------------------
+
 
 def test_subir_archivo_retorna_storage_key_con_formato_correcto(mock_boto):
     from app.services.storage import subir_archivo
@@ -86,10 +89,13 @@ def test_subir_foto_tamano_excedido(mock_boto):
 # obtener_url_firmada
 # ---------------------------------------------------------------------------
 
+
 def test_obtener_url_firmada_llama_generate_presigned(mock_boto):
     from app.services.storage import obtener_url_firmada
 
-    mock_boto.generate_presigned_url.return_value = "https://signed.url/foto_perfil/abc.jpg?X-Sig=xxx"
+    mock_boto.generate_presigned_url.return_value = (
+        "https://signed.url/foto_perfil/abc.jpg?X-Sig=xxx"
+    )
 
     url = obtener_url_firmada("foto_perfil/abc.jpg")
 
@@ -115,6 +121,7 @@ def test_obtener_url_firmada_expiry_custom(mock_boto):
 # ---------------------------------------------------------------------------
 # eliminar_archivo
 # ---------------------------------------------------------------------------
+
 
 def test_eliminar_archivo_llama_delete_object(mock_boto):
     from app.services.storage import eliminar_archivo

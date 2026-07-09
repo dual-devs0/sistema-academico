@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON
 from app.database import Base
 
+
 class Temario(Base):
     __tablename__ = "temarios"
 

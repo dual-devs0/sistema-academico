@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
 from app.database import Base
 
+
 class Materia(Base):
     __tablename__ = "materias"
 

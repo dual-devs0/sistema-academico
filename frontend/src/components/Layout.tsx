@@ -150,8 +150,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => { document.body.removeAttribute('data-role') }
   }, [role])
 
-  useEffect(() => { setMobileOpen(false) }, [location.pathname])
-
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }

@@ -4,17 +4,39 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
 load_dotenv()  # carga .env antes de que cualquier módulo lea os.getenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.jobs.reintento_facturacion import ciclo_reintentos
-from app.routers import (
-    users, auth, materias, inscripciones, test as test_router,
-    carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno, foro,
-    horarios, profesor, pensum, expediente, finanzas, becas, tramites,
-    pasantias, graduacion, equivalencias,
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from app.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
+from app.jobs.reintento_facturacion import ciclo_reintentos  # noqa: E402
+from app.routers import (  # noqa: E402
+    users,
+    auth,
+    materias,
+    inscripciones,
+    test as test_router,
+    carreras,
+    asistencias,
+    puntajes,
+    apuntes,
+    eventos,
+    programas,
+    reportes,
+    boleta,
+    alumno,
+    foro,
+    horarios,
+    profesor,
+    pensum,
+    expediente,
+    finanzas,
+    becas,
+    tramites,
+    pasantias,
+    graduacion,
+    equivalencias,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -55,7 +77,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
+origins = [
+    o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+]
 print(f"CORS origins: {origins}")
 
 app.add_middleware(SecurityHeadersMiddleware)

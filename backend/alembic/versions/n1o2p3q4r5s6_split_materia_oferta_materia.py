@@ -17,6 +17,7 @@ Revision ID: n1o2p3q4r5s6
 Revises: e7f1g5h3i4j9
 Create Date: 2026-07-06
 """
+
 from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
@@ -36,8 +37,12 @@ def upgrade() -> None:
     op.create_table(
         "ofertas_materia",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("materia_id", sa.Integer(), sa.ForeignKey("materias.id"), nullable=False),
-        sa.Column("profesor_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column(
+            "materia_id", sa.Integer(), sa.ForeignKey("materias.id"), nullable=False
+        ),
+        sa.Column(
+            "profesor_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+        ),
         sa.Column("periodo", sa.String(10), nullable=False),
         sa.Column("activa", sa.Boolean(), server_default=sa.true()),
         sa.UniqueConstraint("materia_id", "periodo", name="uq_oferta_materia_periodo"),
@@ -54,12 +59,22 @@ def upgrade() -> None:
 
     # 3. Agregar oferta_materia_id (nullable) a inscripciones, puntajes, asistencias
     for tabla in ("inscripciones", "puntajes", "asistencias"):
-        op.add_column(tabla, sa.Column("oferta_materia_id", sa.Integer(), sa.ForeignKey("ofertas_materia.id"), nullable=True))
-        # Backfill: cada materia tiene exactamente 1 oferta en este momento -> join directo sin ambiguedad
-        bind.execute(sa.text(
-            f"UPDATE {tabla} t SET oferta_materia_id = om.id "
-            f"FROM ofertas_materia om WHERE om.materia_id = t.materia_id"
-        ))
+        op.add_column(
+            tabla,
+            sa.Column(
+                "oferta_materia_id",
+                sa.Integer(),
+                sa.ForeignKey("ofertas_materia.id"),
+                nullable=True,
+            ),
+        )
+        # Backfill: cada materia tiene exactamente 1 oferta en este momento -> join directo sin ambiguedad  # noqa: E501
+        bind.execute(
+            sa.text(
+                f"UPDATE {tabla} t SET oferta_materia_id = om.id "
+                f"FROM ofertas_materia om WHERE om.materia_id = t.materia_id"
+            )
+        )
         op.alter_column(tabla, "oferta_materia_id", nullable=False)
 
     # 4. Constraints nuevas. NOTA: uq_puntaje_user_materia_tipo y
@@ -68,8 +83,16 @@ def upgrade() -> None:
     # solo existen las FK simples, ninguna UNIQUE compuesta) -- drift entre
     # modelo y schema desde la migracion SQLite->Postgres de Fase 0. No hay
     # nada que dropear; solo se crean las nuevas.
-    op.create_unique_constraint("uq_puntaje_user_oferta_tipo", "puntajes", ["user_id", "oferta_materia_id", "tipo"])
-    op.create_unique_constraint("uq_asistencia_user_oferta_fecha", "asistencias", ["user_id", "oferta_materia_id", "fecha"])
+    op.create_unique_constraint(
+        "uq_puntaje_user_oferta_tipo",
+        "puntajes",
+        ["user_id", "oferta_materia_id", "tipo"],
+    )
+    op.create_unique_constraint(
+        "uq_asistencia_user_oferta_fecha",
+        "asistencias",
+        ["user_id", "oferta_materia_id", "fecha"],
+    )
 
     # 5. Drop materia_id viejo en las 3 tablas (cascada tambien la FK)
     op.drop_column("inscripciones", "materia_id")
@@ -83,19 +106,34 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
 
-    op.add_column("materias", sa.Column("profesor_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True))
-    bind.execute(sa.text(
-        "UPDATE materias m SET profesor_id = om.profesor_id "
-        "FROM ofertas_materia om WHERE om.materia_id = m.id AND om.periodo = :periodo"
-    ), {"periodo": PERIODO_BACKFILL})
+    op.add_column(
+        "materias",
+        sa.Column(
+            "profesor_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True
+        ),
+    )
+    bind.execute(
+        sa.text(
+            "UPDATE materias m SET profesor_id = om.profesor_id "
+            "FROM ofertas_materia om WHERE om.materia_id = m.id AND om.periodo = :periodo"  # noqa: E501
+        ),
+        {"periodo": PERIODO_BACKFILL},
+    )
     op.alter_column("materias", "profesor_id", nullable=False)
 
     for tabla in ("inscripciones", "puntajes", "asistencias"):
-        op.add_column(tabla, sa.Column("materia_id", sa.Integer(), sa.ForeignKey("materias.id"), nullable=True))
-        bind.execute(sa.text(
-            f"UPDATE {tabla} t SET materia_id = om.materia_id "
-            f"FROM ofertas_materia om WHERE om.id = t.oferta_materia_id"
-        ))
+        op.add_column(
+            tabla,
+            sa.Column(
+                "materia_id", sa.Integer(), sa.ForeignKey("materias.id"), nullable=True
+            ),
+        )
+        bind.execute(
+            sa.text(
+                f"UPDATE {tabla} t SET materia_id = om.materia_id "
+                f"FROM ofertas_materia om WHERE om.id = t.oferta_materia_id"
+            )
+        )
         op.alter_column(tabla, "materia_id", nullable=False)
 
     op.drop_constraint("uq_puntaje_user_oferta_tipo", "puntajes", type_="unique")

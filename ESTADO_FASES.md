@@ -14,6 +14,8 @@
 | Fase 5C — Pasantías | COMPLETA | 2026-07-09 | 2026-07-09 | Backend: 3 tablas (`empresas_receptoras`, `pasantias`, `informes_pasantia`). 6 endpoints (`POST /pasantias/empresas`, `POST /pasantias/solicitudes`, `PUT /pasantias/{id}/aprobar`, `PUT .../horas`, `POST .../informes`, `PUT .../finalizar`). 11 tests ✓. Frontend: `PasantiasAlumno.tsx` (`/mis-pasantias`). |
 | Fase 5D — Equivalencias | COMPLETA | 2026-07-09 | 2026-07-09 | Backend: 3 tablas (`solicitudes_equivalencia`, `equivalencias_materia`, `examenes_suficiencia`). Al aprobar equivalencia: inserta en `expediente_materias` y actualiza `avance_alumno_pensum`. 4 endpoints (`POST /equivalencias/solicitudes`, `PUT .../materias/{mid}/resolver`, `POST .../examenes-suficiencia`, `GET .../alumno/{id}`). 7 tests ✓. Frontend: `EquivalenciasAlumno.tsx` (`/mis-equivalencias`). |
 
+| Fase 6 — Auditoría integral back/front | COMPLETA | 2026-07-09 | 2026-07-09 | Backend: 873→0 errores ruff E,F (auto-fix + formateo + noqa intencionales). Frontend: 89→0 eslint, tsc 0 errores, 6 warnings. Queda mypy pendiente (stubs faltantes). |
+
 Estados válidos: PENDIENTE / EN_PROGRESO / EN_REVISION / COMPLETA
 
 ---

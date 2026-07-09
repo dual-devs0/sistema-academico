@@ -1,11 +1,13 @@
 from pydantic import BaseModel
 from datetime import datetime
 
+
 class RecordatorioCreate(BaseModel):
     titulo: str
     descripcion: str | None = None
     fecha: datetime
     materia_id: int | None = None
+
 
 class RecordatorioUpdate(BaseModel):
     titulo: str | None = None
@@ -13,6 +15,7 @@ class RecordatorioUpdate(BaseModel):
     fecha: datetime | None = None
     materia_id: int | None = None
     completado: bool | None = None
+
 
 class RecordatorioOut(BaseModel):
     id: int

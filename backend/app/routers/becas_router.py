@@ -8,6 +8,7 @@ Endpoints:
   GET  /becas/alumno/{id}/activas
   GET  /becas/reportes/rendicion?fuente=X&periodo=Y
 """
+
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -20,12 +21,18 @@ from sqlalchemy.orm import Session
 from app import database
 from app.dependencias import get_current_user, require_role
 from app.models.financiero import (
-    BecaActiva, BecaCatalogo, FuenteBeca, PostulacionBeca,
+    BecaActiva,
+    BecaCatalogo,
+    FuenteBeca,
+    PostulacionBeca,
 )
 from app.schemas.financiero import (
-    BecaCatalogoCreate, BecaCatalogoOut,
+    BecaCatalogoCreate,
+    BecaCatalogoOut,
     BecaActivaOut,
-    PostulacionCreate, PostulacionOut, PostulacionRevisar,
+    PostulacionCreate,
+    PostulacionOut,
+    PostulacionRevisar,
     FuenteBecaOut,
 )
 from app.services.financiero import (
@@ -37,6 +44,7 @@ router = APIRouter(prefix="/becas", tags=["becas"])
 
 
 # ── Fuentes (lectura) ─────────────────────────────────────────────────
+
 
 @router.get(
     "/fuentes",
@@ -51,6 +59,7 @@ def listar_fuentes(
 
 
 # ── Catálogo ──────────────────────────────────────────────────────────
+
 
 @router.get(
     "/catalogo",
@@ -99,6 +108,7 @@ def crear_beca_catalogo(
 
 # ── Postulaciones ─────────────────────────────────────────────────────
 
+
 @router.post(
     "/postulaciones",
     response_model=PostulacionOut,
@@ -117,7 +127,9 @@ def postular_beca(
 
     # Cupos disponibles
     if beca.cupos_disponibles is not None and beca.cupos_disponibles <= 0:
-        raise HTTPException(status_code=422, detail="No hay cupos disponibles para esta beca")
+        raise HTTPException(
+            status_code=422, detail="No hay cupos disponibles para esta beca"
+        )
 
     # Evitar doble postulación activa
     existente = (
@@ -130,7 +142,9 @@ def postular_beca(
         .first()
     )
     if existente:
-        raise HTTPException(status_code=409, detail="Ya tiene una postulación activa para esta beca")
+        raise HTTPException(
+            status_code=409, detail="Ya tiene una postulación activa para esta beca"
+        )
 
     post = PostulacionBeca(
         alumno_id=alumno_id,
@@ -150,7 +164,9 @@ def postular_beca(
     summary="Listar postulaciones — OBLIGATORIO filtrar por fuente_id (admin)",
 )
 def listar_postulaciones(
-    fuente_id: int = Query(..., description="Filtro mandatorio: separar flujos internos de externos"),
+    fuente_id: int = Query(
+        ..., description="Filtro mandatorio: separar flujos internos de externos"
+    ),
     estado: Optional[str] = None,
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role("admin")),
@@ -180,11 +196,15 @@ def revisar_postulacion(
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role("admin")),
 ):
-    post = db.query(PostulacionBeca).filter(PostulacionBeca.id == postulacion_id).first()
+    post = (
+        db.query(PostulacionBeca).filter(PostulacionBeca.id == postulacion_id).first()
+    )
     if not post:
         raise HTTPException(status_code=404, detail="Postulación no encontrada")
     if post.estado not in ("pendiente", "en_revision"):
-        raise HTTPException(status_code=409, detail=f"Postulación ya cerrada (estado: {post.estado})")
+        raise HTTPException(
+            status_code=409, detail=f"Postulación ya cerrada (estado: {post.estado})"
+        )
 
     post.estado = data.estado
     post.motivo_rechazo = data.motivo_rechazo
@@ -215,6 +235,7 @@ def revisar_postulacion(
 
 # ── Becas activas por alumno ──────────────────────────────────────────
 
+
 @router.get(
     "/alumno/{alumno_id}/activas",
     response_model=List[BecaActivaOut],
@@ -231,6 +252,7 @@ def becas_activas_alumno(
 
 
 # ── Reporte rendición ─────────────────────────────────────────────────
+
 
 @router.get(
     "/reportes/rendicion",

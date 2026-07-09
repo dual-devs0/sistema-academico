@@ -11,7 +11,9 @@ def _materia_con_oferta(db, seed, nombre, periodo="2026-1"):
     m = Materia(nombre=nombre, carrera_id=seed["carrera"].id)
     db.add(m)
     db.flush()
-    oferta = OfertaMateria(materia_id=m.id, profesor_id=seed["profesor"].id, periodo=periodo, activa=True)
+    oferta = OfertaMateria(
+        materia_id=m.id, profesor_id=seed["profesor"].id, periodo=periodo, activa=True
+    )
     db.add(oferta)
     db.commit()
     db.refresh(m)
@@ -22,8 +24,12 @@ def _materia_con_oferta(db, seed, nombre, periodo="2026-1"):
 def _cerrar(db, alumno_id, oferta, nota, creditos, condicion=None, admin_id=1):
     cond = condicion or ("aprobada" if nota >= 6 else "reprobada")
     reg = ExpedienteMateria(
-        alumno_id=alumno_id, oferta_materia_id=oferta.id,
-        nota_final=nota, creditos=creditos, condicion=cond, cerrado_por=admin_id,
+        alumno_id=alumno_id,
+        oferta_materia_id=oferta.id,
+        nota_final=nota,
+        creditos=creditos,
+        condicion=cond,
+        cerrado_por=admin_id,
     )
     db.add(reg)
     db.commit()
@@ -92,10 +98,14 @@ def test_regularidad_en_riesgo_por_asistencia_baja(seed, db):
     _, oferta = _materia_con_oferta(db, seed, "Reg Asistencia")
     _cerrar(db, seed["alumno"].id, oferta, nota=8.0, creditos=4)
     for i in range(10):
-        db.add(Asistencia(
-            user_id=seed["alumno"].id, oferta_materia_id=oferta.id,
-            fecha=date(2026, 3, i + 1), presente=(i < 5),
-        ))
+        db.add(
+            Asistencia(
+                user_id=seed["alumno"].id,
+                oferta_materia_id=oferta.id,
+                fecha=date(2026, 3, i + 1),
+                presente=(i < 5),
+            )
+        )
     db.commit()
     resultado = calcular_regularidad(seed["alumno"].id, db)
     assert resultado["estado"] == "en_riesgo"
@@ -107,13 +117,19 @@ def test_regularidad_irregular_materia_reprobada_fuera_de_plazo(seed, db):
     # sumando a periodos_sistema, por eso el rango se arma con margen (0..3+)
     # para que la diferencia de indices supere PLAZO_RECURSAR_PERIODOS=2 sin
     # depender de dónde caiga "2026-1" en el orden.
-    reprobada, oferta_vieja = _materia_con_oferta(db, seed, "Reg Irregular Base", periodo="2023-1")
+    reprobada, oferta_vieja = _materia_con_oferta(
+        db, seed, "Reg Irregular Base", periodo="2023-1"
+    )
     _cerrar(db, seed["alumno"].id, oferta_vieja, nota=3.0, creditos=4)
 
     _materia_con_oferta(db, seed, "Reg Irregular Media 1", periodo="2023-2")
     _materia_con_oferta(db, seed, "Reg Irregular Media 2", periodo="2024-1")
-    _, oferta_reciente = _materia_con_oferta(db, seed, "Reg Irregular Reciente", periodo="2025-2")
-    db.add(Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=oferta_reciente.id))
+    _, oferta_reciente = _materia_con_oferta(
+        db, seed, "Reg Irregular Reciente", periodo="2025-2"
+    )
+    db.add(
+        Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=oferta_reciente.id)
+    )
     db.commit()
 
     resultado = calcular_regularidad(seed["alumno"].id, db)
@@ -122,10 +138,17 @@ def test_regularidad_irregular_materia_reprobada_fuera_de_plazo(seed, db):
 
 
 def test_regularidad_no_irregular_si_reprobada_fue_recursada_y_aprobada(seed, db):
-    materia, oferta_vieja = _materia_con_oferta(db, seed, "Reg Recursada", periodo="2024-1")
+    materia, oferta_vieja = _materia_con_oferta(
+        db, seed, "Reg Recursada", periodo="2024-1"
+    )
     _cerrar(db, seed["alumno"].id, oferta_vieja, nota=3.0, creditos=4)
 
-    oferta_nueva = OfertaMateria(materia_id=materia.id, profesor_id=seed["profesor"].id, periodo="2025-2", activa=True)
+    oferta_nueva = OfertaMateria(
+        materia_id=materia.id,
+        profesor_id=seed["profesor"].id,
+        periodo="2025-2",
+        activa=True,
+    )
     db.add(oferta_nueva)
     db.commit()
     db.refresh(oferta_nueva)

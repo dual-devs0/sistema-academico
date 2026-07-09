@@ -53,7 +53,7 @@ export default function EquivalenciasAlumno() {
       emitToast('Solicitud creada', 'success')
       setTipo('equivalencia'); setUniversidad('')
       cargar()
-    } catch (e: any) {
+    } catch (e: unknown) {
       emitToast(e?.message || 'Error creando solicitud', 'error')
     } finally { setLoading(false) }
   }

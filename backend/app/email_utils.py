@@ -18,7 +18,8 @@ conf = ConnectionConfig(
     MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
     MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", "True").lower() in ("true", "1", "yes"),
     MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", "False").lower() in ("true", "1", "yes"),
-    USE_CREDENTIALS=os.getenv("USE_CREDENTIALS", "True").lower() in ("true", "1", "yes"),
+    USE_CREDENTIALS=os.getenv("USE_CREDENTIALS", "True").lower()
+    in ("true", "1", "yes"),
     VALIDATE_CERTS=os.getenv("VALIDATE_CERTS", "True").lower() in ("true", "1", "yes"),
 )
 
@@ -30,21 +31,28 @@ def _credentials_configured() -> bool:
     return bool(pw) and pw != "dummy"
 
 
-async def _send_with_retry(message: MessageSchema, max_attempts: int = 3, backoff_base: int = 2) -> None:
+async def _send_with_retry(
+    message: MessageSchema, max_attempts: int = 3, backoff_base: int = 2
+) -> None:
     for attempt in range(max_attempts):
         try:
             await fm.send_message(message)
             return
         except Exception as exc:
             if attempt < max_attempts - 1:
-                wait = backoff_base ** attempt
+                wait = backoff_base**attempt
                 logger.warning(
                     "Email send failed (attempt %d/%d): %s. Retrying in %ds…",
-                    attempt + 1, max_attempts, exc, wait,
+                    attempt + 1,
+                    max_attempts,
+                    exc,
+                    wait,
                 )
                 await asyncio.sleep(wait)
             else:
-                logger.error("Email send failed after %d attempts: %s", max_attempts, exc)
+                logger.error(
+                    "Email send failed after %d attempts: %s", max_attempts, exc
+                )
 
 
 def send_password_reset_email_bg(
@@ -81,7 +89,9 @@ def send_new_grade_email_bg(
     valor_nota: float,
 ) -> None:
     if not _credentials_configured():
-        print(f"Mock Email sent to {email_to}: Grade {valor_nota} in {materia_name} ({tipo_nota})")
+        print(
+            f"Mock Email sent to {email_to}: Grade {valor_nota} in {materia_name} ({tipo_nota})"  # noqa: E501
+        )
         return
 
     html = f"""

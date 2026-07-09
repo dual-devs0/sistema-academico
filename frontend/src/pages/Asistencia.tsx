@@ -188,6 +188,13 @@ const cssAlumno = `
   @media(max-width:768px){ .aa-kpis { grid-template-columns:1fr 1fr; } .aa-fab-qr { bottom:80px; } }
 `
 
+interface AsistenciaApiRow {
+  materia_id: number
+  materia_nombre?: string
+  fecha: string
+  presente: boolean
+}
+
 function AlumnoView() {
   const navigate = useNavigate()
   const uid = Number(decodeToken(sessionStorage.getItem('token') || '')?.user_id || 0)
@@ -200,13 +207,13 @@ function AlumnoView() {
   useEffect(() => {
     Promise.all([
       api.get<MateriaAsistRow[]>('/alumno/mi-asistencia').catch(() => [] as MateriaAsistRow[]),
-      api.get<any[]>(`/asistencias/?user_id=${uid}`).catch(() => [] as any[]),
+      api.get<AsistenciaApiRow[]>(`/asistencias/?user_id=${uid}`).catch(() => [] as AsistenciaApiRow[]),
       api.get<{ carrera_id: number | null }>('/users/me').catch(() => null),
       api.get<{ id: number; nombre: string }[]>('/carreras/').catch(() => [] as { id: number; nombre: string }[]),
     ]).then(([porMat, asis, me, carreras]) => {
       setPorMateria(porMat)
       setSesiones(
-        asis.slice(-12).reverse().map((a: any) => ({
+        asis.slice(-12).reverse().map((a: AsistenciaApiRow) => ({
           materia_id: a.materia_id, materia_nombre: a.materia_nombre || `Materia #${a.materia_id}`,
           fecha: a.fecha, presente: a.presente,
         }))
@@ -373,7 +380,7 @@ function ProfesorView() {
   const [alumnos, setAlumn]     = useState<AlumnoAsist[]>([])
   const [selCarr, setSelCarr]   = useState<Carrera | null>(null)
   const [selMat, setSelMat]     = useState<Materia | null>(null)
-  const [loading, setLoading]   = useState(false)
+  const [loading, setLoading]   = useState(true)
   const [qrMatId, setQrMatId]   = useState<number | null>(null)
   const [fecha, setFecha]       = useState(() => new Date().toISOString().slice(0, 10))
   const [fechaLabel, setFechaL] = useState(() => {
@@ -391,7 +398,6 @@ function ProfesorView() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    setLoading(true)
     api.get<Carrera[]>('/asistencias/profesor/carreras')
       .then(d => { setCarr(d || []); setLoading(false) })
       .catch(() => setLoading(false))

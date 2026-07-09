@@ -249,13 +249,6 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
   const [loadingAlumnos, setLoadingAlumnos] = useState(false)
   const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    api.get<MateriaSimple[]>(`/materias/?profesor_id=${profesorId}`)
-      .then(data => { setMaterias(data); if (data.length > 0) setSelectedMateria(data[0]) })
-      .catch(() => {})
-      .finally(() => setLoadingMaterias(false))
-  }, [profesorId])
-
   const fetchAlumnos = useCallback(async (materia: MateriaSimple) => {
     setLoadingAlumnos(true)
     setPage(1)
@@ -280,7 +273,20 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     } finally { setLoadingAlumnos(false) }
   }, [])
 
-  useEffect(() => { if (selectedMateria) fetchAlumnos(selectedMateria) }, [selectedMateria, fetchAlumnos])
+  useEffect(() => {
+    api.get<MateriaSimple[]>(`/materias/?profesor_id=${profesorId}`)
+      .then(data => {
+        setMaterias(data)
+        if (data.length > 0) {
+          setSelectedMateria(data[0])
+          fetchAlumnos(data[0])
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMaterias(false))
+  }, [profesorId, fetchAlumnos])
+
+
 
   function updateVal(alumno_id: number, campo: keyof AlumnoRow['vals'], value: string) {
     if (value !== '' && !/^\d{0,2}(\.\d{0,1})?$/.test(value)) return
@@ -369,7 +375,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
         <>
           <div className="pro-tabs">
             {materias.map(m => (
-              <button key={m.id} className={`pill-tab${selectedMateria?.id === m.id ? ' active' : ''}`} onClick={() => setSelectedMateria(m)}>
+              <button key={m.id} className={`pill-tab${selectedMateria?.id === m.id ? ' active' : ''}`} onClick={() => { setSelectedMateria(m); fetchAlumnos(m) }}>
                 {m.nombre}
               </button>
             ))}

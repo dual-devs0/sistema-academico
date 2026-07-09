@@ -78,7 +78,6 @@ export default function MisCuotas() {
 
   useEffect(() => {
     if (!alumnoId) return
-    setLoading(true)
     Promise.all([
       getCuotasAlumno(alumnoId),
       getBecasActivas(alumnoId),

@@ -9,18 +9,24 @@ Tests — Fase 5C: Pasantías.
   POST /pasantias/{id}/informes
   PUT  /pasantias/{id}/finalizar
 """
+
 import pytest
-from datetime import date, timedelta
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
+
 def _crear_empresa(client, token, nombre="Empresa Test SA"):
     return client.post(
         "/pasantias/empresas",
-        json={"nombre": nombre, "rubro": "Tecnología",
-              "contacto": "Juan", "telefono": "021123456",
-              "email": "juan@test.com", "convenio_activo": True},
+        json={
+            "nombre": nombre,
+            "rubro": "Tecnología",
+            "contacto": "Juan",
+            "telefono": "021123456",
+            "email": "juan@test.com",
+            "convenio_activo": True,
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -28,13 +34,17 @@ def _crear_empresa(client, token, nombre="Empresa Test SA"):
 def _solicitar(client, token, empresa_id):
     return client.post(
         "/pasantias/solicitudes",
-        json={"empresa_id": empresa_id, "fecha_inicio": "2026-08-01",
-              "horas_requeridas": 200},
+        json={
+            "empresa_id": empresa_id,
+            "fecha_inicio": "2026-08-01",
+            "horas_requeridas": 200,
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
 
 
 # ── Tests ────────────────────────────────────────────────────────────
+
 
 class TestEmpresas:
     def test_admin_crea_empresa(self, client, tokens):
@@ -84,7 +94,9 @@ def aprobar_setup(client, tokens):
 class TestAprobacion:
     def test_aprobar_pasantia(self, client, tokens, aprobar_setup):
         prof_token = tokens["profesor"]
-        prof_r = client.get("/users/me", headers={"Authorization": f"Bearer {prof_token}"})
+        prof_r = client.get(
+            "/users/me", headers={"Authorization": f"Bearer {prof_token}"}
+        )
         assert prof_r.status_code == 200
         tutor_id = prof_r.json()["id"]
 

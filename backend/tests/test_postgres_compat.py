@@ -6,9 +6,9 @@ Correr: TEST_DATABASE_URL=postgresql+psycopg2://... pytest -m postgres
 
 Si TEST_DATABASE_URL no existe o sigue siendo SQLite, todos se saltean.
 """
+
 import concurrent.futures
 import os
-import threading
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -34,7 +34,9 @@ from app.security import hash_password
 _PG_URL = os.getenv("TEST_DATABASE_URL", "")
 _IS_PG = _PG_URL.startswith("postgresql")
 
-pytestmark = pytest.mark.skipif(not _IS_PG, reason="TEST_DATABASE_URL not set to PostgreSQL")
+pytestmark = pytest.mark.skipif(
+    not _IS_PG, reason="TEST_DATABASE_URL not set to PostgreSQL"
+)
 
 
 def _host_base(url: str) -> str | None:
@@ -43,11 +45,14 @@ def _host_base(url: str) -> str | None:
     el FQDN tal cual no detecta el caso real que causo perdida de datos en
     produccion (ep-x vs ep-x-pooler.<mismo dominio>)."""
     from urllib.parse import urlparse
+
     host = urlparse(url).hostname
     if not host:
         return None
     partes = host.split(".", 1)
-    subdominio = partes[0][:-len("-pooler")] if partes[0].endswith("-pooler") else partes[0]
+    subdominio = (
+        partes[0][: -len("-pooler")] if partes[0].endswith("-pooler") else partes[0]
+    )
     resto = "." + partes[1] if len(partes) > 1 else ""
     return subdominio + resto
 
@@ -72,7 +77,9 @@ def pg_engine():
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except OperationalError as e:
-        pytest.skip(f"neondb_test inalcanzable (compute suspendido u otro problema de infra): {e}")
+        pytest.skip(
+            f"neondb_test inalcanzable (compute suspendido u otro problema de infra): {e}"  # noqa: E501
+        )
 
     # create_all es no-op si las tablas ya existen (creadas por Alembic)
     Base.metadata.create_all(bind=engine)
@@ -80,15 +87,34 @@ def pg_engine():
     # No drop_all — las tablas pertenecen al schema Alembic.
     # Limpiamos solo los datos de test para no dejar basura.
     _TABLE_CLEANUP_ORDER = [
-        "asistencias", "puntajes", "avance_alumno_pensum", "correlatividades",
-        "apuntes", "foro_mensajes",
-        "foro_hilos", "inscripciones", "eventos_calendario",
-        "programas", "temarios", "horarios", "pensum_materias", "ofertas_materia", "materias",
+        "asistencias",
+        "puntajes",
+        "avance_alumno_pensum",
+        "correlatividades",
+        "apuntes",
+        "foro_mensajes",
+        "foro_hilos",
+        "inscripciones",
+        "eventos_calendario",
+        "programas",
+        "temarios",
+        "horarios",
+        "pensum_materias",
+        "ofertas_materia",
+        "materias",
         "regularidad_alumno",
-        "auditoria_override_mora", "comprobantes", "pagos", "cuotas",
-        "postulaciones_beca", "becas_activas", "becas_catalogo", "fuentes_beca",
+        "auditoria_override_mora",
+        "comprobantes",
+        "pagos",
+        "cuotas",
+        "postulaciones_beca",
+        "becas_activas",
+        "becas_catalogo",
+        "fuentes_beca",
         "conceptos_arancel",
-        "refresh_tokens", "users", "carreras",
+        "refresh_tokens",
+        "users",
+        "carreras",
     ]
     with engine.begin() as conn:
         for tbl in _TABLE_CLEANUP_ORDER:
@@ -109,6 +135,7 @@ def pg_session(pg_engine):
 # Conectividad básica
 # ---------------------------------------------------------------------------
 
+
 def test_pg_connection(pg_engine):
     with pg_engine.connect() as conn:
         result = conn.execute(text("SELECT 1")).scalar()
@@ -118,6 +145,7 @@ def test_pg_connection(pg_engine):
 # ---------------------------------------------------------------------------
 # Tipos de columna
 # ---------------------------------------------------------------------------
+
 
 def test_boolean_columns_round_trip(pg_session):
     carrera = carrera_model.Carrera(nombre="Test Carrera Bool")
@@ -163,8 +191,9 @@ def test_datetime_timezone_aware(pg_session):
 # Escritura concurrente (el caso crítico de SQLite)
 # ---------------------------------------------------------------------------
 
+
 def test_concurrent_writes_no_lock(pg_engine):
-    """10 threads insertan asistencias simultáneamente — ningún OperationalError por lock."""
+    """10 threads insertan asistencias simultáneamente — ningún OperationalError por lock."""  # noqa: E501
     from datetime import date, timedelta
     from app.models.asistencia import Asistencia
 
@@ -202,7 +231,10 @@ def test_concurrent_writes_no_lock(pg_engine):
     setup_session.flush()
 
     from app.models.oferta_materia import OfertaMateria
-    oferta = OfertaMateria(materia_id=materia.id, profesor_id=profesor.id, periodo="2026-1", activa=True)
+
+    oferta = OfertaMateria(
+        materia_id=materia.id, profesor_id=profesor.id, periodo="2026-1", activa=True
+    )
     setup_session.add(oferta)
     setup_session.commit()
 

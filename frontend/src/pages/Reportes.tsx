@@ -351,7 +351,7 @@ export default function Reportes() {
     // Esperar render completo
     await new Promise(res=>setTimeout(res,600))
     try {
-      await (html2pdf() as any).set({
+      await (html2pdf() as {set(o:Record<string,unknown>):{from(e:HTMLElement):{save():Promise<void>}}}).set({
         margin:[8,8],
         filename:`reporte_${r.tipo}_2026.pdf`,
         image:{type:'jpeg',quality:1},
@@ -366,7 +366,7 @@ export default function Reportes() {
         jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
       }).from(container).save()
       showToast('PDF descargado ✓')
-    } catch(e) {
+    } catch {
       showToast('Error al generar PDF')
     } finally {
       document.body.removeChild(container)

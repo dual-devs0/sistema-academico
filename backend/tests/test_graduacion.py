@@ -3,8 +3,6 @@ Tests — Fase 5B: Graduación.
 
 6 endpoints + verificar_condicion_egreso como función pura.
 """
-import pytest
-from sqlalchemy.orm import Session
 
 from app.services.graduacion import verificar_condicion_egreso
 from app.models.pensum_materia import PensumMateria
@@ -14,6 +12,7 @@ from app.models.oferta_materia import OfertaMateria
 
 
 # ── Helper ───────────────────────────────────────────────────────────
+
 
 def _avanzar_alumno(db, seed, creditos=10):
     """Simula que el alumno aprobó materias suficientes en su pensum."""
@@ -59,6 +58,7 @@ def _avanzar_alumno(db, seed, creditos=10):
 
 
 # ── Tests ────────────────────────────────────────────────────────────
+
 
 class TestCondicionEgreso:
     def test_alumno_sin_datos_no_puede_graduarse(self, db, seed):
@@ -135,7 +135,7 @@ class TestProcesosEndpoint:
 
     def test_solvencia_endpoint_empty(self, client, tokens, seed):
         r = client.get(
-            f"/graduacion/procesos/9999/solvencia",
+            "/graduacion/procesos/9999/solvencia",
             headers={"Authorization": f"Bearer {tokens['admin']}"},
         )
         assert r.status_code == 404

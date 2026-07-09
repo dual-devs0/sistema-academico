@@ -1,12 +1,15 @@
 from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey
 from app.database import Base
 
+
 class EventoCalendario(Base):
     __tablename__ = "eventos_calendario"
 
     id = Column(Integer, primary_key=True, index=True)
     titulo = Column(String(200), nullable=False)
-    tipo = Column(String(20), nullable=False)  # parcial, final, feriado, asueto, entrega, actividad
+    tipo = Column(
+        String(20), nullable=False
+    )  # parcial, final, feriado, asueto, entrega, actividad
     fecha = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=True)
     materia_id = Column(Integer, ForeignKey("materias.id"), nullable=True)

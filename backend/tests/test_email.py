@@ -1,12 +1,12 @@
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import BackgroundTasks
 
 
 # ---------------------------------------------------------------------------
 # _send_with_retry
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_send_with_retry_succeeds_on_first_attempt():
@@ -28,10 +28,14 @@ async def test_send_with_retry_retries_on_failure():
 
     msg = MagicMock()
     # Falla 2 veces, éxito en el tercero
-    mock_send = AsyncMock(side_effect=[ConnectionError("timeout"), ConnectionError("timeout"), None])
+    mock_send = AsyncMock(
+        side_effect=[ConnectionError("timeout"), ConnectionError("timeout"), None]
+    )
 
-    with patch("app.email_utils.fm") as mock_fm, \
-         patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with (
+        patch("app.email_utils.fm") as mock_fm,
+        patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
         mock_fm.send_message = mock_send
         await _send_with_retry(msg, max_attempts=3, backoff_base=2)
 
@@ -49,9 +53,11 @@ async def test_send_with_retry_gives_up_after_max_attempts():
     msg = MagicMock()
     mock_send = AsyncMock(side_effect=ConnectionError("timeout"))
 
-    with patch("app.email_utils.fm") as mock_fm, \
-         patch("asyncio.sleep", new_callable=AsyncMock), \
-         patch("app.email_utils.logger") as mock_logger:
+    with (
+        patch("app.email_utils.fm") as mock_fm,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+        patch("app.email_utils.logger") as mock_logger,
+    ):
         mock_fm.send_message = mock_send
         # No debe lanzar excepción — falla silenciosamente con log
         await _send_with_retry(msg, max_attempts=3, backoff_base=2)
@@ -63,6 +69,7 @@ async def test_send_with_retry_gives_up_after_max_attempts():
 # ---------------------------------------------------------------------------
 # send_password_reset_email_bg
 # ---------------------------------------------------------------------------
+
 
 def test_password_reset_email_mocked_when_no_credentials(capsys):
     from app.email_utils import send_password_reset_email_bg
@@ -90,12 +97,15 @@ def test_password_reset_email_queues_task_when_credentials_present():
 # send_new_grade_email_bg
 # ---------------------------------------------------------------------------
 
+
 def test_grade_email_mocked_when_no_credentials(capsys):
     from app.email_utils import send_new_grade_email_bg
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
-        send_new_grade_email_bg(bg, "test@example.com", "Juan", "Matemáticas", "parcial1", 8.5)
+        send_new_grade_email_bg(
+            bg, "test@example.com", "Juan", "Matemáticas", "parcial1", 8.5
+        )
 
     captured = capsys.readouterr()
     assert "Mock" in captured.out
@@ -107,6 +117,8 @@ def test_grade_email_queues_task_when_credentials_present():
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "real_app_password"}, clear=False):
-        send_new_grade_email_bg(bg, "test@example.com", "Juan", "Matemáticas", "parcial1", 8.5)
+        send_new_grade_email_bg(
+            bg, "test@example.com", "Juan", "Matemáticas", "parcial1", 8.5
+        )
 
     assert len(bg.tasks) == 1

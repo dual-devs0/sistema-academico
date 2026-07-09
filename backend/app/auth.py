@@ -8,7 +8,8 @@ _SECRET_KEY_ENV = os.getenv("JWT_SECRET", "")
 if not _SECRET_KEY_ENV:
     raise RuntimeError(
         "JWT_SECRET no configurado. "
-        "Agregá JWT_SECRET=<clave-de-64-hex> al archivo .env antes de arrancar el servidor."
+        "Agregá JWT_SECRET=<clave-de-64-hex> al archivo .env "
+        "antes de arrancar el servidor."
     )
 SECRET_KEY = _SECRET_KEY_ENV
 ALGORITHM = "HS256"
@@ -19,7 +20,9 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc), "jti": secrets.token_hex(16)})
+    to_encode.update(
+        {"exp": expire, "iat": datetime.now(timezone.utc), "jti": secrets.token_hex(16)}
+    )
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 

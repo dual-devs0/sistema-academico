@@ -1,6 +1,7 @@
 """
 Schemas Pydantic — Fase 5B: Graduación y tesis.
 """
+
 from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional

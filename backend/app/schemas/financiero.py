@@ -3,6 +3,7 @@ Schemas Pydantic — Fase 4: Módulo Financiero + Becas Diferenciadas.
 
 Todos los montos monetarios usan Decimal (mapea a Numeric(12,2) en la DB).
 """
+
 from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 # ═══════════════════════════════════════════════════════════════════════
 # FUENTES BECA
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class FuenteBecaOut(BaseModel):
     id: int
@@ -28,6 +30,7 @@ class FuenteBecaOut(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════
 # BECAS CATÁLOGO
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class BecaCatalogoCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=200)
@@ -56,6 +59,7 @@ class BecaCatalogoOut(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════
 # POSTULACIONES
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class PostulacionCreate(BaseModel):
     beca_id: int
@@ -86,6 +90,7 @@ class PostulacionOut(BaseModel):
 # BECAS ACTIVAS  (shape exacto del enunciado)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class BecaActivaOut(BaseModel):
     id: int
     beca_nombre: str
@@ -104,6 +109,7 @@ class BecaActivaOut(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════
 # CONCEPTOS ARANCEL
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class ConceptoArancelCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=200)
@@ -127,11 +133,13 @@ class ConceptoArancelOut(BaseModel):
 # CUOTAS  (incluye fuente de beca para trazabilidad)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class GenerarCuotasRequest(BaseModel):
     alumno_id: int
     concepto_id: int
-    periodos: List[str] = Field(..., min_length=1,
-        description="Lista de períodos ej. ['2026-01','2026-02',...]")
+    periodos: List[str] = Field(
+        ..., min_length=1, description="Lista de períodos ej. ['2026-01','2026-02',...]"
+    )
     fecha_vencimiento_base: date = Field(
         ..., description="Fecha de vencimiento para el primer período"
     )
@@ -144,14 +152,14 @@ class CuotaOut(BaseModel):
     periodo: str
     monto: Decimal
     monto_descuento: Decimal
-    monto_a_pagar: Decimal          # monto - monto_descuento calculado
+    monto_a_pagar: Decimal  # monto - monto_descuento calculado
     fecha_vencimiento: date
     estado: str
-    beca_nombre: Optional[str]      # trazabilidad
-    fuente_beca: Optional[str]      # trazabilidad
+    beca_nombre: Optional[str]  # trazabilidad
+    fuente_beca: Optional[str]  # trazabilidad
     es_beca_externa: Optional[bool]
-    pago_id: Optional[int] = None                 # último pago registrado (Fase 4B)
-    comprobante_estado: Optional[str] = None       # estado_emision del comprobante fiscal
+    pago_id: Optional[int] = None  # último pago registrado (Fase 4B)
+    comprobante_estado: Optional[str] = None  # estado_emision del comprobante fiscal
     comprobante_url_pdf: Optional[str] = None
 
     model_config = {"from_attributes": True}
@@ -161,13 +169,16 @@ class CuotaOut(BaseModel):
 # PAGOS
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class PagoCreate(BaseModel):
     cuota_id: int
     monto_pagado: Decimal = Field(..., gt=0)
-    metodo: str = Field(..., pattern="^(transferencia|efectivo|cheque|tarjeta|deposito)$")
+    metodo: str = Field(
+        ..., pattern="^(transferencia|efectivo|cheque|tarjeta|deposito)$"
+    )
     referencia: Optional[str] = None
     nota_ajuste: Optional[str] = None
-    pago_ajuste_ref_id: Optional[int] = None   # para ajustes
+    pago_ajuste_ref_id: Optional[int] = None  # para ajustes
 
 
 class PagoOut(BaseModel):
@@ -188,6 +199,7 @@ class PagoOut(BaseModel):
 # COMPROBANTES
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class ComprobanteOut(BaseModel):
     id: int
     pago_id: int
@@ -207,6 +219,7 @@ class ComprobanteOut(BaseModel):
 
 class ComprobantePendienteOut(BaseModel):
     """Vista para el panel admin de comprobantes en error/pendiente."""
+
     id: int
     pago_id: int
     alumno_nombre: str
@@ -222,6 +235,7 @@ class ComprobantePendienteOut(BaseModel):
 # ESTADO DEUDA PARA INSCRIPCIÓN
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class CuotaVencidaDetalle(BaseModel):
     cuota_id: int
     periodo: str
@@ -235,13 +249,14 @@ class EstadoDeudaOut(BaseModel):
     cuotas_vencidas: int
     max_permitidas: int
     detalle: List[CuotaVencidaDetalle]
-    tiene_beca_100: bool              # excepción ITAIPU / beca total
-    override_disponible: bool         # solo admins pueden activarlo
+    tiene_beca_100: bool  # excepción ITAIPU / beca total
+    override_disponible: bool  # solo admins pueden activarlo
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # RENDICIÓN  (export Excel/CSV)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class RendicionRow(BaseModel):
     alumno_nombre: str
@@ -250,5 +265,5 @@ class RendicionRow(BaseModel):
     beca_nombre: str
     fuente: str
     porcentaje_descuento: Decimal
-    monto_becado: Decimal             # sum(monto_descuento) en cuotas del período
+    monto_becado: Decimal  # sum(monto_descuento) en cuotas del período
     periodo: str

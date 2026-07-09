@@ -39,7 +39,6 @@ export default function MallaAdmin() {
 
   function cargar() {
     if (carreraId === null) return
-    setLoading(true)
     Promise.all([
       obtenerMallaCarrera(carreraId),
       obtenerCorrelatividades(carreraId),

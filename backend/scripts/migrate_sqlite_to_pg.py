@@ -2,13 +2,15 @@
 Migra datos de sistema_academico.db (SQLite) → PostgreSQL.
 
 Uso:
-    DATABASE_URL=postgresql+psycopg2://sa_user:sa_pass@localhost:5432/sistema_academico \
+    DATABASE_URL=postgresql+psycopg2://sa_user:sa_pass@localhost:5432/
+    sistema_academico \
     python scripts/migrate_sqlite_to_pg.py
 
 Requiere que el schema de PG ya exista (alembic upgrade head).
 Borra todos los datos existentes en PG antes de insertar.
 NO usar en producción con datos reales sin backup previo.
 """
+
 import os
 import sqlite3
 import sys
@@ -46,11 +48,11 @@ TABLE_ORDER = [
     "foro_hilos",
     "foro_mensajes",
     "eventos_calendario",
-    "refresh_tokens",   # si ya existe
+    "refresh_tokens",  # si ya existe
 ]
 
 from sqlalchemy import create_engine, text, inspect  # noqa: E402
-from sqlalchemy.types import Boolean, DateTime
+from sqlalchemy.types import Boolean, DateTime  # noqa: E402
 
 
 def get_columns(engine, table_name: str) -> list[str]:
@@ -60,12 +62,20 @@ def get_columns(engine, table_name: str) -> list[str]:
 
 def get_bool_cols(engine, table_name: str) -> set[str]:
     insp = inspect(engine)
-    return {c["name"] for c in insp.get_columns(table_name) if isinstance(c["type"], Boolean)}
+    return {
+        c["name"]
+        for c in insp.get_columns(table_name)
+        if isinstance(c["type"], Boolean)
+    }
 
 
 def get_datetime_cols(engine, table_name: str) -> set[str]:
     insp = inspect(engine)
-    return {c["name"] for c in insp.get_columns(table_name) if isinstance(c["type"], DateTime)}
+    return {
+        c["name"]
+        for c in insp.get_columns(table_name)
+        if isinstance(c["type"], DateTime)
+    }
 
 
 def coerce_row(row: dict, bool_cols: set, dt_cols: set) -> dict:
@@ -75,7 +85,12 @@ def coerce_row(row: dict, bool_cols: set, dt_cols: set) -> dict:
             result[k] = bool(v)
         elif k in dt_cols and isinstance(v, str):
             # SQLite returns datetime as string; parse to datetime object
-            for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+            for fmt in (
+                "%Y-%m-%d %H:%M:%S.%f",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%dT%H:%M:%S",
+            ):
                 try:
                     result[k] = datetime.strptime(v, fmt)
                     break
@@ -99,7 +114,8 @@ def migrate():
         existing_tables = pg_insp.get_table_names()
 
         sqlite_tables = {
-            r[0] for r in sqlite_conn.execute(
+            r[0]
+            for r in sqlite_conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
@@ -123,13 +139,17 @@ def migrate():
             col_list = ", ".join(f'"{c}"' for c in common_cols)
             placeholders = ", ".join(f":{c}" for c in common_cols)
 
-            # Borrar destino antes de insertar (orden inverso no necesario — truncate cascade)
+            # Borrar destino antes de insertar (orden inverso no necesario — truncate cascade)  # noqa: E501
             pg_conn.execute(text(f'DELETE FROM "{table}"'))
 
             bool_cols = get_bool_cols(pg_engine, table)
             dt_cols = get_datetime_cols(pg_engine, table)
             records = [
-                coerce_row(dict(zip(common_cols, [row[c] for c in common_cols])), bool_cols, dt_cols)
+                coerce_row(
+                    dict(zip(common_cols, [row[c] for c in common_cols])),
+                    bool_cols,
+                    dt_cols,
+                )
                 for row in rows
             ]
             pg_conn.execute(
@@ -145,10 +165,12 @@ def migrate():
             if not has_id:
                 continue
             try:
-                pg_conn.execute(text(
-                    f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
-                    f"COALESCE(MAX(id), 1)) FROM \"{table}\""
-                ))
+                pg_conn.execute(
+                    text(
+                        f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                        f'COALESCE(MAX(id), 1)) FROM "{table}"'
+                    )
+                )
             except Exception:
                 pass  # tabla sin sequence serial
 

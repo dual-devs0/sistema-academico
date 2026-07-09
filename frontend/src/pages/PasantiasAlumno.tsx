@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { getCurrentUser, emitToast } from '../lib/api'
-import { solicitarPasantia, getEmpresas, subirInforme,
-  type EmpresaReceptora, type Pasantia } from '../services/pasantiasService'
+import { emitToast } from '../lib/api'
+import { solicitarPasantia, getEmpresas,
+  type EmpresaReceptora } from '../services/pasantiasService'
 
 const css = `
   .ps-title { font-size:22px; font-weight:800; margin-bottom:20px; color:var(--text-primary); }
@@ -47,7 +47,7 @@ export default function PasantiasAlumno() {
       await solicitarPasantia(empresaId, fechaInicio, horas)
       emitToast('Solicitud enviada', 'success')
       setEmpresaId(0); setFechaInicio(''); setHoras(200)
-    } catch (e: any) {
+    } catch (e: Error) {
       emitToast(e?.message || 'Error al solicitar', 'error')
     } finally { setLoading(false) }
   }

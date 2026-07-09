@@ -6,7 +6,9 @@ Run once to migrate materias table:
 
 Usage: python migrate_materias.py
 """
-import sqlite3, os
+
+import sqlite3
+import os
 
 DB = os.path.join(os.path.dirname(__file__), "sistema_academico.db")
 print(f"Migrating: {DB}")
@@ -34,29 +36,37 @@ ORDER BY id;
 -- Redirect all FK references to kept IDs
 UPDATE inscripciones SET materia_id = (
     SELECT mn.id FROM materias_new mn
-    JOIN materias m ON m.nombre = (SELECT nombre FROM materias WHERE id = inscripciones.materia_id)
-                    AND (mn.carrera_id = m.carrera_id OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
+    JOIN materias m
+      ON m.nombre = (SELECT nombre FROM materias WHERE id = inscripciones.materia_id)
+     AND (mn.carrera_id = m.carrera_id
+          OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
     ORDER BY mn.id LIMIT 1
 ) WHERE materia_id NOT IN (SELECT id FROM materias_new);
 
 UPDATE puntajes SET materia_id = (
     SELECT mn.id FROM materias_new mn
-    JOIN materias m ON m.nombre = (SELECT nombre FROM materias WHERE id = puntajes.materia_id)
-                    AND (mn.carrera_id = m.carrera_id OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
+    JOIN materias m
+      ON m.nombre = (SELECT nombre FROM materias WHERE id = puntajes.materia_id)
+     AND (mn.carrera_id = m.carrera_id
+          OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
     ORDER BY mn.id LIMIT 1
 ) WHERE materia_id NOT IN (SELECT id FROM materias_new);
 
 UPDATE asistencias SET materia_id = (
     SELECT mn.id FROM materias_new mn
-    JOIN materias m ON m.nombre = (SELECT nombre FROM materias WHERE id = asistencias.materia_id)
-                    AND (mn.carrera_id = m.carrera_id OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
+    JOIN materias m
+      ON m.nombre = (SELECT nombre FROM materias WHERE id = asistencias.materia_id)
+     AND (mn.carrera_id = m.carrera_id
+          OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
     ORDER BY mn.id LIMIT 1
 ) WHERE materia_id NOT IN (SELECT id FROM materias_new);
 
 UPDATE apuntes SET materia_id = (
     SELECT mn.id FROM materias_new mn
-    JOIN materias m ON m.nombre = (SELECT nombre FROM materias WHERE id = apuntes.materia_id)
-                    AND (mn.carrera_id = m.carrera_id OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
+    JOIN materias m
+      ON m.nombre = (SELECT nombre FROM materias WHERE id = apuntes.materia_id)
+     AND (mn.carrera_id = m.carrera_id
+          OR (mn.carrera_id IS NULL AND m.carrera_id IS NULL))
     ORDER BY mn.id LIMIT 1
 ) WHERE materia_id IS NOT NULL AND materia_id NOT IN (SELECT id FROM materias_new);
 

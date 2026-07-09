@@ -45,11 +45,19 @@ export default function Foro() {
   function cargarHilos(matId: number) {
     setLoading(true)
     api.get<Hilo[]>(`/foro/hilos?materia_id=${matId}`)
-      .then(setHilos)
+      .then(hilos => {
+        setHilos(hilos)
+        setHiloSel(null)
+      })
       .catch(() => setHilos([]))
       .finally(() => setLoading(false))
   }
-  useEffect(() => { if (matSelId) { cargarHilos(matSelId); setHiloSel(null) } }, [matSelId])
+  useEffect(() => {
+    if (!matSelId) return
+    api.get<Hilo[]>(`/foro/hilos?materia_id=${matSelId}`)
+      .then(h => { setHilos(h); setHiloSel(null) })
+      .catch(() => setHilos([]))
+  }, [matSelId])
 
   async function cargarMensajes(hiloId: number, skip: number, append: boolean) {
     if (append) setCargandoMas(true)
@@ -104,13 +112,10 @@ export default function Foro() {
 
   function puedeEditar(m: Mensaje) {
     if (!user || m.user_id !== user.user_id || !m.created_at) return false
-    return Date.now() - new Date(m.created_at).getTime() <= VENTANA_EDICION_MS
+    return true
   }
 
-  function empezarEdicion(m: Mensaje) {
-    setEditId(m.id)
-    setEditValue(m.contenido)
-  }
+
 
   async function guardarEdicion(id: number) {
     if (!editValue.trim()) return
@@ -224,7 +229,11 @@ export default function Foro() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span className="mono-label" style={{ fontSize: 8.5 }}>{m.created_at ? new Date(m.created_at).toLocaleDateString('es-PY') : ''}</span>
                         {puedeEditar(m) && editId !== m.id && (
-                          <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }} onClick={() => empezarEdicion(m)}>
+                          <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }} onClick={() => {
+                            const expiro = !!(m.created_at && Date.now() - new Date(m.created_at).getTime() > VENTANA_EDICION_MS)
+                            if (expiro) { emitToast('Ventana de edición expirada (15 min)', 'warning'); return }
+                            setEditId(m.id); setEditValue(m.contenido)
+                          }}>
                             <i className="ti ti-pencil" style={{ fontSize: 12 }} />
                           </button>
                         )}

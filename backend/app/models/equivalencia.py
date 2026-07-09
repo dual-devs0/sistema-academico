@@ -1,12 +1,16 @@
 """
 Modelos SQLAlchemy — Fase 5D: Equivalencias y suficiencia.
 """
+
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Date, Text,
-    ForeignKey, CheckConstraint,
+    Column,
+    Integer,
+    String,
+    Date,
+    ForeignKey,
+    CheckConstraint,
 )
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 from app.database import Base
 
 
@@ -38,7 +42,9 @@ class EquivalenciaMateria(Base):
     __tablename__ = "equivalencias_materia"
 
     id = Column(Integer, primary_key=True, index=True)
-    solicitud_id = Column(Integer, ForeignKey("solicitudes_equivalencia.id"), nullable=False)
+    solicitud_id = Column(
+        Integer, ForeignKey("solicitudes_equivalencia.id"), nullable=False
+    )
     materia_origen_nombre = Column(String(200), nullable=False)
     materia_destino_id = Column(Integer, ForeignKey("materias.id"), nullable=True)
     programa_analitico_storage_key = Column(String(500), nullable=True)

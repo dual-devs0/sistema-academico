@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
 
-from app.dependencias import require_role, get_current_user
+from app.dependencias import get_current_user
 
 router = APIRouter(prefix="/materias", tags=["materias"])
 
@@ -25,13 +25,21 @@ def _enrich(m, db: Session) -> dict:
     profesor_id = None
     if oferta:
         profesor_id = oferta.profesor_id
-        prof = db.query(models.user.User).filter(models.user.User.id == oferta.profesor_id).first()
+        prof = (
+            db.query(models.user.User)
+            .filter(models.user.User.id == oferta.profesor_id)
+            .first()
+        )
         if prof:
             prof_nombre = prof.nombre or prof.username
 
     carrera_nombre = None
     if m.carrera_id:
-        carrera = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id == m.carrera_id).first()
+        carrera = (
+            db.query(models.carrera.Carrera)
+            .filter(models.carrera.Carrera.id == m.carrera_id)
+            .first()
+        )
         if carrera:
             carrera_nombre = carrera.nombre
 
@@ -48,15 +56,26 @@ def _enrich(m, db: Session) -> dict:
 
 
 @router.post("/")
-def create_materia(materia: schemas.materia.MateriaCreate, db: Session = Depends(database.get_db), current_user=Depends(get_current_user)):
+def create_materia(
+    materia: schemas.materia.MateriaCreate,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    existing = db.query(models.materia.Materia).filter(
-        models.materia.Materia.nombre == materia.nombre,
-        models.materia.Materia.carrera_id == materia.carrera_id,
-    ).first()
+    existing = (
+        db.query(models.materia.Materia)
+        .filter(
+            models.materia.Materia.nombre == materia.nombre,
+            models.materia.Materia.carrera_id == materia.carrera_id,
+        )
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Ya existe una materia con ese nombre en esta carrera")
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe una materia con ese nombre en esta carrera",
+        )
     new_materia = models.materia.Materia(
         nombre=materia.nombre,
         carrera_id=materia.carrera_id,
@@ -74,7 +93,7 @@ def list_materias(
     profesor_id: Optional[int] = Query(None),
     carrera_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     query = db.query(models.materia.Materia)
     if profesor_id is not None:
@@ -91,8 +110,16 @@ def list_materias(
 
 
 @router.get("/{materia_id}")
-def get_materia(materia_id: int, db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
-    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
+def get_materia(
+    materia_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == materia_id)
+        .first()
+    )
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
     return _enrich(materia, db)
@@ -102,23 +129,38 @@ def get_materia(materia_id: int, db: Session = Depends(database.get_db), current
 def crear_oferta(
     oferta: schemas.oferta_materia.OfertaMateriaCreate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """Admin: asigna un profesor a una materia para un período dado."""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == oferta.materia_id).first()
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == oferta.materia_id)
+        .first()
+    )
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
-    profesor = db.query(models.user.User).filter(models.user.User.id == oferta.profesor_id).first()
+    profesor = (
+        db.query(models.user.User)
+        .filter(models.user.User.id == oferta.profesor_id)
+        .first()
+    )
     if not profesor:
         raise HTTPException(status_code=404, detail="Profesor no encontrado")
-    existing = db.query(models.oferta_materia.OfertaMateria).filter(
-        models.oferta_materia.OfertaMateria.materia_id == oferta.materia_id,
-        models.oferta_materia.OfertaMateria.periodo == oferta.periodo,
-    ).first()
+    existing = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(
+            models.oferta_materia.OfertaMateria.materia_id == oferta.materia_id,
+            models.oferta_materia.OfertaMateria.periodo == oferta.periodo,
+        )
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Ya existe una oferta de esta materia para ese período")
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe una oferta de esta materia para ese período",
+        )
     nueva = models.oferta_materia.OfertaMateria(
         materia_id=oferta.materia_id,
         profesor_id=oferta.profesor_id,
@@ -129,7 +171,11 @@ def crear_oferta(
     db.commit()
     db.refresh(nueva)
     return schemas.oferta_materia.OfertaMateriaOut(
-        id=nueva.id, materia_id=nueva.materia_id, profesor_id=nueva.profesor_id,
-        periodo=nueva.periodo, activa=nueva.activa,
-        materia_nombre=materia.nombre, profesor_nombre=profesor.nombre or profesor.username,
+        id=nueva.id,
+        materia_id=nueva.materia_id,
+        profesor_id=nueva.profesor_id,
+        periodo=nueva.periodo,
+        activa=nueva.activa,
+        materia_nombre=materia.nombre,
+        profesor_nombre=profesor.nombre or profesor.username,
     )

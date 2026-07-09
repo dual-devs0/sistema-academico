@@ -41,6 +41,18 @@ export default function Usuarios() {
     return () => clearTimeout(t)
   }, [busqueda])
 
+  useEffect(() => {
+    const params = new URLSearchParams()
+    params.set('skip', String((page - 1) * PAGE_SIZE))
+    params.set('limit', String(PAGE_SIZE))
+    if (filtroRol) params.set('role', filtroRol)
+    if (busquedaDebounced) params.set('q', busquedaDebounced)
+    api.get<{ items: Usuario[]; total: number }>(`/users/?${params}`)
+      .then(res => { setUsuarios(res.items); setTotal(res.total) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [page, filtroRol, busquedaDebounced])
+
   function cargar() {
     setLoading(true)
     const params = new URLSearchParams()
@@ -53,7 +65,6 @@ export default function Usuarios() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }
-  useEffect(cargar, [page, filtroRol, busquedaDebounced])
 
   const columnas: ColumnaTabla<Usuario>[] = [
     {

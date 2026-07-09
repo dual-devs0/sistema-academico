@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from app.database import Base
 
+
 class RecordatorioDocente(Base):
     __tablename__ = "recordatorios_docente"
 

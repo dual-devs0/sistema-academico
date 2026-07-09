@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, Boolean, ForeignKey, UniqueConstraint
 from app.database import Base
 
+
 class PensumMateria(Base):
     __tablename__ = "pensum_materias"
 

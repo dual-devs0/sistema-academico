@@ -6,6 +6,7 @@ Corre cada 10 minutos (ver lifespan en app/main.py), hasta 5 intentos
 por comprobante. Nunca debe tumbar el loop del proceso — cualquier
 excepción se loguea y el ciclo sigue.
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,7 +43,8 @@ async def ciclo_reintentos() -> int:
         except Exception as exc:
             logger.error(
                 "Ciclo de reintentos: fallo inesperado en comprobante_id=%s: %s",
-                comprobante_id, exc,
+                comprobante_id,
+                exc,
             )
 
     return len(ids)

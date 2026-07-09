@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, UniqueConstraint
 from app.database import Base
 
+
 class ExpedienteSemestre(Base):
     __tablename__ = "expediente_semestres"
 
@@ -13,5 +14,7 @@ class ExpedienteSemestre(Base):
     materias_reprobadas = Column(Integer, nullable=False, default=0)
 
     __table_args__ = (
-        UniqueConstraint("alumno_id", "periodo", name="uq_expediente_semestre_alumno_periodo"),
+        UniqueConstraint(
+            "alumno_id", "periodo", name="uq_expediente_semestre_alumno_periodo"
+        ),
     )

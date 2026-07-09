@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from app.database import Base
 
+
 class Programa(Base):
     __tablename__ = "programas"
 

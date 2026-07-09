@@ -5,6 +5,7 @@ from datetime import datetime
 Visibilidad = Literal["publico", "privado", "solo_materia"]
 TipoContenido = Literal["pdf", "video", "imagen", "link", "documento", "otro"]
 
+
 class ApunteBase(BaseModel):
     user_id: int
     materia_id: int
@@ -16,8 +17,10 @@ class ApunteBase(BaseModel):
     tipo_contenido: TipoContenido = "pdf"
     visibilidad: Visibilidad = "publico"
 
+
 class ApunteCreate(ApunteBase):
     pass
+
 
 class ApunteUpdate(BaseModel):
     titulo: str | None = None
@@ -27,6 +30,7 @@ class ApunteUpdate(BaseModel):
     tipo_contenido: TipoContenido | None = None
     visibilidad: Visibilidad | None = None
 
+
 class ApunteOut(ApunteBase):
     id: int
     likes: int = 0
@@ -34,6 +38,7 @@ class ApunteOut(ApunteBase):
     fecha_subida: datetime | None = None
 
     model_config = {"from_attributes": True}
+
 
 class ApunteSearchParams(BaseModel):
     q: str | None = None

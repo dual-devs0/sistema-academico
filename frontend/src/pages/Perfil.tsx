@@ -55,11 +55,11 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
       .then(d => { if (d.nombre) setNombre(d.nombre); if (d.email) setEmail(d.email); if (d.foto_url) setFotoUrl(d.foto_url) })
       .catch(() => {})
     if (role === 'alumno' && userId) {
-      api.get<any[]>(`/puntajes/?user_id=${userId}`).then(pts => {
+      api.get<{valor:number}[]>(`/puntajes/?user_id=${userId}`).then(pts => {
         const vals = pts.map(p => Number(p.valor)).filter(v => !isNaN(v))
         if (vals.length) setPromedio(Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10)
       }).catch(() => {})
-      api.get<any[]>(`/asistencias/?user_id=${userId}`).then(as => {
+      api.get<{presente:boolean}[]>(`/asistencias/?user_id=${userId}`).then(as => {
         if (as.length) setAsistencia(Math.round(as.filter(a => a.presente).length / as.length * 100))
       }).catch(() => {})
       

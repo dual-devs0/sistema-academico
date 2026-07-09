@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   getFuentes, getCatalogoBecas, getPostulaciones, revisarPostulacion,
-  getCuotasAlumno, generarCuotas, registrarPago, getConceptos, crearConcepto,
+  getConceptos, crearConcepto,
   downloadRendicion, formatGs,
   getComprobantesPendientes, reintentarComprobante,
-  type FuenteBeca, type BecaCatalogo, type Postulacion, type Cuota, type ConceptoArancel,
+  type FuenteBeca, type BecaCatalogo, type Postulacion, type ConceptoArancel,
   type ComprobantePendiente,
 } from '../services/finanzasService'
 import { emitToast } from '../lib/api'
@@ -343,11 +343,10 @@ function TabConceptos() {
 // ── Sub-componente: Comprobantes pendientes/error (Fase 4B) ───────────
 function TabComprobantes() {
   const [items, setItems] = useState<ComprobantePendiente[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [reintentando, setReintentando] = useState<number | null>(null)
 
   const cargar = () => {
-    setLoading(true)
     getComprobantesPendientes()
       .then(setItems)
       .catch(() => emitToast('Error cargando comprobantes pendientes', 'error'))

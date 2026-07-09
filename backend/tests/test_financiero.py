@@ -10,6 +10,7 @@ Cubre:
 - Excepción beca 100% ITAIPU → no bloqueo
 - Rendición Excel (bytes + content-type)
 """
+
 from __future__ import annotations
 import pytest
 from datetime import date, timedelta
@@ -20,11 +21,16 @@ import httpx
 from sqlalchemy.orm import sessionmaker
 
 from app.models.financiero import (
-    BecaActiva, BecaCatalogo, ConceptoArancel, Comprobante, Cuota, FuenteBeca, Pago,
+    BecaActiva,
+    BecaCatalogo,
+    ConceptoArancel,
+    Comprobante,
+    Cuota,
+    FuenteBeca,
+    Pago,
 )
 from app.services.financiero import (
     calcular_descuento_beca,
-    cuota_to_out,
     export_rendicion_excel,
     generar_cuotas_alumno,
     registrar_pago,
@@ -36,33 +42,48 @@ from app.services.facturacion_electronica import procesar_facturacion, MAX_INTEN
 
 # ─── helpers ─────────────────────────────────────────────────────────
 
-def _make_fuente(db, nombre="TestFuente", es_externa=False, editable=True, reporte=False) -> FuenteBeca:
-    f = FuenteBeca(nombre=nombre, tipo="test", es_externa=es_externa,
-                   requiere_reporte_externo=reporte, editable_porcentaje=editable)
+
+def _make_fuente(
+    db, nombre="TestFuente", es_externa=False, editable=True, reporte=False
+) -> FuenteBeca:
+    f = FuenteBeca(
+        nombre=nombre,
+        tipo="test",
+        es_externa=es_externa,
+        requiere_reporte_externo=reporte,
+        editable_porcentaje=editable,
+    )
     db.add(f)
     db.flush()
     return f
 
 
 def _make_beca(db, fuente_id, porcentaje="50.00", nombre="Beca Test") -> BecaCatalogo:
-    b = BecaCatalogo(nombre=nombre, fuente_id=fuente_id,
-                     porcentaje_descuento=Decimal(porcentaje))
+    b = BecaCatalogo(
+        nombre=nombre, fuente_id=fuente_id, porcentaje_descuento=Decimal(porcentaje)
+    )
     db.add(b)
     db.flush()
     return b
 
 
 def _make_beca_activa(db, alumno_id, beca, fuente_id, estado="vigente") -> BecaActiva:
-    ba = BecaActiva(alumno_id=alumno_id, beca_id=beca.id, fuente_id=fuente_id,
-                    periodo_inicio="2026-01", estado_renovacion=estado)
+    ba = BecaActiva(
+        alumno_id=alumno_id,
+        beca_id=beca.id,
+        fuente_id=fuente_id,
+        periodo_inicio="2026-01",
+        estado_renovacion=estado,
+    )
     db.add(ba)
     db.flush()
     return ba
 
 
 def _make_concepto(db, carrera_id=None, monto=Decimal("500000")) -> ConceptoArancel:
-    c = ConceptoArancel(nombre="Cuota Mensual Test", monto_base=monto,
-                        carrera_id=carrera_id)
+    c = ConceptoArancel(
+        nombre="Cuota Mensual Test", monto_base=monto, carrera_id=carrera_id
+    )
     db.add(c)
     db.flush()
     return c
@@ -85,6 +106,7 @@ def _make_cuota_vencida(db, alumno_id, concepto_id) -> Cuota:
 
 
 # ─── tests ───────────────────────────────────────────────────────────
+
 
 class TestGenerarCuotas:
     def test_sin_beca_monto_completo(self, db, seed):
@@ -137,7 +159,7 @@ class TestGenerarCuotas:
         beca_60 = _make_beca(db, fuente.id, "60.00", "Beca 60")
         _make_beca_activa(db, alumno.id, beca_30, fuente.id)
         _make_beca_activa(db, alumno.id, beca_60, fuente.id)
-        concepto = _make_concepto(db, monto=Decimal("1000000"))
+        _make_concepto(db, monto=Decimal("1000000"))
         db.commit()
 
         porcentaje, beca_aplicada = calcular_descuento_beca(alumno.id, db)
@@ -151,26 +173,35 @@ class TestPagos:
         concepto = _make_concepto(db)
         db.commit()
         cuotas = generar_cuotas_alumno(
-            alumno_id=alumno.id, concepto_id=concepto.id,
-            periodos=["2026-01"], fecha_vencimiento_base=date(2026, 1, 31),
-            generado_por=seed["admin"].id, db=db,
+            alumno_id=alumno.id,
+            concepto_id=concepto.id,
+            periodos=["2026-01"],
+            fecha_vencimiento_base=date(2026, 1, 31),
+            generado_por=seed["admin"].id,
+            db=db,
         )
         db.commit()
         cuota = cuotas[0]
 
         # Primer pago: 200k (parcial)
-        pago1 = registrar_pago(
-            cuota_id=cuota.id, monto_pagado=Decimal("200000"),
-            metodo="efectivo", registrado_por=seed["admin"].id, db=db,
+        registrar_pago(
+            cuota_id=cuota.id,
+            monto_pagado=Decimal("200000"),
+            metodo="efectivo",
+            registrado_por=seed["admin"].id,
+            db=db,
         )
         db.commit()
         db.refresh(cuota)
-        assert cuota.estado == "pendiente"   # todavía no está completa
+        assert cuota.estado == "pendiente"  # todavía no está completa
 
         # Segundo pago: 300k (cubre el resto)
         registrar_pago(
-            cuota_id=cuota.id, monto_pagado=Decimal("300000"),
-            metodo="transferencia", registrado_por=seed["admin"].id, db=db,
+            cuota_id=cuota.id,
+            monto_pagado=Decimal("300000"),
+            metodo="transferencia",
+            registrado_por=seed["admin"].id,
+            db=db,
         )
         db.commit()
         db.refresh(cuota)
@@ -181,9 +212,12 @@ class TestPagos:
         concepto = _make_concepto(db)
         db.commit()
         cuotas = generar_cuotas_alumno(
-            alumno_id=alumno.id, concepto_id=concepto.id,
-            periodos=["2026-02"], fecha_vencimiento_base=date(2026, 2, 28),
-            generado_por=seed["admin"].id, db=db,
+            alumno_id=alumno.id,
+            concepto_id=concepto.id,
+            periodos=["2026-02"],
+            fecha_vencimiento_base=date(2026, 2, 28),
+            generado_por=seed["admin"].id,
+            db=db,
         )
         db.commit()
         cuota = cuotas[0]
@@ -192,8 +226,11 @@ class TestPagos:
 
         with pytest.raises(ValueError, match="anulada"):
             registrar_pago(
-                cuota_id=cuota.id, monto_pagado=Decimal("500000"),
-                metodo="efectivo", registrado_por=seed["admin"].id, db=db,
+                cuota_id=cuota.id,
+                monto_pagado=Decimal("500000"),
+                metodo="efectivo",
+                registrado_por=seed["admin"].id,
+                db=db,
             )
 
 
@@ -220,7 +257,9 @@ class TestBloqueoPorMora:
     def test_beca_100_no_bloquea(self, db, seed):
         """Alumno con beca ITAIPU 100% no debe quedar bloqueado aunque tenga mora."""
         alumno = seed["alumno"]
-        fuente = _make_fuente(db, "ITAIPU", es_externa=True, editable=False, reporte=True)
+        fuente = _make_fuente(
+            db, "ITAIPU", es_externa=True, editable=False, reporte=True
+        )
         beca = _make_beca(db, fuente.id, "100.00", "Beca ITAIPU")
         _make_beca_activa(db, alumno.id, beca, fuente.id)
         concepto = _make_concepto(db)
@@ -268,7 +307,9 @@ class TestBloqueoPorMora:
 class TestRendicionExcel:
     def test_export_retorna_bytes_xlsx(self, db, seed):
         alumno = seed["alumno"]
-        fuente = _make_fuente(db, "ITAIPU", es_externa=True, editable=False, reporte=True)
+        fuente = _make_fuente(
+            db, "ITAIPU", es_externa=True, editable=False, reporte=True
+        )
         beca = _make_beca(db, fuente.id, "100.00", "Beca ITAIPU")
         _make_beca_activa(db, alumno.id, beca, fuente.id)
         db.commit()
@@ -300,17 +341,25 @@ class TestComprobantes:
         concepto = _make_concepto(db)
         db.commit()
         cuotas = generar_cuotas_alumno(
-            alumno_id=alumno.id, concepto_id=concepto.id,
-            periodos=["2026-03"], fecha_vencimiento_base=date(2026, 3, 31),
-            generado_por=seed["admin"].id, db=db,
+            alumno_id=alumno.id,
+            concepto_id=concepto.id,
+            periodos=["2026-03"],
+            fecha_vencimiento_base=date(2026, 3, 31),
+            generado_por=seed["admin"].id,
+            db=db,
         )
         db.commit()
         pago = registrar_pago(
-            cuota_id=cuotas[0].id, monto_pagado=Decimal("500000"),
-            metodo="efectivo", registrado_por=seed["admin"].id, db=db,
+            cuota_id=cuotas[0].id,
+            monto_pagado=Decimal("500000"),
+            metodo="efectivo",
+            registrado_por=seed["admin"].id,
+            db=db,
         )
         db.commit()
-        comprobante = Comprobante(pago_id=pago.id, tipo="factura", estado_emision="pendiente")
+        comprobante = Comprobante(
+            pago_id=pago.id, tipo="factura", estado_emision="pendiente"
+        )
         db.add(comprobante)
         db.commit()
         db.refresh(comprobante)
@@ -326,12 +375,19 @@ class TestComprobantes:
             "timbrado": "12345678",
             "url_pdf": "https://guarani.app/comprobantes/123.pdf",
         }
-        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
-             patch("app.services.facturacion_electronica.emitir_factura", AsyncMock(return_value=resultado_mock)):
+        with (
+            patch("app.services.facturacion_electronica.SessionLocal", TestSession),
+            patch(
+                "app.services.facturacion_electronica.emitir_factura",
+                AsyncMock(return_value=resultado_mock),
+            ),
+        ):
             await procesar_facturacion(pago.id, comprobante.id)
 
         db.expire_all()
-        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        actualizado = (
+            db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        )
         assert actualizado.estado_emision == "emitido"
         assert actualizado.numero_comprobante == "001-001-0000123"
         assert actualizado.url_pdf == resultado_mock["url_pdf"]
@@ -343,13 +399,19 @@ class TestComprobantes:
         pago, comprobante = self._preparar_pago(db, seed)
         pago_id_original = pago.id
 
-        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
-             patch("app.services.facturacion_electronica.emitir_factura",
-                   AsyncMock(side_effect=httpx.TimeoutException("timeout de guarani.app"))):
+        with (
+            patch("app.services.facturacion_electronica.SessionLocal", TestSession),
+            patch(
+                "app.services.facturacion_electronica.emitir_factura",
+                AsyncMock(side_effect=httpx.TimeoutException("timeout de guarani.app")),
+            ),
+        ):
             await procesar_facturacion(pago.id, comprobante.id)
 
         db.expire_all()
-        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        actualizado = (
+            db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        )
         assert actualizado.estado_emision == "error"
         assert "timeout" in actualizado.ultimo_error.lower()
         assert actualizado.intentos == 1
@@ -364,14 +426,23 @@ class TestComprobantes:
         pago, comprobante = self._preparar_pago(db, seed)
 
         error = httpx.HTTPStatusError(
-            "422 client error", request=MagicMock(), response=MagicMock(status_code=422),
+            "422 client error",
+            request=MagicMock(),
+            response=MagicMock(status_code=422),
         )
-        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
-             patch("app.services.facturacion_electronica.emitir_factura", AsyncMock(side_effect=error)):
+        with (
+            patch("app.services.facturacion_electronica.SessionLocal", TestSession),
+            patch(
+                "app.services.facturacion_electronica.emitir_factura",
+                AsyncMock(side_effect=error),
+            ),
+        ):
             await procesar_facturacion(pago.id, comprobante.id)
 
         db.expire_all()
-        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        actualizado = (
+            db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        )
         assert actualizado.estado_emision == "error"
         assert actualizado.ultimo_error
 
@@ -384,17 +455,26 @@ class TestComprobantes:
             await procesar_facturacion(pago.id, comprobante.id)
 
         db.expire_all()
-        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        actualizado = (
+            db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        )
         assert actualizado.estado_emision == "error"
         assert "GUARANI_APP_API_KEY" in actualizado.ultimo_error
 
     def test_reintento_manual_respeta_limite_intentos(self, client, db, seed):
         from app.auth import create_access_token
+
         pago, comprobante = self._preparar_pago(db, seed)
         comprobante.intentos = MAX_INTENTOS
         db.commit()
 
-        token = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+        token = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
         r = client.post(
             f"/finanzas/pagos/{pago.id}/comprobante/reintentar",
             headers={"Authorization": f"Bearer {token}"},
@@ -403,9 +483,16 @@ class TestComprobantes:
 
     def test_reintento_manual_no_admin_falla(self, client, db, seed):
         from app.auth import create_access_token
+
         pago, comprobante = self._preparar_pago(db, seed)
 
-        token = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+        token = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
         r = client.post(
             f"/finanzas/pagos/{pago.id}/comprobante/reintentar",
             headers={"Authorization": f"Bearer {token}"},
@@ -414,17 +501,36 @@ class TestComprobantes:
 
     def test_listar_pendientes_solo_admin(self, client, db, seed):
         from app.auth import create_access_token
+
         self._preparar_pago(db, seed)
 
-        token_admin = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
-        r = client.get("/finanzas/comprobantes/pendientes", headers={"Authorization": f"Bearer {token_admin}"})
+        token_admin = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
+        r = client.get(
+            "/finanzas/comprobantes/pendientes",
+            headers={"Authorization": f"Bearer {token_admin}"},
+        )
         assert r.status_code == 200
         data = r.json()
         assert len(data) == 1
         assert data[0]["estado_emision"] == "pendiente"
 
-        token_alumno = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
-        r2 = client.get("/finanzas/comprobantes/pendientes", headers={"Authorization": f"Bearer {token_alumno}"})
+        token_alumno = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
+        r2 = client.get(
+            "/finanzas/comprobantes/pendientes",
+            headers={"Authorization": f"Bearer {token_alumno}"},
+        )
         assert r2.status_code == 403
 
     async def test_ciclo_reintentos_ignora_intentos_agotados(self, db, seed):
@@ -435,11 +541,21 @@ class TestComprobantes:
         comp1.intentos = MAX_INTENTOS  # agotado, no debe procesarse
         db.commit()
 
-        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
-             patch("app.jobs.reintento_facturacion.SessionLocal", TestSession), \
-             patch("app.services.facturacion_electronica.emitir_factura", AsyncMock(return_value={
-                 "numero_comprobante": "x", "cdc": "x", "timbrado": "x", "url_pdf": "x",
-             })) as mock_emitir:
+        with (
+            patch("app.services.facturacion_electronica.SessionLocal", TestSession),
+            patch("app.jobs.reintento_facturacion.SessionLocal", TestSession),
+            patch(
+                "app.services.facturacion_electronica.emitir_factura",
+                AsyncMock(
+                    return_value={
+                        "numero_comprobante": "x",
+                        "cdc": "x",
+                        "timbrado": "x",
+                        "url_pdf": "x",
+                    }
+                ),
+            ) as mock_emitir,
+        ):
             procesados = await ciclo_reintentos()
 
         assert procesados == 0

@@ -4,14 +4,17 @@ from datetime import datetime
 
 TipoEvaluacion = Literal["parcial1", "parcial2", "practico", "final"]
 
+
 class PuntajeBase(BaseModel):
     user_id: int
     materia_id: int
     tipo: TipoEvaluacion
     valor: float = Field(ge=0, le=10)
 
+
 class PuntajeCreate(PuntajeBase):
     pass
+
 
 class PuntajeOut(PuntajeBase):
     id: int
@@ -21,6 +24,7 @@ class PuntajeOut(PuntajeBase):
 
     model_config = {"from_attributes": True}
 
+
 class PromedioFinalOut(BaseModel):
     user_id: int
     nombre: str
@@ -29,6 +33,7 @@ class PromedioFinalOut(BaseModel):
     practico: float | None = None
     final: float | None = None
     promedio_final: float | None = None
+
 
 class AlumnoExportRow(BaseModel):
     user_id: int
@@ -40,6 +45,7 @@ class AlumnoExportRow(BaseModel):
     final: float | None = None
     promedio: float | None = None
     asistencia_pct: float | None = None
+
 
 class ExportacionMateriaOut(BaseModel):
     materia_id: int

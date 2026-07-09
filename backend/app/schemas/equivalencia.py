@@ -1,6 +1,7 @@
 """
 Schemas Pydantic — Fase 5D: Equivalencias y suficiencia.
 """
+
 from __future__ import annotations
 from datetime import date
 from typing import Optional

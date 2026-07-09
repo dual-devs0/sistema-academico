@@ -8,6 +8,7 @@ Revision ID: t7u8v9w0x1y2
 Revises: s6t7u8v9w0x1
 Create Date: 2026-07-09
 """
+
 from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
@@ -29,7 +30,9 @@ def upgrade() -> None:
     op.add_column("comprobantes", sa.Column("url_pdf", sa.String(500), nullable=True))
     op.add_column(
         "comprobantes",
-        sa.Column("estado_emision", sa.String(20), nullable=False, server_default="pendiente"),
+        sa.Column(
+            "estado_emision", sa.String(20), nullable=False, server_default="pendiente"
+        ),
     )
     op.add_column(
         "comprobantes",

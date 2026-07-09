@@ -7,14 +7,10 @@ Tests — Fase 5D: Equivalencias.
   POST /equivalencias/examenes-suficiencia
   GET  /equivalencias/alumno/{id}
 """
-import pytest
-from sqlalchemy.orm import Session
-
-from app.models.equivalencia import EquivalenciaMateria
-from app.models.expediente_materia import ExpedienteMateria
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def _crear_solicitud(client, token, tipo="equivalencia"):
     return client.post(
@@ -25,6 +21,7 @@ def _crear_solicitud(client, token, tipo="equivalencia"):
 
 
 # ── Tests ────────────────────────────────────────────────────────────
+
 
 class TestSolicitudes:
     def test_alumno_crea_solicitud(self, client, tokens):

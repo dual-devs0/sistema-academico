@@ -7,6 +7,7 @@ Revision ID: a4f7b2c9d1e8
 Revises: m0n1p2q3r4s5
 Create Date: 2026-07-04
 """
+
 from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
@@ -23,13 +24,15 @@ def upgrade() -> None:
 
     if dialect == "postgresql":
         op.alter_column(
-            "users", "created_at",
+            "users",
+            "created_at",
             type_=sa.DateTime(timezone=True),
             existing_nullable=True,
             postgresql_using="created_at AT TIME ZONE 'UTC'",
         )
         op.alter_column(
-            "puntajes", "editado_en",
+            "puntajes",
+            "editado_en",
             type_=sa.DateTime(timezone=True),
             existing_nullable=True,
             postgresql_using="editado_en AT TIME ZONE 'UTC'",
@@ -42,12 +45,14 @@ def downgrade() -> None:
 
     if dialect == "postgresql":
         op.alter_column(
-            "users", "created_at",
+            "users",
+            "created_at",
             type_=sa.DateTime(timezone=False),
             existing_nullable=True,
         )
         op.alter_column(
-            "puntajes", "editado_en",
+            "puntajes",
+            "editado_en",
             type_=sa.DateTime(timezone=False),
             existing_nullable=True,
         )

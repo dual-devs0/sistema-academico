@@ -1,9 +1,16 @@
 """
 Modelos SQLAlchemy — Fase 5A: Solicitudes y trámites.
 """
+
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Text,
-    ForeignKey, CheckConstraint,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Text,
+    ForeignKey,
+    CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -30,9 +37,13 @@ class Solicitud(Base):
     tipo_tramite_id = Column(Integer, ForeignKey("tipos_tramite.id"), nullable=False)
     estado = Column(String(20), nullable=False, default="pendiente")
     # pendiente / en_proceso / resuelta / rechazada
-    fecha_solicitud = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    fecha_solicitud = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
     fecha_resolucion = Column(DateTime(timezone=True), nullable=True)
-    resuelto_por = Column(Integer, ForeignKey("users.id"), nullable=True)  # null = auto-generada
+    resuelto_por = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )  # null = auto-generada
     storage_key_resultado = Column(String(500), nullable=True)
     motivo_rechazo = Column(Text, nullable=True)
 

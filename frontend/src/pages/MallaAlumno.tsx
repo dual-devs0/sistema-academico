@@ -28,7 +28,6 @@ export default function MallaAlumno() {
 
   useEffect(() => {
     if (alumnoId === null) return
-    setLoading(true)
     Promise.all([obtenerAvanceAlumno(alumnoId), obtenerCreditosAlumno(alumnoId)])
       .then(([a, c]) => { setAvance(a); setCreditos(c) })
       .catch(() => {})

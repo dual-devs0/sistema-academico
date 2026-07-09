@@ -45,17 +45,17 @@ def test_admin_sees_all_puntajes(client, seed, tokens, db):
 
 def test_create_puntaje(client, seed, tokens):
     payload = {
-        "user_id":    seed["alumno"].id,
+        "user_id": seed["alumno"].id,
         "materia_id": seed["materia"].id,
-        "tipo":       "parcial2",
-        "valor":      7.5,
+        "tipo": "parcial2",
+        "valor": 7.5,
     }
     res = client.post("/puntajes/", json=payload, headers=auth(tokens["admin"]))
     assert res.status_code == 200
     data = res.json()
-    assert data["user_id"]    == seed["alumno"].id
+    assert data["user_id"] == seed["alumno"].id
     assert data["materia_id"] == seed["materia"].id
-    assert data["tipo"]       == "parcial2"
+    assert data["tipo"] == "parcial2"
     assert float(data["valor"]) == 7.5
 
 

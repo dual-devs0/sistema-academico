@@ -9,32 +9,44 @@ router = APIRouter(prefix="/profesor", tags=["profesor"])
 
 def _requiere_profesor(current_user: dict):
     if current_user["role"] != "profesor":
-        raise HTTPException(status_code=403, detail="Solo profesores pueden acceder a este recurso")
+        raise HTTPException(
+            status_code=403, detail="Solo profesores pueden acceder a este recurso"
+        )
 
 
 @router.get("/mi-historico")
 def mi_historico(
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """Cátedras dictadas por el profesor, agrupadas por período (más reciente primero)."""
+    """Cátedras dictadas por el profesor, agrupadas por período (más reciente primero)."""  # noqa: E501
     _requiere_profesor(current_user)
 
     ofertas = (
         db.query(models.oferta_materia.OfertaMateria)
-        .filter(models.oferta_materia.OfertaMateria.profesor_id == current_user["user_id"])
+        .filter(
+            models.oferta_materia.OfertaMateria.profesor_id == current_user["user_id"]
+        )
         .order_by(models.oferta_materia.OfertaMateria.periodo.desc())
         .all()
     )
 
     periodos: dict[str, list] = {}
     for oferta in ofertas:
-        materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == oferta.materia_id).first()
+        materia = (
+            db.query(models.materia.Materia)
+            .filter(models.materia.Materia.id == oferta.materia_id)
+            .first()
+        )
         if not materia:
             continue
         carrera_nombre = None
         if materia.carrera_id:
-            carrera = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id == materia.carrera_id).first()
+            carrera = (
+                db.query(models.carrera.Carrera)
+                .filter(models.carrera.Carrera.id == materia.carrera_id)
+                .first()
+            )
             carrera_nombre = carrera.nombre if carrera else None
 
         cantidad_alumnos = (
@@ -83,12 +95,14 @@ def mi_agenda(
     desde: date = Query(...),
     hasta: date = Query(...),
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """Clases fijas + eventos institucionales + recordatorios propios, normalizado por dia."""
+    """Clases fijas + eventos institucionales + recordatorios propios, normalizado por dia."""  # noqa: E501
     _requiere_profesor(current_user)
     if hasta < desde:
-        raise HTTPException(status_code=422, detail="'hasta' no puede ser anterior a 'desde'")
+        raise HTTPException(
+            status_code=422, detail="'hasta' no puede ser anterior a 'desde'"
+        )
 
     ofertas_activas = (
         db.query(models.oferta_materia.OfertaMateria)
@@ -101,7 +115,11 @@ def mi_agenda(
     materia_ids = [o.materia_id for o in ofertas_activas]
     materia_nombre = {}
     if materia_ids:
-        for m in db.query(models.materia.Materia).filter(models.materia.Materia.id.in_(materia_ids)).all():
+        for m in (
+            db.query(models.materia.Materia)
+            .filter(models.materia.Materia.id.in_(materia_ids))
+            .all()
+        ):
             materia_nombre[m.id] = m.nombre
 
     items = []
@@ -117,60 +135,76 @@ def mi_agenda(
         while cur <= hasta:
             for h in horarios:
                 if h.dia_semana == cur.weekday():
-                    items.append({
-                        "tipo": "clase",
-                        "fecha": cur.isoformat(),
-                        "hora_inicio": h.hora_inicio.isoformat(),
-                        "hora_fin": h.hora_fin.isoformat(),
-                        "materia_id": h.materia_id,
-                        "materia_nombre": materia_nombre.get(h.materia_id),
-                        "aula": h.aula,
-                    })
+                    items.append(
+                        {
+                            "tipo": "clase",
+                            "fecha": cur.isoformat(),
+                            "hora_inicio": h.hora_inicio.isoformat(),
+                            "hora_fin": h.hora_fin.isoformat(),
+                            "materia_id": h.materia_id,
+                            "materia_nombre": materia_nombre.get(h.materia_id),
+                            "aula": h.aula,
+                        }
+                    )
             cur += timedelta(days=1)
 
     # Eventos institucionales o de sus materias
     from sqlalchemy import or_
+
     eventos_q = db.query(models.evento.EventoCalendario).filter(
         models.evento.EventoCalendario.fecha >= desde,
         models.evento.EventoCalendario.fecha <= hasta,
     )
     if materia_ids:
-        eventos_q = eventos_q.filter(or_(
-            models.evento.EventoCalendario.materia_id.is_(None),
-            models.evento.EventoCalendario.materia_id.in_(materia_ids),
-        ))
+        eventos_q = eventos_q.filter(
+            or_(
+                models.evento.EventoCalendario.materia_id.is_(None),
+                models.evento.EventoCalendario.materia_id.in_(materia_ids),
+            )
+        )
     else:
-        eventos_q = eventos_q.filter(models.evento.EventoCalendario.materia_id.is_(None))
+        eventos_q = eventos_q.filter(
+            models.evento.EventoCalendario.materia_id.is_(None)
+        )
     for e in eventos_q.all():
-        items.append({
-            "tipo": "evento",
-            "fecha": e.fecha.isoformat(),
-            "titulo": e.titulo,
-            "evento_tipo": e.tipo,
-            "materia_id": e.materia_id,
-            "materia_nombre": materia_nombre.get(e.materia_id) if e.materia_id else None,
-            "descripcion": e.descripcion,
-        })
+        items.append(
+            {
+                "tipo": "evento",
+                "fecha": e.fecha.isoformat(),
+                "titulo": e.titulo,
+                "evento_tipo": e.tipo,
+                "materia_id": e.materia_id,
+                "materia_nombre": materia_nombre.get(e.materia_id)
+                if e.materia_id
+                else None,
+                "descripcion": e.descripcion,
+            }
+        )
 
     # Recordatorios propios
     desde_dt = datetime.combine(desde, datetime.min.time())
     hasta_dt = datetime.combine(hasta, datetime.max.time())
     recordatorios_q = db.query(models.recordatorio_docente.RecordatorioDocente).filter(
-        models.recordatorio_docente.RecordatorioDocente.profesor_id == current_user["user_id"],
+        models.recordatorio_docente.RecordatorioDocente.profesor_id
+        == current_user["user_id"],
         models.recordatorio_docente.RecordatorioDocente.fecha >= desde_dt,
         models.recordatorio_docente.RecordatorioDocente.fecha <= hasta_dt,
     )
     for r in recordatorios_q.all():
-        items.append({
-            "tipo": "recordatorio",
-            "id": r.id,
-            "fecha": r.fecha.isoformat(),
-            "titulo": r.titulo,
-            "descripcion": r.descripcion,
-            "materia_id": r.materia_id,
-            "materia_nombre": materia_nombre.get(r.materia_id) if r.materia_id else None,
-            "completado": r.completado,
-        })
+        items.append(
+            {
+                "tipo": "recordatorio",
+                "id": r.id,
+                "fecha": r.fecha.isoformat(),
+                "titulo": r.titulo,
+                "descripcion": r.descripcion,
+                "materia_id": r.materia_id,
+                "materia_nombre": materia_nombre.get(r.materia_id)
+                if r.materia_id
+                else None,
+                "completado": r.completado,
+            }
+        )
 
     return {"desde": desde.isoformat(), "hasta": hasta.isoformat(), "items": items}
 
@@ -179,7 +213,7 @@ def mi_agenda(
 def crear_recordatorio(
     data: schemas.recordatorio.RecordatorioCreate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     _requiere_profesor(current_user)
     nuevo = models.recordatorio_docente.RecordatorioDocente(
@@ -195,17 +229,22 @@ def crear_recordatorio(
     return nuevo
 
 
-@router.patch("/recordatorios/{recordatorio_id}", response_model=schemas.recordatorio.RecordatorioOut)
+@router.patch(
+    "/recordatorios/{recordatorio_id}",
+    response_model=schemas.recordatorio.RecordatorioOut,
+)
 def actualizar_recordatorio(
     recordatorio_id: int,
     data: schemas.recordatorio.RecordatorioUpdate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     _requiere_profesor(current_user)
-    rec = db.query(models.recordatorio_docente.RecordatorioDocente).filter(
-        models.recordatorio_docente.RecordatorioDocente.id == recordatorio_id
-    ).first()
+    rec = (
+        db.query(models.recordatorio_docente.RecordatorioDocente)
+        .filter(models.recordatorio_docente.RecordatorioDocente.id == recordatorio_id)
+        .first()
+    )
     if not rec:
         raise HTTPException(status_code=404, detail="Recordatorio no encontrado")
     if rec.profesor_id != current_user["user_id"]:
@@ -221,12 +260,14 @@ def actualizar_recordatorio(
 def eliminar_recordatorio(
     recordatorio_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     _requiere_profesor(current_user)
-    rec = db.query(models.recordatorio_docente.RecordatorioDocente).filter(
-        models.recordatorio_docente.RecordatorioDocente.id == recordatorio_id
-    ).first()
+    rec = (
+        db.query(models.recordatorio_docente.RecordatorioDocente)
+        .filter(models.recordatorio_docente.RecordatorioDocente.id == recordatorio_id)
+        .first()
+    )
     if not rec:
         raise HTTPException(status_code=404, detail="Recordatorio no encontrado")
     if rec.profesor_id != current_user["user_id"]:

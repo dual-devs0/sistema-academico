@@ -64,12 +64,15 @@ export default function AsistenciaScan() {
       navigate(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)
       return
     }
-    if (userRol !== 'alumno') { setEstado('no_autorizado'); return }
-    api.post<ResultData>('/asistencias/scan', { token })
+    const prom = userRol !== 'alumno'
+      ? Promise.reject(new Error('no_autorizado'))
+      : api.post<ResultData>('/asistencias/scan', { token })
+    prom
       .then(res => { setResult(res); setEstado('exito') })
-      .catch((err: any) => {
-        const msg = err.message || ''
-        if (msg.includes('expirado') || msg.includes('inválido')) setEstado('expirado')
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : ''
+        if (msg.includes('no_autorizado')) setEstado('no_autorizado')
+        else if (msg.includes('expirado') || msg.includes('inválido')) setEstado('expirado')
         else if (msg.includes('ya registraste')) setEstado('duplicado')
         else { setEstado('error'); setErrorMsg(msg || 'Error al conectar con el servidor') }
       })
@@ -86,7 +89,12 @@ export default function AsistenciaScan() {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
         }
-        const BD = (window as any).BarcodeDetector
+        interface BarcodeDetectorCtor {
+  new (options: { formats: string[] }): {
+    detect(el: HTMLVideoElement): Promise<Array<{ rawValue: string }>>
+  }
+}
+const BD = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector
         if (!BD) { setErrorMsg('Tu navegador no soporta detección QR nativa. Usá la cámara del teléfono.'); return }
         const detector = new BD({ formats: ['qr_code'] })
         const tick = async () => {

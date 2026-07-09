@@ -10,6 +10,7 @@ UCA V2 no genera ni firma XML fiscal — solo consume la respuesta de la
 API de guarani.app y persiste la referencia (cdc, numero_comprobante,
 timbrado, url_pdf).
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,11 +58,13 @@ async def emitir_factura(pago: Pago, alumno: User, concepto_nombre: str) -> dict
             "documento": alumno.cedula or "",
             "email": alumno.email or "",
         },
-        "items": [{
-            "descripcion": concepto_nombre,
-            "cantidad": 1,
-            "precio_unitario": float(pago.monto_pagado),
-        }],
+        "items": [
+            {
+                "descripcion": concepto_nombre,
+                "cantidad": 1,
+                "precio_unitario": float(pago.monto_pagado),
+            }
+        ],
         "referencia_externa": f"uca-pago-{pago.id}",
     }
     async with httpx.AsyncClient(timeout=15) as client:
@@ -99,7 +102,9 @@ async def procesar_facturacion(pago_id: int, comprobante_id: int) -> None:
     """
     db = SessionLocal()
     try:
-        comprobante = db.query(Comprobante).filter(Comprobante.id == comprobante_id).first()
+        comprobante = (
+            db.query(Comprobante).filter(Comprobante.id == comprobante_id).first()
+        )
         pago = db.query(Pago).filter(Pago.id == pago_id).first()
         if not comprobante or not pago:
             return
@@ -127,7 +132,10 @@ async def procesar_facturacion(pago_id: int, comprobante_id: int) -> None:
             db.commit()
             logger.warning(
                 "Facturación electrónica falló (pago_id=%s, intento %d/%d): %s",
-                pago_id, comprobante.intentos, MAX_INTENTOS, exc,
+                pago_id,
+                comprobante.intentos,
+                MAX_INTENTOS,
+                exc,
             )
     finally:
         db.close()

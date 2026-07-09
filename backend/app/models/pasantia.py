@@ -1,9 +1,16 @@
 """
 Modelos SQLAlchemy — Fase 5C: Pasantías.
 """
+
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Date, Text,
-    ForeignKey, CheckConstraint,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Date,
+    ForeignKey,
+    CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -57,7 +64,9 @@ class InformePasantia(Base):
     pasantia_id = Column(Integer, ForeignKey("pasantias.id"), nullable=False)
     tipo = Column(String(30), nullable=False)
     storage_key = Column(String(500), nullable=True)
-    fecha_entrega = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    fecha_entrega = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     __table_args__ = (
         CheckConstraint(

@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConst
 from sqlalchemy.orm import relationship
 from app.database import Base
 
+
 class OfertaMateria(Base):
     __tablename__ = "ofertas_materia"
 

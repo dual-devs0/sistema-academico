@@ -50,7 +50,6 @@ function VistaAlumno() {
   const [solicitando, setSolicitando] = useState<number | null>(null)
 
   const cargar = () => {
-    setLoading(true)
     Promise.all([getTiposTramite(), getMisSolicitudes()])
       .then(([t, s]) => { setTipos(t); setSolicitudes(s) })
       .catch(() => emitToast('Error cargando trámites', 'error'))
@@ -64,9 +63,9 @@ function VistaAlumno() {
     try {
       await crearSolicitud(tipoId)
       emitToast('Solicitud creada', 'success')
-      cargar()
-    } catch (e: any) {
-      emitToast(e?.message || 'No se pudo crear la solicitud', 'error')
+      setLoading(true); cargar()
+    } catch (e: unknown) {
+      emitToast(e instanceof Error ? e.message : 'No se pudo crear la solicitud', 'error')
     } finally {
       setSolicitando(null)
     }
@@ -152,7 +151,6 @@ function VistaAdmin() {
   const [motivo, setMotivo] = useState<Record<number, string>>({})
 
   const cargar = () => {
-    setLoading(true)
     Promise.all([getTiposTramite(), getMisSolicitudes('pendiente')])
       .then(([t, s]) => { setTipos(t); setSolicitudes(s) })
       .catch(() => emitToast('Error cargando solicitudes', 'error'))

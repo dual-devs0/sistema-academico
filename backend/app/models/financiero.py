@@ -3,9 +3,19 @@ Modelos SQLAlchemy — Fase 4: Módulo Financiero + Becas Diferenciadas.
 
 REGLA: todos los montos monetarios usan Numeric(12,2) — nunca float.
 """
+
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Date, Text,
-    ForeignKey, Numeric, JSON, CheckConstraint, UniqueConstraint,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Date,
+    Text,
+    ForeignKey,
+    Numeric,
+    JSON,
+    CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -57,7 +67,9 @@ class PostulacionBeca(Base):
     alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     beca_id = Column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
     estado = Column(String(20), nullable=False, default="pendiente")
-    fecha_postulacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    fecha_postulacion = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
     documentos_storage_keys = Column(JSON, nullable=True)
     motivo_rechazo = Column(Text, nullable=True)
     revisado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -81,14 +93,18 @@ class BecaActiva(Base):
     id = Column(Integer, primary_key=True, index=True)
     alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     beca_id = Column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
-    fuente_id = Column(Integer, ForeignKey("fuentes_beca.id"), nullable=False)  # denorm para reportes
+    fuente_id = Column(
+        Integer, ForeignKey("fuentes_beca.id"), nullable=False
+    )  # denorm para reportes
     periodo_inicio = Column(String(10), nullable=False)
     periodo_fin = Column(String(10), nullable=True)
     promedio_minimo_requerido = Column(Numeric(5, 2), nullable=True)
     promedio_actual = Column(Numeric(5, 2), nullable=True)
     estado_renovacion = Column(String(30), nullable=False, default="vigente")
     otorgado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
-    otorgado_en = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    otorgado_en = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -130,7 +146,9 @@ class Cuota(Base):
     fecha_vencimiento = Column(Date, nullable=False)
     estado = Column(String(20), nullable=False, default="pendiente")
     beca_aplicada_id = Column(Integer, ForeignKey("becas_activas.id"), nullable=True)
-    generado_en = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    generado_en = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
     generado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     __table_args__ = (
@@ -150,14 +168,18 @@ class Cuota(Base):
 class Pago(Base):
     """
     Los pagos son INMUTABLES. Nunca se editan ni eliminan.
-    Correcciones = nuevo Pago con es_ajuste=True y pago_ajuste_ref_id apuntando al original.
+    Correcciones = nuevo Pago con es_ajuste=True
+    y pago_ajuste_ref_id apuntando al original.
     """
+
     __tablename__ = "pagos"
 
     id = Column(Integer, primary_key=True, index=True)
     cuota_id = Column(Integer, ForeignKey("cuotas.id"), nullable=False)
     monto_pagado = Column(Numeric(12, 2), nullable=False)
-    fecha_pago = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    fecha_pago = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
     metodo = Column(String(50), nullable=False)
     referencia = Column(String(200), nullable=True)
     registrado_por = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -199,6 +221,7 @@ class Comprobante(Base):
 
 class AuditoriaOverrideMora(Base):
     """Registro de auditoría cuando admin omite el bloqueo por mora."""
+
     __tablename__ = "auditoria_override_mora"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -206,7 +229,9 @@ class AuditoriaOverrideMora(Base):
     admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     oferta_materia_id = Column(Integer, ForeignKey("ofertas_materia.id"), nullable=True)
     motivo = Column(Text, nullable=True)
-    registrado_en = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    registrado_en = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     alumno = relationship("User", foreign_keys=[alumno_id])
     admin = relationship("User", foreign_keys=[admin_id])

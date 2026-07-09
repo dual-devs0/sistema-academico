@@ -10,8 +10,8 @@ Cubre:
 - GET /becas/postulaciones requiere fuente_id (mandatorio)
 - GET /becas/reportes/rendicion retorna Excel
 """
+
 from __future__ import annotations
-import pytest
 from decimal import Decimal
 
 from app.models.financiero import BecaActiva, BecaCatalogo, FuenteBeca
@@ -19,18 +19,23 @@ from app.models.financiero import BecaActiva, BecaCatalogo, FuenteBeca
 
 # ─── helpers ─────────────────────────────────────────────────────────
 
+
 def _seed_beca(db, seed, es_externa=False, porcentaje="30.00"):
     fuente = FuenteBeca(
-        nombre="TestFuenteHTTP", tipo="test",
-        es_externa=es_externa, requiere_reporte_externo=False,
+        nombre="TestFuenteHTTP",
+        tipo="test",
+        es_externa=es_externa,
+        requiere_reporte_externo=False,
         editable_porcentaje=True,
     )
     db.add(fuente)
     db.flush()
     beca = BecaCatalogo(
-        nombre="Beca HTTP Test", fuente_id=fuente.id,
+        nombre="Beca HTTP Test",
+        fuente_id=fuente.id,
         porcentaje_descuento=Decimal(porcentaje),
-        cupos_totales=10, cupos_disponibles=10,
+        cupos_totales=10,
+        cupos_disponibles=10,
     )
     db.add(beca)
     db.commit()
@@ -41,11 +46,19 @@ def _seed_beca(db, seed, es_externa=False, porcentaje="30.00"):
 
 # ─── tests ───────────────────────────────────────────────────────────
 
+
 class TestCatalogo:
     def test_catalogo_publico(self, client, seed, db):
         _seed_beca(db, seed)
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
         r = client.get("/becas/catalogo", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert isinstance(r.json(), list)
@@ -59,7 +72,14 @@ class TestPostulaciones:
     def test_alumno_puede_postular(self, client, seed, db):
         fuente, beca = _seed_beca(db, seed)
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
         r = client.post(
             "/becas/postulaciones",
             json={"beca_id": beca.id},
@@ -73,16 +93,32 @@ class TestPostulaciones:
     def test_doble_postulacion_rechazada(self, client, seed, db):
         fuente, beca = _seed_beca(db, seed)
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
         headers = {"Authorization": f"Bearer {token}"}
         client.post("/becas/postulaciones", json={"beca_id": beca.id}, headers=headers)
-        r = client.post("/becas/postulaciones", json={"beca_id": beca.id}, headers=headers)
+        r = client.post(
+            "/becas/postulaciones", json={"beca_id": beca.id}, headers=headers
+        )
         assert r.status_code == 409
 
     def test_profesor_no_puede_postular(self, client, seed, db):
         fuente, beca = _seed_beca(db, seed)
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["profesor"].username, "role": "profesor", "user_id": seed["profesor"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["profesor"].username,
+                "role": "profesor",
+                "user_id": seed["profesor"].id,
+            }
+        )
         r = client.post(
             "/becas/postulaciones",
             json={"beca_id": beca.id},
@@ -95,8 +131,21 @@ class TestRevisionComite:
     def _postular_y_token_admin(self, client, seed, db):
         fuente, beca = _seed_beca(db, seed)
         from app.auth import create_access_token
-        token_alumno = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
-        token_admin = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+
+        token_alumno = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
+        token_admin = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
         r = client.post(
             "/becas/postulaciones",
             json={"beca_id": beca.id},
@@ -116,7 +165,14 @@ class TestRevisionComite:
 
         # Verificar que BecaActiva fue creada
         from app.auth import create_access_token
-        token_admin2 = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+
+        token_admin2 = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
         r2 = client.get(
             f"/becas/alumno/{seed['alumno'].id}/activas",
             headers={"Authorization": f"Bearer {token_admin2}"},
@@ -139,7 +195,7 @@ class TestRevisionComite:
 
 class TestBecasActiasShape:
     def test_shape_exacto_enunciado(self, client, seed, db):
-        """GET /becas/alumno/{id}/activas debe retornar los campos exactos del enunciado."""
+        """GET /becas/alumno/{id}/activas debe retornar los campos exactos del enunciado."""  # noqa: E501
         fuente, beca = _seed_beca(db, seed)
         activa = BecaActiva(
             alumno_id=seed["alumno"].id,
@@ -155,7 +211,14 @@ class TestBecasActiasShape:
         db.commit()
 
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        )
         r = client.get(
             f"/becas/alumno/{seed['alumno'].id}/activas",
             headers={"Authorization": f"Bearer {token}"},
@@ -166,9 +229,15 @@ class TestBecasActiasShape:
         item = data[0]
         # Verificar todos los campos del enunciado
         required_fields = {
-            "beca_nombre", "fuente", "es_externa", "porcentaje_descuento",
-            "periodo_inicio", "periodo_fin", "promedio_minimo_requerido",
-            "promedio_actual", "estado_renovacion",
+            "beca_nombre",
+            "fuente",
+            "es_externa",
+            "porcentaje_descuento",
+            "periodo_inicio",
+            "periodo_fin",
+            "promedio_minimo_requerido",
+            "promedio_actual",
+            "estado_renovacion",
         }
         assert required_fields.issubset(set(item.keys()))
 
@@ -176,15 +245,31 @@ class TestBecasActiasShape:
 class TestListadoPostulaciones:
     def test_requiere_fuente_id(self, client, seed, db):
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
         # Sin fuente_id → 422
-        r = client.get("/becas/postulaciones", headers={"Authorization": f"Bearer {token}"})
+        r = client.get(
+            "/becas/postulaciones", headers={"Authorization": f"Bearer {token}"}
+        )
         assert r.status_code == 422
 
     def test_con_fuente_id_funciona(self, client, seed, db):
         fuente, beca = _seed_beca(db, seed)
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
         r = client.get(
             f"/becas/postulaciones?fuente_id={fuente.id}",
             headers={"Authorization": f"Bearer {token}"},
@@ -200,7 +285,14 @@ class TestRendicionExcelHTTP:
         fuente.nombre = "ITAIPU"
         db.commit()
         from app.auth import create_access_token
-        token = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+
+        token = create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        )
         r = client.get(
             "/becas/reportes/rendicion?fuente=ITAIPU",
             headers={"Authorization": f"Bearer {token}"},

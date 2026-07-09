@@ -13,7 +13,7 @@ router = APIRouter(prefix="/apuntes", tags=["apuntes"])
 def create_apunte(
     apunte: schemas.apunte.ApunteCreate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     data = apunte.model_dump()
     data["user_id"] = current_user["user_id"]
@@ -31,7 +31,7 @@ def list_apuntes(
     tipo_contenido: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     query = db.query(models.apunte.Apunte)
     if materia_id is not None:
@@ -55,9 +55,13 @@ def list_apuntes(
 def get_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     return apunte
@@ -68,12 +72,19 @@ def update_apunte(
     apunte_id: int,
     data: schemas.apunte.ApunteUpdate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    if current_user["role"] not in ("admin",) and current_user["user_id"] != apunte.user_id:
+    if (
+        current_user["role"] not in ("admin",)
+        and current_user["user_id"] != apunte.user_id
+    ):
         raise HTTPException(status_code=403, detail="No autorizado")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(apunte, key, value)
@@ -86,11 +97,15 @@ def update_apunte(
 def aprobar_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     apunte.aprobado = True
@@ -103,9 +118,13 @@ def aprobar_apunte(
 def like_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).update(
@@ -120,9 +139,13 @@ def like_apunte(
 def descargar_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).update(
@@ -140,10 +163,17 @@ async def upload_archivo_apunte(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    if current_user["role"] not in ("admin",) and current_user["user_id"] != apunte.user_id:
+    if (
+        current_user["role"] not in ("admin",)
+        and current_user["user_id"] != apunte.user_id
+    ):
         raise HTTPException(status_code=403, detail="No autorizado")
 
     contenido = await archivo.read()
@@ -170,11 +200,17 @@ def get_url_descarga(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     if not apunte.storage_key:
-        raise HTTPException(status_code=404, detail="Este apunte no tiene archivo subido")
+        raise HTTPException(
+            status_code=404, detail="Este apunte no tiene archivo subido"
+        )
     return {"url": obtener_url_firmada(apunte.storage_key)}
 
 
@@ -182,12 +218,19 @@ def get_url_descarga(
 def delete_apunte(
     apunte_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    apunte = db.query(models.apunte.Apunte).filter(models.apunte.Apunte.id == apunte_id).first()
+    apunte = (
+        db.query(models.apunte.Apunte)
+        .filter(models.apunte.Apunte.id == apunte_id)
+        .first()
+    )
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
-    if current_user["role"] not in ("admin",) and current_user["user_id"] != apunte.user_id:
+    if (
+        current_user["role"] not in ("admin",)
+        and current_user["user_id"] != apunte.user_id
+    ):
         raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(apunte)
     db.commit()

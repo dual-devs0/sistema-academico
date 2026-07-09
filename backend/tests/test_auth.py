@@ -1,5 +1,7 @@
 def test_login_success(client, seed):
-    res = client.post("/auth/login", json={"username": "admin_test", "password": "admin123"})
+    res = client.post(
+        "/auth/login", json={"username": "admin_test", "password": "admin123"}
+    )
     assert res.status_code == 200
     body = res.json()
     assert "access_token" in body
@@ -7,7 +9,9 @@ def test_login_success(client, seed):
 
 
 def test_login_wrong_password(client, seed):
-    res = client.post("/auth/login", json={"username": "admin_test", "password": "wrongpass"})
+    res = client.post(
+        "/auth/login", json={"username": "admin_test", "password": "wrongpass"}
+    )
     assert res.status_code == 400
 
 

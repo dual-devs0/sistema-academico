@@ -16,15 +16,22 @@ router = APIRouter(prefix="/eventos", tags=["eventos"])
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 
-def _parsear_pdf_con_gemini(pdf_bytes: bytes, anio: int, semestre: int, instrucciones: str | None = None) -> list[dict]:
+def _parsear_pdf_con_gemini(
+    pdf_bytes: bytes, anio: int, semestre: int, instrucciones: str | None = None
+) -> list[dict]:
     """Env\u00eda PDF a Gemini y devuelve lista de eventos parseados."""
     try:
         import google.generativeai as genai
     except ImportError:
-        raise HTTPException(status_code=500, detail="google-generativeai no instalado. pip install google-generativeai")
+        raise HTTPException(
+            status_code=500,
+            detail="google-generativeai no instalado. pip install google-generativeai",
+        )
 
     if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY no configurada en .env")
+        raise HTTPException(
+            status_code=500, detail="GEMINI_API_KEY no configurada en .env"
+        )
 
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel("gemini-2.0-flash")
@@ -32,7 +39,7 @@ def _parsear_pdf_con_gemini(pdf_bytes: bytes, anio: int, semestre: int, instrucc
     prompt = f"""
 Eres un asistente que extrae eventos de calendarios acad\u00e9micos en PDF.
 El a\u00f1o es {anio}, el semestre es {semestre}.
-{ 'Instrucciones adicionales: ' + instrucciones if instrucciones else '' }
+{"Instrucciones adicionales: " + instrucciones if instrucciones else ""}
 
 Devuelve SOLO un JSON array con objetos con los campos:
 - titulo: string
@@ -54,7 +61,10 @@ No incluyas markdown ni texto adicional, solo el JSON array.
     try:
         eventos = json.loads(text)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Gemini devolvi\u00f3 JSON inv\u00e1lido: " + text[:300])
+        raise HTTPException(
+            status_code=500,
+            detail="Gemini devolvi\u00f3 JSON inv\u00e1lido: " + text[:300],
+        )
 
     if not isinstance(eventos, list):
         raise HTTPException(status_code=500, detail="Gemini no devolvi\u00f3 un array")
@@ -72,7 +82,7 @@ No incluyas markdown ni texto adicional, solo el JSON array.
 def create_evento(
     evento: schemas.evento.EventoCreate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -96,7 +106,7 @@ def list_eventos(
     desde: Optional[str] = Query(None),
     hasta: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     query = db.query(models.evento.EventoCalendario)
     if tipo is not None:
@@ -110,18 +120,24 @@ def list_eventos(
     if semestre is not None:
         query = query.filter(models.evento.EventoCalendario.semestre == semestre)
     if desde is not None:
-        query = query.filter(models.evento.EventoCalendario.fecha >= date.fromisoformat(desde))
+        query = query.filter(
+            models.evento.EventoCalendario.fecha >= date.fromisoformat(desde)
+        )
     if hasta is not None:
-        query = query.filter(models.evento.EventoCalendario.fecha <= date.fromisoformat(hasta))
+        query = query.filter(
+            models.evento.EventoCalendario.fecha <= date.fromisoformat(hasta)
+        )
 
     # Alumno ve eventos globales + de sus carreras/materias
     if current_user["role"] == "alumno":
-        user = db.query(models.user.User).filter(models.user.User.id == current_user["user_id"]).first()
-        inscripciones = db.query(models.inscripcion.Inscripcion).filter(
-            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
-        ).all()
+        inscripciones = (
+            db.query(models.inscripcion.Inscripcion)
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .all()
+        )
         materia_ids = {i.oferta.materia_id for i in inscripciones}
         from sqlalchemy import or_
+
         if materia_ids:
             query = query.filter(
                 or_(
@@ -139,9 +155,13 @@ def list_eventos(
 def get_evento(
     evento_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    evento = db.query(models.evento.EventoCalendario).filter(models.evento.EventoCalendario.id == evento_id).first()
+    evento = (
+        db.query(models.evento.EventoCalendario)
+        .filter(models.evento.EventoCalendario.id == evento_id)
+        .first()
+    )
     if not evento:
         raise HTTPException(status_code=404, detail="Evento no encontrado")
     return evento
@@ -152,11 +172,15 @@ def update_evento(
     evento_id: int,
     data: schemas.evento.EventoUpdate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    evento = db.query(models.evento.EventoCalendario).filter(models.evento.EventoCalendario.id == evento_id).first()
+    evento = (
+        db.query(models.evento.EventoCalendario)
+        .filter(models.evento.EventoCalendario.id == evento_id)
+        .first()
+    )
     if not evento:
         raise HTTPException(status_code=404, detail="Evento no encontrado")
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -170,11 +194,15 @@ def update_evento(
 def delete_evento(
     evento_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    evento = db.query(models.evento.EventoCalendario).filter(models.evento.EventoCalendario.id == evento_id).first()
+    evento = (
+        db.query(models.evento.EventoCalendario)
+        .filter(models.evento.EventoCalendario.id == evento_id)
+        .first()
+    )
     if not evento:
         raise HTTPException(status_code=404, detail="Evento no encontrado")
     db.delete(evento)
@@ -186,9 +214,9 @@ def delete_evento(
 def cargar_pdf(
     payload: schemas.evento.CargaPdfRequest,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """Carga un PDF del calendario acad\u00e9mico, lo parsea con Gemini y crea los eventos."""
+    """Carga un PDF del calendario acad\u00e9mico, lo parsea con Gemini y crea los eventos."""  # noqa: E501
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -197,7 +225,9 @@ def cargar_pdf(
     except Exception:
         raise HTTPException(status_code=400, detail="Base64 inv\u00e1lido")
 
-    eventos_data = _parsear_pdf_con_gemini(pdf_bytes, payload.anio, payload.semestre, payload.instrucciones)
+    eventos_data = _parsear_pdf_con_gemini(
+        pdf_bytes, payload.anio, payload.semestre, payload.instrucciones
+    )
 
     creados = []
     errores = []
@@ -207,7 +237,9 @@ def cargar_pdf(
                 titulo=ev_data["titulo"],
                 tipo=ev_data["tipo"],
                 fecha=date.fromisoformat(ev_data["fecha"]),
-                fecha_fin=date.fromisoformat(ev_data["fecha_fin"]) if ev_data.get("fecha_fin") else None,
+                fecha_fin=date.fromisoformat(ev_data["fecha_fin"])
+                if ev_data.get("fecha_fin")
+                else None,
                 descripcion=ev_data.get("descripcion"),
                 anio=payload.anio,
                 semestre=payload.semestre,
@@ -235,7 +267,7 @@ def eventos_mes(
     anio: int,
     mes: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """Eventos de un mes espec\u00edfico (para vista mensual del alumno)."""
     primero = date(anio, mes, 1)
@@ -250,16 +282,21 @@ def eventos_mes(
     )
 
     if current_user["role"] == "alumno":
-        inscripciones = db.query(models.inscripcion.Inscripcion).filter(
-            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
-        ).all()
+        inscripciones = (
+            db.query(models.inscripcion.Inscripcion)
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .all()
+        )
         materia_ids = {i.oferta.materia_id for i in inscripciones}
 
         from sqlalchemy import or_
+
         query = query.filter(
             or_(
                 models.evento.EventoCalendario.materia_id.is_(None),
-                models.evento.EventoCalendario.materia_id.in_(materia_ids) if materia_ids else False,
+                models.evento.EventoCalendario.materia_id.in_(materia_ids)
+                if materia_ids
+                else False,
             )
         )
 
@@ -270,28 +307,35 @@ def eventos_mes(
 def eventos_dia(
     fecha_str: str,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """Eventos de un d\u00eda espec\u00edfico (click en el d\u00eda en vista mensual)."""
+    """Eventos de un d\u00eda espec\u00edfico (click en el d\u00eda en vista mensual)."""  # noqa: E501
     try:
         fecha = date.fromisoformat(fecha_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Fecha inv\u00e1lida. Us\u00e1 YYYY-MM-DD")
+        raise HTTPException(
+            status_code=400, detail="Fecha inv\u00e1lida. Us\u00e1 YYYY-MM-DD"
+        )
 
     query = db.query(models.evento.EventoCalendario).filter(
         models.evento.EventoCalendario.fecha == fecha,
     )
 
     if current_user["role"] == "alumno":
-        inscripciones = db.query(models.inscripcion.Inscripcion).filter(
-            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"]
-        ).all()
+        inscripciones = (
+            db.query(models.inscripcion.Inscripcion)
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .all()
+        )
         materia_ids = {i.oferta.materia_id for i in inscripciones}
         from sqlalchemy import or_
+
         query = query.filter(
             or_(
                 models.evento.EventoCalendario.materia_id.is_(None),
-                models.evento.EventoCalendario.materia_id.in_(materia_ids) if materia_ids else False,
+                models.evento.EventoCalendario.materia_id.in_(materia_ids)
+                if materia_ids
+                else False,
             )
         )
 

@@ -10,6 +10,7 @@ Revision ID: s6t7u8v9w0x1
 Revises: r5s6t7u8v9w0
 Create Date: 2026-07-08
 """
+
 from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
@@ -33,7 +34,9 @@ def upgrade() -> None:
     if "max_cuotas_mora" not in [c["name"] for c in insp.get_columns("carreras")]:
         op.add_column(
             "carreras",
-            sa.Column("max_cuotas_mora", sa.Integer(), nullable=False, server_default="1"),
+            sa.Column(
+                "max_cuotas_mora", sa.Integer(), nullable=False, server_default="1"
+            ),
         )
 
     # ── fuentes_beca ─────────────────────────────────────────────────────
@@ -43,9 +46,21 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer(), primary_key=True),
             sa.Column("nombre", sa.String(150), nullable=False, unique=True),
             sa.Column("tipo", sa.String(80), nullable=False),
-            sa.Column("es_externa", sa.Boolean(), nullable=False, server_default="false"),
-            sa.Column("requiere_reporte_externo", sa.Boolean(), nullable=False, server_default="false"),
-            sa.Column("editable_porcentaje", sa.Boolean(), nullable=False, server_default="true"),
+            sa.Column(
+                "es_externa", sa.Boolean(), nullable=False, server_default="false"
+            ),
+            sa.Column(
+                "requiere_reporte_externo",
+                sa.Boolean(),
+                nullable=False,
+                server_default="false",
+            ),
+            sa.Column(
+                "editable_porcentaje",
+                sa.Boolean(),
+                nullable=False,
+                server_default="true",
+            ),
         )
 
     # seed: 4 fuentes iniciales (solo si la tabla está vacía)
@@ -62,10 +77,34 @@ def upgrade() -> None:
         op.bulk_insert(
             fuentes_table,
             [
-                {"nombre": "ITAIPU",            "tipo": "convenio_externo",  "es_externa": True,  "requiere_reporte_externo": True,  "editable_porcentaje": False},
-                {"nombre": "Institucional UCA", "tipo": "institucional",     "es_externa": False, "requiere_reporte_externo": False, "editable_porcentaje": True},
-                {"nombre": "BECAL",             "tipo": "convenio_externo",  "es_externa": True,  "requiere_reporte_externo": True,  "editable_porcentaje": False},
-                {"nombre": "Fundasep",          "tipo": "convenio_externo",  "es_externa": True,  "requiere_reporte_externo": True,  "editable_porcentaje": False},
+                {
+                    "nombre": "ITAIPU",
+                    "tipo": "convenio_externo",
+                    "es_externa": True,
+                    "requiere_reporte_externo": True,
+                    "editable_porcentaje": False,
+                },
+                {
+                    "nombre": "Institucional UCA",
+                    "tipo": "institucional",
+                    "es_externa": False,
+                    "requiere_reporte_externo": False,
+                    "editable_porcentaje": True,
+                },
+                {
+                    "nombre": "BECAL",
+                    "tipo": "convenio_externo",
+                    "es_externa": True,
+                    "requiere_reporte_externo": True,
+                    "editable_porcentaje": False,
+                },
+                {
+                    "nombre": "Fundasep",
+                    "tipo": "convenio_externo",
+                    "es_externa": True,
+                    "requiere_reporte_externo": True,
+                    "editable_porcentaje": False,
+                },
             ],
         )
 
@@ -75,7 +114,12 @@ def upgrade() -> None:
             "becas_catalogo",
             sa.Column("id", sa.Integer(), primary_key=True),
             sa.Column("nombre", sa.String(200), nullable=False),
-            sa.Column("fuente_id", sa.Integer(), sa.ForeignKey("fuentes_beca.id"), nullable=False),
+            sa.Column(
+                "fuente_id",
+                sa.Integer(),
+                sa.ForeignKey("fuentes_beca.id"),
+                nullable=False,
+            ),
             sa.Column("porcentaje_descuento", sa.Numeric(5, 2), nullable=False),
             sa.Column("monto_fijo", sa.Numeric(12, 2), nullable=True),
             sa.Column("requisitos", sa.Text(), nullable=True),
@@ -92,13 +136,28 @@ def upgrade() -> None:
         op.create_table(
             "postulaciones_beca",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("beca_id", sa.Integer(), sa.ForeignKey("becas_catalogo.id"), nullable=False),
-            sa.Column("estado", sa.String(20), nullable=False, server_default="pendiente"),
-            sa.Column("fecha_postulacion", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column(
+                "alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+            ),
+            sa.Column(
+                "beca_id",
+                sa.Integer(),
+                sa.ForeignKey("becas_catalogo.id"),
+                nullable=False,
+            ),
+            sa.Column(
+                "estado", sa.String(20), nullable=False, server_default="pendiente"
+            ),
+            sa.Column(
+                "fecha_postulacion",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+            ),
             sa.Column("documentos_storage_keys", sa.JSON(), nullable=True),
             sa.Column("motivo_rechazo", sa.Text(), nullable=True),
-            sa.Column("revisado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
+            sa.Column(
+                "revisado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True
+            ),
             sa.Column("revisado_en", sa.DateTime(timezone=True), nullable=True),
             sa.CheckConstraint(
                 "estado IN ('pendiente','en_revision','aprobada','rechazada')",
@@ -111,18 +170,39 @@ def upgrade() -> None:
         op.create_table(
             "becas_activas",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("beca_id", sa.Integer(), sa.ForeignKey("becas_catalogo.id"), nullable=False),
-            sa.Column("fuente_id", sa.Integer(), sa.ForeignKey("fuentes_beca.id"), nullable=False),  # denorm para reportes
+            sa.Column(
+                "alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+            ),
+            sa.Column(
+                "beca_id",
+                sa.Integer(),
+                sa.ForeignKey("becas_catalogo.id"),
+                nullable=False,
+            ),
+            sa.Column(
+                "fuente_id",
+                sa.Integer(),
+                sa.ForeignKey("fuentes_beca.id"),
+                nullable=False,
+            ),  # denorm para reportes
             sa.Column("periodo_inicio", sa.String(10), nullable=False),
             sa.Column("periodo_fin", sa.String(10), nullable=True),
             sa.Column("promedio_minimo_requerido", sa.Numeric(5, 2), nullable=True),
             sa.Column("promedio_actual", sa.Numeric(5, 2), nullable=True),
-            sa.Column("estado_renovacion", sa.String(30), nullable=False, server_default="vigente"),
-            sa.Column("otorgado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
-            sa.Column("otorgado_en", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column(
+                "estado_renovacion",
+                sa.String(30),
+                nullable=False,
+                server_default="vigente",
+            ),
+            sa.Column(
+                "otorgado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True
+            ),
+            sa.Column(
+                "otorgado_en", sa.DateTime(timezone=True), server_default=sa.func.now()
+            ),
             sa.CheckConstraint(
-                "estado_renovacion IN ('vigente','en_riesgo','suspendida','finalizada')",
+                "estado_renovacion IN ('vigente','en_riesgo','suspendida','finalizada')",  # noqa: E501
                 name="ck_beca_activa_estado",
             ),
         )
@@ -133,9 +213,13 @@ def upgrade() -> None:
             "conceptos_arancel",
             sa.Column("id", sa.Integer(), primary_key=True),
             sa.Column("nombre", sa.String(200), nullable=False),
-            sa.Column("carrera_id", sa.Integer(), sa.ForeignKey("carreras.id"), nullable=True),
+            sa.Column(
+                "carrera_id", sa.Integer(), sa.ForeignKey("carreras.id"), nullable=True
+            ),
             sa.Column("monto_base", sa.Numeric(12, 2), nullable=False),
-            sa.Column("periodicidad", sa.String(80), nullable=False, server_default="mensual"),
+            sa.Column(
+                "periodicidad", sa.String(80), nullable=False, server_default="mensual"
+            ),
             sa.Column("activo", sa.Boolean(), nullable=False, server_default="true"),
         )
 
@@ -144,16 +228,36 @@ def upgrade() -> None:
         op.create_table(
             "cuotas",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("concepto_id", sa.Integer(), sa.ForeignKey("conceptos_arancel.id"), nullable=False),
+            sa.Column(
+                "alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+            ),
+            sa.Column(
+                "concepto_id",
+                sa.Integer(),
+                sa.ForeignKey("conceptos_arancel.id"),
+                nullable=False,
+            ),
             sa.Column("periodo", sa.String(10), nullable=False),
             sa.Column("monto", sa.Numeric(12, 2), nullable=False),
-            sa.Column("monto_descuento", sa.Numeric(12, 2), nullable=False, server_default="0"),
+            sa.Column(
+                "monto_descuento", sa.Numeric(12, 2), nullable=False, server_default="0"
+            ),
             sa.Column("fecha_vencimiento", sa.Date(), nullable=False),
-            sa.Column("estado", sa.String(20), nullable=False, server_default="pendiente"),
-            sa.Column("beca_aplicada_id", sa.Integer(), sa.ForeignKey("becas_activas.id"), nullable=True),
-            sa.Column("generado_en", sa.DateTime(timezone=True), server_default=sa.func.now()),
-            sa.Column("generado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
+            sa.Column(
+                "estado", sa.String(20), nullable=False, server_default="pendiente"
+            ),
+            sa.Column(
+                "beca_aplicada_id",
+                sa.Integer(),
+                sa.ForeignKey("becas_activas.id"),
+                nullable=True,
+            ),
+            sa.Column(
+                "generado_en", sa.DateTime(timezone=True), server_default=sa.func.now()
+            ),
+            sa.Column(
+                "generado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True
+            ),
             sa.CheckConstraint(
                 "estado IN ('pendiente','pagada','vencida','anulada')",
                 name="ck_cuota_estado",
@@ -165,14 +269,32 @@ def upgrade() -> None:
         op.create_table(
             "pagos",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("cuota_id", sa.Integer(), sa.ForeignKey("cuotas.id"), nullable=False),
+            sa.Column(
+                "cuota_id", sa.Integer(), sa.ForeignKey("cuotas.id"), nullable=False
+            ),
             sa.Column("monto_pagado", sa.Numeric(12, 2), nullable=False),
-            sa.Column("fecha_pago", sa.DateTime(timezone=True), server_default=sa.func.now()),
-            sa.Column("metodo", sa.String(50), nullable=False),           # transferencia, efectivo, cheque
+            sa.Column(
+                "fecha_pago", sa.DateTime(timezone=True), server_default=sa.func.now()
+            ),
+            sa.Column(
+                "metodo", sa.String(50), nullable=False
+            ),  # transferencia, efectivo, cheque
             sa.Column("referencia", sa.String(200), nullable=True),
-            sa.Column("registrado_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("pago_ajuste_ref_id", sa.Integer(), sa.ForeignKey("pagos.id"), nullable=True),  # para ajustes
-            sa.Column("es_ajuste", sa.Boolean(), nullable=False, server_default="false"),
+            sa.Column(
+                "registrado_por",
+                sa.Integer(),
+                sa.ForeignKey("users.id"),
+                nullable=False,
+            ),
+            sa.Column(
+                "pago_ajuste_ref_id",
+                sa.Integer(),
+                sa.ForeignKey("pagos.id"),
+                nullable=True,
+            ),  # para ajustes
+            sa.Column(
+                "es_ajuste", sa.Boolean(), nullable=False, server_default="false"
+            ),
             sa.Column("nota_ajuste", sa.Text(), nullable=True),
         )
 
@@ -181,11 +303,21 @@ def upgrade() -> None:
         op.create_table(
             "comprobantes",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("pago_id", sa.Integer(), sa.ForeignKey("pagos.id"), nullable=False, unique=True),
+            sa.Column(
+                "pago_id",
+                sa.Integer(),
+                sa.ForeignKey("pagos.id"),
+                nullable=False,
+                unique=True,
+            ),
             sa.Column("numero_comprobante", sa.String(50), nullable=True),
-            sa.Column("cdc", sa.String(44), nullable=True),               # DNIT — fase 4B
+            sa.Column("cdc", sa.String(44), nullable=True),  # DNIT — fase 4B
             sa.Column("storage_key", sa.String(500), nullable=True),
-            sa.Column("fecha_emision", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column(
+                "fecha_emision",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+            ),
         )
 
     # ── auditoria_override_mora ───────────────────────────────────────────
@@ -193,11 +325,24 @@ def upgrade() -> None:
         op.create_table(
             "auditoria_override_mora",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("admin_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("oferta_materia_id", sa.Integer(), sa.ForeignKey("ofertas_materia.id"), nullable=True),
+            sa.Column(
+                "alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+            ),
+            sa.Column(
+                "admin_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+            ),
+            sa.Column(
+                "oferta_materia_id",
+                sa.Integer(),
+                sa.ForeignKey("ofertas_materia.id"),
+                nullable=True,
+            ),
             sa.Column("motivo", sa.Text(), nullable=True),
-            sa.Column("registrado_en", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column(
+                "registrado_en",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+            ),
         )
 
 

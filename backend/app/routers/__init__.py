@@ -24,4 +24,29 @@ from . import pasantias_router as pasantias
 from . import graduacion_router as graduacion
 from . import equivalencias_router as equivalencias
 
-__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro", "horarios", "profesor", "pensum", "expediente", "finanzas", "becas", "tramites", "pasantias", "graduacion", "equivalencias"]
+__all__ = [
+    "users",
+    "auth",
+    "materias",
+    "inscripciones",
+    "carreras",
+    "asistencias",
+    "puntajes",
+    "apuntes",
+    "eventos",
+    "programas",
+    "reportes",
+    "boleta",
+    "alumno",
+    "foro",
+    "horarios",
+    "profesor",
+    "pensum",
+    "expediente",
+    "finanzas",
+    "becas",
+    "tramites",
+    "pasantias",
+    "graduacion",
+    "equivalencias",
+]

@@ -48,7 +48,7 @@ export default function GraduacionAdmin() {
     try {
       const p = await crearProcesoGraduacion(Number(alumnoId))
       emitToast(`Proceso creado ID: ${p.id}`, 'success')
-    } catch (e: any) {
+    } catch (e: unknown) {
       emitToast(e?.message || 'Error creando proceso', 'error')
     }
   }

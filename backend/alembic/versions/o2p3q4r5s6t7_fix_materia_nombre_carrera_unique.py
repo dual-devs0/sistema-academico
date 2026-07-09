@@ -16,8 +16,8 @@ Revision ID: o2p3q4r5s6t7
 Revises: n1o2p3q4r5s6
 Create Date: 2026-07-06
 """
+
 from typing import Sequence, Union
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = "o2p3q4r5s6t7"
@@ -28,7 +28,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.drop_constraint("materias_nombre_key", "materias", type_="unique")
-    op.create_unique_constraint("uq_materia_nombre_carrera", "materias", ["nombre", "carrera_id"])
+    op.create_unique_constraint(
+        "uq_materia_nombre_carrera", "materias", ["nombre", "carrera_id"]
+    )
 
 
 def downgrade() -> None:

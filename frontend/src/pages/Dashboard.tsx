@@ -483,21 +483,21 @@ export default function Dashboard() {
     ;(async () => {
       try {
         if (user.role === 'admin') {
-          const users = await api.get<any[]>('/users/').catch(() => [] as any[])
+          const users = await api.get<unknown[]>('/users/').catch(() => [] as unknown[])
           if (users.length) setTotalUsuarios(users.length)
           return
         }
         const [materiasRes, puntajesRes, asistenciasRes, eventosRes] = await Promise.all([
-          api.get<any[]>(isProfesor && !isNaN(uid) ? `/materias/?profesor_id=${uid}` : '/materias/').catch(() => [] as any[]),
-          api.get<any[]>(isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/').catch(() => [] as any[]),
-          api.get<any[]>(isAlumno && !isNaN(uid) ? `/asistencias/?user_id=${uid}` : '/asistencias/').catch(() => [] as any[]),
-          api.get<any[]>('/eventos/').catch(() => [] as any[]),
+          api.get<{id:number;nombre:string;profesor_nombre:string|null;profesor_id:number}[]>(isProfesor && !isNaN(uid) ? `/materias/?profesor_id=${uid}` : '/materias/').catch(() => []),
+          api.get<{materia_id:number;valor:number}[]>(isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/').catch(() => []),
+          api.get<{presente:boolean}[]>(isAlumno && !isNaN(uid) ? `/asistencias/?user_id=${uid}` : '/asistencias/').catch(() => []),
+          api.get<{fecha:string;titulo:string;descripcion:string|null}[]>('/eventos/').catch(() => []),
         ])
 
         if (materiasRes.length > 0) {
-          const rows: MateriaRow[] = materiasRes.map((m: any) => {
-            const pts = puntajesRes.filter((p: any) => p.materia_id === m.id)
-            const vals = pts.map((p: any) => Number(p.valor)).filter((v: number) => !isNaN(v))
+          const rows: MateriaRow[] = materiasRes.map((m) => {
+            const pts = puntajesRes.filter((p) => p.materia_id === m.id)
+            const vals = pts.map((p) => Number(p.valor)).filter((v: number) => !isNaN(v))
             const ultima = vals.length ? vals[vals.length - 1] : null
             const prom = vals.length ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : null
             const estado = prom === null ? 'SIN CURSAR' : prom >= 9 ? 'PROMOCIONANDO' : prom >= 6 ? 'REGULAR' : 'REPROBADO'
@@ -513,11 +513,11 @@ export default function Dashboard() {
           if (proms.length) setPromedio(Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 10) / 10)
         }
         if (asistenciasRes.length > 0) {
-          const pres = asistenciasRes.filter((a: any) => a.presente).length
+          const pres = asistenciasRes.filter((a) => a.presente).length
           setAsistencia(Math.round((pres / asistenciasRes.length) * 100))
         }
         if (eventosRes.length > 0) {
-          setEventos(eventosRes.slice(0, 4).map((e: any, i: number) => ({
+          setEventos(eventosRes.slice(0, 4).map((e, i: number) => ({
             hora: e.fecha?.slice(5, 10) ?? '—',
             titulo: e.titulo,
             lugar: e.descripcion || 'Campus UCA',

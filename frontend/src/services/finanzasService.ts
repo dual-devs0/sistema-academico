@@ -2,7 +2,7 @@
  * finanzasService.ts — Fase 4: Módulo Financiero + Becas
  * Wrappers tipados para todos los endpoints de finanzas y becas.
  */
-import { api, getAccessToken } from '../lib/api'
+import { api } from '../lib/api'
 
 // ── Tipos ────────────────────────────────────────────────────────────
 
@@ -195,7 +195,7 @@ export const getEstadoDeuda = (alumnoId: number) =>
 
 // Rendición Excel
 export const downloadRendicion = async (fuente: string, periodo?: string): Promise<void> => {
-  const token = (window as any).__auth_token__ || ''
+  const token = (window as {__auth_token__?: string}).__auth_token__ || ''
   const url = `/finanzas/../becas/reportes/rendicion?fuente=${encodeURIComponent(fuente)}${periodo ? `&periodo=${periodo}` : ''}`
   const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${url}`, {
     headers: { Authorization: `Bearer ${token}` },

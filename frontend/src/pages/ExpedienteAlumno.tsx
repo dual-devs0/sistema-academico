@@ -32,7 +32,6 @@ export default function ExpedienteAlumno() {
 
   useEffect(() => {
     if (alumnoId === null) return
-    setLoading(true)
     Promise.all([obtenerPPA(alumnoId), obtenerExpediente(alumnoId), obtenerRegularidad(alumnoId)])
       .then(([p, e, r]) => { setPpa(p); setExpediente(e); setRegularidad(r) })
       .catch(() => {})

@@ -4,16 +4,17 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env.test")
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
 
-from app.main import app
-from app.database import Base, get_db
+from app.main import app  # noqa: E402
+from app.database import Base, get_db  # noqa: E402
+
 # Import all models so every table is registered in Base.metadata
-from app.models import (  # noqa: F401
+from app.models import (  # noqa: F401, E402
     user as user_model,
     materia as materia_model,
     oferta_materia as oferta_materia_model,
@@ -31,8 +32,8 @@ from app.models import (  # noqa: F401
     graduacion,  # noqa: F401 — Fase 5B: graduación
     equivalencia,  # noqa: F401 — Fase 5D: equivalencias
 )
-from app.security import hash_password
-from app.auth import create_access_token
+from app.security import hash_password  # noqa: E402
+from app.auth import create_access_token  # noqa: E402
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -133,21 +134,45 @@ def seed(db):
         db.refresh(obj)
 
     return {
-        "admin":    admin,
+        "admin": admin,
         "profesor": profesor,
-        "alumno":   alumno,
-        "alumno2":  alumno2,
-        "carrera":  carrera,
-        "materia":  materia,
-        "oferta":   oferta,
+        "alumno": alumno,
+        "alumno2": alumno2,
+        "carrera": carrera,
+        "materia": materia,
+        "oferta": oferta,
     }
 
 
 @pytest.fixture()
 def tokens(seed):
     return {
-        "admin":    create_access_token({"sub": seed["admin"].username,    "role": "admin",    "user_id": seed["admin"].id}),
-        "profesor": create_access_token({"sub": seed["profesor"].username, "role": "profesor", "user_id": seed["profesor"].id}),
-        "alumno":   create_access_token({"sub": seed["alumno"].username,   "role": "alumno",   "user_id": seed["alumno"].id}),
-        "alumno2":  create_access_token({"sub": seed["alumno2"].username,  "role": "alumno",   "user_id": seed["alumno2"].id}),
+        "admin": create_access_token(
+            {
+                "sub": seed["admin"].username,
+                "role": "admin",
+                "user_id": seed["admin"].id,
+            }
+        ),
+        "profesor": create_access_token(
+            {
+                "sub": seed["profesor"].username,
+                "role": "profesor",
+                "user_id": seed["profesor"].id,
+            }
+        ),
+        "alumno": create_access_token(
+            {
+                "sub": seed["alumno"].username,
+                "role": "alumno",
+                "user_id": seed["alumno"].id,
+            }
+        ),
+        "alumno2": create_access_token(
+            {
+                "sub": seed["alumno2"].username,
+                "role": "alumno",
+                "user_id": seed["alumno2"].id,
+            }
+        ),
     }

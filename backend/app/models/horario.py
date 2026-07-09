@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Time, ForeignKey, UniqueConstraint
 from app.database import Base
 
+
 class Horario(Base):
     __tablename__ = "horarios"
 
@@ -12,5 +13,10 @@ class Horario(Base):
     aula = Column(String(50), nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("materia_id", "dia_semana", "hora_inicio", name="uq_horario_materia_dia_hora"),
+        UniqueConstraint(
+            "materia_id",
+            "dia_semana",
+            "hora_inicio",
+            name="uq_horario_materia_dia_hora",
+        ),
     )

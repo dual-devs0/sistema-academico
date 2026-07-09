@@ -440,7 +440,7 @@ function ProfesorProgramaView() {
   const [saving,     setSaving]     = useState(false)
   const [toast,      setToast]      = useState('')
 
-  function showToast(msg: string, _ok = true) {
+  function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 2400)
   }
@@ -599,8 +599,6 @@ export default function Programa() {
   const user = token ? decodeToken(token) : null
   const ROL = user?.role || 'alumno'
 
-  if (ROL === 'profesor') return <ProfesorProgramaView />
-
   const [data,       setData]       = useState<MateriaTemario[]>([])
   const [activa,     setActiva]     = useState('')
   const [claseOpen,  setClaseOpen]  = useState<number|null>(null)
@@ -611,16 +609,16 @@ export default function Programa() {
 
   useEffect(() => {
     Promise.all([
-      api.get<any[]>('/programas/').catch(() => null),
-      api.get<any[]>('/materias/').catch(() => null),
+      api.get<{ materia_id: number; semana: number; fecha_referencia: string; titulo: string; descripcion: string; bibliografia: string; apunte_url: string | null }[]>('/programas/').catch(() => null),
+      api.get<{ id: number; nombre: string }[]>('/materias/').catch(() => null),
     ]).then(([temariosData, materiasData]) => {
       setCargando(false)
       if (temariosData && temariosData.length > 0 && materiasData) {
-        const materiaMap: Record<number, { nombre: string }> = {}
-        materiasData.forEach((m: any) => { materiaMap[m.id] = m })
+        const materiaMap: Record<number, { id: number; nombre: string }> = {}
+        materiasData.forEach(m => { materiaMap[m.id] = m })
 
         const grouped: Record<string, MateriaTemario> = {}
-        temariosData.forEach((t: any) => {
+        temariosData.forEach(t => {
           const m = materiaMap[t.materia_id]
           const key = m?.nombre || `Materia #${t.materia_id}`
           if (!grouped[key]) {
@@ -650,19 +648,13 @@ export default function Programa() {
     }).catch(() => {})
   }, [])
 
-  const temario = data.find(t => t.materia === activa)
-
-  const completadas  = temario ? temario.clases.filter(c=>c.completada).length : 0
-  const progreso     = temario ? Math.round((completadas/temario.clases.length)*100) : 0
-  const totalClases  = data.reduce((s,t)=>s+t.clases.length,0)
-  const totalComp    = data.reduce((s,t)=>s+t.clases.filter(c=>c.completada).length,0)
-  const progresoGlob = totalClases > 0 ? Math.round((totalComp/totalClases)*100) : 0
-
   useEffect(() => {
     function h(e:MouseEvent){ if(dropRef.current && !dropRef.current.contains(e.target as Node)) setDropOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
+
+  if (ROL === 'profesor') return <ProfesorProgramaView />
 
   function showToast(msg:string){ setToast(msg); setTimeout(()=>setToast(''),2000) }
   function cambiarMateria(m:string){ setActiva(m); setClaseOpen(null); setDropOpen(false) }

@@ -10,9 +10,9 @@ ALLOWED_EXTENSIONS: dict[str, set[str]] = {
     "tramite": {".pdf"},
 }
 MAX_SIZE_BYTES: dict[str, int] = {
-    "foto_perfil": 2 * 1024 * 1024,   # 2 MB
-    "apunte": 20 * 1024 * 1024,        # 20 MB
-    "tramite": 5 * 1024 * 1024,        # 5 MB
+    "foto_perfil": 2 * 1024 * 1024,  # 2 MB
+    "apunte": 20 * 1024 * 1024,  # 20 MB
+    "tramite": 5 * 1024 * 1024,  # 5 MB
 }
 
 
@@ -39,7 +39,8 @@ def subir_archivo(file_bytes: bytes, filename: str, prefix: str) -> str:
     max_size = MAX_SIZE_BYTES.get(prefix, 0)
     if len(file_bytes) > max_size:
         raise ValueError(
-            f"Archivo excede el tamaño máximo permitido ({max_size // (1024 * 1024)} MB)"
+            f"Archivo excede el tamaño máximo permitido "
+            f"({max_size // (1024 * 1024)} MB)"
         )
     key = f"{prefix}/{uuid.uuid4()}{ext}"
     _get_client().put_object(Bucket=_bucket(), Key=key, Body=file_bytes)

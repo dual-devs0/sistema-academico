@@ -11,7 +11,7 @@ router = APIRouter(prefix="/temarios", tags=["temarios"])
 def create_temario(
     temario: schemas.temario.TemarioCreate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -29,7 +29,7 @@ def create_temario(
 def list_temarios(
     materia_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     query = db.query(models.temario.Temario)
     if materia_id is not None:
@@ -41,9 +41,13 @@ def list_temarios(
 def get_temario(
     temario_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    temario = db.query(models.temario.Temario).filter(models.temario.Temario.id == temario_id).first()
+    temario = (
+        db.query(models.temario.Temario)
+        .filter(models.temario.Temario.id == temario_id)
+        .first()
+    )
     if not temario:
         raise HTTPException(status_code=404, detail="Temario no encontrado")
     return temario
@@ -54,16 +58,22 @@ def update_temario(
     temario_id: int,
     data: schemas.temario.TemarioUpdate,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    temario = db.query(models.temario.Temario).filter(models.temario.Temario.id == temario_id).first()
+    temario = (
+        db.query(models.temario.Temario)
+        .filter(models.temario.Temario.id == temario_id)
+        .first()
+    )
     if not temario:
         raise HTTPException(status_code=404, detail="Temario no encontrado")
     update_data = data.model_dump(exclude_unset=True)
     if "bibliografia" in update_data and update_data["bibliografia"] is not None:
-        update_data["bibliografia"] = [b.model_dump() for b in update_data["bibliografia"]]
+        update_data["bibliografia"] = [
+            b.model_dump() for b in update_data["bibliografia"]
+        ]
     for key, value in update_data.items():
         setattr(temario, key, value)
     db.commit()
@@ -75,11 +85,15 @@ def update_temario(
 def delete_temario(
     temario_id: int,
     db: Session = Depends(database.get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     if current_user["role"] not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    temario = db.query(models.temario.Temario).filter(models.temario.Temario.id == temario_id).first()
+    temario = (
+        db.query(models.temario.Temario)
+        .filter(models.temario.Temario.id == temario_id)
+        .first()
+    )
     if not temario:
         raise HTTPException(status_code=404, detail="Temario no encontrado")
     db.delete(temario)

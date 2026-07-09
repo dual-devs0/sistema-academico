@@ -1,10 +1,12 @@
 from pydantic import BaseModel
 from datetime import datetime
 
+
 class ForoHiloCreate(BaseModel):
     materia_id: int
     titulo: str
     descripcion: str | None = None
+
 
 class ForoHiloUpdate(BaseModel):
     titulo: str | None = None
@@ -12,11 +14,14 @@ class ForoHiloUpdate(BaseModel):
     fijado: bool | None = None
     cerrado: bool | None = None
 
+
 class ForoMensajeCreate(BaseModel):
     contenido: str
 
+
 class ForoMensajeUpdate(BaseModel):
     contenido: str
+
 
 class ForoMensajeOut(BaseModel):
     id: int
@@ -28,9 +33,11 @@ class ForoMensajeOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class ForoMensajesListOut(BaseModel):
     items: list[ForoMensajeOut]
     total: int
+
 
 class ForoHiloOut(BaseModel):
     id: int

@@ -10,6 +10,7 @@ Revision ID: u8v9w0x1y2z3
 Revises: t7u8v9w0x1y2
 Create Date: 2026-07-09
 """
+
 from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
@@ -34,7 +35,12 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer(), primary_key=True),
             sa.Column("nombre", sa.String(200), nullable=False, unique=True),
             sa.Column("descripcion", sa.Text(), nullable=True),
-            sa.Column("requiere_aprobacion", sa.Boolean(), nullable=False, server_default="false"),
+            sa.Column(
+                "requiere_aprobacion",
+                sa.Boolean(),
+                nullable=False,
+                server_default="false",
+            ),
             sa.Column("dias_estimados", sa.Integer(), nullable=True),
         )
 
@@ -52,25 +58,25 @@ def upgrade() -> None:
             [
                 {
                     "nombre": "Constancia de alumno regular",
-                    "descripcion": "Generación automática — requiere estado de regularidad 'activo'.",
+                    "descripcion": "Generación automática — requiere estado de regularidad 'activo'.",  # noqa: E501
                     "requiere_aprobacion": False,
                     "dias_estimados": 0,
                 },
                 {
                     "nombre": "Historial académico oficial",
-                    "descripcion": "Generación automática — requiere estado de regularidad 'activo'.",
+                    "descripcion": "Generación automática — requiere estado de regularidad 'activo'.",  # noqa: E501
                     "requiere_aprobacion": False,
                     "dias_estimados": 0,
                 },
                 {
                     "nombre": "Carta de presentación",
-                    "descripcion": "Revisión manual por administración (Fase 5C — pasantías).",
+                    "descripcion": "Revisión manual por administración (Fase 5C — pasantías).",  # noqa: E501
                     "requiere_aprobacion": True,
                     "dias_estimados": 5,
                 },
                 {
                     "nombre": "Constancia de egreso",
-                    "descripcion": "Revisión manual por administración (Fase 5D — graduación).",
+                    "descripcion": "Revisión manual por administración (Fase 5D — graduación).",  # noqa: E501
                     "requiere_aprobacion": True,
                     "dias_estimados": 10,
                 },
@@ -81,12 +87,27 @@ def upgrade() -> None:
         op.create_table(
             "solicitudes",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("tipo_tramite_id", sa.Integer(), sa.ForeignKey("tipos_tramite.id"), nullable=False),
-            sa.Column("estado", sa.String(20), nullable=False, server_default="pendiente"),
-            sa.Column("fecha_solicitud", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column(
+                "alumno_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False
+            ),
+            sa.Column(
+                "tipo_tramite_id",
+                sa.Integer(),
+                sa.ForeignKey("tipos_tramite.id"),
+                nullable=False,
+            ),
+            sa.Column(
+                "estado", sa.String(20), nullable=False, server_default="pendiente"
+            ),
+            sa.Column(
+                "fecha_solicitud",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+            ),
             sa.Column("fecha_resolucion", sa.DateTime(timezone=True), nullable=True),
-            sa.Column("resuelto_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
+            sa.Column(
+                "resuelto_por", sa.Integer(), sa.ForeignKey("users.id"), nullable=True
+            ),
             sa.Column("storage_key_resultado", sa.String(500), nullable=True),
             sa.Column("motivo_rechazo", sa.Text(), nullable=True),
             sa.CheckConstraint(
