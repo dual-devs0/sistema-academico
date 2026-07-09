@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
-
-from app.dependencias import get_current_user
+from app.dependencias import require_role, get_current_user
 
 router = APIRouter(prefix="/materias", tags=["materias"])
 
