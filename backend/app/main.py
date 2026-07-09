@@ -13,7 +13,8 @@ from app.jobs.reintento_facturacion import ciclo_reintentos
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
     carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno, foro,
-    horarios, profesor, pensum, expediente, finanzas, becas,
+    horarios, profesor, pensum, expediente, finanzas, becas, tramites,
+    pasantias, graduacion, equivalencias,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -88,6 +89,10 @@ app.include_router(pensum.router)
 app.include_router(expediente.router)
 app.include_router(finanzas.router)
 app.include_router(becas.router)
+app.include_router(tramites.router)
+app.include_router(pasantias.router)
+app.include_router(graduacion.router)
+app.include_router(equivalencias.router)
 app.include_router(test_router.router)
 
 

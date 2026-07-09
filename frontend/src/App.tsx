@@ -25,6 +25,11 @@ import Malla from './pages/Malla'
 import Expediente from './pages/Expediente'
 import Finanzas from './pages/Finanzas'
 import MisCuotas from './pages/MisCuotas'
+import SolicitudesTramites from './pages/SolicitudesTramites'
+import PasantiasAlumno from './pages/PasantiasAlumno'
+import GraduacionAdmin from './pages/GraduacionAdmin'
+import GraduacionAlumno from './pages/GraduacionAlumno'
+import EquivalenciasAlumno from './pages/EquivalenciasAlumno'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -47,6 +52,11 @@ const rolesPermitidos: Record<string, string[]> = {
   '/expediente':         ['admin', 'alumno'],
   '/finanzas':           ['admin'],
   '/mis-cuotas':         ['alumno'],
+  '/tramites':           ['admin', 'alumno'],
+  '/mis-pasantias':      ['alumno', 'profesor'],
+  '/graduacion-admin':   ['admin'],
+  '/mi-graduacion':      ['alumno'],
+  '/mis-equivalencias':  ['alumno'],
 }
 
 function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
@@ -104,6 +114,11 @@ function App() {
         <Route path="/expediente" element={<Layout><RutaProtegida path="/expediente"><Expediente /></RutaProtegida></Layout>} />
         <Route path="/finanzas" element={<Layout><RutaProtegida path="/finanzas"><Finanzas /></RutaProtegida></Layout>} />
         <Route path="/mis-cuotas" element={<Layout><RutaProtegida path="/mis-cuotas"><MisCuotas /></RutaProtegida></Layout>} />
+        <Route path="/tramites" element={<Layout><RutaProtegida path="/tramites"><SolicitudesTramites /></RutaProtegida></Layout>} />
+        <Route path="/mis-pasantias" element={<Layout><RutaProtegida path="/mis-pasantias"><PasantiasAlumno /></RutaProtegida></Layout>} />
+        <Route path="/graduacion-admin" element={<Layout><RutaProtegida path="/graduacion-admin"><GraduacionAdmin /></RutaProtegida></Layout>} />
+        <Route path="/mi-graduacion" element={<Layout><RutaProtegida path="/mi-graduacion"><GraduacionAlumno /></RutaProtegida></Layout>} />
+        <Route path="/mis-equivalencias" element={<Layout><RutaProtegida path="/mis-equivalencias"><EquivalenciasAlumno /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><AsistenciaScan /></Layout>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

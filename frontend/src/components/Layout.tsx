@@ -20,6 +20,9 @@ const menuAlumno: MenuItem[] = [
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
   { label: 'Foro', path: '/foro', icon: 'ti-messages' },
+  { label: 'Pasantías', path: '/mis-pasantias', icon: 'ti-briefcase' },
+  { label: 'Equivalencias', path: '/mis-equivalencias', icon: 'ti-shuffle' },
+  { label: 'Graduación', path: '/mi-graduacion', icon: 'ti-graduation-cap' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
@@ -47,6 +50,7 @@ const menuAdmin: MenuItem[] = [
   { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-bar' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Foro', path: '/foro', icon: 'ti-messages' },
+  { label: 'Graduación', path: '/graduacion-admin', icon: 'ti-graduation-cap' },
   { label: 'Ajustes Globales', path: '/perfil', icon: 'ti-settings' },
 ]
 

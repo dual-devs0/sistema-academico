@@ -14,5 +14,8 @@ from . import recordatorio_schema as recordatorio
 from . import pensum_schema as pensum
 from . import expediente_schema as expediente
 from . import financiero as financiero
+from . import pasantia
+from . import graduacion
+from . import equivalencia
 
-__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "recordatorio", "pensum", "expediente", "financiero"]
+__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "recordatorio", "pensum", "expediente", "financiero", "pasantia", "graduacion", "equivalencia"]

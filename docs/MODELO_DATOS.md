@@ -348,6 +348,38 @@ Un pago que cubre el saldo (`monto - monto_descuento`) marca la `Cuota.estado` c
 | motivo | Text, nullable | | |
 | registrado_en | DateTime(tz) | server_default now() | |
 
+## `tipos_tramite` — `models/tramites.py`
+
+**Para qué sirve:** Catálogo fijo de trámites disponibles. Sembrado con 4 filas en la migración `u8v9w0x1y2z3`.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| nombre | String(200) | UNIQUE | Usado como clave de dispatch para el generador de PDF automático (ver Decisión de diseño) |
+| descripcion | Text, nullable | | |
+| requiere_aprobacion | Boolean | default false | `false` = intenta generación automática al solicitar; `true` = queda `pendiente` para resolución manual del admin |
+| dias_estimados | Integer, nullable | | Informativo, no aplica lógica sobre plazos |
+
+**Decisión de diseño:** no hay columna `codigo`/slug — el servicio (`app/services/tramites.py`, dict `_GENERADORES_AUTO`) hace *dispatch* del generador de PDF por `nombre` exacto. Catálogo fijo sembrado por migración, sin endpoint de edición; si se agrega un endpoint para editar `nombre` en el futuro, este dispatch se rompe silenciosamente — revisar `_GENERADORES_AUTO` primero.
+
+## `solicitudes` — `models/tramites.py`
+
+**Para qué sirve:** Solicitud de un alumno para un trámite del catálogo, con su ciclo de resolución (automática o manual).
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| alumno_id | Integer | FK → users.id | |
+| tipo_tramite_id | Integer | FK → tipos_tramite.id | |
+| estado | String(20) | default `pendiente`, CHECK IN ('pendiente','en_proceso','resuelta','rechazada') (`ck_solicitud_estado`) | |
+| fecha_solicitud | DateTime(tz) | default now() | |
+| fecha_resolucion | DateTime(tz), nullable | | Seteada tanto en auto-resolución como en resolución manual |
+| resuelto_por | Integer, nullable | FK → users.id | `null` si la solicitud se auto-resolvió (nadie la resolvió manualmente) |
+| storage_key_resultado | String(500), nullable | | Key en R2 (prefix `tramite`) del PDF resultante |
+| motivo_rechazo | Text, nullable | | Solo poblado si `estado='rechazada'` |
+
+**Decisión de diseño:** trámites automáticos (`tipos_tramite.requiere_aprobacion=false` y con generador en `_GENERADORES_AUTO`) se resuelven de forma **síncrona** dentro de `POST /tramites/solicitudes` — no hay llamada externa de por medio (a diferencia de Fase 4B/guarani.app), así que no hace falta background task ni job de reintentos. Si el alumno no está en estado `activo` (`calcular_regularidad()` de Fase 3), la solicitud automática se rechaza con `ValueError` (422) en vez de crearse en `pendiente`.
+
 ## Diagrama de dependencias (FK, alto nivel)
 
 ```

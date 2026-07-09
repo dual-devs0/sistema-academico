@@ -1,6 +1,30 @@
 # Changelog Técnico — Sistema Académico UCA V2
 
-> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2, Fase 3, Fase 4 y Fase 4B — todas cerradas.
+> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2, Fase 3, Fase 4, Fase 4B y Fase 5A — todas cerradas.
+
+---
+
+## Fase 5A — Solicitudes y trámites (2026-07-09) — COMPLETA
+
+**Qué se hizo:** Catálogo de tipos de trámite y flujo de solicitudes de alumnos. Los trámites automáticos (constancia de alumno regular, historial académico oficial) generan su PDF de forma síncrona al crear la solicitud — reusando `calcular_regularidad()` de Fase 3 como gate (solo se genera si el alumno está `activo`) y el patrón reportlab de `boleta_router.py` (Fase 3 no tenía ninguna plantilla PDF, pese a que el plan decía lo contrario — se corrigió esa premisa antes de implementar). Los trámites manuales (carta de presentación, constancia de egreso — dependientes de Fases 5C/5D) quedan `pendiente` hasta que un admin los resuelve, opcionalmente adjuntando un documento propio.
+
+**Decisión de diseño:** `tipos_tramite` no tiene columna para identificar qué generador de PDF usar en los automáticos — se sembraron 4 filas fijas en la migración y el servicio hace *dispatch* por `nombre` exacto (`_GENERADORES_AUTO` en `tramites.py`). Catálogo fijo, sin endpoint de edición en este bloque.
+
+**Decisión de diseño:** el criterio de aceptación pedía exactamente 5 endpoints, pero el panel admin necesita alguna forma de listar solicitudes pendientes de otros alumnos. Se resolvió sin agregar un 6º endpoint: `GET /tramites/solicitudes/mias` tiene comportamiento dual por rol — admin ve todas (filtro opcional `?estado=`), alumno ve solo las propias.
+
+**Archivos tocados:**
+- `backend/alembic/versions/u8v9w0x1y2z3_create_tramites.py` — nuevo (`tipos_tramite`, `solicitudes`, seed de 4 tipos)
+- `backend/app/models/tramites.py`, `backend/app/schemas/tramites.py` — nuevos
+- `backend/app/services/tramites.py` — nuevo (`crear_solicitud`, `generar_constancia_regular_pdf`, `generar_historial_oficial_pdf`)
+- `backend/app/services/storage.py` — prefix `"tramite"` agregado a `ALLOWED_EXTENSIONS`/`MAX_SIZE_BYTES`
+- `backend/app/routers/tramites_router.py` — nuevo, prefix `/tramites`
+- `backend/app/routers/__init__.py`, `backend/app/main.py` — registro del router
+- `frontend/src/services/tramitesService.ts`, `frontend/src/pages/SolicitudesTramites.tsx` — nuevos
+- `frontend/src/App.tsx` — ruta `/tramites` (roles admin + alumno)
+
+**Tests:** 182/182 pasando (sqlite) — 10 nuevos en `tests/test_tramites.py`: auto-resolución con alumno activo, rechazo con motivo si no-regular, trámite manual queda pendiente, admin resuelve vía multipart, autorización dueño-o-admin en descarga, listado dual-role. `subir_archivo` mockeado (`unittest.mock.patch`), sin llamadas reales a R2. Migración `u8v9w0x1y2z3` aplicada en `neondb_test` y `neondb` (confirmado con el usuario antes de tocar prod) — se encontró el mismo drift de `test_postgres_compat.py::pg_engine` corriendo `Base.metadata.create_all()` contra `neondb_test` antes de que la migración se aplicara (ya conocido de Fase 4B); la migración se hizo idempotente (`inspector.has_table`) siguiendo el mismo patrón que `s6t7u8v9w0x1`.
+
+**Pendiente de esta tarea:** Fase 5B (equivalencias), 5C (pasantías), 5D (graduación) — los tipos de trámite "Carta de presentación" y "Constancia de egreso" quedan sembrados pero sin generador automático propio hasta que esas fases se implementen.
 
 ---
 

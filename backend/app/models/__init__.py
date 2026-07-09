@@ -19,5 +19,8 @@ from . import expediente_materia
 from . import expediente_semestre
 from . import regularidad_alumno
 from . import financiero
+from . import pasantia
+from . import graduacion
+from . import equivalencia
 
-__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "refresh_token", "recordatorio_docente", "pensum_materia", "correlatividad", "avance_alumno_pensum", "expediente_materia", "expediente_semestre", "regularidad_alumno", "financiero"]
+__all__ = ["user", "materia", "oferta_materia", "inscripcion", "carrera", "asistencia", "puntaje", "apunte", "evento", "programa", "foro", "horario", "refresh_token", "recordatorio_docente", "pensum_materia", "correlatividad", "avance_alumno_pensum", "expediente_materia", "expediente_semestre", "regularidad_alumno", "financiero", "pasantia", "graduacion", "equivalencia"]

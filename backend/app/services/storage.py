@@ -7,10 +7,12 @@ import boto3
 ALLOWED_EXTENSIONS: dict[str, set[str]] = {
     "foto_perfil": {".jpg", ".jpeg", ".png"},
     "apunte": {".pdf", ".docx", ".pptx"},
+    "tramite": {".pdf"},
 }
 MAX_SIZE_BYTES: dict[str, int] = {
     "foto_perfil": 2 * 1024 * 1024,   # 2 MB
     "apunte": 20 * 1024 * 1024,        # 20 MB
+    "tramite": 5 * 1024 * 1024,        # 5 MB
 }
 
 

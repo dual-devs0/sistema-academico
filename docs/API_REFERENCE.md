@@ -286,6 +286,74 @@ Fase 4B: al confirmar el pago crea un `Comprobante` en `estado_emision='pendient
 
 **Archivo:** `app/routers/becas_router.py`
 
+## `/tramites` — `tramites_router.py` (Fase 5A)
+
+### GET /tramites/tipos
+
+**Rol requerido:** auth (cualquier rol autenticado)
+**Qué hace:** Lista el catálogo de `tipos_tramite`.
+
+**Archivo:** `app/routers/tramites_router.py`
+
+### POST /tramites/solicitudes
+
+**Rol requerido:** alumno
+**Qué hace:** Crea una solicitud. Si el tipo es automático
+(`requiere_aprobacion=false` y tiene generador en `_GENERADORES_AUTO`),
+la resuelve de forma síncrona: valida que `calcular_regularidad()` del
+alumno sea `activo`, genera el PDF (reportlab) y lo sube a R2
+(`prefix="tramite"`) — todo dentro de la misma request. Si el tipo es
+manual, queda en `pendiente`.
+
+**Respuestas:**
+| Código | Cuándo |
+|---|---|
+| 200 | Solicitud creada (auto-resuelta o pendiente según el tipo) |
+| 422 | Tipo de trámite inexistente, o alumno no está en estado `activo` para un trámite automático |
+
+**Archivo:** `app/routers/tramites_router.py`
+
+### GET /tramites/solicitudes/mias
+
+**Rol requerido:** auth — comportamiento **dual por rol**
+**Qué hace:** Alumno ve solo sus propias solicitudes. Admin ve **todas**
+las solicitudes, con filtro opcional `?estado=`. Mismo endpoint para
+ambos casos — decisión tomada para no exceder los 5 endpoints del
+alcance de Fase 5A en vez de agregar una ruta de listado admin aparte.
+
+**Archivo:** `app/routers/tramites_router.py`
+
+### PUT /tramites/solicitudes/{solicitud_id}/resolver
+
+**Rol requerido:** admin
+**Qué hace:** Resuelve manualmente una solicitud. Request `multipart/form-data`
+con `estado` (`resuelta` \| `rechazada`), `motivo_rechazo` opcional, y
+`archivo` opcional (PDF, sube a R2 con `prefix="tramite"` si `estado='resuelta'`).
+Setea `resuelto_por` y `fecha_resolucion`.
+
+**Respuestas:**
+| Código | Cuándo |
+|---|---|
+| 200 | Resuelta correctamente |
+| 404 | Solicitud no encontrada |
+| 422 | `estado` fuera de `('resuelta','rechazada')`, o archivo con extensión/tamaño no permitidos |
+
+**Archivo:** `app/routers/tramites_router.py`
+
+### GET /tramites/solicitudes/{solicitud_id}/descargar
+
+**Rol requerido:** alumno dueño de la solicitud, o admin (chequeo manual — `require_role` no cubre "self or admin", mismo patrón que `boleta_router.py`)
+**Qué hace:** Devuelve `{download_url}` con una URL firmada de corta duración (`obtener_url_firmada()`, `app/services/storage.py`) al PDF resultante.
+
+**Respuestas:**
+| Código | Cuándo |
+|---|---|
+| 200 | OK |
+| 403 | Otro alumno intentando ver una solicitud que no es suya |
+| 404 | Solicitud no encontrada, o todavía no tiene resultado (`storage_key_resultado` vacío) |
+
+**Archivo:** `app/routers/tramites_router.py`
+
 ## `/test` — `test.py` (interno, health-check)
 
 `GET /test/` (sin auth), `GET /test/auth` (smoke test de token). No es API de dominio.

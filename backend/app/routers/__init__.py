@@ -19,5 +19,9 @@ from . import pensum_router as pensum
 from . import expediente_router as expediente
 from . import finanzas_router as finanzas
 from . import becas_router as becas
+from . import tramites_router as tramites
+from . import pasantias_router as pasantias
+from . import graduacion_router as graduacion
+from . import equivalencias_router as equivalencias
 
-__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro", "horarios", "profesor", "pensum", "expediente", "finanzas", "becas"]
+__all__ = ["users", "auth", "materias", "inscripciones", "carreras", "asistencias", "puntajes", "apuntes", "eventos", "programas", "reportes", "boleta", "alumno", "foro", "horarios", "profesor", "pensum", "expediente", "finanzas", "becas", "tramites", "pasantias", "graduacion", "equivalencias"]

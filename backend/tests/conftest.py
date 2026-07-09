@@ -26,6 +26,10 @@ from app.models import (  # noqa: F401
     temario,
     horario,
     financiero,  # noqa: F401 — registra todas las tablas financieras en Base.metadata
+    tramites,  # noqa: F401 — registra tipos_tramite/solicitudes en Base.metadata
+    pasantia,  # noqa: F401 — Fase 5C: pasantías
+    graduacion,  # noqa: F401 — Fase 5B: graduación
+    equivalencia,  # noqa: F401 — Fase 5D: equivalencias
 )
 from app.security import hash_password
 from app.auth import create_access_token
