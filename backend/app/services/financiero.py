@@ -16,6 +16,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
+from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
@@ -123,13 +124,7 @@ def generar_cuotas_alumno(
 
     nuevas: List[Cuota] = []
     for i, periodo in enumerate(periodos):
-        # Desplazar fecha de vencimiento mes a mes (aproximado por 30 días)
-        from datetime import timedelta
-        fecha_venc = date(
-            fecha_vencimiento_base.year + ((fecha_vencimiento_base.month - 1 + i) // 12),
-            ((fecha_vencimiento_base.month - 1 + i) % 12) + 1,
-            fecha_vencimiento_base.day,
-        )
+        fecha_venc = fecha_vencimiento_base + relativedelta(months=i)
         monto_desc = (concepto.monto_base * descuento_factor).quantize(Decimal("0.01"))
         cuota = Cuota(
             alumno_id=alumno_id,
@@ -277,7 +272,7 @@ def verificar_deuda_inscripcion(
     ]
 
     _tiene_beca_100 = tiene_beca_100(alumno_id, db)
-    bloqueado = len(cuotas_vencidas) > max_mora and not _tiene_beca_100
+    bloqueado = len(cuotas_vencidas) >= max_mora and not _tiene_beca_100
 
     return EstadoDeudaOut(
         bloqueado=bloqueado,

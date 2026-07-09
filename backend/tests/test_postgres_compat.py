@@ -84,6 +84,10 @@ def pg_engine():
         "apuntes", "foro_mensajes",
         "foro_hilos", "inscripciones", "eventos_calendario",
         "programas", "temarios", "horarios", "pensum_materias", "ofertas_materia", "materias",
+        "regularidad_alumno",
+        "auditoria_override_mora", "comprobantes", "pagos", "cuotas",
+        "postulaciones_beca", "becas_activas", "becas_catalogo", "fuentes_beca",
+        "conceptos_arancel",
         "refresh_tokens", "users", "carreras",
     ]
     with engine.begin() as conn:

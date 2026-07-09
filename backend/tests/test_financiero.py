@@ -241,6 +241,24 @@ class TestBloqueoPorMora:
         assert estado_admin.override_disponible is True
         assert estado_alumno.override_disponible is False
 
+    def test_umbral_mora_se_lee_de_carrera_no_hardcode(self, db, seed):
+        """Con max_cuotas_mora=2 en la carrera, 1 vencida no bloquea, 2 sí."""
+        carrera = seed["carrera"]
+        carrera.max_cuotas_mora = 2
+        concepto = _make_concepto(db)
+        db.commit()
+
+        _make_cuota_vencida(db, seed["alumno"].id, concepto.id)
+        db.commit()
+        estado_una = verificar_deuda_inscripcion(seed["alumno"].id, db)
+        assert estado_una.bloqueado is False
+        assert estado_una.max_permitidas == 2
+
+        _make_cuota_vencida(db, seed["alumno"].id, concepto.id)
+        db.commit()
+        estado_dos = verificar_deuda_inscripcion(seed["alumno"].id, db)
+        assert estado_dos.bloqueado is True
+
 
 class TestRendicionExcel:
     def test_export_retorna_bytes_xlsx(self, db, seed):
