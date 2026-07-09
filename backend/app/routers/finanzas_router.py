@@ -1,5 +1,5 @@
 """
-Router Finanzas — Fase 4.
+Router Finanzas — Fase 4 + 4B.
 
 Endpoints:
   POST /finanzas/conceptos
@@ -7,12 +7,14 @@ Endpoints:
   GET  /finanzas/alumno/{id}/cuotas
   POST /finanzas/pagos
   GET  /finanzas/pagos/{id}/comprobante
+  POST /finanzas/pagos/{id}/comprobante/reintentar
+  GET  /finanzas/comprobantes/pendientes
   GET  /finanzas/alumno/{id}/estado-deuda-inscripcion
 """
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app import models, database
@@ -24,7 +26,7 @@ from app.schemas.financiero import (
     ConceptoArancelCreate, ConceptoArancelOut,
     GenerarCuotasRequest, CuotaOut,
     PagoCreate, PagoOut,
-    ComprobanteOut,
+    ComprobanteOut, ComprobantePendienteOut,
     EstadoDeudaOut,
 )
 from app.services.financiero import (
@@ -33,6 +35,7 @@ from app.services.financiero import (
     registrar_pago,
     verificar_deuda_inscripcion,
 )
+from app.services.facturacion_electronica import procesar_facturacion, MAX_INTENTOS
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
@@ -142,12 +145,17 @@ def cuotas_alumno(
 )
 def crear_pago(
     data: PagoCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role(["admin"])),
 ):
     """
     Pagos INMUTABLES. No existe endpoint PUT/DELETE.
     Para correcciones usar pago_ajuste_ref_id con nota_ajuste.
+
+    Al registrar el pago se crea un Comprobante en estado 'pendiente' y
+    se dispara la emisión fiscal en background (guarani.app) — un fallo
+    del proveedor externo nunca bloquea ni revierte el pago académico.
     """
     try:
         with db.begin_nested():
@@ -163,6 +171,14 @@ def crear_pago(
             )
         db.commit()
         db.refresh(pago)
+
+        comprobante = Comprobante(pago_id=pago.id, tipo="factura", estado_emision="pendiente")
+        db.add(comprobante)
+        db.commit()
+        db.refresh(comprobante)
+
+        background_tasks.add_task(procesar_facturacion, pago.id, comprobante.id)
+
         return pago
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -192,6 +208,60 @@ def get_comprobante(
     if not comp:
         raise HTTPException(status_code=404, detail="Comprobante no encontrado")
     return comp
+
+
+@router.post(
+    "/pagos/{pago_id}/comprobante/reintentar",
+    response_model=ComprobanteOut,
+    summary="Forzar reintento manual de emisión de comprobante (admin)",
+)
+async def reintentar_comprobante(
+    pago_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role(["admin"])),
+):
+    comp = db.query(Comprobante).filter(Comprobante.pago_id == pago_id).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Comprobante no encontrado")
+    if comp.intentos >= MAX_INTENTOS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Comprobante alcanzó el máximo de {MAX_INTENTOS} intentos",
+        )
+
+    await procesar_facturacion(pago_id, comp.id)
+    db.refresh(comp)
+    return comp
+
+
+@router.get(
+    "/comprobantes/pendientes",
+    response_model=List[ComprobantePendienteOut],
+    summary="Listar comprobantes pendientes o en error (admin)",
+)
+def listar_comprobantes_pendientes(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role(["admin"])),
+):
+    comps = (
+        db.query(Comprobante)
+        .filter(Comprobante.estado_emision.in_(["pendiente", "error", "reintentando"]))
+        .all()
+    )
+    out = []
+    for c in comps:
+        pago = c.pago
+        alumno = pago.cuota.alumno if pago and pago.cuota else None
+        out.append(ComprobantePendienteOut(
+            id=c.id,
+            pago_id=c.pago_id,
+            alumno_nombre=alumno.nombre if alumno else "—",
+            monto_pagado=pago.monto_pagado if pago else Decimal("0"),
+            estado_emision=c.estado_emision,
+            intentos=c.intentos,
+            ultimo_error=c.ultimo_error,
+        ))
+    return out
 
 
 # ── Estado deuda para inscripción (endpoint interno) ──────────────────

@@ -15,6 +15,7 @@
 | carrera_id | FK → carreras.id, nullable | |
 | es_becado | Boolean | |
 | foto_url | String, nullable | storage key en R2 |
+| cedula | String(20), nullable | agregado Fase 4B — documento del alumno, requerido por guarani.app para emitir factura válida ante la DNIT |
 | created_at | DateTime(tz) | |
 
 ## `carreras` — `models/carrera.py`
@@ -25,6 +26,7 @@
 | nombre | String(150), unique | |
 | duracion_semestres | Integer, nullable | agregado Fase 2 |
 | creditos_totales | Integer, nullable | agregado Fase 2 |
+| max_cuotas_mora | Integer, default 1 | agregado Fase 4 — umbral de cuotas vencidas que bloquea inscripción (`verificar_deuda_inscripcion` bloquea cuando `cuotas_vencidas >= max_cuotas_mora`, salvo beca 100%) |
 
 ## `materias` — `models/materia.py`
 
@@ -196,6 +198,156 @@ Fase 2. id, alumno_id (FK users), pensum_materia_id (FK), estado (`pendiente`\|`
 | motivo | String(255), nullable | | Texto human-readable (ej. `"PPA 6.5 < 7.0"`) |
 | calculado_en | DateTime(tz) | server_default now(), onupdate now() | |
 
+## `fuentes_beca` — `models/financiero.py`
+
+**Para qué sirve:** Catálogo de fuentes de becas (institucional o convenio externo — ITAIPU, BECAL, Fundasep). Sembrada con 4 filas en la migración `s6t7u8v9w0x1`.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| nombre | String(150) | UNIQUE | |
+| tipo | String(80) | | `institucional` \| `convenio_externo` |
+| es_externa | Boolean | default false | Determina badge visual (🏦 vs 🎓) en frontend |
+| requiere_reporte_externo | Boolean | default false | Fuentes externas exportan rendición Excel para el convenio |
+| editable_porcentaje | Boolean | default true | Si es false (convenios), el % de descuento es fijo por el proveedor, no editable en UI |
+
+## `becas_catalogo` — `models/financiero.py`
+
+**Para qué sirve:** Catálogo de becas disponibles (nombre, % de descuento, cupos).
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| nombre | String(200) | | |
+| fuente_id | Integer | FK → fuentes_beca.id | |
+| porcentaje_descuento | Numeric(5,2) | CHECK 0-100 (`ck_beca_porcentaje_rango`) | |
+| monto_fijo | Numeric(12,2), nullable | | Alternativa a porcentaje (no usada actualmente en el cálculo) |
+| requisitos | Text, nullable | | |
+| cupos_totales | Integer, nullable | | |
+| cupos_disponibles | Integer, nullable | | |
+
+## `postulaciones_beca` — `models/financiero.py`
+
+**Para qué sirve:** Solicitud de un alumno a una beca del catálogo, con flujo de revisión por comité.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| alumno_id | Integer | FK → users.id | |
+| beca_id | Integer | FK → becas_catalogo.id | |
+| estado | String(20) | CHECK IN ('pendiente','en_revision','aprobada','rechazada') (`ck_postulacion_estado`) | |
+| fecha_postulacion | DateTime(tz) | server_default now() | |
+| documentos_storage_keys | JSON, nullable | | Keys en R2 de documentos adjuntos |
+| motivo_rechazo | Text, nullable | | |
+| revisado_por | Integer, nullable | FK → users.id | |
+| revisado_en | DateTime(tz), nullable | | |
+
+## `becas_activas` — `models/financiero.py`
+
+**Para qué sirve:** Beca efectivamente otorgada a un alumno (tras aprobar postulación), con vigencia y seguimiento de rendimiento académico para renovación.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| alumno_id | Integer | FK → users.id | |
+| beca_id | Integer | FK → becas_catalogo.id | |
+| fuente_id | Integer | FK → fuentes_beca.id | Denormalizado para reportes de rendición |
+| periodo_inicio | String(10) | | |
+| periodo_fin | String(10), nullable | | |
+| promedio_minimo_requerido | Numeric(5,2), nullable | | |
+| promedio_actual | Numeric(5,2), nullable | | |
+| estado_renovacion | String(30) | default `vigente`, CHECK IN ('vigente','en_riesgo','suspendida','finalizada') (`ck_beca_activa_estado`) | Solo `vigente` cuenta para el cálculo de descuento |
+| otorgado_por | Integer, nullable | FK → users.id | |
+| otorgado_en | DateTime(tz) | server_default now() | |
+
+**Decisión de diseño — multi-beca:** un alumno puede tener varias `BecaActiva` vigentes simultáneamente. `calcular_descuento_beca()` (`app/services/financiero.py`) aplica el **mayor** porcentaje entre todas las vigentes (`max()`, no suma) — evita que acumular becas supere el 100% del arancel. `Cuota.beca_aplicada_id` referencia una sola `BecaActiva` (la ganadora), no una lista.
+
+## `conceptos_arancel` — `models/financiero.py`
+
+**Para qué sirve:** Catálogo de conceptos facturables (ej. "Cuota Mensual Ingeniería").
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| nombre | String(200) | | |
+| carrera_id | Integer, nullable | FK → carreras.id | Null = aplica a cualquier carrera |
+| monto_base | Numeric(12,2) | | |
+| periodicidad | String(80) | default `mensual` | mensual / semestral / anual / unica |
+| activo | Boolean | default true | |
+
+## `cuotas` — `models/financiero.py`
+
+**Para qué sirve:** Cuota generada para un alumno a partir de un concepto, con el descuento de beca ya aplicado.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| alumno_id | Integer | FK → users.id | |
+| concepto_id | Integer | FK → conceptos_arancel.id | |
+| periodo | String(10) | | |
+| monto | Numeric(12,2) | | Monto original del concepto |
+| monto_descuento | Numeric(12,2) | default 0 | Calculado con `calcular_descuento_beca()` al generar |
+| fecha_vencimiento | Date | | |
+| estado | String(20) | default `pendiente`, CHECK IN ('pendiente','pagada','vencida','anulada') (`ck_cuota_estado`) | |
+| beca_aplicada_id | Integer, nullable | FK → becas_activas.id | La beca ganadora (mayor %) al momento de generar |
+| generado_en | DateTime(tz) | server_default now() | |
+| generado_por | Integer, nullable | FK → users.id | |
+
+`monto_a_pagar` (`monto - monto_descuento`) se calcula en `cuota_to_out()`, no persiste como columna.
+
+## `pagos` — `models/financiero.py`
+
+**Para qué sirve:** Registro de un pago sobre una cuota. **Inmutable** — no existe endpoint PUT/DELETE; correcciones se hacen con un pago nuevo `es_ajuste=True` referenciando el original.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| cuota_id | Integer | FK → cuotas.id | |
+| monto_pagado | Numeric(12,2) | | |
+| fecha_pago | DateTime(tz) | server_default now() | |
+| metodo | String(50) | | transferencia / efectivo / cheque / tarjeta / deposito |
+| referencia | String(200), nullable | | |
+| registrado_por | Integer | FK → users.id | |
+| pago_ajuste_ref_id | Integer, nullable | FK → pagos.id | Apunta al pago original que corrige |
+| es_ajuste | Boolean | default false | |
+| nota_ajuste | Text, nullable | | |
+
+Un pago que cubre el saldo (`monto - monto_descuento`) marca la `Cuota.estado` como `pagada` (`registrar_pago()` en `app/services/financiero.py`); soporta pagos parciales.
+
+## `comprobantes` — `models/financiero.py`
+
+**Para qué sirve:** Referencia al comprobante fiscal (factura electrónica) de un pago. Fase 4 creó la tabla mínima; **Fase 4B** (migración `t7u8v9w0x1y2`) la extendió con el ciclo de vida completo de emisión vía guarani.app.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| pago_id | Integer | FK → pagos.id, UNIQUE | Un comprobante por pago |
+| tipo | String(20) | default `factura` | factura / nota_credito / nota_debito / remision (solo `factura` implementado) |
+| numero_comprobante | String(50), nullable | | Devuelto por guarani.app |
+| cdc | String(44), nullable | | Código de Control DNIT (44 dígitos exactos) |
+| timbrado | String(20), nullable | agregado Fase 4B | |
+| url_pdf | String(500), nullable | agregado Fase 4B | URL del PDF servido por guarani.app — UCA V2 no almacena el archivo |
+| storage_key | String(500), nullable | | Vestigial de Fase 4 — sin uso; el PDF vive en guarani.app, no en R2 |
+| estado_emision | String(20) | agregado Fase 4B, default `pendiente`, CHECK IN ('pendiente','emitido','error','reintentando') (`ck_comprobante_estado_emision`) | |
+| intentos | Integer | agregado Fase 4B, default 0 | Incrementado en cada intento de emisión; tope 5 (`MAX_INTENTOS` en `facturacion_electronica.py`) |
+| ultimo_error | Text, nullable | agregado Fase 4B | Mensaje de la última excepción, visible en panel admin |
+| fecha_emision | DateTime(tz), nullable | Fase 4B cambió a nullable (antes se seteaba al crear; ahora solo al emitir con éxito) | |
+
+**Decisión de diseño — degradación con gracia:** un fallo de guarani.app (timeout, HTTP error, credenciales faltantes) nunca revierte ni bloquea el `Pago` — el comprobante queda en `error` y se reintenta (endpoint manual o job cada 10 min, máx. 5 intentos). Ver `ARQUITECTURA.md`.
+
+## `auditoria_override_mora` — `models/financiero.py`
+
+**Para qué sirve:** Registro de auditoría cuando un admin usa `override_mora=true` para inscribir a un alumno bloqueado por mora.
+
+| Columna | Tipo | Constraint | Para qué sirve |
+|---|---|---|---|
+| id | Integer | PK | |
+| alumno_id | Integer | FK → users.id | |
+| admin_id | Integer | FK → users.id | |
+| oferta_materia_id | Integer, nullable | FK → ofertas_materia.id | |
+| motivo | Text, nullable | | |
+| registrado_en | DateTime(tz) | server_default now() | |
+
 ## Diagrama de dependencias (FK, alto nivel)
 
 ```
@@ -207,6 +359,11 @@ carreras ← materias ← ofertas_materia ← inscripciones
                       ofertas_materia ← expediente_materias
 users ← refresh_tokens, recordatorios_docente, foro_hilos, foro_mensajes, apuntes,
         expediente_materias, expediente_semestres, regularidad_alumno
+
+fuentes_beca ← becas_catalogo ← postulaciones_beca
+                              ← becas_activas → cuotas.beca_aplicada_id
+carreras ← conceptos_arancel ← cuotas ← pagos ← comprobantes
+users ← becas_activas, cuotas, pagos, comprobantes (vía pagos), auditoria_override_mora
 ```
 
 ## Nota de integridad (drift histórico, ya resuelto)

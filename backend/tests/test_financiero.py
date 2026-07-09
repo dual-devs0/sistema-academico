@@ -14,9 +14,13 @@ from __future__ import annotations
 import pytest
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+from sqlalchemy.orm import sessionmaker
 
 from app.models.financiero import (
-    BecaActiva, BecaCatalogo, ConceptoArancel, Cuota, FuenteBeca, Pago,
+    BecaActiva, BecaCatalogo, ConceptoArancel, Comprobante, Cuota, FuenteBeca, Pago,
 )
 from app.services.financiero import (
     calcular_descuento_beca,
@@ -27,6 +31,7 @@ from app.services.financiero import (
     tiene_beca_100,
     verificar_deuda_inscripcion,
 )
+from app.services.facturacion_electronica import procesar_facturacion, MAX_INTENTOS
 
 
 # ─── helpers ─────────────────────────────────────────────────────────
@@ -278,3 +283,164 @@ class TestRendicionExcel:
         db.commit()
         excel_bytes = export_rendicion_excel(9999, None, db)
         assert isinstance(excel_bytes, bytes)
+
+
+class TestComprobantes:
+    """Fase 4B — facturación electrónica guarani.app.
+
+    procesar_facturacion() abre su propia sesión (SessionLocal), separada
+    de la sesión `db` de estos tests (que corre sobre el engine sqlite en
+    memoria de conftest) — se parchea SessionLocal para que apunte al
+    mismo engine de test, igual patrón que usaría el proceso real.
+    """
+
+    def _preparar_pago(self, db, seed):
+        alumno = seed["alumno"]
+        alumno.cedula = "1234567"
+        concepto = _make_concepto(db)
+        db.commit()
+        cuotas = generar_cuotas_alumno(
+            alumno_id=alumno.id, concepto_id=concepto.id,
+            periodos=["2026-03"], fecha_vencimiento_base=date(2026, 3, 31),
+            generado_por=seed["admin"].id, db=db,
+        )
+        db.commit()
+        pago = registrar_pago(
+            cuota_id=cuotas[0].id, monto_pagado=Decimal("500000"),
+            metodo="efectivo", registrado_por=seed["admin"].id, db=db,
+        )
+        db.commit()
+        comprobante = Comprobante(pago_id=pago.id, tipo="factura", estado_emision="pendiente")
+        db.add(comprobante)
+        db.commit()
+        db.refresh(comprobante)
+        return pago, comprobante
+
+    async def test_emision_exitosa_actualiza_comprobante(self, db, seed):
+        TestSession = sessionmaker(bind=db.get_bind())
+        pago, comprobante = self._preparar_pago(db, seed)
+
+        resultado_mock = {
+            "numero_comprobante": "001-001-0000123",
+            "cdc": "0" * 44,
+            "timbrado": "12345678",
+            "url_pdf": "https://guarani.app/comprobantes/123.pdf",
+        }
+        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
+             patch("app.services.facturacion_electronica.emitir_factura", AsyncMock(return_value=resultado_mock)):
+            await procesar_facturacion(pago.id, comprobante.id)
+
+        db.expire_all()
+        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        assert actualizado.estado_emision == "emitido"
+        assert actualizado.numero_comprobante == "001-001-0000123"
+        assert actualizado.url_pdf == resultado_mock["url_pdf"]
+        assert actualizado.intentos == 1
+        assert actualizado.ultimo_error is None
+
+    async def test_fallo_timeout_no_afecta_pago(self, db, seed):
+        TestSession = sessionmaker(bind=db.get_bind())
+        pago, comprobante = self._preparar_pago(db, seed)
+        pago_id_original = pago.id
+
+        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
+             patch("app.services.facturacion_electronica.emitir_factura",
+                   AsyncMock(side_effect=httpx.TimeoutException("timeout de guarani.app"))):
+            await procesar_facturacion(pago.id, comprobante.id)
+
+        db.expire_all()
+        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        assert actualizado.estado_emision == "error"
+        assert "timeout" in actualizado.ultimo_error.lower()
+        assert actualizado.intentos == 1
+
+        # el pago académico no se ve afectado por el fallo de facturación
+        pago_verificado = db.query(Pago).filter(Pago.id == pago_id_original).first()
+        assert pago_verificado is not None
+        assert pago_verificado.monto_pagado == Decimal("500000")
+
+    async def test_fallo_http_status_error_marca_error(self, db, seed):
+        TestSession = sessionmaker(bind=db.get_bind())
+        pago, comprobante = self._preparar_pago(db, seed)
+
+        error = httpx.HTTPStatusError(
+            "422 client error", request=MagicMock(), response=MagicMock(status_code=422),
+        )
+        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
+             patch("app.services.facturacion_electronica.emitir_factura", AsyncMock(side_effect=error)):
+            await procesar_facturacion(pago.id, comprobante.id)
+
+        db.expire_all()
+        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        assert actualizado.estado_emision == "error"
+        assert actualizado.ultimo_error
+
+    async def test_sin_api_key_configurada_marca_error(self, db, seed, monkeypatch):
+        TestSession = sessionmaker(bind=db.get_bind())
+        monkeypatch.delenv("GUARANI_APP_API_KEY", raising=False)
+        pago, comprobante = self._preparar_pago(db, seed)
+
+        with patch("app.services.facturacion_electronica.SessionLocal", TestSession):
+            await procesar_facturacion(pago.id, comprobante.id)
+
+        db.expire_all()
+        actualizado = db.query(Comprobante).filter(Comprobante.id == comprobante.id).first()
+        assert actualizado.estado_emision == "error"
+        assert "GUARANI_APP_API_KEY" in actualizado.ultimo_error
+
+    def test_reintento_manual_respeta_limite_intentos(self, client, db, seed):
+        from app.auth import create_access_token
+        pago, comprobante = self._preparar_pago(db, seed)
+        comprobante.intentos = MAX_INTENTOS
+        db.commit()
+
+        token = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+        r = client.post(
+            f"/finanzas/pagos/{pago.id}/comprobante/reintentar",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422
+
+    def test_reintento_manual_no_admin_falla(self, client, db, seed):
+        from app.auth import create_access_token
+        pago, comprobante = self._preparar_pago(db, seed)
+
+        token = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+        r = client.post(
+            f"/finanzas/pagos/{pago.id}/comprobante/reintentar",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+
+    def test_listar_pendientes_solo_admin(self, client, db, seed):
+        from app.auth import create_access_token
+        self._preparar_pago(db, seed)
+
+        token_admin = create_access_token({"sub": seed["admin"].username, "role": "admin", "user_id": seed["admin"].id})
+        r = client.get("/finanzas/comprobantes/pendientes", headers={"Authorization": f"Bearer {token_admin}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == 1
+        assert data[0]["estado_emision"] == "pendiente"
+
+        token_alumno = create_access_token({"sub": seed["alumno"].username, "role": "alumno", "user_id": seed["alumno"].id})
+        r2 = client.get("/finanzas/comprobantes/pendientes", headers={"Authorization": f"Bearer {token_alumno}"})
+        assert r2.status_code == 403
+
+    async def test_ciclo_reintentos_ignora_intentos_agotados(self, db, seed):
+        TestSession = sessionmaker(bind=db.get_bind())
+        from app.jobs.reintento_facturacion import ciclo_reintentos
+
+        pago1, comp1 = self._preparar_pago(db, seed)
+        comp1.intentos = MAX_INTENTOS  # agotado, no debe procesarse
+        db.commit()
+
+        with patch("app.services.facturacion_electronica.SessionLocal", TestSession), \
+             patch("app.jobs.reintento_facturacion.SessionLocal", TestSession), \
+             patch("app.services.facturacion_electronica.emitir_factura", AsyncMock(return_value={
+                 "numero_comprobante": "x", "cdc": "x", "timbrado": "x", "url_pdf": "x",
+             })) as mock_emitir:
+            procesados = await ciclo_reintentos()
+
+        assert procesados == 0
+        mock_emitir.assert_not_called()

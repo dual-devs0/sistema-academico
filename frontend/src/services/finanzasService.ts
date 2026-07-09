@@ -2,7 +2,7 @@
  * finanzasService.ts — Fase 4: Módulo Financiero + Becas
  * Wrappers tipados para todos los endpoints de finanzas y becas.
  */
-import { api } from '../lib/api'
+import { api, getAccessToken } from '../lib/api'
 
 // ── Tipos ────────────────────────────────────────────────────────────
 
@@ -75,6 +75,9 @@ export interface Cuota {
   beca_nombre: string | null
   fuente_beca: string | null
   es_beca_externa: boolean | null
+  pago_id: number | null
+  comprobante_estado: 'pendiente' | 'emitido' | 'error' | 'reintentando' | null
+  comprobante_url_pdf: string | null
 }
 
 export interface Pago {
@@ -87,6 +90,31 @@ export interface Pago {
   registrado_por: number
   es_ajuste: boolean
   pago_ajuste_ref_id: number | null
+}
+
+export interface Comprobante {
+  id: number
+  pago_id: number
+  tipo: string
+  numero_comprobante: string | null
+  cdc: string | null
+  timbrado: string | null
+  url_pdf: string | null
+  storage_key: string | null
+  estado_emision: 'pendiente' | 'emitido' | 'error' | 'reintentando'
+  intentos: number
+  ultimo_error: string | null
+  fecha_emision: string | null
+}
+
+export interface ComprobantePendiente {
+  id: number
+  pago_id: number
+  alumno_nombre: string
+  monto_pagado: string
+  estado_emision: string
+  intentos: number
+  ultimo_error: string | null
 }
 
 export interface EstadoDeuda {
@@ -150,6 +178,16 @@ export const registrarPago = (data: {
   metodo: string
   referencia?: string
 }) => api.post<Pago>('/finanzas/pagos', data)
+
+// Comprobantes (Fase 4B — facturación electrónica)
+export const getComprobante = (pagoId: number) =>
+  api.get<Comprobante>(`/finanzas/pagos/${pagoId}/comprobante`)
+
+export const reintentarComprobante = (pagoId: number) =>
+  api.post<Comprobante>(`/finanzas/pagos/${pagoId}/comprobante/reintentar`, {})
+
+export const getComprobantesPendientes = () =>
+  api.get<ComprobantePendiente[]>('/finanzas/comprobantes/pendientes')
 
 // Estado deuda
 export const getEstadoDeuda = (alumnoId: number) =>

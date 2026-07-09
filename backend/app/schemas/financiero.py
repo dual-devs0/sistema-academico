@@ -150,6 +150,9 @@ class CuotaOut(BaseModel):
     beca_nombre: Optional[str]      # trazabilidad
     fuente_beca: Optional[str]      # trazabilidad
     es_beca_externa: Optional[bool]
+    pago_id: Optional[int] = None                 # último pago registrado (Fase 4B)
+    comprobante_estado: Optional[str] = None       # estado_emision del comprobante fiscal
+    comprobante_url_pdf: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -188,10 +191,29 @@ class PagoOut(BaseModel):
 class ComprobanteOut(BaseModel):
     id: int
     pago_id: int
+    tipo: str
     numero_comprobante: Optional[str]
     cdc: Optional[str]
+    timbrado: Optional[str]
+    url_pdf: Optional[str]
     storage_key: Optional[str]
-    fecha_emision: datetime
+    estado_emision: str
+    intentos: int
+    ultimo_error: Optional[str]
+    fecha_emision: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
+class ComprobantePendienteOut(BaseModel):
+    """Vista para el panel admin de comprobantes en error/pendiente."""
+    id: int
+    pago_id: int
+    alumno_nombre: str
+    monto_pagado: Decimal
+    estado_emision: str
+    intentos: int
+    ultimo_error: Optional[str]
 
     model_config = {"from_attributes": True}
 

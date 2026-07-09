@@ -13,6 +13,7 @@ class User(Base):
 
     nombre = Column(String(120), nullable=False, default="")
     email = Column(String(200), unique=True, nullable=True)
+    cedula = Column(String(20), nullable=True)
     carrera_id = Column(Integer, ForeignKey("carreras.id"), nullable=True)
     es_becado = Column(Boolean, default=False)
     foto_url = Column(String, nullable=True)

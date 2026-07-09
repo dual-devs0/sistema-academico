@@ -1,8 +1,53 @@
 # Changelog Técnico — Sistema Académico UCA V2
 
-> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2 y Fase 3 — todas cerradas.
+> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2, Fase 3, Fase 4 y Fase 4B — todas cerradas.
 
 ---
+
+## Fase 4B — Facturación electrónica guarani.app (2026-07-09) — COMPLETA
+
+**Qué se hizo:** Integración con guarani.app para emitir factura electrónica válida ante la DNIT en cada pago, con degradación con gracia — un fallo del proveedor externo nunca bloquea ni revierte el pago académico. Extiende la tabla `comprobantes` de Fase 4 (que solo tenía campos mínimos, sin lógica de emisión) con el ciclo de vida completo: `estado_emision`, `intentos`, `ultimo_error`, `url_pdf`, `timbrado`. Agrega `users.cedula` (requerido por guarani.app, no existía en el modelo). Job de reintentos cada 10 min (máx. 5 intentos por comprobante) implementado con `asyncio` puro vía `lifespan` de FastAPI — no se agregó ninguna dependencia de scheduler nueva.
+
+Auditado contra el pseudocódigo de diseño en `PLAN_DESARROLLO_UNIVERSIDAD.md` (líneas 583-765) antes de implementar: se corrigieron 3 discrepancias con el código real (`alumno.cedula` no existía, `cuota.saldo` no existe — se reusa `registrar_pago()` existente en vez de duplicar esa lógica, `pago.alumno` no es relationship directa — se accede vía `pago.cuota.alumno`).
+
+Sin credenciales reales de guarani.app disponibles esta sesión (`GUARANI_APP_API_KEY` vacía) — todos los tests mockean la llamada externa; en producción, hasta que se configuren las credenciales, todo comprobante queda en `error` reintentable sin afectar pagos.
+
+**Archivos tocados:**
+- `backend/alembic/versions/t7u8v9w0x1y2_facturacion_electronica.py` — nuevo (users.cedula + comprobantes extendido)
+- `backend/app/models/users.py`, `backend/app/models/financiero.py` — columnas nuevas
+- `backend/app/schemas/financiero.py` — `ComprobanteOut` extendido, `ComprobantePendienteOut` nuevo, `CuotaOut` gana `pago_id`/`comprobante_estado`/`comprobante_url_pdf`
+- `backend/app/services/facturacion_electronica.py` — nuevo (`emitir_factura`, `procesar_facturacion`)
+- `backend/app/services/financiero.py` — `cuota_to_out()` resuelve comprobante del último pago
+- `backend/app/jobs/reintento_facturacion.py` — nuevo (`ciclo_reintentos`)
+- `backend/app/main.py` — `lifespan` con loop de reintentos cada 600s
+- `backend/app/routers/finanzas_router.py` — `crear_pago` dispara facturación en background; 2 endpoints nuevos (`.../comprobante/reintentar`, `/comprobantes/pendientes`)
+- `backend/.env.example`, `.env`, `.env.test` — `GUARANI_APP_API_KEY/PUNTO_EMISION/BASE_URL`
+- `frontend/src/services/finanzasService.ts` — tipo `Comprobante`/`ComprobantePendiente`, wrappers nuevos
+- `frontend/src/pages/MisCuotas.tsx` — badge/link de comprobante, gateado por `estado_emision==='emitido'`
+- `frontend/src/pages/Finanzas.tsx` — tab "Comprobantes" (admin) con reintento manual
+
+**Tests:** 172/172 pasando (sqlite) — 8 nuevos en `TestComprobantes` (`tests/test_financiero.py`): emisión exitosa, `TimeoutException`, `HTTPStatusError`, sin API key, límite de 5 intentos, rol no-admin rechazado, listado admin-only, job de reintentos ignora intentos agotados. Migración `t7u8v9w0x1y2` aplicada en `neondb_test` y `neondb` (confirmado con el usuario antes de tocar prod).
+
+**Pendiente de esta tarea:** credenciales reales de guarani.app (alta de cuenta, punto de emisión) — gestión, no desarrollo. Sin eso, la emisión real no puede probarse end-to-end.
+
+## Fase 4 — Financiero + becas (2026-07-08) — COMPLETA
+
+**Qué se hizo:** Módulo financiero completo: aranceles (`ConceptoArancel`), cuotas con descuento por beca (`Cuota`, aplica el **mayor** % entre becas vigentes del alumno, no suma), pagos inmutables (`Pago`, correcciones vía `pago_ajuste_ref_id`), becas diferenciadas por fuente institucional/externa (`FuenteBeca`, `BecaCatalogo`, `PostulacionBeca`, `BecaActiva`) con flujo de revisión por comité, bloqueo de inscripción por mora leído de `carreras.max_cuotas_mora` (con excepción para beca 100% y override auditado para admin), y exportación Excel de rendición para convenios externos. Todos los montos en `Numeric(12,2)`, nunca float.
+
+*(Documentado retroactivamente el 2026-07-09, junto con el cierre de Fase 4B — no se generó changelog al cerrar esta fase originalmente.)*
+
+**Archivos tocados:**
+- `backend/alembic/versions/s6t7u8v9w0x1_create_financiero_becas.py` — 8 tablas nuevas + `carreras.max_cuotas_mora`
+- `backend/app/models/financiero.py`, `backend/app/schemas/financiero.py` — nuevos
+- `backend/app/services/financiero.py` — `calcular_descuento_beca`, `generar_cuotas_alumno`, `registrar_pago`, `verificar_deuda_inscripcion`, `export_rendicion_excel`
+- `backend/app/routers/finanzas_router.py`, `backend/app/routers/becas_router.py` — nuevos
+- `backend/app/routers/inscripciones_router.py` — integración del bloqueo por mora
+- `frontend/src/pages/MisCuotas.tsx`, `frontend/src/pages/Finanzas.tsx`, `frontend/src/services/finanzasService.ts` — nuevos
+- `frontend/src/pages/Perfil.tsx` — badges/info de becas
+
+**Tests:** ver Fase 4B (suite consolidada, no se registró conteo separado al cierre original de Fase 4).
+
+**Pendiente de esta tarea:** ninguno (facturación electrónica quedó explícitamente diferida a Fase 4B).
 
 ## Fase 3 (backend + frontend) — Expediente académico consolidado (2026-07-08) — COMPLETA
 

@@ -175,10 +175,24 @@ class Comprobante(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     pago_id = Column(Integer, ForeignKey("pagos.id"), nullable=False, unique=True)
+    tipo = Column(String(20), nullable=False, default="factura")
     numero_comprobante = Column(String(50), nullable=True)
-    cdc = Column(String(44), nullable=True)  # DNIT — fase 4B
+    cdc = Column(String(44), nullable=True)  # DNIT
+    timbrado = Column(String(20), nullable=True)
+    url_pdf = Column(String(500), nullable=True)  # PDF servido por guarani.app
     storage_key = Column(String(500), nullable=True)
-    fecha_emision = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    estado_emision = Column(String(20), nullable=False, default="pendiente")
+    # pendiente / emitido / error / reintentando
+    intentos = Column(Integer, nullable=False, default=0)
+    ultimo_error = Column(Text, nullable=True)
+    fecha_emision = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado_emision IN ('pendiente','emitido','error','reintentando')",
+            name="ck_comprobante_estado_emision",
+        ),
+    )
 
     pago = relationship("Pago", back_populates="comprobante")
 

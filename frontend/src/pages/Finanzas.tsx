@@ -3,7 +3,9 @@ import {
   getFuentes, getCatalogoBecas, getPostulaciones, revisarPostulacion,
   getCuotasAlumno, generarCuotas, registrarPago, getConceptos, crearConcepto,
   downloadRendicion, formatGs,
+  getComprobantesPendientes, reintentarComprobante,
   type FuenteBeca, type BecaCatalogo, type Postulacion, type Cuota, type ConceptoArancel,
+  type ComprobantePendiente,
 } from '../services/finanzasService'
 import { emitToast } from '../lib/api'
 
@@ -66,7 +68,7 @@ const css = `
   @media(max-width:700px){ .fin-grid2 { grid-template-columns:1fr; } }
 `
 
-type Tab = 'conceptos' | 'cuotas' | 'pagos' | 'becas' | 'rendicion'
+type Tab = 'conceptos' | 'cuotas' | 'pagos' | 'becas' | 'rendicion' | 'comprobantes'
 
 // ── Sub-componente: Catálogo de Becas (admin) ─────────────────────────
 function TabBecas() {
@@ -338,6 +340,82 @@ function TabConceptos() {
   )
 }
 
+// ── Sub-componente: Comprobantes pendientes/error (Fase 4B) ───────────
+function TabComprobantes() {
+  const [items, setItems] = useState<ComprobantePendiente[]>([])
+  const [loading, setLoading] = useState(false)
+  const [reintentando, setReintentando] = useState<number | null>(null)
+
+  const cargar = () => {
+    setLoading(true)
+    getComprobantesPendientes()
+      .then(setItems)
+      .catch(() => emitToast('Error cargando comprobantes pendientes', 'error'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { cargar() }, [])
+
+  const reintentar = async (pagoId: number) => {
+    setReintentando(pagoId)
+    try {
+      await reintentarComprobante(pagoId)
+      emitToast('Reintento ejecutado', 'success')
+      cargar()
+    } catch {
+      emitToast('Error al reintentar emisión', 'error')
+    } finally {
+      setReintentando(null)
+    }
+  }
+
+  return (
+    <div>
+      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>
+        Comprobantes pendientes o con error
+      </h3>
+      {loading ? (
+        <div style={{ color: 'var(--text-secondary)', padding: 16 }}>Cargando…</div>
+      ) : items.length === 0 ? (
+        <div className="fin-alert" style={{ background: 'rgba(16,185,129,.1)', borderColor: 'rgba(16,185,129,.3)', color: '#10b981' }}>
+          No hay comprobantes pendientes de emisión.
+        </div>
+      ) : (
+        <div className="fin-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="fin-table">
+            <thead>
+              <tr>
+                <th>Pago</th><th>Alumno</th><th>Monto</th><th>Estado</th><th>Intentos</th><th>Último error</th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(c => (
+                <tr key={c.id}>
+                  <td>#{c.pago_id}</td>
+                  <td style={{ fontWeight: 600 }}>{c.alumno_nombre}</td>
+                  <td>{formatGs(c.monto_pagado)}</td>
+                  <td><span className={`fin-estado ${c.estado_emision === 'error' ? 'rechazada' : 'pendiente'}`}>{c.estado_emision}</span></td>
+                  <td>{c.intentos} / 5</td>
+                  <td style={{ maxWidth: 220, fontSize: 11, color: 'var(--text-secondary)' }}>{c.ultimo_error || '—'}</td>
+                  <td>
+                    <button
+                      className="fin-btn secondary"
+                      disabled={c.intentos >= 5 || reintentando === c.pago_id}
+                      onClick={() => reintentar(c.pago_id)}
+                    >
+                      {reintentando === c.pago_id ? 'Reintentando…' : '↻ Reintentar'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────
 export default function Finanzas() {
   const [tab, setTab] = useState<Tab>('conceptos')
@@ -348,6 +426,7 @@ export default function Finanzas() {
     { key: 'pagos', label: '💰 Pagos' },
     { key: 'becas', label: '🎓 Becas' },
     { key: 'rendicion', label: '📊 Rendición' },
+    { key: 'comprobantes', label: '🧾 Comprobantes' },
   ]
 
   return (
@@ -374,6 +453,7 @@ export default function Finanzas() {
           {tab === 'pagos' && <div style={{ color: 'var(--text-secondary)' }}>Registro de pagos disponible vía API. UI completa en Fase 4B.</div>}
           {tab === 'becas' && <TabBecas />}
           {tab === 'rendicion' && <TabRendicion />}
+          {tab === 'comprobantes' && <TabComprobantes />}
         </div>
       </div>
     </>

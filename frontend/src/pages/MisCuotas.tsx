@@ -54,6 +54,13 @@ const css = `
   .mc-estado-badge.pagada { background:rgba(16,185,129,.15); color:#10b981; }
   .mc-estado-badge.anulada { background:rgba(156,163,175,.15); color:#9ca3af; }
   .mc-vence { font-size:11px; color:var(--text-secondary); margin-top:4px; }
+  .mc-comprobante { margin-top:8px; font-size:12px; }
+  .mc-comprobante-link {
+    color:#10b981; font-weight:700; text-decoration:none;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .mc-comprobante-link:hover { text-decoration:underline; }
+  .mc-comprobante-pendiente { color:var(--text-secondary); font-style:italic; }
   .mc-empty { text-align:center; padding:48px; color:var(--text-secondary); font-size:15px; }
   @media(max-width:700px){ .mc-summary { grid-template-columns:1fr; } .mc-card { grid-template-columns:1fr; } .mc-montos { text-align:left; } }
 `
@@ -214,6 +221,24 @@ export default function MisCuotas() {
                         {estadoLabel(cuota.estado)}
                       </span>
                     </div>
+                    {cuota.estado === 'pagada' && (
+                      <div className="mc-comprobante">
+                        {cuota.comprobante_estado === 'emitido' && cuota.comprobante_url_pdf ? (
+                          <a
+                            className="mc-comprobante-link"
+                            href={cuota.comprobante_url_pdf}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            ⬇ Descargar comprobante
+                          </a>
+                        ) : (
+                          <span className="mc-comprobante-pendiente">
+                            Comprobante en proceso, disponible en breve
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )

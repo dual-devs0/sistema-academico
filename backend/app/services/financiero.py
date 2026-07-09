@@ -152,6 +152,17 @@ def cuota_to_out(cuota: Cuota) -> CuotaOut:
         beca_nombre = cuota.beca_aplicada.beca.nombre if cuota.beca_aplicada.beca else None
         fuente_beca = cuota.beca_aplicada.fuente.nombre if cuota.beca_aplicada.fuente else None
         es_beca_externa = cuota.beca_aplicada.fuente.es_externa if cuota.beca_aplicada.fuente else None
+
+    pago_id = None
+    comprobante_estado = None
+    comprobante_url_pdf = None
+    if cuota.pagos:
+        ultimo_pago = max(cuota.pagos, key=lambda p: p.fecha_pago)
+        pago_id = ultimo_pago.id
+        if ultimo_pago.comprobante:
+            comprobante_estado = ultimo_pago.comprobante.estado_emision
+            comprobante_url_pdf = ultimo_pago.comprobante.url_pdf
+
     return CuotaOut(
         id=cuota.id,
         alumno_id=cuota.alumno_id,
@@ -165,6 +176,9 @@ def cuota_to_out(cuota: Cuota) -> CuotaOut:
         beca_nombre=beca_nombre,
         fuente_beca=fuente_beca,
         es_beca_externa=es_beca_externa,
+        pago_id=pago_id,
+        comprobante_estado=comprobante_estado,
+        comprobante_url_pdf=comprobante_url_pdf,
     )
 
 

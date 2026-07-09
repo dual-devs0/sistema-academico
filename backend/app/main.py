@@ -1,11 +1,15 @@
+import asyncio
+import logging
 import os
 import sqlite3
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()  # carga .env antes de que cualquier módulo lea os.getenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.jobs.reintento_facturacion import ciclo_reintentos
 from app.routers import (
     users, auth, materias, inscripciones, test as test_router,
     carreras, asistencias, puntajes, apuntes, eventos, programas, reportes, boleta, alumno, foro,
@@ -18,10 +22,36 @@ from app.routers import (
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 os.makedirs(os.path.join(STATIC_DIR, "avatars"), exist_ok=True)
 
+logger = logging.getLogger(__name__)
+
+REINTENTO_INTERVALO_SEGUNDOS = 600  # Fase 4B: job de reintentos de facturación
+
+
+async def _loop_reintentos_facturacion():
+    while True:
+        await asyncio.sleep(REINTENTO_INTERVALO_SEGUNDOS)
+        try:
+            await ciclo_reintentos()
+        except Exception as exc:
+            logger.error("Loop de reintentos de facturación falló: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_loop_reintentos_facturacion())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
 app = FastAPI(
     title="Sistema Academico",
     description="API para gestion academica de la Universidad Catolica",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
