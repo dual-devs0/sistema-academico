@@ -84,26 +84,33 @@ def login(
     db.commit()
 
     _set_refresh_cookie(response, raw)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": raw,  # nuevo — para clientes móviles (SecureStore)
+    }
 
 
 @router.post("/refresh")
 def refresh(
     response: Response,
+    body: schemas.user.RefreshRequest | None = None,
     db: Session = Depends(database.get_db),
     refresh_token: str | None = Cookie(default=None),
 ):
-    if not refresh_token:
+    # Precedencia: body si viene, sino cookie. Si ninguno → 401.
+    token = (body.refresh_token if body else None) or refresh_token
+    if not token:
         raise HTTPException(status_code=401, detail="No hay refresh token")
 
-    hashed = hashlib.sha256(refresh_token.encode()).hexdigest()
+    hashed = hashlib.sha256(token.encode()).hexdigest()
     now = datetime.now(timezone.utc)
 
     rt = (
         db.query(RefreshToken)
         .filter(
             RefreshToken.token_hash == hashed,
-            not RefreshToken.revocado,
+            RefreshToken.revocado == False,  # noqa: E712 — comparación SQL, no Python truthiness
             RefreshToken.expira_en > now,
         )
         .first()
@@ -131,7 +138,11 @@ def refresh(
     db.commit()
 
     _set_refresh_cookie(response, raw)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": raw,  # nuevo — refresh rotado, para móvil
+    }
 
 
 @router.post("/logout")
