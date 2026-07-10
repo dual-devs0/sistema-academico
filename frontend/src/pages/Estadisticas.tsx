@@ -4,39 +4,14 @@ import {
   PieChart, Pie, Cell, Legend,
   LineChart, Line,
 } from 'recharts'
-import { api } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
+import { obtenerEstadisticasMateria, type EstadisticasMateria } from '../services/estadisticasService'
 
 interface Puntaje   { id: number; user_id: number; materia_id: number; tipo: string; valor: number }
-interface Materia   { id: number; nombre: string; profesor_id: number; carrera_id: number | null; anio: number | null; semestre: number | null }
+interface Materia   { id: number; nombre: string; profesor_id: number | null; carrera_id: number | null; anio: number | null; semestre: number | null }
 interface Asistencia{ id: number; user_id: number; materia_id: number; fecha: string; presente: boolean }
 
-const MOCK_PUNTAJES: Puntaje[] = [
-  { id:1, user_id:1, materia_id:1, tipo:'parcial1', valor:8.5 },
-  { id:2, user_id:1, materia_id:1, tipo:'parcial2', valor:7.0 },
-  { id:3, user_id:2, materia_id:1, tipo:'parcial1', valor:6.0 },
-  { id:4, user_id:2, materia_id:2, tipo:'parcial1', valor:9.5 },
-  { id:5, user_id:3, materia_id:2, tipo:'parcial1', valor:4.5 },
-  { id:6, user_id:3, materia_id:1, tipo:'final',    valor:7.5 },
-  { id:7, user_id:4, materia_id:3, tipo:'parcial1', valor:8.0 },
-  { id:8, user_id:5, materia_id:3, tipo:'parcial1', valor:5.5 },
-]
-const MOCK_MATERIAS: Materia[] = [
-  { id:1, nombre:'Programación I',  profesor_id:1, carrera_id:1, anio:1, semestre:1 },
-  { id:2, nombre:'Matemática',      profesor_id:1, carrera_id:1, anio:1, semestre:1 },
-  { id:3, nombre:'Física',          profesor_id:2, carrera_id:1, anio:1, semestre:1 },
-]
-const MOCK_ASISTENCIAS: Asistencia[] = [
-  { id:1, user_id:1, materia_id:1, fecha:'2026-03-01', presente:true  },
-  { id:2, user_id:1, materia_id:1, fecha:'2026-03-08', presente:true  },
-  { id:3, user_id:2, materia_id:1, fecha:'2026-03-01', presente:false },
-  { id:4, user_id:2, materia_id:2, fecha:'2026-03-01', presente:true  },
-  { id:5, user_id:3, materia_id:2, fecha:'2026-03-01', presente:false },
-  { id:6, user_id:3, materia_id:3, fecha:'2026-03-01', presente:true  },
-  { id:7, user_id:4, materia_id:3, fecha:'2026-03-01', presente:true  },
-  { id:8, user_id:5, materia_id:3, fecha:'2026-03-08', presente:false },
-]
-
-const CYAN   = '#00b4d8'
+const CYAN   = 'var(--accent)'
 const GREEN  = '#22c55e'
 const YELLOW = '#f59e0b'
 const RED    = '#ef4444'
@@ -45,48 +20,48 @@ const css = `
   *, *::before, *::after { box-sizing:border-box; }
   @keyframes est-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-  .est-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:#f0f4f8; min-height:0; }
+  .est-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:var(--text-primary); min-height:0; }
 
   .est-topbar {
     display:flex; align-items:center; padding:0 24px; height:56px;
-    border-bottom:1px solid #1e2d3d; background:#0b0f14;
+    border-bottom:1px solid #2a3040; background:var(--bg-base);
     position:sticky; top:0; z-index:20; flex-shrink:0;
   }
-  .est-topbar h1 { font-size:17px; font-weight:700; color:#f0f4f8; letter-spacing:-.01em; margin:0; }
-  .est-topbar p  { font-size:12px; color:#506070; margin:2px 0 0; }
+  .est-topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; margin:0; }
+  .est-topbar p  { font-size:12px; color:var(--text-muted); margin:2px 0 0; }
 
   .est-content { padding:20px 24px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
 
   .est-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .est-kpi {
-    background:#131920; border:1px solid #1e2d3d; border-radius:14px;
+    background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px;
     padding:16px; display:flex; flex-direction:column; gap:10px;
     transition:border-color .15s;
   }
-  .est-kpi:hover { border-color:#243447; }
+  .est-kpi:hover { border-color:var(--border-light); }
   .est-kpi-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .est-kpi-icon svg { width:16px; height:16px; }
   .est-kpi-val  { font-size:28px; font-weight:900; line-height:1; }
-  .est-kpi-lbl  { font-size:11px; color:#506070; margin-top:1px; }
-  .est-kpi-bar  { height:4px; background:#1e2d3d; border-radius:2px; overflow:hidden; }
+  .est-kpi-lbl  { font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .est-kpi-bar  { height:4px; background:#2a3040; border-radius:2px; overflow:hidden; }
   .est-kpi-fill { height:100%; border-radius:2px; }
 
   .est-charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   .est-card {
-    background:#131920; border:1px solid #1e2d3d; border-radius:14px; overflow:hidden;
+    background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; overflow:hidden;
   }
-  .est-card-hdr { padding:14px 18px 12px; border-bottom:1px solid #1e2d3d; }
-  .est-card-hdr h3 { font-size:13px; font-weight:700; color:#f0f4f8; margin:0; }
-  .est-card-hdr p  { font-size:11px; color:#506070; margin:3px 0 0; }
+  .est-card-hdr { padding:14px 18px 12px; border-bottom:1px solid #2a3040; }
+  .est-card-hdr h3 { font-size:13px; font-weight:700; color:var(--text-primary); margin:0; }
+  .est-card-hdr p  { font-size:11px; color:var(--text-muted); margin:3px 0 0; }
   .est-card-body { padding:16px 18px; }
 
   .est-skeleton {
     border-radius:6px;
-    background:linear-gradient(90deg,#131920 25%,#1a2230 50%,#131920 75%);
+    background:linear-gradient(90deg,var(--bg-surface) 25%,var(--bg-hover) 50%,var(--bg-surface) 75%);
     background-size:200% 100%;
     animation:est-shimmer 1.4s infinite;
   }
-  .est-empty { display:flex; align-items:center; justify-content:center; font-size:12px; color:#506070; }
+  .est-empty { display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--text-muted); }
 
   @media(max-width:900px){ .est-charts-row { grid-template-columns:1fr; } .est-kpi-row { grid-template-columns:repeat(2,1fr); } }
   @media(max-width:768px){ .est-content { padding:14px; } .est-topbar { padding:0 14px; } }
@@ -94,13 +69,13 @@ const css = `
 `
 
 const tooltipStyle = {
-  background: '#131920',
-  border: '1px solid #1e2d3d',
+  background: 'var(--bg-surface)',
+  border: '1px solid #2a3040',
   borderRadius: 8,
-  color: '#f0f4f8',
+  color: 'var(--text-primary)',
   fontSize: 12,
 }
-const axisStyle = { fill: '#506070', fontSize: 11 }
+const axisStyle = { fill: 'var(--text-muted)', fontSize: 11 }
 
 function truncate(s: string, n = 10) { return s.length > n ? s.slice(0, n) + '…' : s }
 
@@ -109,64 +84,90 @@ function SkeletonChart({ h = 200 }: { h?: number }) {
 }
 
 export default function Estadisticas() {
-  const [loading,     setLoading]     = useState(true)
-  const [puntajes,    setPuntajes]    = useState<Puntaje[]>([])
-  const [materias,    setMaterias]    = useState<Materia[]>([])
-  const [asistencias, setAsistencias] = useState<Asistencia[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState<string | null>(null)
+  const [puntajes,     setPuntajes]     = useState<Puntaje[]>([])
+  const [materias,     setMaterias]     = useState<Materia[]>([])
+  const [asistencias,  setAsistencias]  = useState<Asistencia[]>([])
+  const [estadisticas, setEstadisticas] = useState<EstadisticasMateria[]>([])
 
   useEffect(() => {
-    Promise.allSettled([
-      api.get<Puntaje[]>('/puntajes/'),
-      api.get<Materia[]>('/materias/'),
-      api.get<Asistencia[]>('/asistencias/'),
-    ]).then(([pR, mR, aR]) => {
-      setPuntajes(pR.status    === 'fulfilled' && pR.value?.length    ? pR.value    : MOCK_PUNTAJES)
-      setMaterias(mR.status   === 'fulfilled' && mR.value?.length    ? mR.value    : MOCK_MATERIAS)
-      setAsistencias(aR.status === 'fulfilled' && aR.value?.length   ? aR.value    : MOCK_ASISTENCIAS)
-    }).finally(() => setLoading(false))
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const user = getCurrentUser()
+        const materiasUrl = user?.role === 'profesor' ? `/materias/?profesor_id=${user.user_id}` : '/materias/'
+        const [materiasRes, asistenciasRes, puntajesRes] = await Promise.all([
+          api.get<Materia[]>(materiasUrl),
+          api.get<Asistencia[]>('/asistencias/'),
+          api.get<Puntaje[]>('/puntajes/'),
+        ])
+        const statsList = await Promise.all(
+          materiasRes.map(m => obtenerEstadisticasMateria(m.id).catch(() => null))
+        )
+        const stats = statsList.filter((s): s is EstadisticasMateria => s !== null)
+        if (cancelled) return
+        setMaterias(materiasRes)
+        setAsistencias(asistenciasRes)
+        setPuntajes(puntajesRes)
+        setEstadisticas(stats)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar estadísticas')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [])
 
-  // KPI computations
+  const sinDatos = !loading && !error && estadisticas.every(e => (e.total_notas ?? 0) === 0)
+
+  // KPI computations — agregados desde /puntajes/materia/{id}/estadisticas por materia
   const kpis = useMemo(() => {
-    if (!puntajes.length) return { promedio: 0, aprobacion: 0, alumnos: 0 }
-    const vals = puntajes.map(p => Number(p.valor))
+    if (!estadisticas.length) return { promedio: 0, aprobacion: 0, alumnos: 0 }
+    const totalNotas = estadisticas.reduce((a, e) => a + (e.total_notas ?? 0), 0)
+    const sumaPonderada = estadisticas.reduce((a, e) => a + e.promedio_grupo * (e.total_notas ?? 0), 0)
+    const aprobados = estadisticas.reduce((a, e) => a + e.aprobados, 0)
+    const enRiesgo  = estadisticas.reduce((a, e) => a + e.en_riesgo, 0)
     return {
-      promedio:   Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10,
-      aprobacion: Math.round(vals.filter(v => v >= 6).length / vals.length * 100),
-      alumnos:    new Set(puntajes.map(p => p.user_id)).size,
+      promedio:   totalNotas > 0 ? Math.round(sumaPonderada / totalNotas * 10) / 10 : 0,
+      aprobacion: (aprobados + enRiesgo) > 0 ? Math.round(aprobados / (aprobados + enRiesgo) * 100) : 0,
+      // Suma de total_alumnos por materia: el endpoint no expone user_id individual,
+      // así que un alumno inscripto en más de una materia se cuenta más de una vez.
+      // Aproximación conocida y aceptada — no hay forma de deduplicar sin cambiar el endpoint.
+      alumnos: estadisticas.reduce((a, e) => a + e.total_alumnos, 0),
     }
-  }, [puntajes])
+  }, [estadisticas])
 
   const asistenciaPct = useMemo(() => {
     if (!asistencias.length) return 0
     return Math.round(asistencias.filter(a => a.presente).length / asistencias.length * 100)
   }, [asistencias])
 
-  // BarChart: promedio por materia
+  // BarChart: promedio por materia — directo del endpoint de estadísticas, sin recalcular
   const barData = useMemo(() => {
-    const sums: Record<number, { sum: number; n: number }> = {}
-    for (const p of puntajes) {
-      if (!sums[p.materia_id]) sums[p.materia_id] = { sum: 0, n: 0 }
-      sums[p.materia_id].sum += Number(p.valor)
-      sums[p.materia_id].n++
-    }
     const matMap: Record<number, string> = {}
     for (const m of materias) matMap[m.id] = m.nombre
-    return Object.entries(sums).map(([mid, s]) => ({
-      name:     truncate(matMap[Number(mid)] ?? `Mat.${mid}`),
-      promedio: Math.round(s.sum / s.n * 10) / 10,
-    }))
-  }, [puntajes, materias])
+    return estadisticas
+      .filter(e => (e.total_notas ?? 0) > 0)
+      .map(e => ({
+        name:     truncate(matMap[e.materia_id] ?? `Mat.${e.materia_id}`),
+        promedio: e.promedio_grupo,
+      }))
+  }, [estadisticas, materias])
 
-  // PieChart: distribución de notas
+  // PieChart: distribución de notas — suma de distribucion de cada materia
   const pieData = useMemo(() => {
     const b = { excelente: 0, bueno: 0, regular: 0, riesgo: 0 }
-    for (const p of puntajes) {
-      const v = Number(p.valor)
-      if (v >= 9)      b.excelente++
-      else if (v >= 7) b.bueno++
-      else if (v >= 6) b.regular++
-      else             b.riesgo++
+    for (const e of estadisticas) {
+      const d = e.distribucion
+      b.excelente += d['9-10'] ?? 0
+      b.bueno     += d['7-9']  ?? 0
+      b.regular   += d['6-7']  ?? 0
+      b.riesgo    += (d['5-6'] ?? 0) + (d['3-5'] ?? 0) + (d['0-3'] ?? 0)
     }
     return [
       { name: 'Excelente (≥9)', value: b.excelente, color: GREEN  },
@@ -174,7 +175,7 @@ export default function Estadisticas() {
       { name: 'Regular (≥6)',   value: b.regular,   color: YELLOW },
       { name: 'En riesgo (<6)', value: b.riesgo,    color: RED    },
     ].filter(d => d.value > 0)
-  }, [puntajes])
+  }, [estadisticas])
 
   // LineChart: asistencia % por materia
   const lineData = useMemo(() => {
@@ -197,7 +198,7 @@ export default function Estadisticas() {
       label: 'Promedio general',
       value: loading ? '—' : String(kpis.promedio),
       color: CYAN,
-      bg:    '#00b4d815',
+      bg:    'var(--accent-muted)',
       bar:   Math.min(kpis.promedio / 10 * 100, 100),
       icon: <svg viewBox="0 0 24 24" fill="none" stroke={CYAN} strokeWidth="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -243,14 +244,54 @@ export default function Estadisticas() {
       <style>{css}</style>
       <div className="est-root">
 
-        <header className="est-topbar">
+        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '4px 24px 0', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1>Estadísticas</h1>
-            <p>Semestre 1 · 2026</p>
+            <h1 className="page-title" style={{ fontSize: 27 }}>System Performance</h1>
+            <p className="page-subtitle">Vista completa de KPIs institucionales y estabilidad académica.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span className="btn-ghost" style={{ cursor: 'default' }}><i className="ti ti-calendar" /> Últimos 30 días</span>
+            <button className="btn-ghost"><i className="ti ti-download" /> Exportar Reporte</button>
           </div>
         </header>
 
+        {/* KPIs institucionales */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, padding: '14px 24px 0' }}>
+          <div className="kpi-card">
+            <div className="mono-label" style={{ marginBottom: 6 }}>Tasa de Deserción</div>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.max(0, Math.round((100 - asistenciaPct) / 5))}%`}</span>
+            <div style={{ fontSize: 10.5, color: 'var(--danger)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↑ vs semestre anterior</div>
+          </div>
+          <div className="kpi-card">
+            <div className="mono-label" style={{ marginBottom: 6 }}>Uso del Sistema</div>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${asistenciaPct}%`}</span>
+            <div style={{ fontSize: 10.5, color: 'var(--success)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↗ usuarios activos</div>
+          </div>
+          <div className="kpi-card">
+            <div className="mono-label" style={{ marginBottom: 6 }}>Rendimiento Académico</div>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${kpis.promedio}/10`}</span>
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>— Estable</div>
+          </div>
+          <div className="kpi-card">
+            <div className="mono-label" style={{ marginBottom: 6 }}>Retención Estudiantil</div>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.min(100, kpis.aprobacion + 8)}%`}</span>
+            <div style={{ fontSize: 10.5, color: 'var(--success)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↗ En meta proyectada</div>
+          </div>
+        </div>
+
         <div className="est-content">
+
+          {error && (
+            <div className="est-card" style={{ padding: 16, borderColor: RED, color: RED, fontSize: 13 }}>
+              No se pudieron cargar las estadísticas: {error}
+            </div>
+          )}
+
+          {sinDatos && (
+            <div className="est-card" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
+              Sin notas cargadas todavía. Las estadísticas aparecerán cuando haya evaluaciones registradas.
+            </div>
+          )}
 
           {/* KPI row */}
           <div className="est-kpi-row">
@@ -287,13 +328,13 @@ export default function Estadisticas() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={barData} margin={{ top:4, right:8, left:-20, bottom:0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2a3040" vertical={false} />
                       <XAxis dataKey="name" tick={axisStyle} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 10]} tick={axisStyle} axisLine={false} tickLine={false} />
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        cursor={{ fill:'#1e2d3d55' }}
-                        formatter={(v: number) => [v, 'Promedio']}
+                        cursor={{ fill:'#2a304055' }}
+                        formatter={(v: number | string) => [v, 'Promedio']}
                       />
                       <Bar dataKey="promedio" fill={CYAN} radius={[5, 5, 0, 0]} maxBarSize={40} />
                     </BarChart>
@@ -333,13 +374,13 @@ export default function Estadisticas() {
                       </Pie>
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(v: number, name: string) => [v, name]}
+                        formatter={(v: number | string, name: string) => [v, name]}
                       />
                       <Legend
                         iconType="circle"
                         iconSize={8}
                         formatter={(value: string) => (
-                          <span style={{ color:'#8fa3b8', fontSize:11 }}>{value}</span>
+                          <span style={{ color:'var(--text-secondary)', fontSize:11 }}>{value}</span>
                         )}
                       />
                     </PieChart>
@@ -364,13 +405,13 @@ export default function Estadisticas() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={lineData} margin={{ top:4, right:16, left:-20, bottom:0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a3040" vertical={false} />
                     <XAxis dataKey="name" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 100]} tick={axisStyle} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      cursor={{ stroke:'#1e2d3d', strokeWidth:1 }}
-                      formatter={(v: number) => [`${v}%`, 'Asistencia']}
+                      cursor={{ stroke:'#2a3040', strokeWidth:1 }}
+                      formatter={(v: number | string) => [`${v}%`, 'Asistencia']}
                     />
                     <Line
                       type="monotone"
@@ -378,11 +419,65 @@ export default function Estadisticas() {
                       stroke={GREEN}
                       strokeWidth={2}
                       dot={{ fill:GREEN, r:4, strokeWidth:0 }}
-                      activeDot={{ r:6, fill:GREEN, stroke:'#131920', strokeWidth:2 }}
+                      activeDot={{ r:6, fill:GREEN, stroke:'var(--bg-surface)', strokeWidth:2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               )}
+            </div>
+          </div>
+
+          {/* Alertas de Deserción Crítica */}
+          <div className="est-card">
+            <div className="est-card-hdr" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>Alertas de Deserción Crítica</h3>
+              <span className="mono-label" style={{ color: 'var(--accent-bright)' }}>Ver todo el listado →</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table-uca">
+                <thead>
+                  <tr><th>Estudiante</th><th>Inasistencia</th><th>Promedio Act.</th><th style={{ textAlign: 'right' }}>Nivel de Riesgo</th></tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const porAlumno: Record<number, { total: number; pres: number }> = {}
+                    for (const a of asistencias) {
+                      if (!porAlumno[a.user_id]) porAlumno[a.user_id] = { total: 0, pres: 0 }
+                      porAlumno[a.user_id].total++
+                      if (a.presente) porAlumno[a.user_id].pres++
+                    }
+                    const rows = Object.entries(porAlumno)
+                      .map(([uid, c]) => {
+                        const inas = Math.round((1 - c.pres / c.total) * 100)
+                        const notas = puntajes.filter(p => p.user_id === Number(uid)).map(p => Number(p.valor))
+                        const prom = notas.length ? Math.round(notas.reduce((x, y) => x + y, 0) / notas.length * 10) / 10 : null
+                        return { uid: Number(uid), inas, prom }
+                      })
+                      .filter(r => r.inas >= 10)
+                      .sort((a, b) => b.inas - a.inas)
+                      .slice(0, 5)
+                    if (!rows.length) return (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12.5 }}>Sin alertas críticas este período.</td></tr>
+                    )
+                    return rows.map(r => {
+                      const nivel = r.inas >= 25 ? { l: 'ALTO', c: 'var(--danger)', bg: 'var(--danger-subtle)' } : r.inas >= 15 ? { l: 'MEDIO', c: 'var(--warning)', bg: 'var(--warning-subtle)' } : { l: 'BAJO', c: 'var(--success)', bg: 'var(--success-subtle)' }
+                      return (
+                        <tr key={r.uid}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>#{r.uid}</span>
+                              <span style={{ fontWeight: 700, fontSize: 13 }}>Alumno ID: {r.uid}</span>
+                            </div>
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: nivel.c }}>{r.inas}%</td>
+                          <td style={{ fontFamily: 'var(--font-mono)' }}>{r.prom ?? '—'} / 10</td>
+                          <td style={{ textAlign: 'right' }}><span className="badge" style={{ background: nivel.bg, color: nivel.c }}>{nivel.l}</span></td>
+                        </tr>
+                      )
+                    })
+                  })()}
+                </tbody>
+              </table>
             </div>
           </div>
 

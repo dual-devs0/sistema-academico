@@ -30,6 +30,16 @@ fastapi-mail
 aiofiles
 email-validator
 
+# Storage (Cloudflare R2 / S3-compatible)
+boto3>=1.34
+
+# Financiero — fechas y exportación
+python-dateutil
+openpyxl
+
 # Pruebas
 pytest
+pytest-asyncio
+pytest-mock
 httpx
+python-multipart

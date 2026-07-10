@@ -19,10 +19,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import Base and all models so every table is registered in metadata
-from app.database import Base
-from app.models import (  # noqa: F401
+from app.database import Base  # noqa: E402
+from app.models import (  # noqa: F401, E402
     user,
     materia,
+    oferta_materia,
     inscripcion,
     carrera,
     asistencia,
@@ -30,6 +31,13 @@ from app.models import (  # noqa: F401
     apunte,
     evento_calendario,
     temario,
+    recordatorio_docente,
+    pensum_materia,
+    correlatividad,
+    avance_alumno_pensum,
+    expediente_materia,
+    expediente_semestre,
+    regularidad_alumno,
 )
 
 target_metadata = Base.metadata

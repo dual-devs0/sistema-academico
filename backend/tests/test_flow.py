@@ -12,7 +12,7 @@ def auth(token: str) -> dict:
 def test_root(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "API Sistema Académico funcionando"}
+    assert response.json() == {"message": "API Sistema Academico funcionando"}
 
 
 def test_user_flow(client, seed, tokens):
@@ -30,11 +30,22 @@ def test_user_flow(client, seed, tokens):
     assert response.status_code == 200
     assert response.json()["username"] == "flow_user"
 
-    # Admin creates a materia (profesor_id must be an existing user)
-    materia_data = {"nombre": "Álgebra Avanzada", "profesor_id": seed["profesor"].id}
+    # Admin creates a materia (catalogo, sin profesor asignado todavia)
+    materia_data = {"nombre": "Álgebra Avanzada"}
     response = client.post("/materias/", json=materia_data, headers=headers)
     assert response.status_code == 200
+    materia_id = response.json()["id"]
     assert response.json()["nombre"] == "Álgebra Avanzada"
+
+    # Admin asigna profesor a la materia para el periodo actual (oferta)
+    oferta_data = {
+        "materia_id": materia_id,
+        "profesor_id": seed["profesor"].id,
+        "periodo": "2026-1",
+    }
+    response = client.post("/materias/ofertas", json=oferta_data, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["profesor_id"] == seed["profesor"].id
 
 
 def test_alumno_flow(client, seed, tokens):

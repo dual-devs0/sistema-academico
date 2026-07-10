@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.production
+.env.test
 
 # Dependencias
 node_modules/
@@ -33,3 +34,25 @@ coverage/
 
 # Docker volumes locales
 postgres_data/
+
+# Base de datos SQLite local
+*.db
+*.sqlite
+*.sqlite3
+
+# Sesiones de Claude / IDE local
+.claude/
+
+# Archivos de borrador
+mark.txt
+
+# Backups de DB locales (pueden contener datos sensibles)
+backend/backup_*.json
+
+# Venv de Python (backend)
+backend/venv/
+venv/
+
+# uploaded avatars (runtime user content)
+backend/static/avatars/*
+!backend/static/avatars/.gitkeep

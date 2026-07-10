@@ -18,10 +18,16 @@ def resumen(
     _=Depends(get_admin_user),
 ):
     return {
-        "total_alumnos":    db.query(models.user.User).filter(models.user.User.role == "alumno").count(),
-        "total_becados":    db.query(models.user.User).filter(models.user.User.es_becado == True).count(),
-        "total_materias":   db.query(models.materia.Materia).count(),
-        "total_profesores": db.query(models.user.User).filter(models.user.User.role == "profesor").count(),
+        "total_alumnos": db.query(models.user.User)
+        .filter(models.user.User.role == "alumno")
+        .count(),
+        "total_becados": db.query(models.user.User)
+        .filter(models.user.User.es_becado)
+        .count(),
+        "total_materias": db.query(models.materia.Materia).count(),
+        "total_profesores": db.query(models.user.User)
+        .filter(models.user.User.role == "profesor")
+        .count(),
     }
 
 
@@ -36,7 +42,9 @@ def por_carrera(
     for c in carreras:
         alumnos = (
             db.query(models.user.User)
-            .filter(models.user.User.role == "alumno", models.user.User.carrera_id == c.id)
+            .filter(
+                models.user.User.role == "alumno", models.user.User.carrera_id == c.id
+            )
             .all()
         )
         alumno_ids = [a.id for a in alumnos]
@@ -52,11 +60,13 @@ def por_carrera(
                 db.query(models.asistencia.Asistencia)
                 .filter(
                     models.asistencia.Asistencia.user_id.in_(alumno_ids),
-                    models.asistencia.Asistencia.presente == True,
+                    models.asistencia.Asistencia.presente,
                 )
                 .count()
             )
-            asistencia_pct = round((pres_asist / total_asist * 100) if total_asist > 0 else 0.0, 1)
+            asistencia_pct = round(
+                (pres_asist / total_asist * 100) if total_asist > 0 else 0.0, 1
+            )
 
             puntajes = (
                 db.query(models.puntaje.Puntaje)
@@ -81,13 +91,15 @@ def por_carrera(
             aprobados_pct = 0.0
             en_riesgo = 0
 
-        result.append({
-            "carrera":        c.nombre,
-            "total_alumnos":  total_alumnos,
-            "asistencia_pct": asistencia_pct,
-            "aprobados_pct":  aprobados_pct,
-            "en_riesgo":      en_riesgo,
-        })
+        result.append(
+            {
+                "carrera": c.nombre,
+                "total_alumnos": total_alumnos,
+                "asistencia_pct": asistencia_pct,
+                "aprobados_pct": aprobados_pct,
+                "en_riesgo": en_riesgo,
+            }
+        )
 
     return result
 
@@ -97,4 +109,4 @@ def becados(
     db: Session = Depends(database.get_db),
     _=Depends(get_admin_user),
 ):
-    return db.query(models.user.User).filter(models.user.User.es_becado == True).all()
+    return db.query(models.user.User).filter(models.user.User.es_becado).all()
