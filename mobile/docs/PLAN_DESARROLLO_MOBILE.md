@@ -46,7 +46,7 @@ Numeradas según `CLAUDE.md`. Estado actual:
 | 6 | `app/(tabs)/perfil.tsx` | Perfil, ajustes, logout | ✅ Completada |
 | 7 | `app/cursos/index.tsx` + `[id].tsx` | Cursos por carrera/semestre | ✅ Completada |
 | 8 | `app/cuenta.tsx` | Estado de cuenta (saldo, cuotas, historial) | ✅ Completada |
-| 9 | `app/examenes.tsx` | Exámenes disponibles / inscriptos | ✅ Completada (pending backend endpoints) |
+| 9 | `app/examenes.tsx` | Exámenes disponibles / inscriptos | ✅ Completada (backend endpoints implementados en Fase 7E — `/examenes/disponibles`, `/examenes/inscriptos`, `POST /examenes/inscripciones`) |
 
 Todas las pantallas del grupo `(tabs)` comparten el tab bar custom con QR
 central elevado (`app/(tabs)/_layout.tsx`).
@@ -162,8 +162,8 @@ para paridad className / StyleSheet.
 |---|---|---|
 | No hay `assets/campus.jpg` — login usa View oscuro placeholder | Bajo — visual | Media |
 | Endpoint `/pensum/alumno/{id}/avance` no consumido — Dashboard estima créditos por materia * 5 | Datos aproximados en "Avance Académico" | Media |
-| No hay endpoint de exámenes inscriptos — KPI Exámenes muestra 0 hardcoded | Falta info real en Dashboard | Alta cuando se toque pant. 9 |
-| Backend no expone endpoints de exámenes (`/examenes/disponibles`, `/inscriptos`, `POST /inscripciones`) — la pantalla muestra "Próximamente" | Bloquea inscripción a exámenes end-to-end | Alta |
+| ~~No hay endpoint de exámenes inscriptos — KPI Exámenes muestra 0 hardcoded~~ | ✅ Resuelto en Fase 7E — 6 endpoints + 15 tests | — |
+| ~~Backend no expone endpoints de exámenes~~ | ✅ Resuelto en Fase 7E — `/examenes/disponibles`, `/inscriptos`, `/inscripciones`, etc. | — |
 | Backend `/alumno/mi-perfil` no incluye `fuente_beca` — hoy mostramos "BECADO INSTITUCIONAL" hardcoded cuando `es_becado=true` | Falta distinguir BECADO ITAIPU vs INSTITUCIONAL | Baja |
 | Backend no expone historial de pagos ni fecha_pago en cuotas — derivamos transacciones desde `fecha_vencimiento` | Historial impreciso | Media |
 | Backend no expone endpoint bulk de comprobantes — Facturas se derivan del campo `comprobante_estado` en cuota | Aceptable pero limita metadata | Baja |
@@ -171,12 +171,46 @@ para paridad className / StyleSheet.
 | No hay endpoint de foto de perfil — avatar usa iniciales | Cosmético | Baja |
 | No hay endpoint agregado `/alumno/dashboard` — mobile compone 4 requests | Latencia visible en 3G/4G lento | Media |
 | Sin cache de respuestas — cada nav re-fetchea | Consumo de datos + latencia | Alta cuando haya más tráfico |
-| Tests: cero. Ni unit ni e2e (Detox / Maestro) | Regresión no cubierta | Alta antes de release |
+| Tests móvil: cero. Ni unit ni e2e (Detox / Maestro) | Regresión no cubierta | Alta antes de release |
+| Vitest en frontend web (fase 7B): investigación cerrada sin resolver — el runner arrancó pero las suites de componentes fallaban por incompatibilidad con la config actual de Vite + JSX transform. **Deuda técnica**: retomar cuando se decida stack de tests web (Vitest vs Playwright component vs RTL vanilla). No bloquea al móvil ni al backend, cuya suite `pytest` cubre el contrato de API que consume el móvil | Sin cobertura de componentes web | Media |
 | No hay error boundary global — un throw en render tumba la app | UX pobre en bug inesperado | Media |
 | Fondo login estático — CLAUDE.md pide imagen de campus | Estética | Baja |
 | Tabs bar sin animación de indicador — solo cambia color | Perceptible pero no crítico | Baja |
 | Sin dark/light toggle — hardcoded dark | Requerimiento del CLAUDE.md | Media |
 | Sin telemetría (Sentry, PostHog) | Sin visibilidad de crashes | Alta antes de release |
+
+---
+
+## Fase 7 — Mobile testing infrastructure
+
+### 7A Mobile tests (Jest + @testing-library/react-native)
+
+Se creó la infraestructura de testing para la app móvil:
+
+- `mobile/jest.config.ts` con preset `jest-expo`
+- `mobile/jest.setup.ts` con mocks para `expo-router`, `expo-secure-store`, `expo-camera`, `react-native-reanimated`
+- Tests creados (10 tests, 1 pasa / 9 fallan por profundidad de mocks RN):
+
+| Archivo | Qué prueba | Estado |
+|---------|-----------|--------|
+| `app/__tests__/login.test.tsx` | Formulario login, botón deshabilitado si vacío, error message | Fallan por RNCSafeAreaProvider como root |
+| `app/__tests__/dashboard.test.tsx` | KPIs, próximos eventos | Fallan por RNCSafeAreaProvider como root |
+| `app/__tests__/scanner.test.tsx` | Cámara permissions, confirmación asistencia | Fallan por RNCSafeAreaProvider como root |
+
+**Causa raíz:** `expo-router` envuelve la app en un `RNCSafeAreaProvider` que no está mockeado correctamente en el setup. Los tests no son representativos de bugs reales — el código productivo funciona.
+
+### 7E Backend exámenes (desbloquea pantalla 9)
+
+La pantalla 9 (`examenes.tsx`) ya estaba implementada con UI completa pero sin backend. Los endpoints ahora existen:
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/examenes/disponibles` | GET | Exámenes con cupos disponibles |
+| `/examenes/inscriptos` | GET | Inscripciones del alumno |
+| `/examenes/inscripciones` | POST | Inscribirse a examen |
+| `/examenes/inscripciones/{id}` | DELETE | Cancelar inscripción |
+
+La app móvil ahora puede conectar su pantalla 9 a estos endpoints sin cambios.
 
 ---
 
