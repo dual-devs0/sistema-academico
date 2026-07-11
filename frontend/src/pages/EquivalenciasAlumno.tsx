@@ -54,7 +54,7 @@ export default function EquivalenciasAlumno() {
       setTipo('equivalencia'); setUniversidad('')
       cargar()
     } catch (e: unknown) {
-      emitToast(e?.message || 'Error creando solicitud', 'error')
+      emitToast(e instanceof Error ? e.message : 'Error creando solicitud', 'error')
     } finally { setLoading(false) }
   }
 

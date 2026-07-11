@@ -334,7 +334,7 @@ export default function Estadisticas() {
                       <Tooltip
                         contentStyle={tooltipStyle}
                         cursor={{ fill:'#2a304055' }}
-                        formatter={(v: number | string) => [v, 'Promedio']}
+                        formatter={(value) => [String(value ?? ''), 'Promedio']}
                       />
                       <Bar dataKey="promedio" fill={CYAN} radius={[5, 5, 0, 0]} maxBarSize={40} />
                     </BarChart>
@@ -374,7 +374,7 @@ export default function Estadisticas() {
                       </Pie>
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(v: number | string, name: string) => [v, name]}
+                        formatter={(value, name) => [String(value ?? ''), String(name)]}
                       />
                       <Legend
                         iconType="circle"
@@ -408,11 +408,11 @@ export default function Estadisticas() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#2a3040" vertical={false} />
                     <XAxis dataKey="name" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 100]} tick={axisStyle} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={{ stroke:'#2a3040', strokeWidth:1 }}
-                      formatter={(v: number | string) => [`${v}%`, 'Asistencia']}
-                    />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        cursor={{ stroke:'#2a3040', strokeWidth:1 }}
+                        formatter={(value) => [`${String(value ?? '')}%`, 'Asistencia']}
+                      />
                     <Line
                       type="monotone"
                       dataKey="asistencia"

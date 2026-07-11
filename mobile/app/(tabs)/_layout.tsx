@@ -1,8 +1,13 @@
 import { Tabs, useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { colors, fontFamily, fontSize, spacing, tabBar } from "../../constants/design";
+
+type TabBarProps = React.ComponentProps<typeof Tabs>["tabBar"] extends
+  | ((props: infer P) => React.ReactNode)
+  | undefined
+  ? P
+  : never;
 
 /**
  * Tab bar custom con botón QR central elevado.
@@ -40,7 +45,7 @@ const RIGHT_TABS: TabDef[] = [
   { routeName: "perfil", label: "Perfil", glyph: "◍" },
 ];
 
-function UcaTabBar({ state, navigation }: BottomTabBarProps) {
+function UcaTabBar({ state, navigation }: TabBarProps) {
   const router = useRouter();
   const currentRouteName = state.routes[state.index]?.name;
 

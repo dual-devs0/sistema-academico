@@ -94,9 +94,13 @@ def crear_examen_endpoint(
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role("admin")),
 ):
+    from app.models.users import User
+    alumno = db.query(User).filter(User.id == data.alumno_id, User.role == "alumno").first()
+    if not alumno:
+        raise HTTPException(status_code=422, detail="El alumno_id proporcionado no existe o no es un alumno")
     try:
         examen = crear_examen_suficiencia(
-            alumno_id=current_user["user_id"],
+            alumno_id=data.alumno_id,
             materia_id=data.materia_id,
             fecha=data.fecha,
             db=db,

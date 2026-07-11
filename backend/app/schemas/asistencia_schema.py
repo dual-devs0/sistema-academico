@@ -69,3 +69,22 @@ class PorcentajeGlobalOut(BaseModel):
     total_clases: int
     presentes: int
     porcentaje: float
+
+
+# ─── Módulo QR asistencia ────────────────────────────────────────────────────
+
+
+class QrVerifyRequest(BaseModel):
+    """Token JWT firmado por el profesor que abre el registro de asistencia."""
+
+    qr_token: str
+
+
+class QrVerifyResponse(BaseModel):
+    """Confirmación de registro de asistencia del alumno + conteo en vivo."""
+
+    materia_nombre: str
+    fecha: date
+    hora_registro: str  # HH:MM
+    presentes: int
+    ausentes: int

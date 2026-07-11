@@ -23,6 +23,8 @@ const menuAlumno: MenuItem[] = [
   { label: 'Pasantías', path: '/mis-pasantias', icon: 'ti-briefcase' },
   { label: 'Equivalencias', path: '/mis-equivalencias', icon: 'ti-shuffle' },
   { label: 'Graduación', path: '/mi-graduacion', icon: 'ti-graduation-cap' },
+  { label: 'Trámites', path: '/tramites', icon: 'ti-file-description' },
+  { label: 'Mis Cuotas', path: '/mis-cuotas', icon: 'ti-coin' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
@@ -35,6 +37,7 @@ const menuProfesor: MenuItem[] = [
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
   { label: 'Foro', path: '/foro', icon: 'ti-messages' },
+  { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
@@ -46,11 +49,15 @@ const menuAdmin: MenuItem[] = [
   { label: 'Expediente', path: '/expediente', icon: 'ti-file-certificate' },
   { label: 'Inscripciones', path: '/inscripciones', icon: 'ti-clipboard-list' },
   { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
+  { label: 'Finanzas', path: '/finanzas', icon: 'ti-coin' },
+  { label: 'Trámites', path: '/tramites', icon: 'ti-file-description' },
   { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
   { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-bar' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Graduación', path: '/graduacion-admin', icon: 'ti-graduation-cap' },
+  { label: 'Pasantías', path: '/pasantias-admin', icon: 'ti-briefcase' },
+  { label: 'Equivalencias', path: '/equivalencias-admin', icon: 'ti-shuffle' },
   { label: 'Ajustes Globales', path: '/perfil', icon: 'ti-settings' },
 ]
 

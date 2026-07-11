@@ -52,7 +52,7 @@ export const actualizarHoras = (id: number, horas_completadas: number) =>
   api.put<Pasantia>(`/pasantias/${id}/horas`, { horas_completadas })
 
 export const finalizarPasantia = (id: number) =>
-  api.put<Pasantia>(`/pasantias/${id}/finalizar`)
+  api.put<Pasantia>(`/pasantias/${id}/finalizar`, {})
 
 export const subirInforme = async (id: number, tipo: string, archivo?: File) => {
   const form = new FormData()
