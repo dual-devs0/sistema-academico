@@ -1,6 +1,32 @@
 # Changelog Técnico — Sistema Académico UCA V2
 
-> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2, Fase 3, Fase 4, Fase 4B y Fase 5A — todas cerradas.
+> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2, Fase 3, Fase 4, Fase 4B, Fase 5A y Fase 6b — todas cerradas. (Fase 5B/5C/5D y Fase 6 se implementaron fuera de esta bitácora — ver `ESTADO_FASES.md` para su resumen.)
+
+---
+
+## Fase 6b — Auditoría de seguimiento + hardening (2026-07-09) — COMPLETA
+
+**Bug de producción crítico encontrado y corregido:** `POST /auth/refresh` estaba completamente roto en `backend/app/routers/auth_router.py` (línea ~106) — el código tenía `not RefreshToken.revocado` dentro de un `.filter(...)`. Esto **no** es una negación SQL: es el operador `not` de Python aplicado al objeto `Column` de la clase (no a una instancia), que siempre evalúa a `False` como booleano de Python — el filtro terminaba siendo efectivamente `.filter(..., False, ...)`, que hace que la query nunca devuelva ninguna fila. Efecto real: ningún refresh token era encontrado nunca, por lo que `/auth/refresh` devolvía 401 para cualquier usuario, siempre — el flujo de renovación de sesión estaba muerto en producción. Corregido a `RefreshToken.revocado == False` (con `# noqa: E712` — en contexto de query SQLAlchemy la comparación explícita con `False` es la forma correcta, no un error de estilo). El mismo antipatrón apareció 2 veces más en `backend/tests/test_refresh_tokens.py`, cuyas propias queries de aserción estaban igual de rotas (pasaban en falso). Las 3 correcciones llevaron la suite de 3 failed a 0 failed.
+
+**Auditoría de calidad ejecutada:**
+- Suite backend (pytest): 3 failed → 0 failed (209 passed, sqlite).
+- `ruff check . --select E,F,W`: 5 → 0 (imports sin usar en `materia_router.py`, `inscripcion_shemas.py`, `materia_shemas.py`; 2 `__init__.py` sin newline final — regresión menor posterior a la auditoría ruff previa de Fase 6, corregida con `--fix`).
+- `mypy`: 267 errores, el 100% del mismo patrón sistémico (`Column[T]` incompatible con `T`) porque el codebase declara modelos con `Column()` clásico de SQLAlchemy, no `Mapped[]` (estilo 2.0) — no son bugs reales, a runtime cada atributo de una instancia ORM es su tipo real. Se probó el plugin oficial `sqlalchemy.ext.mypy.plugin`: empeoró a 377 errores (mezcla mal con `Column()` clásico, genera `"Mapped[Any]" has no attribute`) — descartado. `backend/mypy.ini` (nuevo) documenta esta decisión. Los 267 quedan como deuda técnica conocida — se resolverían migrando a `Mapped[]`, fuera de alcance.
+- Frontend: `tsc --noEmit` → 0 errores. `eslint . --ext .ts,.tsx` → 0 errores, 6 warnings pre-existentes de `react-hooks/exhaustive-deps` (`Asistencia.tsx`, `EquivalenciasAlumno.tsx`, `Foro.tsx`, `MallaAdmin.tsx`, `MisMaterias.tsx`) sin tocar — requieren revisar caso a caso si envolver en `useCallback` cambia comportamiento de negocio.
+- `tsconfig.app.json`: agregado `"strict": true` (ya tenía `noUnusedLocals`/`noUnusedParameters`). 0 errores nuevos.
+- Scripts `check`/`check:backend` agregados en `package.json` (raíz) y `"check"` en `frontend/package.json`.
+
+**Archivos tocados:**
+- `backend/app/routers/auth_router.py` — fix del filtro roto en `/auth/refresh`
+- `backend/tests/test_refresh_tokens.py` — mismo fix en 2 queries de test
+- `backend/mypy.ini` — nuevo
+- `backend/app/routers/materia_router.py`, `backend/app/schemas/inscripcion_shemas.py`, `backend/app/schemas/materia_shemas.py`, `backend/app/__init__.py`, `backend/tests/__init__.py` — limpieza automática ruff
+- `frontend/tsconfig.app.json` — `strict: true`
+- `frontend/package.json`, `package.json` (raíz) — scripts `check`/`check:backend`
+
+**Tests:** 209/209 pasando (sqlite), incluyendo los 3 de `test_refresh_tokens.py` que fallaban antes de esta auditoría.
+
+**Pendiente de esta tarea:** deuda técnica de mypy (267 errores `Column[T]`, requiere migrar a `Mapped[]`). 6 warnings de `react-hooks/exhaustive-deps` sin resolver.
 
 ---
 
