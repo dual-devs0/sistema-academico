@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -32,11 +33,6 @@ import {
 
 /**
  * Pantalla de login.
- *
- * TODO: reemplazar el fondo actual (View oscuro) por
- * `require('../../assets/campus.jpg')` una vez la imagen esté disponible.
- * No la subo ahora para no romper el bundle (require estático falla si el
- * archivo no existe).
  */
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -87,14 +83,11 @@ export default function LoginScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Fondo campus (placeholder View oscuro por ahora). */}
-      <View
-        style={{
-          ...StyleSheetAbs.fill,
-          backgroundColor: "#050810",
-        }}
+      <Image
+        source={require("../../assets/campus.jpg")}
+        style={StyleSheetAbs.fill}
+        resizeMode="cover"
       />
-      {/* Overlay de color por encima del fondo. */}
       <View
         style={{
           ...StyleSheetAbs.fill,
