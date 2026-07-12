@@ -220,7 +220,7 @@ function Body({
         ? colors.warning
         : colors.success;
 
-  const examenesInscriptos = 0; // TODO: endpoint de exámenes inscriptos
+  const examenesInscriptos: number = 0; // TODO: endpoint de exámenes inscriptos
 
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>

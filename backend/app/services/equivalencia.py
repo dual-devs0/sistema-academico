@@ -106,7 +106,7 @@ def resolver_materia(
             if not oferta:
                 oferta = OfertaMateria(
                     materia_id=materia_destino_id,
-                    profesor_id=alumno_id,  # placeholder
+                    profesor_id=1,  # usuario sistema
                     periodo="EQUIVALENCIA",
                     activa=False,
                 )

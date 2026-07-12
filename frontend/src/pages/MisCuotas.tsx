@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getCurrentUser } from '../lib/api'
-import { getCuotasAlumno, getBecasActivas, formatGs, type Cuota, type BecaActiva } from '../services/finanzasService'
+import { getCuotasAlumno, getBecasActivas, initPagoOnline, formatGs, type Cuota, type BecaActiva } from '../services/finanzasService'
 
 const css = `
   .mc-header { display:flex; align-items:center; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
@@ -61,6 +61,13 @@ const css = `
   }
   .mc-comprobante-link:hover { text-decoration:underline; }
   .mc-comprobante-pendiente { color:var(--text-secondary); font-style:italic; }
+  .mc-pagar-btn {
+    padding:7px 18px; border-radius:999px; font-size:12px; font-weight:700;
+    border:none; cursor:pointer; transition:all .18s;
+    background:var(--accent-bright); color:#fff;
+  }
+  .mc-pagar-btn:hover { opacity:.85; transform:translateY(-1px); }
+  .mc-pagar-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
   .mc-empty { text-align:center; padding:48px; color:var(--text-secondary); font-size:15px; }
   @media(max-width:700px){ .mc-summary { grid-template-columns:1fr; } .mc-card { grid-template-columns:1fr; } .mc-montos { text-align:left; } }
 `
@@ -75,6 +82,7 @@ export default function MisCuotas() {
   const [becas, setBecas] = useState<BecaActiva[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<EstadoFilter>('todos')
+  const [pagandoId, setPagandoId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!alumnoId) return
@@ -236,6 +244,27 @@ export default function MisCuotas() {
                             Comprobante en proceso, disponible en breve
                           </span>
                         )}
+                      </div>
+                    )}
+                    {(cuota.estado === 'pendiente' || cuota.estado === 'vencida') && (
+                      <div style={{ marginTop: 8 }}>
+                        <button
+                          className="mc-pagar-btn"
+                          disabled={pagandoId === cuota.id}
+                          onClick={async () => {
+                            setPagandoId(cuota.id)
+                            try {
+                              const res = await initPagoOnline(cuota.id)
+                              window.open(res.redirect_url, '_blank')
+                            } catch {
+                              alert('Error al iniciar pago')
+                            } finally {
+                              setPagandoId(null)
+                            }
+                          }}
+                        >
+                          {pagandoId === cuota.id ? 'Procesando…' : '💳 Pagar Online'}
+                        </button>
                       </div>
                     )}
                   </div>

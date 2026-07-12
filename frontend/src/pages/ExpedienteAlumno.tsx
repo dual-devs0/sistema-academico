@@ -3,6 +3,7 @@ import { getUserId } from '../hooks/useRole'
 import {
   obtenerPPA, obtenerExpediente, obtenerRegularidad,
   type PPAOut, type ExpedienteAlumnoOut, type RegularidadOut,
+  type ExpedienteMateriaOut as ExpMateria,
 } from '../services/expedienteService'
 
 const condicionBadge: Record<string, { bg: string; color: string; label: string }> = {
@@ -97,7 +98,7 @@ export default function ExpedienteAlumno() {
                   </span>
                 )}
               </div>
-              {materias.map(m => {
+              {materias.map((m: ExpMateria) => {
                 const b = condicionBadge[m.condicion]
                 return (
                   <div key={m.id} className="exp-materia-row">

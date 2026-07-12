@@ -37,6 +37,8 @@ from app.routers import (  # noqa: E402
     pasantias,
     graduacion,
     equivalencias,
+    examenes,
+    notificaciones,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -117,6 +119,8 @@ app.include_router(tramites.router)
 app.include_router(pasantias.router)
 app.include_router(graduacion.router)
 app.include_router(equivalencias.router)
+app.include_router(examenes.router)
+app.include_router(notificaciones.router)
 app.include_router(test_router.router)
 
 

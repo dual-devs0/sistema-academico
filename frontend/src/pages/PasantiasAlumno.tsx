@@ -47,8 +47,8 @@ export default function PasantiasAlumno() {
       await solicitarPasantia(empresaId, fechaInicio, horas)
       emitToast('Solicitud enviada', 'success')
       setEmpresaId(0); setFechaInicio(''); setHoras(200)
-    } catch (e: Error) {
-      emitToast(e?.message || 'Error al solicitar', 'error')
+    } catch (e: unknown) {
+      emitToast(e instanceof Error ? e.message : 'Error al solicitar', 'error')
     } finally { setLoading(false) }
   }
 

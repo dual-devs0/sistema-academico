@@ -1,13 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
-from datetime import date
-from app import models, schemas, database
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from app import database, models, schemas
+from app.auth import ALGORITHM, SECRET_KEY
 from app.dependencias import get_current_user
 from app.services.autorizacion import es_profesor_de_materia
 
 
 router = APIRouter(prefix="/asistencias", tags=["asistencias"])
+
+
+# ─── QR de asistencia ────────────────────────────────────────────────────────
+
+QR_TOKEN_KIND = "asistencia_qr"
+QR_TOKEN_TTL_MINUTES = 15
+
+
+def create_qr_token(materia_id: int, oferta_id: int) -> str:
+    """Emite un JWT firmado con SECRET_KEY que autoriza registrar asistencia
+    para (materia_id, oferta_id). Válido por QR_TOKEN_TTL_MINUTES.
+    Consumido por POST /asistencias/qr/verificar.
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "kind": QR_TOKEN_KIND,
+        "materia_id": materia_id,
+        "oferta_id": oferta_id,
+        "iat": now,
+        "exp": now + timedelta(minutes=QR_TOKEN_TTL_MINUTES),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def _oferta_activa_id(db: Session, materia_id: int) -> int | None:
@@ -350,3 +376,122 @@ def resumen_asistencia(
     if total == 0:
         return {"porcentaje": 0}
     return {"porcentaje": round((presentes / total) * 100, 2)}
+
+
+@router.post(
+    "/qr/verificar",
+    response_model=schemas.asistencia.QrVerifyResponse,
+    summary="Registrar asistencia del alumno actual escaneando el QR del aula",
+)
+def verificar_qr_asistencia(
+    body: schemas.asistencia.QrVerifyRequest,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Registra la asistencia del alumno autenticado usando el QR emitido
+    por el profesor. Valida:
+    - JWT firmado con SECRET_KEY, con `kind == "asistencia_qr"` y sin vencer.
+    - Alumno inscripto en una oferta de la materia indicada.
+    - No hay asistencia registrada para hoy en la misma oferta.
+    Devuelve el conteo de presentes/ausentes en la clase de hoy.
+    """
+    # 1. Decodificar y validar el JWT del QR.
+    try:
+        payload = jwt.decode(body.qr_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=400, detail="QR inválido o expirado")
+
+    if payload.get("kind") != QR_TOKEN_KIND:
+        raise HTTPException(status_code=400, detail="QR inválido o expirado")
+
+    materia_id = payload.get("materia_id")
+    oferta_id_qr = payload.get("oferta_id")
+    if materia_id is None or oferta_id_qr is None:
+        raise HTTPException(status_code=400, detail="QR inválido o expirado")
+
+    # 2. Verificar que la oferta del QR sigue siendo la activa de la materia.
+    oferta_activa_id = _oferta_activa_id(db, materia_id)
+    if oferta_activa_id != oferta_id_qr:
+        raise HTTPException(status_code=400, detail="QR inválido o expirado")
+
+    # 3. Verificar que el alumno está inscripto en esa oferta.
+    inscripcion = (
+        db.query(models.inscripcion.Inscripcion)
+        .filter(
+            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"],
+            models.inscripcion.Inscripcion.oferta_materia_id == oferta_activa_id,
+        )
+        .first()
+    )
+    if not inscripcion:
+        raise HTTPException(
+            status_code=403, detail="No estás inscripto en esta materia"
+        )
+
+    # 4. Verificar que no hay asistencia previa para hoy.
+    hoy = date.today()
+    existente = (
+        db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.user_id == current_user["user_id"],
+            models.asistencia.Asistencia.oferta_materia_id == oferta_activa_id,
+            models.asistencia.Asistencia.fecha == hoy,
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(
+            status_code=409, detail="Tu asistencia de hoy ya está registrada"
+        )
+
+    # 5. Snapshot es_becado + insertar registro.
+    alumno = (
+        db.query(models.user.User)
+        .filter(models.user.User.id == current_user["user_id"])
+        .first()
+    )
+    es_becado = alumno.es_becado if alumno else False
+    nueva = models.asistencia.Asistencia(
+        user_id=current_user["user_id"],
+        oferta_materia_id=oferta_activa_id,
+        fecha=hoy,
+        presente=True,
+        es_becado=es_becado,
+    )
+    db.add(nueva)
+    db.commit()
+
+    # 6. Conteo de la clase de hoy (post-insert).
+    presentes = (
+        db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.oferta_materia_id == oferta_activa_id,
+            models.asistencia.Asistencia.fecha == hoy,
+            models.asistencia.Asistencia.presente,
+        )
+        .count()
+    )
+    ausentes = (
+        db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.oferta_materia_id == oferta_activa_id,
+            models.asistencia.Asistencia.fecha == hoy,
+            models.asistencia.Asistencia.presente == False,  # noqa: E712
+        )
+        .count()
+    )
+
+    # Nombre de la materia para la respuesta.
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == materia_id)
+        .first()
+    )
+
+    return schemas.asistencia.QrVerifyResponse(
+        materia_nombre=materia.nombre if materia else "",
+        fecha=hoy,
+        hora_registro=datetime.now().strftime("%H:%M"),
+        presentes=presentes,
+        ausentes=ausentes,
+    )

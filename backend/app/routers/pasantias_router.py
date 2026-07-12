@@ -36,6 +36,20 @@ from app.services.storage import subir_archivo
 router = APIRouter(prefix="/pasantias", tags=["pasantias"])
 
 
+@router.get(
+    "/empresas",
+    response_model=list[EmpresaReceptoraOut],
+    summary="Listar empresas receptoras activas",
+)
+def listar_empresas(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.pasantia import EmpresaReceptora
+    empresas = db.query(EmpresaReceptora).filter(EmpresaReceptora.convenio_activo).all()
+    return empresas
+
+
 @router.post(
     "/empresas",
     response_model=EmpresaReceptoraOut,

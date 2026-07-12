@@ -17,6 +17,7 @@ import {
   JetBrainsMono_700Bold,
 } from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider, useAuth } from "../hooks/useAuth";
+import { ThemeProvider } from "../hooks/useTheme";
 import { colors } from "../constants/design";
 import "../global.css";
 
@@ -69,6 +70,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ThemeProvider>
       <AuthProvider>
         <StatusBar style="light" />
         <AuthGate>
@@ -94,6 +96,7 @@ export default function RootLayout() {
           </Stack>
         </AuthGate>
       </AuthProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

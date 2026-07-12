@@ -7,6 +7,7 @@ interface QRData {
   expira_en: number
   materia: { id: number; nombre: string }
   fecha: string
+  scan_url?: string
 }
 
 interface QRModalProps {
@@ -187,10 +188,10 @@ export default function QRModal({ materiaId, materiaNombre, onClose, onQrActive 
                   navigator.share({
                     title: `QR Asistencia - ${qrData.materia.nombre}`,
                     text: `Escaneá este código QR para registrar tu asistencia a ${qrData.materia.nombre}`,
-                    url: qrData.scan_url,
+                    url: qrData.scan_url || `${window.location.origin}/asistencia/scan?token=${qrData.token}`,
                   }).catch(() => {})
                 } else {
-                  navigator.clipboard.writeText(qrData.scan_url).then(() => {
+                  navigator.clipboard.writeText(qrData.scan_url || `${window.location.origin}/asistencia/scan?token=${qrData.token}`).then(() => {
                     const el = document.createElement('div')
                     el.textContent = '¡Link copiado! Compartilo en tu grupo de WhatsApp'
                     el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#00b4d8;color:#000;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:999;font-family:sans-serif'

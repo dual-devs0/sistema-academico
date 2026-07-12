@@ -1,61 +1,444 @@
-import { Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, fontFamily, fontSize, radius, spacing } from "../../constants/design";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { ScreenHeader } from "../../components/ui/ScreenHeader";
+import { GlassCard } from "../../components/ui/GlassCard";
+import { StatCard } from "../../components/ui/StatCard";
+import { CyanBadge } from "../../components/ui/CyanBadge";
+import { SettingRow } from "../../components/ui/SettingRow";
+import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
+import {
+  colors,
+  fontFamily,
+  fontSize,
+  radius,
+  spacing,
+} from "../../constants/design";
 import { useAuth } from "../../hooks/useAuth";
+import { useTheme } from "../../hooks/useTheme";
+import { useBiometry } from "../../hooks/useBiometry";
+import {
+  fetchPerfil,
+  fetchResumen,
+  type MiResumen,
+  type UserInfo,
+} from "../../services/dashboardService";
 
-/** Stub — pantalla Perfil se completa en el siguiente paso. Ya incluye logout wired. */
+/**
+ * Pantalla Perfil (reemplaza stub).
+ *
+ * Datos: reusa `fetchPerfil` y `fetchResumen` de dashboardService.
+ * BACKEND TODO: no hay endpoint que devuelva `fuente_beca` en /alumno/mi-perfil.
+ * Hoy solo llega `es_becado: boolean`. Mostramos "BECADO INSTITUCIONAL" por
+ * defecto cuando `es_becado=true`; cuando el backend agregue `fuente_beca`
+ * (ej. "itaipu" / "institucional") switchamos el label.
+ */
 export default function PerfilScreen() {
   const { logout } = useAuth();
+  const theme = useTheme();
+  const biometry = useBiometry();
+
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [resumen, setResumen] = useState<MiResumen | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    const [u, r] = await Promise.all([
+      fetchPerfil().catch(() => null),
+      fetchResumen().catch(() => null),
+    ]);
+    setUser(u);
+    setResumen(r);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await load();
+      setLoading(false);
+    })();
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  const nombre = user?.nombre ?? user?.username ?? "";
+  const initials = nombre
+    .split(" ")
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const legajo = user ? formatLegajo(user.id) : "————";
+  const promedio = resumen?.promedio_general;
+  const asistencias = resumen?.asistencia ?? [];
+  const regularidadActiva =
+    asistencias.length === 0
+      ? true
+      : asistencias.every((a) => (a.porcentaje ?? 100) >= 70);
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar sesión",
+      "¿Confirmás que querés cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: () => {
+            void logout();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleBiometryToggle = async (v: boolean) => {
+    if (!biometry.available) {
+      Alert.alert(
+        "Biometría no disponible",
+        "El dispositivo no tiene biometría configurada.",
+      );
+      return;
+    }
+    const res = await biometry.setEnabled(v);
+    if (!res.ok) {
+      Alert.alert("No se pudo activar biometría", res.error ?? "Intentá de nuevo.");
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <View style={{ flex: 1, padding: spacing.xl, justifyContent: "space-between" }}>
-        <View>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontFamily: fontFamily.interBold,
-              fontSize: fontSize.headlineLg,
-            }}
-          >
-            Perfil
-          </Text>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontFamily: fontFamily.inter,
-              fontSize: fontSize.caption,
-              marginTop: spacing.sm,
-            }}
-          >
-            Pendiente de implementación completa.
-          </Text>
-        </View>
+      <ScreenHeader title="Perfil" />
 
-        <Pressable
-          onPress={() => {
-            void logout();
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.cyan}
+          />
+        }
+      >
+        {loading ? (
+          <LoadingBody />
+        ) : (
+          <>
+            <IdentitySection
+              nombre={nombre}
+              initials={initials}
+              carrera={carreraLabel(user)}
+              legajo={legajo}
+              esBecado={!!user?.es_becado}
+            />
+
+            <SectionLabel text="Resumen académico" />
+            <View
+              style={{
+                paddingHorizontal: spacing.xl,
+                flexDirection: "row",
+                gap: spacing.md,
+              }}
+            >
+              <StatCard
+                label="PROMEDIO"
+                value={promedio != null ? promedio.toFixed(2) : "—"}
+                footer={
+                  resumen?.cantidad_materias
+                    ? `${resumen.cantidad_materias} materias`
+                    : "sin datos"
+                }
+                style={{ flex: 1 }}
+              />
+              <StatCard
+                label="REGULARIDAD"
+                value={regularidadActiva ? "● Activa" : "● Riesgo"}
+                valueColor={regularidadActiva ? colors.success : colors.warning}
+                footer={regularidadActiva ? "asistencia OK" : "revisar asistencia"}
+                style={{ flex: 1 }}
+              />
+            </View>
+
+            <SectionLabel text="Ajustes de la app" />
+            <View style={{ paddingHorizontal: spacing.xl, gap: spacing.sm }}>
+              <SettingRow
+                glyph="☾"
+                label="Modo Oscuro"
+                hint={
+                  theme.preference === "system"
+                    ? "Siguiendo el sistema"
+                    : theme.effective === "dark"
+                      ? "Activado"
+                      : "Desactivado"
+                }
+                variant="toggle"
+                toggled={theme.effective === "dark"}
+                onToggle={() => {
+                  void theme.toggleDark();
+                }}
+              />
+              <SettingRow
+                glyph="◈"
+                label="Biometría"
+                hint={
+                  !biometry.available
+                    ? "No disponible en este dispositivo"
+                    : biometry.enabled
+                      ? "Activada al abrir la app"
+                      : "Desactivada"
+                }
+                variant="toggle"
+                toggled={biometry.enabled}
+                onToggle={(v) => {
+                  void handleBiometryToggle(v);
+                }}
+                disabled={!biometry.available || biometry.loading}
+              />
+            </View>
+
+            <SectionLabel text="Centro de soporte" />
+            <View style={{ paddingHorizontal: spacing.xl, gap: spacing.sm }}>
+              <SettingRow
+                glyph="?"
+                label="Ayuda y preguntas frecuentes"
+                variant="chevron"
+                onPress={() => {}}
+              />
+              <SettingRow
+                glyph="§"
+                label="Términos y privacidad"
+                variant="chevron"
+                onPress={() => {}}
+              />
+            </View>
+
+            <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.xl }}>
+              <Pressable
+                onPress={handleLogout}
+                style={({ pressed }) => ({
+                  backgroundColor: colors.logoutBg,
+                  borderWidth: 1,
+                  borderColor: colors.logoutBorder,
+                  borderRadius: radius.md,
+                  paddingVertical: spacing.lg,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: spacing.sm,
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text style={{ color: "#fca5a5", fontSize: fontSize.body }}>⎋</Text>
+                <Text
+                  style={{
+                    color: "#fca5a5",
+                    fontFamily: fontFamily.interSemibold,
+                    fontSize: fontSize.body,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Cerrar Sesión
+                </Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+function IdentitySection({
+  nombre,
+  initials,
+  carrera,
+  legajo,
+  esBecado,
+}: {
+  nombre: string;
+  initials: string;
+  carrera: string;
+  legajo: string;
+  esBecado: boolean;
+}) {
+  const becaLabel = esBecado ? "BECADO INSTITUCIONAL" : null;
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(300)}
+      style={{
+        alignItems: "center",
+        paddingHorizontal: spacing.xl,
+        paddingBottom: spacing.xl,
+      }}
+    >
+      <View
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          borderWidth: 2,
+          borderColor: colors.cyan,
+          backgroundColor: colors.surface,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: spacing.md,
+        }}
+      >
+        <Text
+          style={{
+            color: colors.cyan,
+            fontFamily: fontFamily.interBold,
+            fontSize: fontSize.headlineLg,
           }}
-          style={({ pressed }) => ({
-            backgroundColor: colors.logoutBg,
-            borderWidth: 1,
-            borderColor: colors.logoutBorder,
-            borderRadius: radius.md,
-            paddingVertical: spacing.lg,
+        >
+          {initials || "··"}
+        </Text>
+      </View>
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontFamily: fontFamily.interBold,
+          fontSize: fontSize.headlineLg,
+          textAlign: "center",
+        }}
+        numberOfLines={2}
+      >
+        {nombre || "Sin nombre"}
+      </Text>
+      <Text
+        style={{
+          color: colors.cyan,
+          fontFamily: fontFamily.inter,
+          fontSize: fontSize.caption,
+          marginTop: spacing.xs,
+          letterSpacing: 0.5,
+        }}
+        numberOfLines={1}
+      >
+        {carrera}
+      </Text>
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: spacing.sm,
+          marginTop: spacing.md,
+          flexWrap: "wrap",
+          justifyContent: "center",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
             alignItems: "center",
-            opacity: pressed ? 0.8 : 1,
-          })}
+            gap: spacing.xs,
+            paddingHorizontal: spacing.md,
+            paddingVertical: 6,
+            borderRadius: radius.pill,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
         >
           <Text
             style={{
-              color: "#fca5a5",
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.body,
+              color: colors.textSecondary,
+              fontFamily: fontFamily.interMedium,
+              fontSize: fontSize.caption,
+              letterSpacing: 1,
             }}
           >
-            Cerrar sesión
+            LEGAJO:
           </Text>
-        </Pressable>
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontFamily: fontFamily.monoBold,
+              fontSize: fontSize.caption,
+            }}
+          >
+            {legajo}
+          </Text>
+        </View>
+
+        {becaLabel ? (
+          <CyanBadge label={becaLabel} glyph="🔒" variant="dim" size="sm" />
+        ) : null}
       </View>
-    </SafeAreaView>
+    </Animated.View>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Section label + loading
+// ---------------------------------------------------------------------------
+
+function SectionLabel({ text }: { text: string }) {
+  return (
+    <Text
+      style={{
+        color: colors.textSecondary,
+        fontFamily: fontFamily.interMedium,
+        fontSize: fontSize.caption,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        paddingHorizontal: spacing.xl,
+        marginTop: spacing.xl,
+        marginBottom: spacing.md,
+      }}
+    >
+      {text}
+    </Text>
+  );
+}
+
+function LoadingBody() {
+  return (
+    <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, alignItems: "center" }}>
+      <SkeletonLoader shape="circle" height={80} width={80} />
+      <SkeletonLoader height={22} width="60%" />
+      <SkeletonLoader height={14} width="45%" />
+      <View style={{ flexDirection: "row", gap: spacing.md, width: "100%", marginTop: spacing.lg }}>
+        <SkeletonLoader height={100} style={{ flex: 1 }} />
+        <SkeletonLoader height={100} style={{ flex: 1 }} />
+      </View>
+      <SkeletonLoader height={64} style={{ width: "100%", marginTop: spacing.md }} />
+      <SkeletonLoader height={64} style={{ width: "100%" }} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatLegajo(userId: number): string {
+  const s = String(userId).padStart(8, "0");
+  return `${s.slice(0, 4)}-${s.slice(4)}`;
+}
+
+function carreraLabel(user: UserInfo | null): string {
+  if (!user) return "—";
+  if (user.carrera_id == null) return "Sin carrera asignada";
+  return `Carrera #${user.carrera_id}`;
 }

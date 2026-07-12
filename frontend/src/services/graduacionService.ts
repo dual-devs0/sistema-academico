@@ -43,5 +43,16 @@ export const asignarTutor = (procesoId: number, tutor_id: number) =>
 export const actualizarEtapa = (procesoId: number, etapaId: number, estado: string, observaciones?: string) =>
   api.put<EtapaTesis>(`/graduacion/procesos/${procesoId}/etapas/${etapaId}`, { estado, observaciones })
 
+export const getEtapasProceso = (procesoId: number) =>
+  api.get<EtapaTesis[]>(`/graduacion/procesos/${procesoId}/etapas`)
+
+export interface VerificacionSolvencia {
+  id: number
+  proceso_id: number
+  solvencia_financiera: boolean
+  solvencia_biblioteca: boolean
+  fecha_verificacion: string
+}
+
 export const getSolvencia = (procesoId: number) =>
-  api.get<{id:number;concepto:string;estado:string;observacion:string|null}[]>(`/graduacion/procesos/${procesoId}/solvencia`)
+  api.get<VerificacionSolvencia[]>(`/graduacion/procesos/${procesoId}/solvencia`)

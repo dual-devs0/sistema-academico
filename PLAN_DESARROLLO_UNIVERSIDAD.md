@@ -24,9 +24,11 @@
 7. Fase 4 — Módulo financiero, aranceles y becas diferenciadas
 8. Fase 4B — Facturación electrónica (guarani.app)
 9. Fase 5 — Solicitudes, graduación, pasantías, equivalencias
-10. Cronograma consolidado
-11. Plan de pruebas y control de calidad
-12. Riesgos técnicos y mitigación
+10. Fase 6 — Auditoría integral + hardening
+11. Fase 7 — Extensión integral del sistema
+12. Cronograma consolidado
+13. Plan de pruebas y control de calidad
+14. Riesgos técnicos y mitigación
 
 ---
 
@@ -844,7 +846,239 @@ Al aprobar, crea automáticamente el registro en expediente_materias (Fase 3) co
 
 ---
 
-## 10. Cronograma consolidado y dependencias
+## 10. Fase 6 — Auditoría integral + hardening
+**MANTENIMIENTO — 1 semana**
+
+### 10.1 Backend: ruff a 0 errores
+
+- Correr `ruff check app/` con selección E, F, W (pycodestyle, pyflakes, pycodestyle-warnings)
+- Auto-fix con `ruff check --fix` para reglas automáticas
+- Agregar `noqa` solo donde el cambio alteraría semántica o rompería patrón existente
+
+### 10.2 Frontend: eslint a 0 errores + strict mode
+
+- Correr eslint y corregir todos los errores
+- Agregar `strict: true` en `tsconfig.app.json`
+- No introducir librerías nuevas — solo limpieza
+
+### 10.3 Bugfix de producción: `POST /auth/refresh`
+
+El filtro `not RefreshToken.revocado` es negación Python de un `Column` (siempre `False` a nivel de objeto, nunca genera `WHERE NOT revocado`). Todo refresh devuelve 401. Corregir a `RefreshToken.revocado == False`.
+
+### 10.4 Criterios de aceptación
+
+- `ruff check app/` → All checks passed (0 errores)
+- `cd frontend && npx eslint src/` → 0 errores
+- `cd frontend && npx tsc --noEmit` → 0 errores
+- Suite backend completa → todos pasan
+
+---
+
+## 11. Fase 7 — Extensión integral del sistema
+**IMPACTO ALTO — 1 semana**
+
+Refuerza la calidad del sistema con tests automatizados frontend y mobile, completa la UI de becas para el alumno, conecta el cambio de contraseña al backend real, implementa el módulo de exámenes regulares (que desbloquea la pantalla 9 del móvil), agrega pagos online con gateway stub y notificaciones push para alumnos.
+
+### 11.1 7A — Tests frontend (Vitest)
+
+Establece infraestructura de testing para el frontend React con Vitest + @testing-library/react.
+
+**Dependencias en `frontend/package.json`:**
+- `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`, `happy-dom`
+
+**Archivos de configuración:**
+- `frontend/vitest.config.ts` — environment `jsdom`, globals, setup file
+- `frontend/src/test/setup.ts` — import `@testing-library/jest-dom`
+
+**Tests creados (5 archivos, 19 tests):**
+
+| Archivo | Ubicación | Qué prueba |
+|---------|-----------|-----------|
+| `useRole.test.ts` | `src/test/` | `getRole()` con cada rol, `getUserId()`, `getUsername()` |
+| `RutaProtegida.test.tsx` | `src/test/` | Redirect a login si no autenticado, redirect a dashboard si rol no permitido, render children si ok |
+| `Layout.test.tsx` | `src/test/` | Menú cambia según rol, 18 items admin, 17 alumno, 10 profesor |
+| `AcademicoLogin.test.tsx` | `src/test/` | Renderiza formulario, login exitoso redirige, login fallido muestra error |
+| `Dashboard.test.tsx` | `src/test/` | KPIs se renderizan, cada rol ve su dashboard |
+
+**Verificación:**
+```bash
+cd frontend && npx vitest run --reporter verbose
+```
+
+### 11.2 7B — Design System: migrar estilos inline a clases compartidas
+**DEFERIDO — Riesgo de regresión > beneficio cosmético**
+
+El sistema ya tiene `frontend/src/styles/design-tokens.css` con ~30 clases compartidas (`.card`, `.btn-primary`, `.badge`, `.input-uca`, `.table-uca`, `.page-title`, `.pill-tab`, `.progress-track`, etc.), pero **29 componentes** (~1,680 líneas totales) definen CSS inline duplicado en `const css =` en vez de usar esas clases.
+
+**Motivo del diferimiento:** Los componentes críticos (AcademicoLogin, AdminLogin, Programa, Reportes, Asistencia) tienen CSS autocontenido con estilos únicos que no existen en design-tokens. Reemplazar por clases compartidas requiere cambiar la estructura visual, y el riesgo de regresión visual supera el beneficio cosmético.
+
+**Orden de prioridad si se retoma:**
+
+| Prioridad | Archivo | Líneas CSS | Clases design-tokens a usar |
+|-----------|---------|-----------|---------------------------|
+| 1 | `AcademicoLogin.tsx` | 364 | `.card`, `.btn-primary`, `.input-uca`, `.page-title`, `.badge` |
+| 2 | `Programa.tsx` | 208 | `.card`, `.progress-track`, `.badge`, `.page-title`, `.pill-tab` |
+| 3 | `AdminLogin.tsx` | 175 | `.card`, `.btn-primary`, `.input-uca` |
+| 4 | `Reportes.tsx` | 160 | `.card`, `.table-uca`, `.page-title`, `.btn-ghost`, `.pill-tab` |
+| 5 | `Asistencia.tsx` | 137 | `.card`, `.badge`, `.table-uca`, `.page-title`, `.section-label` |
+| 6-29 | 24 archivos restantes | ~450 | Varias según contexto |
+
+### 11.3 7C — Postulación a becas (UI alumno)
+
+Backend ya existe (Fase 4). Solo frontend.
+
+**Frontend:**
+
+1. `frontend/src/pages/BecasAlumno.tsx` con 3 tabs:
+   - **Catálogo** — tarjetas de becas disponibles con nombre, fuente, descripción, monto, cupos, botón "Postular". Estado vacío si no hay becas.
+   - **Mis Postulaciones** — listado con estado (`pendiente`, `aprobada`, `rechazada`). Estado vacío si no ha postulado.
+   - **Mis Becas** — becas activas con badge de descuento visible.
+
+2. Ruta `/mis-becas` registrada en `App.tsx` para rol `alumno`.
+3. Entrada "Becas" en menú alumno en `Layout.tsx`.
+
+**Servicios:** Reusa `finanzasService.ts` → `getCatalogoBecas()`, `postularBeca()`, `getPostulaciones()`, `getBecasActivas()`
+
+### 11.4 7D — Cambio de contraseña funcional
+
+`Perfil.tsx` ya tiene UI de cambio de contraseña pero solo mostraba un toast sin llamar al backend.
+
+**Conexión a endpoints reales:**
+- **Alumno:** `api.patch('/alumno/mi-perfil', {password: pwNew})`
+- **Admin:** `api.patch('/users/${userId}', {password: pwNew})`
+- **Profesor:** misma lógica que admin (mismo endpoint PATCH)
+
+**Validaciones:**
+- Mínimo 8 caracteres
+- Confirmación debe coincidir
+- Error del backend si falla
+- Loading state en botón, toast de éxito/error
+
+### 11.5 7E — Backend exámenes regulares
+
+La app móvil tiene la pantalla 9 (`examenes.tsx`) completamente implementada con UI para exámenes disponibles e inscriptos, pero el backend no tenía endpoints. Este módulo los implementa.
+
+**Modelo de datos (`app/models/examen.py`):**
+
+```python
+class Examen(Base):
+    __tablename__ = "examenes"
+    id = Column(Integer, primary_key=True)
+    materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
+    fecha = Column(Date, nullable=False)
+    hora_inicio = Column(String(5))
+    hora_fin = Column(String(5))
+    aula = Column(String(50))
+    tipo = Column(String(20), nullable=False)  # parcial, final, recuperatorio
+    periodo = Column(String(10), nullable=False)
+    cupos = Column(Integer, default=30)
+    estado = Column(String(20), default="abierto")  # abierto, cerrado, finalizado
+    profesor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+class InscripcionExamen(Base):
+    __tablename__ = "inscripciones_examen"
+    id = Column(Integer, primary_key=True)
+    examen_id = Column(Integer, ForeignKey("examenes.id"), nullable=False)
+    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    estado = Column(String(20), default="inscripto")
+    nota = Column(Numeric(5,2), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    __table_args__ = (UniqueConstraint("examen_id", "alumno_id"),)
+```
+
+**Nota:** El modelo real implementado difiere del plan original en varios campos — se usó `hora_inicio`/`hora_fin` (String(5)) en vez de `hora` (Time), se agregó `periodo`, `cupos`, `estado`, `profesor_id` y se omitieron `turno`, `habilitado`, `cierre_inscripcion`, `oferta_materia_id`. Los schemas y tests reflejan el modelo real.
+
+**Router (`app/routers/examenes_router.py`):**
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/examenes/disponibles` | GET | alumno | Lista exámenes con cupos. Opcional: `?periodo=` |
+| `/examenes/inscriptos` | GET | alumno | Mis inscripciones a exámenes |
+| `/examenes/` | GET | admin | Listar todos los exámenes (gestión) |
+| `/examenes/` | POST | admin | Crear nuevo examen |
+| `/examenes/inscripciones` | POST | alumno | Inscribirme a un examen (valida no duplicado, cupos) |
+| `/examenes/inscripciones/{id}` | DELETE | alumno/admin | Cancelar inscripción (alumno propia, admin cualquiera) |
+
+**Tests (15 tests, todos ✅):**
+1. GET `/examenes/` como admin → lista
+2. GET `/examenes/` como no-admin → 403
+3. POST `/examenes/` como admin → 201
+4. POST `/examenes/` materia inexistente → 404
+5. POST `/examenes/` como no-admin → 403
+6. GET `/examenes/disponibles` → lista con cupos
+7. GET `/examenes/disponibles?periodo=` → filtrado
+8. POST `/examenes/inscripciones` → 201
+9. POST `/examenes/inscripciones` sin cupos → 400
+10. POST `/examenes/inscripciones` duplicado → 409
+11. GET `/examenes/inscriptos` → lista
+12. DELETE `/examenes/inscripciones/{id}` → 200
+13. DELETE inscripción inexistente → 404
+14. DELETE inscripción de otro alumno → 403
+15. DELETE admin cancela cualquiera → 200
+
+**Migración:** `b890f76d76ae` — aplicada con `alembic upgrade head`
+
+### 11.6 7F — Pagos online + Notificaciones push
+
+#### 11.6.1 7F.1 — Pagos online (Bancard stub)
+
+**Contexto:** El plan original menciona integración con Bancard como próximo paso. Se implementa un stub del gateway para preparar el flujo sin credenciales reales.
+
+**Modelo (`app/models/financiero.py` — clase `PagoOnline`):**
+
+```python
+class PagoOnline(Base):
+    __tablename__ = "pagos_online"
+    id, cuota_id (FK), alumno_id (FK), monto Numeric(12,2)
+    transaction_id (unique), estado (pendiente/confirmado/rechazado)
+    gateway_url, gateway_response (JSON), creado_en, confirmado_en
+```
+
+**Endpoints:**
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/finanzas/pagos/init` | POST | alumno | Crea PagoOnline, devuelve redirect_url simulada |
+| `/finanzas/pagos/confirm` | POST | cualquiera | Callback del gateway, marca cuota como pagada |
+| `/finanzas/pagos/online/{id}` | GET | alumno propio | Estado del pago |
+
+**Frontend:** Botón "💳 Pagar Online" en `MisCuotas.tsx` para cuotas pendientes/vencidas. Abre `redirect_url` en nueva pestaña.
+
+**Migración:** `c6d7e8f9g0h1` — manual (sin acceso a Postgres local para autogenerate)
+
+#### 11.6.2 7F.2 — Notificaciones push
+
+**Modelo (`app/models/financiero.py` — clase `SuscripcionPush`):**
+
+```python
+class SuscripcionPush(Base):
+    __tablename__ = "suscripciones_push"
+    id, user_id (FK), endpoint, p256dh, auth, user_agent, created_at
+```
+
+**Endpoints:**
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/notificaciones/subscribe` | POST | cualquiera | Guarda suscripción Web Push |
+| `/notificaciones/subscribe` | DELETE | cualquiera | Elimina suscripción |
+| `/notificaciones/test` | POST | cualquiera | Envía notificación de prueba (stub) |
+
+**Router:** `app/routers/notificaciones_router.py` — registrado en `__init__.py` y `main.py`.
+
+### 11.7 Criterios de aceptación de Fase 7
+
+- [x] `cd frontend && npx tsc --noEmit` → 0 errores
+- [x] `cd frontend && npm run build` → exitoso
+- [x] `cd backend && pytest tests/test_examenes.py tests/test_financiero.py tests/test_becas.py tests/test_security.py tests/test_flow.py -v` → 80/80 passed
+- [x] Cada nuevo componente tiene estado vacío (empty state)
+- [x] Cada nuevo endpoint tiene test
+- [x] No hay regresión visual en rutas existentes
+
+---
+
+## 12. Cronograma consolidado y dependencias
 
 | Fase | Semanas | Depende de | Puede paralelizarse con |
 |---|---|---|---|
@@ -880,7 +1114,7 @@ Con dos desarrolladores dividiendo backend/frontend por fase, el total puede red
 
 ---
 
-## 11. Plan de pruebas y control de calidad
+## 13. Plan de pruebas y control de calidad
 
 Se extiende la práctica ya establecida (49 tests actuales) a cada módulo nuevo, incluyendo cobertura específica para becas diferenciadas y facturación electrónica.
 
@@ -910,7 +1144,7 @@ Se extiende la práctica ya establecida (49 tests actuales) a cada módulo nuevo
 
 ---
 
-## 12. Riesgos técnicos y mitigación
+## 14. Riesgos técnicos y mitigación
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
@@ -920,11 +1154,11 @@ Se extiende la práctica ya establecida (49 tests actuales) a cada módulo nuevo
 | Falla de la API de guarani.app bloquea el registro de pagos | Alto | Principio de degradación con gracia (sección 4B.6): el pago se registra igual, el comprobante se reintenta aparte |
 | Se aplica el % de descuento incorrecto a una beca externa (ITAIPU) por error manual | Alto | Campo editable_porcentaje bloqueado a nivel de backend, no solo de frontend, para fuentes externas |
 | Job de renovación de becas mal configurado afecta a becados en masa | Medio | Ejecutar el job en modo 'dry-run' (solo reporte) durante la primera semana de la Fase 4 |
-| Dependencia entre fases retrasa el cronograma si una se extiende | Medio | Backend de Fase 4 diseñado para avanzar en paralelo a Fases 2 y 3 (sección 10) |
+| Dependencia entre fases retrasa el cronograma si una se extiende | Medio | Backend de Fase 4 diseñado para avanzar en paralelo a Fases 2 y 3 (sección 12) |
 | Pérdida de sesión masiva al desplegar el nuevo esquema de autenticación | Medio | Retrocompatibilidad con tokens del esquema anterior hasta su expiración natural |
 | Storage mal configurado expone documentos sensibles (comprobantes, historiales) | Alto | URLs firmadas de expiración corta; bucket privado por defecto; revisión de permisos antes de cada despliegue |
 
-### 12.1 Fuera de alcance de este plan
+### 14.1 Fuera de alcance de este plan
 
 Los siguientes elementos corresponden a la línea de producto 'colegio' (documento separado) o a integraciones de largo plazo a evaluar una vez consolidada la base universitaria:
 

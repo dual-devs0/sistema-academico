@@ -40,6 +40,7 @@ class EquivalenciaMateriaOut(BaseModel):
 
 
 class ExamenSuficienciaCreate(BaseModel):
+    alumno_id: int
     materia_id: int
     fecha: date
 

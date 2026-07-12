@@ -45,6 +45,7 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
   const [asistencia, setAsistencia] = useState<number | null>(null)
   const [pwNew, setPwNew] = useState('')
   const [pwConf, setPwConf] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const [becasActivas, setBecasActivas] = useState<BecaActiva[]>([])
@@ -244,11 +245,24 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
               <input className="input-uca" type="password" value={pwNew} onChange={e => setPwNew(e.target.value)} style={{ marginBottom: 12 }} />
               <div className="mono-label" style={{ marginBottom: 6 }}>Confirmar contraseña</div>
               <input className="input-uca" type="password" value={pwConf} onChange={e => setPwConf(e.target.value)} style={{ marginBottom: 16 }} />
-              <button className="btn-primary" onClick={() => {
+              <button className="btn-primary" disabled={pwLoading} onClick={async () => {
                 if (!pwNew || pwNew !== pwConf) { emitToast('Las contraseñas no coinciden', 'error'); return }
-                emitToast('Contraseña actualizada'); setPwNew(''); setPwConf('')
+                if (pwNew.length < 8) { emitToast('La contraseña debe tener al menos 8 caracteres', 'error'); return }
+                setPwLoading(true)
+                try {
+                  if (role === 'admin') {
+                    await api.patch(`/users/${userId}`, { password: pwNew })
+                  } else {
+                    await api.patch('/alumno/mi-perfil', { password: pwNew })
+                  }
+                  emitToast('Contraseña actualizada correctamente')
+                  setPwNew(''); setPwConf('')
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : 'Error al actualizar contraseña'
+                  emitToast(msg, 'error')
+                } finally { setPwLoading(false) }
               }}>
-                <i className="ti ti-lock-check" /> Actualizar contraseña
+                <i className={`ti ${pwLoading ? 'ti-loader-2' : 'ti-lock-check'}`} style={pwLoading ? { animation: 'spin 1s linear infinite' } : {}} /> {pwLoading ? 'Actualizando...' : 'Actualizar contraseña'}
               </button>
             </div>
           )}

@@ -681,6 +681,13 @@ export default function Programa() {
     setClaseOpen(null)
   }
 
+  const temario = data.find(t => t.materia === activa)
+  const totalClases = data.reduce((s, t) => s + t.clases.length, 0)
+  const totalComp = data.reduce((s, t) => s + t.clases.filter(c => c.completada).length, 0)
+  const progresoGlob = totalClases ? Math.round((totalComp / totalClases) * 100) : 0
+  const completadas = temario?.clases.filter(c => c.completada).length ?? 0
+  const progreso = temario?.clases.length ? Math.round((completadas / temario.clases.length) * 100) : 0
+
   if (cargando) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg-base)', color:'var(--text-muted)', fontFamily:'Inter,system-ui,sans-serif', flexDirection:'column', gap:12 }}>
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation:'spin 1s linear infinite' }}>
