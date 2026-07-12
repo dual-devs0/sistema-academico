@@ -4,6 +4,55 @@ Formato cronológico inverso (nuevo arriba).
 
 ---
 
+## 2026-07-11 — Cierre v1: infraestructura de tests + PR
+
+### Añadido
+- `mobile/__tests__/{login,dashboard,scanner}.test.tsx` — jest-expo +
+  `@testing-library/react-native`.
+- `mobile/jest.setup.js` — mocks completos de `react-native-reanimated`
+  v4, `react-native-worklets`, `react-native-svg`, `react-native-css-interop`
+  (NativeWind v4), `expo-camera`, `expo-blur`, `expo-local-authentication`,
+  `expo-secure-store`, `@react-native-async-storage/async-storage`.
+- `mobile/__mocks__/react-native-safe-area-context.js`.
+- `tsconfig.json`: agregado `"types": ["jest", "node"]` — `expo/tsconfig.base`
+  no los incluye por defecto, rompía `tsc --noEmit` sobre archivos de test.
+
+### Cerrado
+- Investigación vitest frontend web (fase 7B) documentada como deuda
+  técnica en `PLAN_DESARROLLO_MOBILE.md` — el runner arrancaba pero las
+  suites de componentes fallaban por incompatibilidad JSX transform /
+  config Vite actual. No bloquea al móvil (su contrato de API está
+  cubierto por `pytest` del backend).
+
+### Estado final v1
+- **Tests mobile: 10/10 passed** (3 suites).
+- **Tests backend: 221/221 passed** (incluye 6 tests del endpoint QR).
+- **`tsc --noEmit` mobile: 0 errores.**
+- **9/9 pantallas implementadas**: Login, Dashboard, Notas, Scanner,
+  Horario, Perfil, Cursos, Cuenta, Exámenes.
+
+### Deuda técnica remanente (no bloqueante para v1)
+- Falta `assets/campus.jpg` — login usa fondo placeholder oscuro.
+- Backend no expone `/examenes/*` — pantalla 9 muestra "Próximamente".
+- Backend no expone `fuente_beca` en `/alumno/mi-perfil` — badge becado
+  siempre dice "INSTITUCIONAL".
+- Backend no expone historial de pagos ni `fecha_pago` en cuotas —
+  transacciones de Cuenta derivadas de `fecha_vencimiento` (impreciso).
+- Cobertura de tests mobile parcial: 3 de 9 pantallas (login, dashboard,
+  scanner). Faltan notas, horario, perfil, cursos, cuenta, examenes.
+- Sin telemetría / crash reporting (Sentry, PostHog).
+- Sin cache HTTP — cada navegación re-fetchea.
+- Vitest frontend web sin resolver (ver arriba).
+
+### Git
+- Commits `fbbc9ae` (spine + auth + 9 pantallas + endpoint QR) y
+  `f82d85c` (infra de tests + fix tsconfig) en rama `sistema-academico-v2`.
+- `sistema-academico-v2` es rama protegida en GitHub — push directo
+  rechazado (GH006). Publicado en rama `mobile-v1-completa` con PR
+  pendiente de apertura hacia `sistema-academico-v2`.
+
+---
+
 ## 2026-07-11 — Backend endpoint QR asistencia + sync móvil
 
 ### Backend
