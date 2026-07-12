@@ -18,6 +18,8 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from uuid import uuid4
+
 from app import database
 from app.dependencias import get_current_user, require_role
 from app.models.financiero import (
@@ -25,7 +27,9 @@ from app.models.financiero import (
     Cuota,
     Pago,
     Comprobante,
+    PagoOnline,
 )
+from app.models.users import User
 from app.schemas.financiero import (
     ConceptoArancelCreate,
     ConceptoArancelOut,
@@ -36,6 +40,10 @@ from app.schemas.financiero import (
     ComprobanteOut,
     ComprobantePendienteOut,
     EstadoDeudaOut,
+    PagoOnlineInitRequest,
+    PagoOnlineInitResponse,
+    PagoOnlineConfirmRequest,
+    PagoOnlineOut,
 )
 from app.services.financiero import (
     generar_cuotas_alumno,
@@ -299,3 +307,96 @@ def estado_deuda_inscripcion(
         db=db,
         es_admin=True,
     )
+
+
+# ── Pagos online (stub Bancard) ──────────────────────────────────────
+
+
+@router.post(
+    "/pagos/init",
+    response_model=PagoOnlineInitResponse,
+    summary="Iniciar pago online (stub)",
+)
+def pago_online_init(
+    body: PagoOnlineInitRequest,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("alumno")),
+):
+    cuota = db.query(Cuota).filter(Cuota.id == body.cuota_id).first()
+    if not cuota:
+        raise HTTPException(404, "Cuota no encontrada")
+    if cuota.alumno_id != current_user.id:
+        raise HTTPException(403, "Esta cuota no te pertenece")
+    if cuota.estado == "pagada":
+        raise HTTPException(400, "La cuota ya está pagada")
+
+    transaction_id = str(uuid4())
+    pago = PagoOnline(
+        cuota_id=cuota.id,
+        alumno_id=current_user.id,
+        monto=cuota.monto_a_pagar,
+        transaction_id=transaction_id,
+        estado="pendiente",
+        gateway_url=f"https://gateway.stub/bancard/checkout?transaction={transaction_id}",
+    )
+    db.add(pago)
+    db.commit()
+    db.refresh(pago)
+
+    return PagoOnlineInitResponse(
+        pago_id=pago.id,
+        transaction_id=pago.transaction_id,
+        redirect_url=pago.gateway_url,
+        monto=pago.monto,
+    )
+
+
+@router.post(
+    "/pagos/confirm",
+    summary="Confirmar/callback del gateway (stub)",
+)
+def pago_online_confirm(
+    body: PagoOnlineConfirmRequest,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    pago = db.query(PagoOnline).filter(
+        PagoOnline.transaction_id == body.transaction_id
+    ).first()
+    if not pago:
+        raise HTTPException(404, "Transacción no encontrada")
+    if pago.estado != "pendiente":
+        raise HTTPException(400, "Transacción ya procesada")
+
+    if body.estado == "confirmado":
+        pago.estado = "confirmado"
+        pago.confirmado_en = datetime.now(timezone.utc)
+        pago.gateway_response = {"status": "confirmado", "timestamp": str(pago.confirmado_en)}
+
+        cuota = db.query(Cuota).filter(Cuota.id == pago.cuota_id).first()
+        if cuota:
+            cuota.estado = "pagada"
+    else:
+        pago.estado = "rechazado"
+        pago.gateway_response = {"status": "rechazado"}
+
+    db.commit()
+    return {"mensaje": f"Pago {body.estado}", "transaction_id": pago.transaction_id}
+
+
+@router.get(
+    "/pagos/online/{pago_id}",
+    response_model=PagoOnlineOut,
+    summary="Estado de un pago online",
+)
+def pago_online_status(
+    pago_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("alumno")),
+):
+    pago = db.query(PagoOnline).filter(PagoOnline.id == pago_id).first()
+    if not pago:
+        raise HTTPException(404, "Pago no encontrado")
+    if pago.alumno_id != current_user.id:
+        raise HTTPException(403, "Acceso denegado")
+    return pago

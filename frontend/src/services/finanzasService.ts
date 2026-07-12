@@ -208,6 +208,30 @@ export const downloadRendicion = async (fuente: string, periodo?: string): Promi
   a.click()
 }
 
+// ── Pagos Online ──────────────────────────────────────────────────────
+
+export interface PagoOnlineInitResponse {
+  pago_id: number
+  transaction_id: string
+  redirect_url: string
+  monto: string
+}
+
+export interface PagoOnlineStatus {
+  id: number
+  cuota_id: number
+  monto: string
+  transaction_id: string | null
+  estado: string
+  creado_en: string | null
+}
+
+export const initPagoOnline = (cuota_id: number) =>
+  api.post<PagoOnlineInitResponse>('/finanzas/pagos/init', { cuota_id })
+
+export const getPagoOnlineStatus = (pago_id: number) =>
+  api.get<PagoOnlineStatus>(`/finanzas/pagos/online/${pago_id}`)
+
 // Formatear Guaraníes
 export const formatGs = (valor: string | number): string => {
   const n = typeof valor === 'string' ? parseFloat(valor) : valor

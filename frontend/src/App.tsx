@@ -32,6 +32,7 @@ import GraduacionAlumno from './pages/GraduacionAlumno'
 import EquivalenciasAlumno from './pages/EquivalenciasAlumno'
 import PasantiasAdmin from './pages/PasantiasAdmin'
 import EquivalenciasAdmin from './pages/EquivalenciasAdmin'
+import BecasAlumno from './pages/BecasAlumno'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -62,9 +63,10 @@ const rolesPermitidos: Record<string, string[]> = {
   '/mi-graduacion':      ['alumno'],
   '/mis-equivalencias':  ['alumno'],
   '/asistencia/scan':    ['alumno'],
+  '/mis-becas':          ['alumno'],
 }
 
-function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
+export function RutaProtegida({ path, children }: { path: string; children: React.ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'ok' | 'denied'>(() =>
     getCurrentUser() ? 'ok' : sessionStorage.getItem('session_active') ? 'loading' : 'denied'
   )
@@ -127,6 +129,7 @@ function App() {
         <Route path="/pasantias-admin" element={<Layout><RutaProtegida path="/pasantias-admin"><PasantiasAdmin /></RutaProtegida></Layout>} />
         <Route path="/equivalencias-admin" element={<Layout><RutaProtegida path="/equivalencias-admin"><EquivalenciasAdmin /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><RutaProtegida path="/asistencia/scan"><AsistenciaScan /></RutaProtegida></Layout>} />
+        <Route path="/mis-becas" element={<Layout><RutaProtegida path="/mis-becas"><BecasAlumno /></RutaProtegida></Layout>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

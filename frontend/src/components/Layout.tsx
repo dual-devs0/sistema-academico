@@ -25,6 +25,7 @@ const menuAlumno: MenuItem[] = [
   { label: 'Graduación', path: '/mi-graduacion', icon: 'ti-graduation-cap' },
   { label: 'Trámites', path: '/tramites', icon: 'ti-file-description' },
   { label: 'Mis Cuotas', path: '/mis-cuotas', icon: 'ti-coin' },
+  { label: 'Becas', path: '/mis-becas', icon: 'ti-receipt-2' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
