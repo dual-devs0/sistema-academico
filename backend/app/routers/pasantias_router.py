@@ -88,7 +88,7 @@ def crear_solicitud_endpoint(
 ):
     try:
         pasantia = crear_solicitud_pasantia(
-            alumno_id=current_user["user_id"],
+            alumno_id=current_user.user_id,
             empresa_id=data.empresa_id,
             fecha_inicio=data.fecha_inicio,
             horas_requeridas=data.horas_requeridas,

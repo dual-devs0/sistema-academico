@@ -20,7 +20,7 @@ def agregar_materia_a_malla(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     carrera = (
         db.query(models.carrera.Carrera)
@@ -77,7 +77,7 @@ def quitar_materia_de_malla(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     pm = (
         db.query(models.pensum_materia.PensumMateria)
@@ -122,7 +122,7 @@ def crear_correlatividad(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     if data.materia_id == data.prerrequisito_id:
         raise HTTPException(
@@ -157,7 +157,7 @@ def eliminar_correlatividad(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     corr = (
         db.query(models.correlatividad.Correlatividad)
@@ -248,7 +248,7 @@ def avance_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
     if not alumno:
@@ -314,7 +314,7 @@ def creditos_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
     if not alumno:

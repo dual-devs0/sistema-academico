@@ -260,6 +260,13 @@ jest.mock('expo-local-authentication', () => ({
   authenticate: jest.fn(),
   hasHardwareAsync: jest.fn().mockResolvedValue(false),
   isEnrolledAsync: jest.fn().mockResolvedValue(false),
+  authenticateAsync: jest.fn().mockResolvedValue({ success: false }),
+  supportedAuthenticationTypesAsync: jest.fn().mockResolvedValue([]),
+  AuthenticationType: {
+    FINGERPRINT: 1,
+    FACIAL_RECOGNITION: 2,
+    IRIS: 3,
+  },
 }))
 
 // Mock expo-secure-store

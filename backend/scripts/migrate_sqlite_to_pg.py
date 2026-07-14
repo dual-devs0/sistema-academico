@@ -43,7 +43,6 @@ TABLE_ORDER = [
     "asistencias",
     "apuntes",
     "programas",
-    "temarios",
     "horarios",
     "foro_hilos",
     "foro_mensajes",

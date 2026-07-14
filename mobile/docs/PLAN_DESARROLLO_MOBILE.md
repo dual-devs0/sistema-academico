@@ -40,7 +40,7 @@ Numeradas según `CLAUDE.md`. Estado actual:
 |---|---|---|---|
 | 1 | `app/(auth)/login.tsx` | Login (usuario/contraseña, biométrico stub) | ✅ Completada |
 | 2 | `app/(tabs)/index.tsx` | Dashboard: KPIs, próximo evento, avance | ✅ Completada |
-| 3 | `app/(tabs)/notas.tsx` | Calificaciones por semestre + desglose | ✅ Completada |
+| 3 | `app/(tabs)/cursos.tsx` | Grid 2 col materias, DonutChart asistencia + puntos (fusionado con Notas, match boceto) | ✅ Completada |
 | 4 | `app/scanner.tsx` | QR scanner cámara + confirmación asistencia | ✅ Completada (backend endpoint listo) |
 | 5 | `app/(tabs)/horario.tsx` | Calendario mensual + eventos del día | ✅ Completada |
 | 6 | `app/(tabs)/perfil.tsx` | Perfil, ajustes, logout | ✅ Completada |
@@ -64,6 +64,8 @@ central elevado (`app/(tabs)/_layout.tsx`).
 | `DonutChart` | Círculo de asistencia SVG con strokeDashoffset animado + umbrales | ✅ |
 | `SkeletonLoader` + `SkeletonGroup` | Placeholder animado (pulse) | ✅ |
 | `ScreenHeader` | Cabecera compartida (avatar + nombre + campana / back + título) | ✅ |
+| `UserAvatar` | Avatar reusable (foto o iniciales sobre gradiente cian), tamaño/borde configurables | ✅ |
+| `NotificationsBell` | Campana con badge + modal sheet de notificaciones (AsyncStorage, semilla local) | ✅ |
 
 Faltan (se irán agregando bajo demanda de cada pantalla):
 
@@ -176,7 +178,10 @@ para paridad className / StyleSheet.
 | No hay error boundary global — un throw en render tumba la app | UX pobre en bug inesperado | Media |
 | Fondo login estático — CLAUDE.md pide imagen de campus | Estética | Baja |
 | Tabs bar sin animación de indicador — solo cambia color | Perceptible pero no crítico | Baja |
-| Sin dark/light toggle — hardcoded dark | Requerimiento del CLAUDE.md | Media |
+| Sin dark/light toggle visual real — `useTheme` soporta preferencia pero no hay tokens `light` en `constants/design.ts` | Toggle Modo Oscuro cambia preferencia pero UI sigue dark-only | Media |
+| No hay endpoint de notificaciones backend — `NotificationsBell` usa semilla local + AsyncStorage | Notificaciones no reflejan eventos reales del servidor | Media |
+| Subtítulo Dashboard usa `Carrera #{id}` en vez de nombre real + semestre — backend no expone nombre de carrera en `/alumno/mi-perfil` ni semestre actual del alumno | No pixel-exacto al boceto ("Ingeniería Informática · 4.º Semestre") | Baja |
+| `/auth/recuperar-contrasena` no valida formato de email — cualquier string se acepta silenciosamente (comportamiento del backend, no del móvil) | UX podría confundir con "usuario inexistente" | Baja |
 | Sin telemetría (Sentry, PostHog) | Sin visibilidad de crashes | Alta antes de release |
 
 ---

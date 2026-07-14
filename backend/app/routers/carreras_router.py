@@ -12,7 +12,7 @@ def create_carrera(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     new_carrera = models.carrera.Carrera(nombre=carrera.nombre)
     db.add(new_carrera)

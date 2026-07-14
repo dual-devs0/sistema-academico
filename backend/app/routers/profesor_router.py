@@ -3,12 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
+from app.schemas.current_user_schema import CurrentUser
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 
 
-def _requiere_profesor(current_user: dict):
-    if current_user["role"] != "profesor":
+def _requiere_profesor(current_user: CurrentUser):
+    if current_user.role != "profesor":
         raise HTTPException(
             status_code=403, detail="Solo profesores pueden acceder a este recurso"
         )
@@ -25,7 +26,7 @@ def mi_historico(
     ofertas = (
         db.query(models.oferta_materia.OfertaMateria)
         .filter(
-            models.oferta_materia.OfertaMateria.profesor_id == current_user["user_id"]
+            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id
         )
         .order_by(models.oferta_materia.OfertaMateria.periodo.desc())
         .all()
@@ -107,7 +108,7 @@ def mi_agenda(
     ofertas_activas = (
         db.query(models.oferta_materia.OfertaMateria)
         .filter(
-            models.oferta_materia.OfertaMateria.profesor_id == current_user["user_id"],
+            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id,
             models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
         )
         .all()
@@ -186,7 +187,7 @@ def mi_agenda(
     hasta_dt = datetime.combine(hasta, datetime.max.time())
     recordatorios_q = db.query(models.recordatorio_docente.RecordatorioDocente).filter(
         models.recordatorio_docente.RecordatorioDocente.profesor_id
-        == current_user["user_id"],
+        == current_user.user_id,
         models.recordatorio_docente.RecordatorioDocente.fecha >= desde_dt,
         models.recordatorio_docente.RecordatorioDocente.fecha <= hasta_dt,
     )
@@ -217,7 +218,7 @@ def crear_recordatorio(
 ):
     _requiere_profesor(current_user)
     nuevo = models.recordatorio_docente.RecordatorioDocente(
-        profesor_id=current_user["user_id"],
+        profesor_id=current_user.user_id,
         titulo=data.titulo,
         descripcion=data.descripcion,
         fecha=data.fecha,
@@ -247,7 +248,7 @@ def actualizar_recordatorio(
     )
     if not rec:
         raise HTTPException(status_code=404, detail="Recordatorio no encontrado")
-    if rec.profesor_id != current_user["user_id"]:
+    if rec.profesor_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(rec, key, value)
@@ -270,7 +271,7 @@ def eliminar_recordatorio(
     )
     if not rec:
         raise HTTPException(status_code=404, detail="Recordatorio no encontrado")
-    if rec.profesor_id != current_user["user_id"]:
+    if rec.profesor_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(rec)
     db.commit()

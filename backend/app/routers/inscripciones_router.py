@@ -41,12 +41,12 @@ def inscribir(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("alumno", "admin"):
+    if current_user.role not in ("alumno", "admin"):
         raise HTTPException(status_code=403, detail="No autorizado")
     # Force the student to only enroll themselves
     alumno_id = inscripcion.alumno_id
-    if current_user["role"] == "alumno":
-        alumno_id = current_user["user_id"]
+    if current_user.role == "alumno":
+        alumno_id = current_user.user_id
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == inscripcion.materia_id)
@@ -76,7 +76,7 @@ def inscribir(
     oferta = _oferta_activa_o_404(db, inscripcion.materia_id)
 
     # ── Bloqueo por mora ──────────────────────────────────────────────
-    es_admin = current_user["role"] == "admin"
+    es_admin = current_user.role == "admin"
     override_mora = (
         inscripcion.override_mora if hasattr(inscripcion, "override_mora") else False
     )
@@ -86,7 +86,7 @@ def inscribir(
             # Admin override — registrar en auditoría
             registrar_override_mora(
                 alumno_id=alumno_id,
-                admin_id=current_user["user_id"],
+                admin_id=current_user.user_id,
                 db=db,
                 oferta_materia_id=oferta.id,
                 motivo="Override manual en inscripción. Cuotas vencidas: "
@@ -155,7 +155,7 @@ def desinscribir(
     )
     if not ins:
         raise HTTPException(status_code=404, detail="Inscripcion no encontrada")
-    if current_user["role"] == "alumno" and ins.alumno_id != current_user["user_id"]:
+    if current_user.role == "alumno" and ins.alumno_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(ins)
     db.commit()
@@ -198,10 +198,10 @@ def alumnos_por_materia(
 def list_inscripciones(
     db: Session = Depends(database.get_db), current_user=Depends(get_current_user)
 ):
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         rows = (
             db.query(models.inscripcion.Inscripcion)
-            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
     else:

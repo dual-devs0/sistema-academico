@@ -35,7 +35,7 @@ def subscribe(
         raise HTTPException(400, "endpoint requerido")
 
     existing = db.query(SuscripcionPush).filter(
-        SuscripcionPush.user_id == current_user.id,
+        SuscripcionPush.user_id == current_user.user_id,
         SuscripcionPush.endpoint == endpoint,
     ).first()
 
@@ -45,7 +45,7 @@ def subscribe(
         existing.user_agent = request.headers.get("user-agent")
     else:
         sub = SuscripcionPush(
-            user_id=current_user.id,
+            user_id=current_user.user_id,
             endpoint=endpoint,
             p256dh=keys.get("p256dh", ""),
             auth=keys.get("auth", ""),
@@ -71,7 +71,7 @@ def unsubscribe(
         raise HTTPException(400, "endpoint requerido")
 
     db.query(SuscripcionPush).filter(
-        SuscripcionPush.user_id == current_user.id,
+        SuscripcionPush.user_id == current_user.user_id,
         SuscripcionPush.endpoint == endpoint,
     ).delete()
     db.commit()
@@ -87,7 +87,7 @@ def test_notification(
     current_user=Depends(get_current_user),
 ):
     subs = db.query(SuscripcionPush).filter(
-        SuscripcionPush.user_id == current_user.id,
+        SuscripcionPush.user_id == current_user.user_id,
     ).all()
     return {
         "mensaje": f"Notificación simulada",

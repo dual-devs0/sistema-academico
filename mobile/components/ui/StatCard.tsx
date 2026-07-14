@@ -84,6 +84,9 @@ export function StatCard({
             fontFamily: fontFamily.monoBold,
             fontSize: fontSize.numeric,
             lineHeight: fontSize.numeric + 2,
+            textShadowColor: valueColor ?? colors.cyan,
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 8,
           }}
           numberOfLines={1}
           adjustsFontSizeToFit

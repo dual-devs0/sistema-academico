@@ -144,9 +144,6 @@ def _apply_db_migrations():
             ("visibilidad", "VARCHAR(20) DEFAULT 'publico'"),
             ("fecha_subida", "DATETIME"),
         ],
-        "temarios": [
-            ("bibliografia", "JSON"),
-        ],
         "eventos_calendario": [
             ("fecha_fin", "DATE"),
             ("anio", "INTEGER"),

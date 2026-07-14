@@ -1,14 +1,16 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app import database, models, schemas
 from app.auth import ALGORITHM, SECRET_KEY
 from app.dependencias import get_current_user
+from app.email_utils import send_alerta_inasistencia_email_bg
 from app.services.autorizacion import es_profesor_de_materia
+from app.schemas.current_user_schema import CurrentUser
 
 
 router = APIRouter(prefix="/asistencias", tags=["asistencias"])
@@ -18,6 +20,9 @@ router = APIRouter(prefix="/asistencias", tags=["asistencias"])
 
 QR_TOKEN_KIND = "asistencia_qr"
 QR_TOKEN_TTL_MINUTES = 15
+
+# ─── Alerta de inasistencia crítica ─────────────────────────────────────────
+UMBRAL_INASISTENCIA_CRITICA = 25.0
 
 
 def create_qr_token(materia_id: int, oferta_id: int) -> str:
@@ -48,9 +53,9 @@ def _oferta_activa_id(db: Session, materia_id: int) -> int | None:
     return oferta.id if oferta else None
 
 
-def _verificar_profesor_materia(db: Session, materia_id: int, current_user: dict):
+def _verificar_profesor_materia(db: Session, materia_id: int, current_user: CurrentUser):
     """Raises 403 if current_user is not the subject's teacher nor admin."""
-    if current_user["role"] == "admin":
+    if current_user.role == "admin":
         return
     materia = (
         db.query(models.materia.Materia)
@@ -59,15 +64,100 @@ def _verificar_profesor_materia(db: Session, materia_id: int, current_user: dict
     )
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
-    if not es_profesor_de_materia(db, materia_id, current_user["user_id"]):
+    if not es_profesor_de_materia(db, materia_id, current_user.user_id):
         raise HTTPException(
             status_code=403, detail="No sos el profesor titular de esta materia"
         )
 
 
+def _verificar_alerta_inasistencia(
+    db: Session,
+    background_tasks: BackgroundTasks,
+    user_id: int,
+    oferta_materia_id: int,
+) -> None:
+    """Si el alumno acaba de cruzar el 25% de inasistencia en la oferta
+    (antes < 25%, ahora >= 25%), notifica por email a alumno, profesor y
+    administradores. Reusa los mismos registros de asistencia (manual o QR).
+    Se dispara una sola vez por cruce, ya que solo alerta en el instante en
+    que el porcentaje pasa de <25% a >=25%; si luego sigue subiendo no
+    reenvía.
+    """
+    total = (
+        db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.user_id == user_id,
+            models.asistencia.Asistencia.oferta_materia_id == oferta_materia_id,
+        )
+        .count()
+    )
+    if total == 0:
+        return
+    ausentes = (
+        db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.user_id == user_id,
+            models.asistencia.Asistencia.oferta_materia_id == oferta_materia_id,
+            models.asistencia.Asistencia.presente == False,  # noqa: E712
+        )
+        .count()
+    )
+    pct_actual = (ausentes / total) * 100
+    if pct_actual < UMBRAL_INASISTENCIA_CRITICA:
+        return
+
+    # Estado justo antes de este registro (para detectar el cruce del umbral)
+    total_antes = total - 1
+    ausentes_antes = ausentes - 1 if ausentes > 0 else 0
+    pct_antes = (ausentes_antes / total_antes) * 100 if total_antes > 0 else 0.0
+    if pct_antes >= UMBRAL_INASISTENCIA_CRITICA:
+        return  # ya se había alertado en un registro anterior
+
+    oferta = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(models.oferta_materia.OfertaMateria.id == oferta_materia_id)
+        .first()
+    )
+    if not oferta:
+        return
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == oferta.materia_id)
+        .first()
+    )
+    alumno = db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    profesor = (
+        db.query(models.user.User)
+        .filter(models.user.User.id == oferta.profesor_id)
+        .first()
+    )
+    admins = (
+        db.query(models.user.User).filter(models.user.User.role == "admin").all()
+    )
+
+    emails = []
+    if alumno and alumno.email:
+        emails.append(alumno.email)
+    if profesor and profesor.email:
+        emails.append(profesor.email)
+    for admin in admins:
+        if admin.email:
+            emails.append(admin.email)
+    emails = list(dict.fromkeys(emails))  # dedupe preservando orden
+
+    send_alerta_inasistencia_email_bg(
+        background_tasks,
+        emails,
+        alumno.nombre or alumno.username if alumno else "Alumno",
+        materia.nombre if materia else "",
+        round(pct_actual, 1),
+    )
+
+
 @router.post("/", response_model=schemas.asistencia.AsistenciaOut)
 def create_asistencia(
     asistencia: schemas.asistencia.AsistenciaCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -109,6 +199,10 @@ def create_asistencia(
     db.add(new_asistencia)
     db.commit()
     db.refresh(new_asistencia)
+
+    if not asistencia.presente:
+        _verificar_alerta_inasistencia(db, background_tasks, asistencia.user_id, oferta_id)
+
     return new_asistencia
 
 
@@ -117,14 +211,16 @@ def list_asistencias(
     materia_id: Optional[int] = Query(None),
     user_id: Optional[int] = Query(None),
     fecha: Optional[date] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
     query = db.query(models.asistencia.Asistencia)
     # Alumno solo ve sus propias asistencias
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         query = query.filter(
-            models.asistencia.Asistencia.user_id == current_user["user_id"]
+            models.asistencia.Asistencia.user_id == current_user.user_id
         )
     else:
         if user_id is not None:
@@ -136,6 +232,7 @@ def list_asistencias(
         )
     if fecha is not None:
         query = query.filter(models.asistencia.Asistencia.fecha == fecha)
+    query = query.order_by(models.asistencia.Asistencia.id).offset(skip).limit(limit)
     return query.all()
 
 
@@ -143,6 +240,7 @@ def list_asistencias(
 def update_asistencia(
     asistencia_id: int,
     asistencia: schemas.asistencia.AsistenciaCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -167,6 +265,12 @@ def update_asistencia(
         setattr(existing, key, value)
     db.commit()
     db.refresh(existing)
+
+    if not existing.presente:
+        _verificar_alerta_inasistencia(
+            db, background_tasks, existing.user_id, existing.oferta_materia_id
+        )
+
     return existing
 
 
@@ -192,6 +296,7 @@ def delete_asistencia(
 @router.post("/lote", response_model=schemas.asistencia.AsistenciaLoteResponse)
 def cargar_asistencia_lote(
     lote: schemas.asistencia.AsistenciaLote,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -204,6 +309,7 @@ def cargar_asistencia_lote(
         )
     guardados = 0
     actualizados = 0
+    ausentes_user_ids = []
 
     for reg in lote.registros:
         alumno = (
@@ -237,7 +343,14 @@ def cargar_asistencia_lote(
             db.add(nueva)
             guardados += 1
 
+        if not reg.presente:
+            ausentes_user_ids.append(reg.user_id)
+
     db.commit()
+
+    for uid in ausentes_user_ids:
+        _verificar_alerta_inasistencia(db, background_tasks, uid, oferta_id)
+
     return schemas.asistencia.AsistenciaLoteResponse(
         guardados=guardados, actualizados=actualizados, total=guardados + actualizados
     )
@@ -254,7 +367,7 @@ def alumnos_asistencia(
     current_user=Depends(get_current_user),
 ):
     """Retorna alumnos matriculados con su porcentaje de asistencia."""
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
 
     ofertas_ids = [
@@ -320,7 +433,7 @@ def porcentaje_asistencia_alumno(
     current_user=Depends(get_current_user),
 ):
     """Porcentaje de asistencia de un alumno (global o por materia)."""
-    if current_user["role"] == "alumno" and current_user["user_id"] != user_id:
+    if current_user.role == "alumno" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     query = db.query(models.asistencia.Asistencia).filter(
@@ -418,7 +531,7 @@ def verificar_qr_asistencia(
     inscripcion = (
         db.query(models.inscripcion.Inscripcion)
         .filter(
-            models.inscripcion.Inscripcion.alumno_id == current_user["user_id"],
+            models.inscripcion.Inscripcion.alumno_id == current_user.user_id,
             models.inscripcion.Inscripcion.oferta_materia_id == oferta_activa_id,
         )
         .first()
@@ -433,7 +546,7 @@ def verificar_qr_asistencia(
     existente = (
         db.query(models.asistencia.Asistencia)
         .filter(
-            models.asistencia.Asistencia.user_id == current_user["user_id"],
+            models.asistencia.Asistencia.user_id == current_user.user_id,
             models.asistencia.Asistencia.oferta_materia_id == oferta_activa_id,
             models.asistencia.Asistencia.fecha == hoy,
         )
@@ -447,12 +560,12 @@ def verificar_qr_asistencia(
     # 5. Snapshot es_becado + insertar registro.
     alumno = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     es_becado = alumno.es_becado if alumno else False
     nueva = models.asistencia.Asistencia(
-        user_id=current_user["user_id"],
+        user_id=current_user.user_id,
         oferta_materia_id=oferta_activa_id,
         fecha=hoy,
         presente=True,
@@ -491,7 +604,7 @@ def verificar_qr_asistencia(
     return schemas.asistencia.QrVerifyResponse(
         materia_nombre=materia.nombre if materia else "",
         fecha=hoy,
-        hora_registro=datetime.now().strftime("%H:%M"),
+        hora_registro=datetime.now(timezone.utc).strftime("%H:%M"),
         presentes=presentes,
         ausentes=ausentes,
     )

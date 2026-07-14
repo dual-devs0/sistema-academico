@@ -107,3 +107,35 @@ def send_new_grade_email_bg(
         subtype=MessageType.html,
     )
     background_tasks.add_task(_send_with_retry, message)
+
+
+def send_alerta_inasistencia_email_bg(
+    background_tasks: BackgroundTasks,
+    emails_to: list[str],
+    alumno_nombre: str,
+    materia_nombre: str,
+    porcentaje: float,
+) -> None:
+    if not emails_to:
+        return
+    if not _credentials_configured():
+        print(
+            f"Mock Email sent to {emails_to}: Alerta inasistencia {alumno_nombre} "
+            f"en {materia_nombre} ({porcentaje}%)"
+        )
+        return
+
+    html = f"""
+    <h3>Alerta de inasistencia crítica</h3>
+    <p>El alumno <b>{alumno_nombre}</b> superó el 25% de faltas en
+    <b>{materia_nombre}</b>.</p>
+    <p>Porcentaje de inasistencia actual: <b>{porcentaje}%</b></p>
+    <p>Según reglamento, esto puede implicar pérdida de regularidad en la materia.</p>
+    """
+    message = MessageSchema(
+        subject=f"UCA - Alerta de inasistencia crítica en {materia_nombre}",
+        recipients=emails_to,
+        body=html,
+        subtype=MessageType.html,
+    )
+    background_tasks.add_task(_send_with_retry, message)

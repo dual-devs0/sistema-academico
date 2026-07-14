@@ -42,3 +42,16 @@ export async function refreshRequest(
 export async function logoutRequest(): Promise<void> {
   await api.post("/auth/logout", {});
 }
+
+/**
+ * Recuperación de contraseña. Endpoint existente en el backend
+ * (`POST /auth/recuperar-contrasena`, body `{ username_or_email }`).
+ * Por seguridad, el backend responde el mismo mensaje genérico exista o
+ * no el usuario — nunca revela si un username/email está registrado.
+ */
+export async function recuperarContrasenaRequest(usernameOrEmail: string): Promise<string> {
+  const { data } = await api.post<{ detail: string }>("/auth/recuperar-contrasena", {
+    username_or_email: usernameOrEmail,
+  });
+  return data.detail;
+}

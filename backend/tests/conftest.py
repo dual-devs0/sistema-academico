@@ -24,7 +24,6 @@ from app.models import (  # noqa: F401, E402
     puntaje as puntaje_model,
     apunte,
     evento_calendario,
-    temario,
     horario,
     financiero,  # noqa: F401 — registra todas las tablas financieras en Base.metadata
     tramites,  # noqa: F401 — registra tipos_tramite/solicitudes en Base.metadata

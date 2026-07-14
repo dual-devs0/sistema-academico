@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
+import { UserAvatar } from "../../components/ui/UserAvatar";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { StatCard } from "../../components/ui/StatCard";
 import { CyanBadge } from "../../components/ui/CyanBadge";
@@ -50,6 +52,8 @@ export default function PerfilScreen() {
   const [resumen, setResumen] = useState<MiResumen | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [u, r] = await Promise.all([
@@ -75,14 +79,6 @@ export default function PerfilScreen() {
   }, [load]);
 
   const nombre = user?.nombre ?? user?.username ?? "";
-  const initials = nombre
-    .split(" ")
-    .map((n) => n[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   const legajo = user ? formatLegajo(user.id) : "————";
   const promedio = resumen?.promedio_general;
   const asistencias = resumen?.asistencia ?? [];
@@ -142,7 +138,6 @@ export default function PerfilScreen() {
           <>
             <IdentitySection
               nombre={nombre}
-              initials={initials}
               carrera={carreraLabel(user)}
               legajo={legajo}
               esBecado={!!user?.es_becado}
@@ -181,16 +176,14 @@ export default function PerfilScreen() {
                 glyph="☾"
                 label="Modo Oscuro"
                 hint={
-                  theme.preference === "system"
-                    ? "Siguiendo el sistema"
-                    : theme.effective === "dark"
-                      ? "Activado"
-                      : "Desactivado"
+                  theme.preference === "dark"
+                    ? "Forzado — siempre oscuro"
+                    : "Siguiendo el sistema"
                 }
                 variant="toggle"
-                toggled={theme.effective === "dark"}
-                onToggle={() => {
-                  void theme.toggleDark();
+                toggled={theme.preference === "dark"}
+                onToggle={(v) => {
+                  void theme.setPreference(v ? "dark" : "system");
                 }}
               />
               <SettingRow
@@ -218,13 +211,13 @@ export default function PerfilScreen() {
                 glyph="?"
                 label="Ayuda y preguntas frecuentes"
                 variant="chevron"
-                onPress={() => {}}
+                onPress={() => setFaqOpen(true)}
               />
               <SettingRow
                 glyph="§"
                 label="Términos y privacidad"
                 variant="chevron"
-                onPress={() => {}}
+                onPress={() => setTermsOpen(true)}
               />
             </View>
 
@@ -260,6 +253,9 @@ export default function PerfilScreen() {
           </>
         )}
       </ScrollView>
+
+      <FaqModal visible={faqOpen} onClose={() => setFaqOpen(false)} />
+      <TermsModal visible={termsOpen} onClose={() => setTermsOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -270,13 +266,11 @@ export default function PerfilScreen() {
 
 function IdentitySection({
   nombre,
-  initials,
   carrera,
   legajo,
   esBecado,
 }: {
   nombre: string;
-  initials: string;
   carrera: string;
   legajo: string;
   esBecado: boolean;
@@ -291,28 +285,8 @@ function IdentitySection({
         paddingBottom: spacing.xl,
       }}
     >
-      <View
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: 40,
-          borderWidth: 2,
-          borderColor: colors.cyan,
-          backgroundColor: colors.surface,
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: spacing.md,
-        }}
-      >
-        <Text
-          style={{
-            color: colors.cyan,
-            fontFamily: fontFamily.interBold,
-            fontSize: fontSize.headlineLg,
-          }}
-        >
-          {initials || "··"}
-        </Text>
+      <View style={{ marginBottom: spacing.md }}>
+        <UserAvatar nombre={nombre} size={80} borderWidth={2} />
       </View>
       <Text
         style={{
@@ -425,6 +399,167 @@ function LoadingBody() {
       <SkeletonLoader height={64} style={{ width: "100%", marginTop: spacing.md }} />
       <SkeletonLoader height={64} style={{ width: "100%" }} />
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FAQ / Términos modals
+// ---------------------------------------------------------------------------
+
+const FAQ_ITEMS: { pregunta: string; respuesta: string }[] = [
+  {
+    pregunta: "¿Cómo registro asistencia?",
+    respuesta:
+      "Tocá el botón QR en el centro de la barra inferior, apuntá la cámara al código que muestra tu profesor y esperá la confirmación en pantalla.",
+  },
+  {
+    pregunta: "¿Dónde veo mis notas?",
+    respuesta:
+      "En la pestaña Cursos podés ver el porcentaje de asistencia y puntos de cada materia. Tocá una materia para ver el desglose completo de notas por componente.",
+  },
+  {
+    pregunta: "¿Cómo pago mis cuotas?",
+    respuesta:
+      'Entrá a "Estado de Cuenta" desde el inicio. Ahí ves el saldo pendiente, las cuotas del ciclo y podés iniciar el pago.',
+  },
+];
+
+function FaqModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <SupportModal visible={visible} onClose={onClose} title="Ayuda y preguntas frecuentes">
+      {FAQ_ITEMS.map((item, i) => (
+        <View
+          key={i}
+          style={{
+            marginBottom: spacing.lg,
+            paddingBottom: spacing.lg,
+            borderBottomWidth: i === FAQ_ITEMS.length - 1 ? 0 : 1,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.cyan,
+              fontFamily: fontFamily.interSemibold,
+              fontSize: fontSize.body,
+              marginBottom: spacing.xs,
+            }}
+          >
+            {item.pregunta}
+          </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.inter,
+              fontSize: fontSize.caption,
+              lineHeight: fontSize.caption * 1.5,
+            }}
+          >
+            {item.respuesta}
+          </Text>
+        </View>
+      ))}
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontFamily: fontFamily.interMedium,
+          fontSize: fontSize.caption,
+        }}
+      >
+        ¿Seguís con dudas? Escribinos a{" "}
+        <Text style={{ color: colors.cyan }}>soporte@uca.edu.py</Text>
+      </Text>
+    </SupportModal>
+  );
+}
+
+function TermsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <SupportModal visible={visible} onClose={onClose} title="Términos y privacidad">
+      <Text
+        style={{
+          color: colors.textSecondary,
+          fontFamily: fontFamily.inter,
+          fontSize: fontSize.caption,
+          lineHeight: fontSize.caption * 1.6,
+        }}
+      >
+        Los datos académicos (calificaciones, asistencia, estado de cuenta y
+        documentos) que ves en esta app pertenecen exclusivamente a tu
+        relación con la Universidad Católica de Asunción — sede Caacupé, y se
+        usan únicamente para brindarte el servicio del Portal Académico.
+        {"\n\n"}
+        No compartimos tu información académica ni personal con terceros
+        ajenos a la universidad. El acceso biométrico, si lo activás, se
+        procesa localmente en tu dispositivo — la app nunca almacena tu
+        huella ni tu rostro, solo el resultado de la verificación del
+        sistema operativo.
+        {"\n\n"}
+        Para consultas sobre tus datos o para solicitar su eliminación tras
+        egresar, contactá a secretaría académica.
+      </Text>
+    </SupportModal>
+  );
+}
+
+function SupportModal({
+  visible,
+  onClose,
+  title,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={{
+            marginTop: "auto",
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: radius.glass,
+            borderTopRightRadius: radius.glass,
+            borderWidth: 1,
+            borderColor: colors.border,
+            maxHeight: "75%",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: spacing.xl,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontFamily: fontFamily.interBold,
+                fontSize: fontSize.headline,
+              }}
+            >
+              {title}
+            </Text>
+            <Pressable onPress={onClose} hitSlop={12}>
+              <Text style={{ color: colors.textSecondary, fontSize: fontSize.headline }}>
+                ×
+              </Text>
+            </Pressable>
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>{children}</ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

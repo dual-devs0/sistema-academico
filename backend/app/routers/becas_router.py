@@ -119,7 +119,7 @@ def postular_beca(
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role(["alumno", "admin"])),
 ):
-    alumno_id = current_user["user_id"]
+    alumno_id = current_user.user_id
 
     beca = db.query(BecaCatalogo).filter(BecaCatalogo.id == data.beca_id).first()
     if not beca:
@@ -208,7 +208,7 @@ def revisar_postulacion(
 
     post.estado = data.estado
     post.motivo_rechazo = data.motivo_rechazo
-    post.revisado_por = current_user["user_id"]
+    post.revisado_por = current_user.user_id
     post.revisado_en = datetime.now(timezone.utc)
 
     # Si aprobada: crear BecaActiva
@@ -221,7 +221,7 @@ def revisar_postulacion(
                 fuente_id=beca.fuente_id,
                 periodo_inicio=datetime.now(timezone.utc).strftime("%Y-%m"),
                 estado_renovacion="vigente",
-                otorgado_por=current_user["user_id"],
+                otorgado_por=current_user.user_id,
             )
             db.add(activa)
             # Reducir cupos
@@ -246,7 +246,7 @@ def becas_activas_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] == "alumno" and current_user["user_id"] != alumno_id:
+    if current_user.role == "alumno" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     return get_becas_activas_out(alumno_id, db)
 

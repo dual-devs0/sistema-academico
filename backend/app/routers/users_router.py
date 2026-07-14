@@ -24,7 +24,7 @@ def create_user(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     new_user = models.user.User(
         username=user.username,
@@ -47,7 +47,7 @@ def get_me(
 ):
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
@@ -64,7 +64,7 @@ def list_users(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     query = db.query(models.user.User)
     if role:
@@ -85,7 +85,7 @@ def list_users(
 
 @router.get("/secure")
 def secure_endpoint(current_user=Depends(get_current_user)):
-    return {"msg": f"Hola {current_user['username']}, tu rol es {current_user['role']}"}
+    return {"msg": f"Hola {current_user.username}, tu rol es {current_user.role}"}
 
 
 @router.post("/me/foto")
@@ -102,7 +102,7 @@ async def upload_foto_perfil(
 
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     user.foto_url = key
@@ -120,7 +120,7 @@ def update_user(
 ):
     from app.email_utils import send_password_reset_email_bg
 
-    if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+    if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
@@ -130,7 +130,7 @@ def update_user(
     new_password = update_data.get("password")
 
     # Non-admin users cannot change role, carrera_id, or es_becado
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         for forbidden in ("role", "carrera_id", "es_becado"):
             update_data.pop(forbidden, None)
 
@@ -160,7 +160,7 @@ def delete_user(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:

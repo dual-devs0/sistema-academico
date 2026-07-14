@@ -32,6 +32,12 @@ def _get_cookie(response, name: str) -> str | None:
     return None
 
 
+def _csrf_headers(login_or_refresh_res) -> dict:
+    """Header X-CSRF-Token a partir del csrf_token devuelto en el body de
+    /auth/login o /auth/refresh — necesario para el flujo cookie en /auth/refresh."""
+    return {"X-CSRF-Token": login_or_refresh_res.json()["csrf_token"]}
+
+
 # ---------------------------------------------------------------------------
 # Login
 # ---------------------------------------------------------------------------
@@ -97,11 +103,11 @@ def test_login_guarda_refresh_token_en_bd(client, seed, db):
 
 
 def test_refresh_valido_emite_nuevo_access_token(client, seed):
-    client.post(
+    login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
     # cookie se envía automáticamente en TestClient con follow_redirects
-    res = client.post("/auth/refresh")
+    res = client.post("/auth/refresh", headers=_csrf_headers(login_res))
     assert res.status_code == 200
     assert "access_token" in res.json()
 
@@ -109,10 +115,10 @@ def test_refresh_valido_emite_nuevo_access_token(client, seed):
 def test_refresh_rota_token_revoca_anterior(client, seed, db):
     from app.models.refresh_token import RefreshToken
 
-    client.post(
+    login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
-    client.post("/auth/refresh")
+    client.post("/auth/refresh", headers=_csrf_headers(login_res))
     # El token anterior debe estar revocado
     revocados = db.query(RefreshToken).filter(RefreshToken.revocado).count()
     assert revocados >= 1
@@ -126,28 +132,62 @@ def test_refresh_sin_cookie_retorna_401(client, seed):
 def test_refresh_token_revocado_retorna_401(client, seed, db):
     from app.models.refresh_token import RefreshToken
 
-    client.post(
+    login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
     # Revocar manualmente todos los tokens
     db.query(RefreshToken).update({"revocado": True})
     db.commit()
-    res = client.post("/auth/refresh")
+    res = client.post("/auth/refresh", headers=_csrf_headers(login_res))
     assert res.status_code == 401
 
 
 def test_refresh_token_expirado_retorna_401(client, seed, db):
     from app.models.refresh_token import RefreshToken
 
-    client.post(
+    login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
     # Expirar todos los tokens
     pasado = datetime.now(timezone.utc) - timedelta(days=1)
     db.query(RefreshToken).update({"expira_en": pasado})
     db.commit()
-    res = client.post("/auth/refresh")
+    res = client.post("/auth/refresh", headers=_csrf_headers(login_res))
     assert res.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# CSRF (double-submit cookie) sobre /auth/refresh — flujo cookie (web)
+# ---------------------------------------------------------------------------
+
+
+def test_refresh_sin_csrf_header_retorna_403(client, seed):
+    client.post(
+        "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
+    )
+    # Cookie de refresh presente, pero sin header X-CSRF-Token
+    res = client.post("/auth/refresh")
+    assert res.status_code == 403
+
+
+def test_refresh_csrf_header_no_coincide_retorna_403(client, seed):
+    client.post(
+        "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
+    )
+    res = client.post("/auth/refresh", headers={"X-CSRF-Token": "token-falso"})
+    assert res.status_code == 403
+
+
+def test_refresh_por_body_no_exige_csrf(client, seed):
+    # Flujo móvil (body, sin cookie jar) no depende de auto-envío de cookie
+    # → no aplica el mismo vector CSRF, no se exige el header.
+    login_res = client.post(
+        "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
+    )
+    raw = login_res.json()["refresh_token"]
+    client.cookies.clear()
+    res = client.post("/auth/refresh", json={"refresh_token": raw})
+    assert res.status_code == 200
 
 
 # ---------------------------------------------------------------------------

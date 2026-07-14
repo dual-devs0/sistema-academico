@@ -60,7 +60,7 @@ def create_materia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.materia.Materia)
@@ -91,6 +91,8 @@ def create_materia(
 def list_materias(
     profesor_id: Optional[int] = Query(None),
     carrera_id: Optional[int] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -105,6 +107,7 @@ def list_materias(
         )
     if carrera_id is not None:
         query = query.filter(models.materia.Materia.carrera_id == carrera_id)
+    query = query.order_by(models.materia.Materia.id).offset(skip).limit(limit)
     return [_enrich(m, db) for m in query.all()]
 
 
@@ -131,7 +134,7 @@ def crear_oferta(
     current_user=Depends(get_current_user),
 ):
     """Admin: asigna un profesor a una materia para un período dado."""
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     materia = (
         db.query(models.materia.Materia)
