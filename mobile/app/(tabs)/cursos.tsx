@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { DonutChart } from "../../components/ui/DonutChart";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
   colors,
@@ -29,16 +30,19 @@ import {
 import { fetchPerfil, type UserInfo } from "../../services/dashboardService";
 
 /**
- * Pantalla Cursos (index) — grid 2 columnas de materias del alumno.
+ * Pantalla Cursos (2.º tab) — grid 2 columnas de materias del alumno.
+ *
+ * Reemplaza la vieja pantalla "Notas" (lista) por el diseño del boceto:
+ * grid 2 col con DonutChart de asistencia + puntos acumulados por card.
+ * El detalle (desglose de notas, asistencia grande) vive en
+ * `app/cursos/[id].tsx` — ruta top-level fuera del grupo de tabs,
+ * llega vía `router.push`.
  *
  * - Selector carrera (pill glass): hoy solo se muestra la del alumno
  *   (backend no expone múltiples carreras por alumno) — pill informativa.
  * - Selector de semestre: horizontal scroll de chips.
- * - Grid 2 columnas via `FlashList` con `numColumns={2}`.
- * - Cada card: nombre materia cian, % asistencia grande JetBrains Mono,
- *   "N puntos" derivado de la suma ponderada de notas parciales.
  */
-export default function CursosIndex() {
+export default function CursosTab() {
   const router = useRouter();
   const [data, setData] = useState<NotasCompleto | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -84,14 +88,11 @@ export default function CursosIndex() {
     [data, semestre],
   );
 
+  const nombre = user?.nombre ?? user?.username;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <ScreenHeader
-        showBack
-        onBackPress={() => router.back()}
-        title="Cursos"
-        hideBell
-      />
+      <ScreenHeader title="Cursos" name={nombre} />
 
       {loading ? (
         <LoadingBody />
@@ -289,23 +290,16 @@ function MateriaGridCard({
   materia: MateriaCard;
   onPress: () => void;
 }) {
-  const asisPct = materia.asistenciaPct ?? 0;
-  const asisColor =
-    asisPct >= 75
-      ? colors.success
-      : asisPct >= 50
-        ? colors.warning
-        : materia.asistenciaPct != null
-          ? colors.error
-          : colors.textSecondary;
-
   const puntos = materia.desglose.reduce(
     (acc, d) => acc + (d.nota != null ? d.nota * d.peso : 0),
     0,
   );
 
   return (
-    <GlassCard onPress={onPress} contentStyle={{ padding: spacing.md, minHeight: 140 }}>
+    <GlassCard
+      onPress={onPress}
+      contentStyle={{ padding: spacing.md, alignItems: "center", minHeight: 190 }}
+    >
       <Text
         style={{
           color: colors.cyan,
@@ -313,32 +307,29 @@ function MateriaGridCard({
           fontSize: fontSize.caption,
           letterSpacing: 0.5,
           minHeight: 32,
+          textAlign: "center",
         }}
         numberOfLines={2}
       >
         {materia.nombre}
       </Text>
-      <Text
-        style={{
-          color: asisColor,
-          fontFamily: fontFamily.monoBold,
-          fontSize: fontSize.headlineLg,
-          marginTop: spacing.sm,
-        }}
-      >
-        {materia.asistenciaPct != null
-          ? `${Math.round(materia.asistenciaPct)}%`
-          : "—"}
-      </Text>
+      <DonutChart
+        value={materia.asistenciaPct ?? 0}
+        max={100}
+        size={84}
+        strokeWidth={7}
+        thresholdColor
+        style={{ marginTop: spacing.sm }}
+      />
       <Text
         style={{
           color: colors.textSecondary,
           fontFamily: fontFamily.mono,
           fontSize: fontSize.caption,
-          marginTop: spacing.xs,
+          marginTop: spacing.sm,
         }}
       >
-        {puntos > 0 ? `${puntos.toFixed(1)} pts` : "sin notas"}
+        {puntos > 0 ? `${puntos.toFixed(1)} puntos` : "Sin puntaje"}
       </Text>
     </GlassCard>
   );
@@ -380,8 +371,8 @@ function LoadingBody() {
       </View>
       {[0, 1].map((row) => (
         <View key={row} style={{ flexDirection: "row", gap: spacing.md }}>
-          <SkeletonLoader height={140} style={{ flex: 1 }} />
-          <SkeletonLoader height={140} style={{ flex: 1 }} />
+          <SkeletonLoader height={190} style={{ flex: 1 }} />
+          <SkeletonLoader height={190} style={{ flex: 1 }} />
         </View>
       ))}
     </View>

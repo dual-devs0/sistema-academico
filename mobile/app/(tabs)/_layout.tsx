@@ -22,7 +22,7 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}
     >
       <Tabs.Screen name="index" options={{ title: "Inicio" }} />
-      <Tabs.Screen name="notas" options={{ title: "Notas" }} />
+      <Tabs.Screen name="cursos" options={{ title: "Cursos" }} />
       <Tabs.Screen name="horario" options={{ title: "Horario" }} />
       <Tabs.Screen name="perfil" options={{ title: "Perfil" }} />
     </Tabs>
@@ -30,20 +30,22 @@ export default function TabsLayout() {
 }
 
 type TabDef = {
-  routeName: "index" | "notas" | "horario" | "perfil";
+  routeName: "index" | "cursos" | "horario" | "perfil";
   label: string;
   glyph: string;
 };
 
 const LEFT_TABS: TabDef[] = [
   { routeName: "index", label: "Inicio", glyph: "◉" },
-  { routeName: "notas", label: "Notas", glyph: "≡" },
+  { routeName: "cursos", label: "Cursos", glyph: "🎓" },
 ];
 
 const RIGHT_TABS: TabDef[] = [
   { routeName: "horario", label: "Horario", glyph: "▦" },
   { routeName: "perfil", label: "Perfil", glyph: "◍" },
 ];
+
+const TAB_INACTIVE = "#6b7280";
 
 function UcaTabBar({ state, navigation }: TabBarProps) {
   const router = useRouter();
@@ -123,7 +125,7 @@ function TabItem({
     >
       <Text
         style={{
-          color: focused ? colors.cyan : colors.textSecondary,
+          color: focused ? colors.cyan : TAB_INACTIVE,
           fontSize: fontSize.headline,
         }}
       >
@@ -131,9 +133,9 @@ function TabItem({
       </Text>
       <Text
         style={{
-          color: focused ? colors.cyan : colors.textSecondary,
-          fontFamily: focused ? fontFamily.interSemibold : fontFamily.inter,
-          fontSize: fontSize.caption,
+          color: focused ? colors.cyan : TAB_INACTIVE,
+          fontFamily: focused ? fontFamily.monoMedium : fontFamily.mono,
+          fontSize: 10,
         }}
       >
         {def.label}
@@ -164,8 +166,8 @@ function QrCenterButton({ onPress }: { onPress: () => void }) {
           marginBottom: tabBar.qrButtonLift,
           shadowColor: colors.cyan,
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: pressed ? 0.4 : 0.6,
-          shadowRadius: 16,
+          shadowOpacity: pressed ? 0.3 : 0.4,
+          shadowRadius: 12,
           elevation: 10,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}

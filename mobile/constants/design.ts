@@ -23,8 +23,8 @@ export const colors = {
   textSecondary: "#9ca3af",
   textAccent: "#00b4d8",
 
-  logoutBg: "rgba(127,29,29,0.5)",
-  logoutBorder: "rgba(239,68,68,0.3)",
+  logoutBg: "rgba(127,29,29,0.6)",
+  logoutBorder: "rgba(239,68,68,0.4)",
 
   overlayLogin: "rgba(10,14,23,0.75)",
   glassBg: "rgba(17,24,39,0.8)",

@@ -14,7 +14,7 @@ def mi_perfil(
 ):
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
@@ -30,7 +30,7 @@ def actualizar_mi_perfil(
 ):
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
@@ -62,7 +62,7 @@ def mis_materias(
 ):
     inscripciones = (
         db.query(models.inscripcion.Inscripcion)
-        .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+        .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
         .all()
     )
     materia_ids = [i.oferta.materia_id for i in inscripciones]
@@ -107,7 +107,7 @@ def mis_notas(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     puntajes = (
         db.query(models.puntaje.Puntaje)
         .filter(models.puntaje.Puntaje.user_id == user_id)
@@ -153,7 +153,7 @@ def mi_asistencia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     asistencias = (
         db.query(models.asistencia.Asistencia)
         .filter(models.asistencia.Asistencia.user_id == user_id)
@@ -193,7 +193,7 @@ def mi_resumen(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     notas = mis_notas(db, current_user) or []
     asistencia = mi_asistencia(db, current_user) or []
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()

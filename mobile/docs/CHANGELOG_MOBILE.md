@@ -4,6 +4,84 @@ Formato cronológico inverso (nuevo arriba).
 
 ---
 
+## 2026-07-12 — Polish v1.1: funcionalidad real + diseño exacto boceto
+
+Revisión contra 19 capturas de boceto (`OneDrive/Pictures/catolica/v2 app alumno`).
+Hallazgo clave: tab bar real del boceto es **Inicio/Cursos/[QR]/Horario/Perfil**
+(no Inicio/Notas/[QR]/Horario/Perfil como se había construido).
+
+### Añadido — Avatar y notificaciones (toda la app)
+- `components/ui/UserAvatar.tsx`: foto real (`uri`) o iniciales sobre
+  `LinearGradient` diagonal cian. Tamaño/borde configurables.
+- `components/ui/NotificationsBell.tsx`: badge rojo con contador, modal
+  sheet con lista tipada por ícono (nota/evento/cuota/general),
+  `AsyncStorage('uca.notifications')`, "Marcar todas como leídas".
+- `ScreenHeader.tsx`: delega avatar a `UserAvatar` (tap → `/perfil`),
+  campana usa `NotificationsBell` por defecto. Greeting default
+  `"BIENVENIDO / ESTUDIANTE"` → `"ESTUDIANTE"`.
+- Propagación automática a Dashboard, Cursos, Horario, Perfil, Cuenta,
+  Exámenes (todos comparten `ScreenHeader`). Scanner mantiene su header
+  propio (botón cerrar × — es modal fullscreen, no tab).
+
+### Cambiado — Cursos reemplaza Notas como 2.º tab
+- `app/(tabs)/cursos.tsx` nuevo: grid 2 col con `DonutChart` de
+  asistencia + puntos por card (antes: lista con nota Mono, sin donut).
+  Reusa `notasService.ts` sin cambios.
+- Eliminados: `app/(tabs)/notas.tsx`, `app/cursos/index.tsx`,
+  `app/cursos/_layout.tsx` (redundantes tras el merge).
+- Detalle `app/cursos/[id].tsx` sin cambios — ya matcheaba boceto.
+- Tab bar: ícono 🎓, label "Cursos".
+
+### Cambiado — Dashboard
+- Grid 2x2 fila 1: `QuickLinkCard` nuevo (ícono en círculo + label +
+  status coloreado) reemplaza `StatCard` genérico para Estado de
+  Cuenta / Exámenes.
+- KPI "Regularidad" → "Asistencia Total %" (promedio de
+  `resumen.asistencia[].porcentaje`).
+- Próximo Evento: agregado botón "Ver agenda" → `router.push('/(tabs)/horario')`.
+- Subtítulo cambia a `Carrera #{id}` cuando hay dato (antes texto fijo
+  "Portal Académico · UCA").
+
+### Añadido — Login funcional
+- Biométrico: `hasHardwareAsync` + `isEnrolledAsync` + `authenticateAsync`
+  → reintenta login con credenciales guardadas en
+  `SecureStore('uca.saved_credentials')` (se guardan tras cada login
+  manual exitoso).
+- Olvidé mi clave: modal con campo usuario/email → llama
+  `POST /auth/recuperar-contrasena` (endpoint real ya existente en
+  backend); fallback a contacto secretaría si falla la red.
+- Doc. extranjero: toggle visual cambia label/placeholder/keyboardType
+  del campo documento.
+- Toast propio (sin dependencia nueva, auto-dismiss 3s).
+- `services/authService.ts`: `recuperarContrasenaRequest()` nuevo.
+
+### Añadido — Perfil funcional
+- Modo Oscuro: **corregido** — antes togglaba dark↔light; ahora ON
+  fuerza `"dark"` explícito, OFF vuelve a `"system"` (usa
+  `useColorScheme`), como pide el spec.
+- FAQ modal (3 preguntas: QR/asistencia, notas/Cursos, pagos/Cuenta) +
+  email soporte.
+- Términos y privacidad modal (texto real sobre datos académicos,
+  biometría procesada localmente, no compartido con terceros).
+- Avatar migrado a `UserAvatar` (80px, borde 2px).
+- Logout: colores corregidos a `rgba(127,29,29,0.6)` /
+  `rgba(239,68,68,0.4)` exactos del spec (`constants/design.ts`).
+
+### Estado
+- `tsc --noEmit`: 0 errores en cada sección y al cierre.
+- Cuenta, Exámenes, Horario: no tocados en esta iteración — ya estaban
+  cerca del boceto desde su construcción original; diferencias
+  restantes son cosméticas menores (documentadas como deuda técnica).
+
+### Deuda técnica nueva
+- Sin tokens `light` en design system — toggle Modo Oscuro cambia
+  preferencia pero no hay UI light real.
+- Notificaciones sin backend — semilla local únicamente.
+- Subtítulo Dashboard no pixel-exacto (falta nombre de carrera +
+  semestre actual, backend no los expone hoy).
+
+---
+
 ## 2026-07-11 — Cierre v1: infraestructura de tests + PR
 
 ### Añadido

@@ -99,7 +99,7 @@ def examenes_disponibles(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    alumno_id = current_user["user_id"]
+    alumno_id = current_user.user_id
 
     q = (
         db.query(Examen, Materia.nombre.label("materia_nombre"))
@@ -184,7 +184,7 @@ def mis_examenes_inscriptos(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    alumno_id = current_user["user_id"]
+    alumno_id = current_user.user_id
 
     rows = (
         db.query(InscripcionExamen, Materia.nombre.label("materia_nombre"))
@@ -228,7 +228,7 @@ def inscribirse_examen(
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role(["alumno", "admin"])),
 ):
-    alumno_id = current_user["user_id"]
+    alumno_id = current_user.user_id
 
     examen = db.query(Examen).filter(Examen.id == data.examen_id).first()
     if not examen:
@@ -292,7 +292,7 @@ def cancelar_inscripcion(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    alumno_id = current_user["user_id"]
+    alumno_id = current_user.user_id
 
     inscripcion = (
         db.query(InscripcionExamen)
@@ -304,7 +304,7 @@ def cancelar_inscripcion(
 
     # Solo el dueño o admin puede cancelar
     if (
-        current_user["role"] != "admin"
+        current_user.role != "admin"
         and inscripcion.alumno_id != alumno_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")

@@ -43,7 +43,7 @@ def crear_solicitud_endpoint(
 ):
     try:
         solicitud = crear_solicitud(
-            alumno_id=current_user["user_id"],
+            alumno_id=current_user.user_id,
             tipo=data.tipo,
             universidad_origen=data.universidad_origen,
             db=db,

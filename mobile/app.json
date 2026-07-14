@@ -69,7 +69,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBase": "http://localhost:8000"
+      "apiBase": "http://192.168.100.14:8000"
     }
   }
 }

@@ -120,7 +120,7 @@ def generar_cuotas(
                 concepto_id=data.concepto_id,
                 periodos=data.periodos,
                 fecha_vencimiento_base=data.fecha_vencimiento_base,
-                generado_por=current_user["user_id"],
+                generado_por=current_user.user_id,
                 db=db,
             )
         db.commit()
@@ -146,7 +146,7 @@ def cuotas_alumno(
     current_user=Depends(get_current_user),
 ):
     # Alumno solo puede ver las suyas
-    if current_user["role"] == "alumno" and current_user["user_id"] != alumno_id:
+    if current_user.role == "alumno" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     q = db.query(Cuota).filter(Cuota.alumno_id == alumno_id)
@@ -184,7 +184,7 @@ def crear_pago(
                 cuota_id=data.cuota_id,
                 monto_pagado=data.monto_pagado,
                 metodo=data.metodo,
-                registrado_por=current_user["user_id"],
+                registrado_por=current_user.user_id,
                 db=db,
                 referencia=data.referencia,
                 pago_ajuste_ref_id=data.pago_ajuste_ref_id,
@@ -222,9 +222,9 @@ def get_comprobante(
         raise HTTPException(status_code=404, detail="Pago no encontrado")
 
     # Alumno solo puede ver comprobantes de sus propias cuotas
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         cuota = db.query(Cuota).filter(Cuota.id == pago.cuota_id).first()
-        if not cuota or cuota.alumno_id != current_user["user_id"]:
+        if not cuota or cuota.alumno_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="No autorizado")
 
     comp = db.query(Comprobante).filter(Comprobante.pago_id == pago_id).first()
@@ -325,7 +325,7 @@ def pago_online_init(
     cuota = db.query(Cuota).filter(Cuota.id == body.cuota_id).first()
     if not cuota:
         raise HTTPException(404, "Cuota no encontrada")
-    if cuota.alumno_id != current_user.id:
+    if cuota.alumno_id != current_user.user_id:
         raise HTTPException(403, "Esta cuota no te pertenece")
     if cuota.estado == "pagada":
         raise HTTPException(400, "La cuota ya está pagada")
@@ -333,7 +333,7 @@ def pago_online_init(
     transaction_id = str(uuid4())
     pago = PagoOnline(
         cuota_id=cuota.id,
-        alumno_id=current_user.id,
+        alumno_id=current_user.user_id,
         monto=cuota.monto_a_pagar,
         transaction_id=transaction_id,
         estado="pendiente",
@@ -397,6 +397,6 @@ def pago_online_status(
     pago = db.query(PagoOnline).filter(PagoOnline.id == pago_id).first()
     if not pago:
         raise HTTPException(404, "Pago no encontrado")
-    if pago.alumno_id != current_user.id:
+    if pago.alumno_id != current_user.user_id:
         raise HTTPException(403, "Acceso denegado")
     return pago

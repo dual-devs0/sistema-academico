@@ -14,7 +14,7 @@ def cerrar_materia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
 
     alumno = (
@@ -73,7 +73,7 @@ def cerrar_materia(
         existente.nota_final = nota_final
         existente.creditos = pensum_materia.creditos
         existente.condicion = condicion
-        existente.cerrado_por = current_user["user_id"]
+        existente.cerrado_por = current_user.user_id
         registro = existente
     else:
         registro = models.expediente_materia.ExpedienteMateria(
@@ -82,7 +82,7 @@ def cerrar_materia(
             nota_final=nota_final,
             creditos=pensum_materia.creditos,
             condicion=condicion,
-            cerrado_por=current_user["user_id"],
+            cerrado_por=current_user.user_id,
         )
         db.add(registro)
     db.commit()
@@ -111,7 +111,7 @@ def ppa_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     resultado = calcular_ppa(alumno_id, db)
     return schemas.expediente.PPAOut(**resultado)
@@ -125,7 +125,7 @@ def expediente_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     filas = (
@@ -239,7 +239,7 @@ def regularidad_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     resultado = calcular_regularidad(alumno_id, db)

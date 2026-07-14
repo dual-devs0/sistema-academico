@@ -1,26 +1,34 @@
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { useRouter } from "expo-router";
+import { UserAvatar } from "./UserAvatar";
+import { NotificationsBell } from "./NotificationsBell";
 import { colors, fontFamily, fontSize, radius, spacing } from "../../constants/design";
 
 /**
- * ScreenHeader — cabecera compartida por Dashboard, Notas, Perfil, Cuenta,
- * Exámenes.
+ * ScreenHeader — cabecera compartida por Dashboard, Cursos, Scanner,
+ * Horario, Perfil, Cuenta, Exámenes.
  *
  * Layout:
  *   ┌──────────────────────────────────────────┐
- *   │ (avatar cian) BIENVENIDO/ESTUDIANTE  🔔  │
+ *   │ (avatar cian) ESTUDIANTE            🔔  │
  *   │               Juan Pérez                 │
  *   └──────────────────────────────────────────┘
  *
- * - `avatarInitials` renderiza fallback si no hay `avatarUrl` (todavía no
- *   tenemos endpoint de foto, por eso solo iniciales).
- * - `onBellPress` opcional — algunas pantallas ocultan la campana.
+ * - `name` alimenta tanto el saludo como las iniciales del avatar
+ *   (vía `UserAvatar`, componente único reusado en toda la app).
+ * - `fotoUrl` opcional — si el backend algún día expone foto de perfil.
+ * - Tocar el avatar navega a `/perfil` salvo que `showBack` esté activo
+ *   (ahí el slot izquierdo es la flecha atrás, no el avatar).
+ * - `onBellPress` opcional — si no se pasa, la campana usa
+ *   `NotificationsBell` (badge + modal) por defecto.
  * - `showBack` reemplaza el bloque avatar+greeting por una flecha atrás
- *   + título (para Cursos, Cuenta, Exámenes).
+ *   + título (para Cursos detalle, Cuenta, Exámenes).
  */
 
 interface Props {
   greeting?: string;
   name?: string;
+  fotoUrl?: string;
   avatarInitials?: string;
   title?: string;
   showBack?: boolean;
@@ -32,8 +40,9 @@ interface Props {
 }
 
 export function ScreenHeader({
-  greeting = "BIENVENIDO / ESTUDIANTE",
+  greeting = "ESTUDIANTE",
   name,
+  fotoUrl,
   avatarInitials,
   title,
   showBack,
@@ -43,6 +52,8 @@ export function ScreenHeader({
   right,
   style,
 }: Props) {
+  const router = useRouter();
+
   return (
     <View
       style={[
@@ -83,7 +94,13 @@ export function ScreenHeader({
             </Text>
           </Pressable>
         ) : (
-          <Avatar initials={avatarInitials} />
+          <UserAvatar
+            nombre={name ?? avatarInitials}
+            fotoUrl={fotoUrl}
+            size={36}
+            borderWidth={1.5}
+            onPress={() => router.push("/(tabs)/perfil")}
+          />
         )}
         <View style={{ flex: 1 }}>
           {title ? (
@@ -128,56 +145,26 @@ export function ScreenHeader({
         </View>
       </View>
 
-      {right ??
-        (hideBell ? null : (
-          <Pressable
-            onPress={onBellPress}
-            hitSlop={12}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: radius.pill,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.glassBg,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text style={{ color: colors.textPrimary, fontSize: fontSize.headline }}>
-              🔔
-            </Text>
-          </Pressable>
-        ))}
-    </View>
-  );
-}
-
-function Avatar({ initials }: { initials?: string }) {
-  return (
-    <View
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: radius.pill,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderLeftWidth: 3,
-        borderColor: colors.border,
-        borderLeftColor: colors.cyan,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Text
-        style={{
-          color: colors.cyan,
-          fontFamily: fontFamily.interBold,
-          fontSize: fontSize.body,
-        }}
-      >
-        {initials?.slice(0, 2).toUpperCase() ?? "··"}
-      </Text>
+      {right ?? (hideBell ? null : onBellPress ? (
+        <Pressable
+          onPress={onBellPress}
+          hitSlop={12}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: radius.pill,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontSize: fontSize.headline }}>🔔</Text>
+        </Pressable>
+      ) : (
+        <NotificationsBell />
+      ))}
     </View>
   );
 }

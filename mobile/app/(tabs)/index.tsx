@@ -114,7 +114,7 @@ export default function DashboardScreen() {
         }
       >
         <ScreenHeader
-          greeting="BIENVENIDO / ESTUDIANTE"
+          greeting="ESTUDIANTE"
           name={nombre || undefined}
           avatarInitials={initials || undefined}
         />
@@ -145,7 +145,9 @@ export default function DashboardScreen() {
                   letterSpacing: 0.5,
                 }}
               >
-                Portal Académico · UCA
+                {data?.user?.carrera_id != null
+                  ? `Carrera #${data.user.carrera_id}`
+                  : "Portal Académico · UCA"}
               </Text>
             </>
           )}
@@ -163,6 +165,7 @@ export default function DashboardScreen() {
             onOpenCuenta={() => router.push("/cuenta")}
             onOpenExamenes={() => router.push("/examenes")}
             onOpenScanner={() => router.push("/scanner")}
+            onOpenAgenda={() => router.push("/(tabs)/horario")}
           />
         ) : null}
       </ScrollView>
@@ -183,6 +186,7 @@ interface BodyProps {
   onOpenCuenta: () => void;
   onOpenExamenes: () => void;
   onOpenScanner: () => void;
+  onOpenAgenda: () => void;
 }
 
 function Body({
@@ -194,6 +198,7 @@ function Body({
   onOpenCuenta,
   onOpenExamenes,
   onOpenScanner,
+  onOpenAgenda,
 }: BodyProps) {
   const cuentaLabel =
     data.cuentaSaldoVencido > 0
@@ -222,55 +227,70 @@ function Body({
 
   const examenesInscriptos: number = 0; // TODO: endpoint de exámenes inscriptos
 
-  return (
-    <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
-      {/* Grid superior 2x2: fila 1 (Estado de Cuenta + Exámenes) */}
-      <View style={{ flexDirection: "row", gap: spacing.md }}>
-        <StaggerCard index={0} style={{ flex: 1 }}>
-          <StatCard
-            label="ESTADO DE CUENTA"
-            value={cuentaValue}
-            valueColor={cuentaColor}
-            footer={cuentaLabel}
-            onPress={onOpenCuenta}
-          />
-        </StaggerCard>
-        <StaggerCard index={1} style={{ flex: 1 }}>
-          <StatCard
-            label="EXÁMENES"
-            value={String(examenesInscriptos)}
-            footer={`${examenesInscriptos} inscripto${examenesInscriptos === 1 ? "" : "s"}`}
-            onPress={onOpenExamenes}
-          />
-        </StaggerCard>
-      </View>
+  const asistencias = data.resumen?.asistencia ?? [];
+  const asistenciaTotal =
+    asistencias.length > 0
+      ? asistencias.reduce((acc, a) => acc + (a.porcentaje ?? 0), 0) / asistencias.length
+      : null;
 
-      {/* Grid superior 2x2: fila 2 (Promedio + Regularidad) */}
-      <View style={{ flexDirection: "row", gap: spacing.md }}>
-        <StaggerCard index={2} style={{ flex: 1 }}>
-          <StatCard
-            label="PROMEDIO GRAL"
-            value={promedio != null ? promedio.toFixed(2) : "—"}
-            footer={
-              data.resumen?.cantidad_materias
-                ? `${data.resumen.cantidad_materias} materias`
-                : "sin datos"
-            }
-          />
-        </StaggerCard>
-        <StaggerCard index={3} style={{ flex: 1 }}>
-          <StatCard
-            label="REGULARIDAD"
-            value={data.regularidadActiva ? "● ACTIVA" : "● EN RIESGO"}
-            valueColor={data.regularidadActiva ? colors.success : colors.warning}
-            footer={data.regularidadActiva ? "asistencia OK" : "revisar asistencia"}
-          />
-        </StaggerCard>
+  return (
+    <View style={{ paddingHorizontal: spacing.xl, gap: spacing["2xl"] }}>
+      {/* Sección KPIs: grid 2x2 — gap interno 12px entre cards, la sección
+          completa se separa 24px de la siguiente (gap del container padre). */}
+      <View style={{ gap: spacing.md }}>
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <StaggerCard index={0} style={{ flex: 1 }}>
+            <QuickLinkCard
+              glyph="💳"
+              label="Estado de Cuenta"
+              status={cuentaLabel}
+              statusColor={cuentaColor}
+              onPress={onOpenCuenta}
+            />
+          </StaggerCard>
+          <StaggerCard index={1} style={{ flex: 1 }}>
+            <QuickLinkCard
+              glyph="📝"
+              label="Exámenes"
+              status={`${examenesInscriptos} inscripto${examenesInscriptos === 1 ? "" : "s"}`}
+              statusColor={colors.cyan}
+              onPress={onOpenExamenes}
+            />
+          </StaggerCard>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <StaggerCard index={2} style={{ flex: 1 }}>
+            <StatCard
+              label="PROMEDIO GRAL"
+              value={promedio != null ? promedio.toFixed(2) : "—"}
+              footer={
+                data.resumen?.cantidad_materias
+                  ? `${data.resumen.cantidad_materias} materias`
+                  : "sin datos"
+              }
+            />
+          </StaggerCard>
+          <StaggerCard index={3} style={{ flex: 1 }}>
+            <StatCard
+              label="ASISTENCIA TOTAL"
+              value={asistenciaTotal != null ? `${Math.round(asistenciaTotal)}%` : "—"}
+              valueColor={
+                asistenciaTotal == null
+                  ? undefined
+                  : asistenciaTotal >= 75
+                    ? colors.textAccent
+                    : colors.warning
+              }
+              footer={data.regularidadActiva ? "Regularidad OK" : "revisar asistencia"}
+            />
+          </StaggerCard>
+        </View>
       </View>
 
       {/* Próximo Evento */}
       <StaggerCard index={4}>
-        <ProximoEventoCard evento={proximo} />
+        <ProximoEventoCard evento={proximo} onVerAgenda={onOpenAgenda} />
       </StaggerCard>
 
       {/* Asistencia rápida */}
@@ -313,6 +333,63 @@ function StaggerCard({
   );
 }
 
+function QuickLinkCard({
+  glyph,
+  label,
+  status,
+  statusColor,
+  onPress,
+}: {
+  glyph: string;
+  label: string;
+  status: string;
+  statusColor: string;
+  onPress: () => void;
+}) {
+  return (
+    <GlassCard
+      onPress={onPress}
+      contentStyle={{ padding: spacing.lg, alignItems: "center" }}
+    >
+      <View
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: "rgba(0,180,216,0.12)",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: spacing.sm,
+        }}
+      >
+        <Text style={{ fontSize: fontSize.headline }}>{glyph}</Text>
+      </View>
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontFamily: fontFamily.interSemibold,
+          fontSize: fontSize.body,
+          textAlign: "center",
+        }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          color: statusColor,
+          fontFamily: fontFamily.monoMedium,
+          fontSize: fontSize.caption,
+          marginTop: 2,
+        }}
+        numberOfLines={1}
+      >
+        {status}
+      </Text>
+    </GlassCard>
+  );
+}
+
 const TIPO_LABEL: Record<TipoEvento, string> = {
   parcial: "PARCIAL",
   final: "FINAL",
@@ -324,34 +401,30 @@ const TIPO_LABEL: Record<TipoEvento, string> = {
 
 function ProximoEventoCard({
   evento,
+  onVerAgenda,
 }: {
   evento: DashboardData["proximoEvento"];
+  onVerAgenda: () => void;
 }) {
   if (!evento) {
     return (
-      <GlassCard variant="leftAccent" contentStyle={{ padding: spacing.lg }}>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontFamily: fontFamily.interMedium,
-            fontSize: fontSize.caption,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-          }}
+      <View>
+        <ProximoEventoHeader onVerAgenda={onVerAgenda} />
+        <GlassCard
+          variant="leftAccent"
+          contentStyle={{ padding: spacing.lg, backgroundColor: "rgba(0,180,216,0.05)" }}
         >
-          Próximo Evento
-        </Text>
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontFamily: fontFamily.inter,
-            fontSize: fontSize.body,
-            marginTop: spacing.sm,
-          }}
-        >
-          Sin eventos programados en los próximos 30 días.
-        </Text>
-      </GlassCard>
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontFamily: fontFamily.inter,
+              fontSize: fontSize.body,
+            }}
+          >
+            Sin eventos programados en los próximos 30 días.
+          </Text>
+        </GlassCard>
+      </View>
     );
   }
 
@@ -368,78 +441,118 @@ function ProximoEventoCard({
   const urgencyColor = dias <= 3 ? colors.error : colors.warning;
 
   return (
-    <GlassCard variant="leftAccent" contentStyle={{ padding: spacing.lg }}>
-      <View style={{ flexDirection: "row", gap: spacing.lg, alignItems: "center" }}>
-        <View
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: radius.md,
-            backgroundColor: colors.cyanDim,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text
+    <View>
+      <ProximoEventoHeader onVerAgenda={onVerAgenda} />
+      <GlassCard
+        variant="leftAccent"
+        contentStyle={{ padding: spacing.lg, backgroundColor: "rgba(0,180,216,0.05)" }}
+      >
+        <View style={{ flexDirection: "row", gap: spacing.lg, alignItems: "center" }}>
+          <View
             style={{
-              color: colors.cyan,
-              fontFamily: fontFamily.monoBold,
-              fontSize: fontSize.headlineLg,
-              lineHeight: fontSize.headlineLg + 2,
+              width: 64,
+              height: 64,
+              borderRadius: radius.md,
+              backgroundColor: colors.cyanDim,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            {day}
-          </Text>
-          <Text
-            style={{
-              color: colors.cyan,
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.caption,
-              letterSpacing: 1,
-            }}
-          >
-            {month}
-          </Text>
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              color: urgencyColor,
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.caption,
-              letterSpacing: 1.5,
-            }}
-          >
-            {TIPO_LABEL[evento.tipo]} — {urgencia}
-          </Text>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontFamily: fontFamily.interBold,
-              fontSize: fontSize.headline,
-              marginTop: 2,
-            }}
-            numberOfLines={2}
-          >
-            {evento.titulo}
-          </Text>
-          {evento.descripcion ? (
             <Text
               style={{
-                color: colors.textSecondary,
-                fontFamily: fontFamily.inter,
+                color: colors.cyan,
+                fontFamily: fontFamily.monoBold,
+                fontSize: fontSize.headlineLg,
+                lineHeight: fontSize.headlineLg + 2,
+              }}
+            >
+              {day}
+            </Text>
+            <Text
+              style={{
+                color: colors.cyan,
+                fontFamily: fontFamily.interSemibold,
                 fontSize: fontSize.caption,
+                letterSpacing: 1,
+              }}
+            >
+              {month}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: urgencyColor,
+                fontFamily: fontFamily.interSemibold,
+                fontSize: fontSize.caption,
+                letterSpacing: 1.5,
+              }}
+            >
+              {TIPO_LABEL[evento.tipo]} — {urgencia}
+            </Text>
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontFamily: fontFamily.interBold,
+                fontSize: fontSize.headline,
                 marginTop: 2,
               }}
-              numberOfLines={1}
+              numberOfLines={2}
             >
-              {evento.descripcion}
+              {evento.titulo}
             </Text>
-          ) : null}
+            {evento.descripcion ? (
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontFamily: fontFamily.inter,
+                  fontSize: fontSize.caption,
+                  marginTop: 2,
+                }}
+                numberOfLines={1}
+              >
+                {evento.descripcion}
+              </Text>
+            ) : null}
+          </View>
         </View>
-      </View>
-    </GlassCard>
+      </GlassCard>
+    </View>
+  );
+}
+
+function ProximoEventoHeader({ onVerAgenda }: { onVerAgenda: () => void }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: spacing.sm,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontFamily: fontFamily.interSemibold,
+          fontSize: fontSize.body,
+        }}
+      >
+        Próximo Evento
+      </Text>
+      <Pressable onPress={onVerAgenda} hitSlop={8}>
+        <Text
+          style={{
+            color: colors.cyan,
+            fontFamily: fontFamily.interMedium,
+            fontSize: fontSize.caption,
+          }}
+        >
+          Ver agenda
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -534,7 +647,7 @@ function AvanceAcademicoCard({
           {Math.round(pct * 100)}% ({creditosAvanzados}/{creditosTotales} créditos)
         </Text>
       </View>
-      <ProgressBar value={pct} height={8} glow />
+      <ProgressBar value={pct} height={8} glow breathe />
       <View
         style={{
           flexDirection: "row",

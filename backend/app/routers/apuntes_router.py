@@ -16,7 +16,7 @@ def create_apunte(
     current_user=Depends(get_current_user),
 ):
     data = apunte.model_dump()
-    data["user_id"] = current_user["user_id"]
+    data["user_id"] = current_user.user_id
     new_apunte = models.apunte.Apunte(**data)
     db.add(new_apunte)
     db.commit()
@@ -82,8 +82,8 @@ def update_apunte(
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     if (
-        current_user["role"] not in ("admin",)
-        and current_user["user_id"] != apunte.user_id
+        current_user.role not in ("admin",)
+        and current_user.user_id != apunte.user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -99,7 +99,7 @@ def aprobar_apunte(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     apunte = (
         db.query(models.apunte.Apunte)
@@ -171,8 +171,8 @@ async def upload_archivo_apunte(
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     if (
-        current_user["role"] not in ("admin",)
-        and current_user["user_id"] != apunte.user_id
+        current_user.role not in ("admin",)
+        and current_user.user_id != apunte.user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -228,8 +228,8 @@ def delete_apunte(
     if not apunte:
         raise HTTPException(status_code=404, detail="Apunte no encontrado")
     if (
-        current_user["role"] not in ("admin",)
-        and current_user["user_id"] != apunte.user_id
+        current_user.role not in ("admin",)
+        and current_user.user_id != apunte.user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(apunte)

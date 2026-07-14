@@ -21,15 +21,17 @@
 
 Fuente: `backend/app/routers/auth_router.py`, `backend/app/dependencias.py`, `backend/app/models/refresh_token.py`.
 
-- **Access token**: JWT, 15 min (`JWT_EXPIRES_MINUTES` en `.env`), payload `{sub, role, user_id}`. Verificado en cada request vía `Depends(get_current_user)` (`dependencias.py:10-20`), que decodifica y devuelve `{username, role, user_id}`.
-- **Refresh token**: cookie httpOnly, `SameSite=Lax`, 7 días, hash SHA-256 guardado en tabla `refresh_tokens` (nunca el token crudo). Rotación: cada `POST /auth/refresh` revoca el token usado y emite uno nuevo (`auth_router.py:77-119`).
-- **Logout**: revoca el refresh token en DB, no solo limpia cookie (`auth_router.py:122-136`).
-- **Reset de contraseña**: `POST /auth/recuperar-contrasena`, rate-limited en memoria (3 intentos / 15 min por username_or_email, `auth_router.py:20-36`), genera password aleatoria de 10 caracteres y la envía por email.
+- **Access token**: JWT, 15 min (`JWT_EXPIRES_MINUTES` en `.env`), payload `{sub, role, user_id}`. Verificado en cada request vía `Depends(get_current_user)` (`dependencias.py`), que decodifica y devuelve una instancia tipada `CurrentUser` (Pydantic, `app/schemas/current_user_schema.py`: `username: str`, `role: str`, `user_id: int`) — **no** un dict. *(Cambio de hardening, 2026-07-13: antes era un dict crudo `{username, role, user_id}` accedido con `current_user["role"]`; tipar con Pydantic evita typos silenciosos de key en los ~26 routers que lo consumen — ver `CHANGELOG_TECNICO.md`.)*
+- **Refresh token**: cookie httpOnly, `secure` (gateado por `COOKIE_SECURE` en `.env`, `true` en producción, `false` solo en dev/test local sobre http), `SameSite=Lax`, 7 días, hash SHA-256 guardado en tabla `refresh_tokens` (nunca el token crudo). Rotación: cada `POST /auth/refresh` revoca el token usado y emite uno nuevo.
+- **CSRF en `/auth/refresh`** *(2026-07-13)*: patrón double-submit cookie. `/auth/login` y `/auth/refresh` emiten además una cookie `csrf_token` (no httpOnly, mismas flags `secure`/`SameSite`). El flujo web (cookie-based) debe reenviar ese valor en el header `X-CSRF-Token`; se compara con `secrets.compare_digest` contra la cookie y rechaza con 403 si falta o no coincide. El flujo mobile (refresh token enviado en el body, no por cookie) queda exento — no hay cookie de sesión que un sitio de terceros pueda explotar.
+- **Rate limit en `/auth/login`** *(2026-07-13)*: 5 intentos fallidos / 15 min, clave `username:ip_cliente` (dict en memoria en `auth_router.py`, mismo patrón que el rate-limit de recuperar-contraseña). Solo cuenta intentos fallidos (no bloquea logins legítimos repetidos); un login exitoso limpia el contador de esa clave.
+- **Logout**: revoca el refresh token en DB, no solo limpia cookie (borra `refresh_token` y `csrf_token`).
+- **Reset de contraseña**: `POST /auth/recuperar-contrasena`, rate-limited en memoria (3 intentos / 15 min por username_or_email), genera password aleatoria de 10 caracteres y la envía por email.
 - **Roles**: `admin`, `profesor`, `alumno` — string plano en `users.role`, sin tabla de roles separada.
 
 ## Patrón de autorización
 
-Cada endpoint usa `Depends(get_current_user)` y compara `current_user["role"]` inline contra los roles permitidos (no hay decorador centralizado de roles en la mayoría de routers, salvo `require_role()` en `dependencias.py:23-32`, poco usado).
+Cada endpoint usa `Depends(get_current_user)` y compara `current_user.role` (atributo tipado, ver arriba) contra los roles permitidos (no hay decorador centralizado de roles en la mayoría de routers, salvo `require_role()` en `dependencias.py`, poco usado).
 
 **Excepción centralizada:** verificación de "¿este profesor dicta esta materia?" vive en `backend/app/services/autorizacion.py` (`es_profesor_de_materia`), consumida por `puntajes_router`, `asistencias_router`, `horarios_router`, `foro_router` — antes de la Fase 1 estaba duplicada 21 veces, se consolidó ahí.
 
@@ -74,6 +76,22 @@ Fuente: `backend/app/models/expediente_materia.py`, `expediente_semestre.py`, `r
 ## Storage de archivos
 
 Fuente: `backend/app/services/storage.py` (no leído completo en esta pasada — <!-- TODO: verificar firma exacta de subir_archivo/obtener_url_firmada/eliminar_archivo -->). Usado por `apuntes_router.py` (archivo de apunte) y `users_router.py` (foto de perfil). Guarda solo la `storage_key` en DB, sirve con URL firmada.
+
+## Alerta de inasistencia crítica (2026-07-13)
+
+Fuente: `backend/app/routers/asistencias_router.py` (`_verificar_alerta_inasistencia`), `backend/app/email_utils.py` (`send_alerta_inasistencia_email_bg`).
+
+Cuando se registra una ausencia (`POST /asistencias/`, `PUT /asistencias/{id}`, `POST /asistencias/lote` — no aplica a `POST /asistencias/qr/verificar`, que solo registra presentes), se recalcula el % de inasistencia del alumno en esa `oferta_materia_id` y se compara contra el estado **antes** de ese registro (`total-1` clases, `ausentes-1`).
+
+**Decisión de diseño — por qué "cruce de umbral" y no "está sobre 25%":** no hay columna de tipo `alerta_enviada` en `asistencias`. Si se alertara cada vez que el % actual es `>=25`, cada ausencia subsiguiente reenviaría el mismo email indefinidamente. En cambio, solo se dispara cuando el % **pasa** de `<25` a `>=25` en ese registro puntual — se detecta recalculando el estado con y sin el registro recién insertado, sin necesidad de persistir un flag ni migración nueva. Efecto secundario aceptado: si se borra una asistencia (`DELETE /asistencias/{id}`) y el % vuelve a bajar de 25%, una ausencia posterior sí volvería a disparar la alerta — comportamiento correcto (la alerta refleja el estado real del alumno, no un evento único de por vida).
+
+Destinatarios: alumno, profesor titular de la oferta (`OfertaMateria.profesor_id`) y todos los usuarios `role == "admin"`, deduplicados. Reusa `send_..._email_bg` (patrón `BackgroundTasks.add_task`, mismo mecanismo que notas nuevas y reset de contraseña).
+
+## Exportación RUE-ES / MEC (2026-07-13)
+
+Fuente: `backend/app/routers/reportes_router.py` (`GET /reportes/rue-es/matricula`, `GET /reportes/rue-es/trayecto-academico`).
+
+El MEC/CONES (Registro Único del Estudiante de Educación Superior, Paraguay) no publica una plantilla técnica CSV descargable — no encontrada en búsqueda web ni en `datos.gov.py`. El export se construyó con los campos estándar que este tipo de registro institucional suele requerir (cédula, nombre, carrera, período, nota final, % asistencia), con `codigo_mec_carrera` como columna placeholder vacía hasta que la universidad reciba el código oficial de carrera del VESC/CONES. **Antes de usarse para una entrega real al MEC, este formato debe validarse contra la plantilla oficial** — ver comentario en el propio archivo. Nota final calculada reusando `PESOS`/`_calcular_promedio_final` de `puntajes_router.py` (mismo criterio de aprobación que el resto del sistema: promedio ponderado `>=6`).
 
 ## Estructura de carpetas
 

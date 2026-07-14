@@ -84,11 +84,11 @@ def create_evento(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     new_evento = models.evento.EventoCalendario(
         **evento.model_dump(exclude_unset=True),
-        creado_por=current_user["user_id"],
+        creado_por=current_user.user_id,
     )
     db.add(new_evento)
     db.commit()
@@ -129,10 +129,10 @@ def list_eventos(
         )
 
     # Alumno ve eventos globales + de sus carreras/materias
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         inscripciones = (
             db.query(models.inscripcion.Inscripcion)
-            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
         materia_ids = {i.oferta.materia_id for i in inscripciones}
@@ -174,7 +174,7 @@ def update_evento(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     evento = (
         db.query(models.evento.EventoCalendario)
@@ -196,7 +196,7 @@ def delete_evento(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     evento = (
         db.query(models.evento.EventoCalendario)
@@ -217,7 +217,7 @@ def cargar_pdf(
     current_user=Depends(get_current_user),
 ):
     """Carga un PDF del calendario acad\u00e9mico, lo parsea con Gemini y crea los eventos."""  # noqa: E501
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
 
     try:
@@ -243,7 +243,7 @@ def cargar_pdf(
                 descripcion=ev_data.get("descripcion"),
                 anio=payload.anio,
                 semestre=payload.semestre,
-                creado_por=current_user["user_id"],
+                creado_por=current_user.user_id,
             )
             db.add(ev)
             db.flush()
@@ -281,10 +281,10 @@ def eventos_mes(
         models.evento.EventoCalendario.fecha <= ultimo,
     )
 
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         inscripciones = (
             db.query(models.inscripcion.Inscripcion)
-            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
         materia_ids = {i.oferta.materia_id for i in inscripciones}
@@ -321,10 +321,10 @@ def eventos_dia(
         models.evento.EventoCalendario.fecha == fecha,
     )
 
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         inscripciones = (
             db.query(models.inscripcion.Inscripcion)
-            .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+            .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
         materia_ids = {i.oferta.materia_id for i in inscripciones}
