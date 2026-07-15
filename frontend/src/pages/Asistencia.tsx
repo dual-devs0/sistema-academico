@@ -630,6 +630,16 @@ function ProfesorView() {
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                         Compartir
                       </button>
+                      <button onClick={() => {
+                        if (qrTimerRef.current) clearInterval(qrTimerRef.current)
+                        setQrActive(false)
+                        setQrImg(null)
+                        setQrToken(null)
+                      }}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 8, background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Cancelar QR
+                      </button>
                     </div>
                   )}
                 </div>
