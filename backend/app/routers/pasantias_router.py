@@ -30,6 +30,7 @@ from app.services.pasantia import (
     actualizar_horas,
     subir_informe,
     finalizar_pasantia,
+    rechazar_pasantia,
 )
 from app.services.storage import subir_archivo
 
@@ -111,7 +112,7 @@ def aprobar_pasantia_endpoint(
     id: int,
     tutor_id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
         pasantia = aprobar_pasantia(id, tutor_id=tutor_id, db=db)
@@ -130,7 +131,7 @@ def actualizar_horas_endpoint(
     id: int,
     data: PasantiaHorasUpdate,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
         pasantia = actualizar_horas(id, horas_completadas=data.horas_completadas, db=db)
@@ -152,7 +153,7 @@ def subir_informe_endpoint(
     tipo: str = Form(...),
     archivo: Optional[UploadFile] = File(None),
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor", "alumno"])),
 ):
     try:
         storage_key = None
@@ -167,11 +168,28 @@ def subir_informe_endpoint(
         raise HTTPException(status_code=422, detail=str(e))
 
 
+@router.put("/{id}/rechazar", response_model=PasantiaOut, summary="Rechazar pasantía")
+def rechazar_pasantia_endpoint(
+    id: int,
+    motivo: str | None = None,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    try:
+        pasantia = rechazar_pasantia(id, db=db, motivo=motivo)
+        db.commit()
+        db.refresh(pasantia)
+        return pasantia
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @router.put("/{id}/finalizar", response_model=PasantiaOut, summary="Finalizar pasantía")
 def finalizar_pasantia_endpoint(
     id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
         pasantia = finalizar_pasantia(id, db=db)

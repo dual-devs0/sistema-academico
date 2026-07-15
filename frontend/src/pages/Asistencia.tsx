@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, decodeToken } from '../lib/api'
+import { api, decodeToken, getCurrentUser, getAccessToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 import QRModal from '../components/QRModal'
 
@@ -153,8 +153,7 @@ const css = `
 `
 
 export default function Asistencia() {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
+  const user = getCurrentUser()
   const rol = user?.role || ''
 
   useEffect(() => {
@@ -197,7 +196,7 @@ interface AsistenciaApiRow {
 
 function AlumnoView() {
   const navigate = useNavigate()
-  const uid = Number(decodeToken(sessionStorage.getItem('token') || '')?.user_id || 0)
+  const uid = Number(getCurrentUser()?.user_id || 0)
   const [porMateria, setPorMateria] = useState<MateriaAsistRow[]>([])
   const [sesiones, setSesiones] = useState<SesionRow[]>([])
   const [carreraNombre, setCarreraNombre] = useState('')
