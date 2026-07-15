@@ -127,6 +127,41 @@ def get_materia(
     return _enrich(materia, db)
 
 
+from pydantic import BaseModel
+
+
+class MateriaPatchBody(BaseModel):
+    profesor_id: int | None = None
+
+
+@router.patch("/{materia_id}")
+def patch_materia(
+    materia_id: int,
+    data: MateriaPatchBody,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == materia_id)
+        .first()
+    )
+    if not materia:
+        raise HTTPException(status_code=404, detail="Materia no encontrada")
+    if data.profesor_id is not None:
+        oferta = _oferta_activa(materia, db)
+        if not oferta:
+            raise HTTPException(
+                status_code=400,
+                detail="No hay oferta activa para esta materia. Creá una oferta primero.",
+            )
+        oferta.profesor_id = data.profesor_id
+        db.commit()
+    return _enrich(materia, db)
+
+
 @router.post("/ofertas", response_model=schemas.oferta_materia.OfertaMateriaOut)
 def crear_oferta(
     oferta: schemas.oferta_materia.OfertaMateriaCreate,

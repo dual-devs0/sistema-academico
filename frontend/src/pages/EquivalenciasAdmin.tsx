@@ -93,7 +93,7 @@ export default function EquivalenciasAdmin() {
     if (!resolver) return
     setSaving(true)
     try {
-      await api.post(`/equivalencias/resolver/${resolver.id}`, {
+      await api.put(`/equivalencias/${resolver.id}/resolver`, {
         resolucion,
         materia_destino_id: materiaDestinoId ? Number(materiaDestinoId) : undefined,
         motivo: motivo || undefined,
@@ -120,7 +120,7 @@ export default function EquivalenciasAdmin() {
     }
     setSaving(true)
     try {
-      await api.post('/equivalencias/examen-suficiencia', {
+      await api.post('/equivalencias/examenes-suficiencia', {
         alumno_id: Number(examAlumnoId),
         materia_id: Number(examMateriaId),
         fecha: examFecha,
