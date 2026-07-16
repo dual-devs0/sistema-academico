@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { GlassCard } from "../components/ui/GlassCard";
 import { CyanBadge } from "../components/ui/CyanBadge";
@@ -36,6 +36,12 @@ import {
 
 /**
  * Pantalla Exámenes.
+ *
+ * CAMBIOS respecto a la versión anterior (rediseño 2026-07):
+ * 1. Animación: se sacó el FadeInDown por-card en las listas de
+ *    disponibles/inscriptos (delay acumulado de 50ms x item, se sentía
+ *    largo con listas de 4-5+ exámenes). Ahora cada tab entra una sola
+ *    vez con un fade simple; las cards individuales ya no animan.
  *
  * Tabs Disponibles / Inscriptos.
  * - Disponibles: selector de turno + cards con habilitado + fecha/hora/aula
@@ -259,11 +265,15 @@ function DisponiblesTab({
       {examenes.length === 0 ? (
         <SoonPlaceholder message="No hay exámenes disponibles para este turno." />
       ) : (
-        examenes.map((e, i) => (
-          <Animated.View key={e.id} entering={FadeInDown.delay(i * 50).duration(280)}>
-            <ExamenDisponibleCard examen={e} onInscribirse={() => onInscribirse(e.id)} />
-          </Animated.View>
-        ))
+        <Animated.View entering={FadeIn.duration(220)} style={{ gap: spacing.md }}>
+          {examenes.map((e) => (
+            <ExamenDisponibleCard
+              key={e.id}
+              examen={e}
+              onInscribirse={() => onInscribirse(e.id)}
+            />
+          ))}
+        </Animated.View>
       )}
     </View>
   );
@@ -453,14 +463,11 @@ function InscriptosTab({
       {examenes.length === 0 ? (
         <SoonPlaceholder message="No hay exámenes en este filtro." />
       ) : (
-        examenes.map((e, i) => (
-          <Animated.View
-            key={e.inscripcion_id}
-            entering={FadeInDown.delay(i * 50).duration(280)}
-          >
-            <ExamenInscriptoCard examen={e} />
-          </Animated.View>
-        ))
+        <Animated.View entering={FadeIn.duration(220)} style={{ gap: spacing.md }}>
+          {examenes.map((e) => (
+            <ExamenInscriptoCard key={e.inscripcion_id} examen={e} />
+          ))}
+        </Animated.View>
       )}
     </View>
   );
@@ -580,25 +587,15 @@ function ExamenInscriptoCard({ examen }: { examen: ExamenInscripto }) {
 
 function SoonPlaceholder({ message }: { message: string }) {
   return (
-    <GlassCard contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
-      <Text
-        style={{
-          color: colors.textSecondary,
-          fontFamily: fontFamily.interMedium,
-          fontSize: fontSize.caption,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          marginBottom: spacing.sm,
-        }}
-      >
-        Próximamente
-      </Text>
+    <GlassCard contentStyle={{ padding: spacing.xl, alignItems: "center" }}>
+      <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📝</Text>
       <Text
         style={{
           color: colors.textPrimary,
-          fontFamily: fontFamily.inter,
+          fontFamily: fontFamily.interSemibold,
           fontSize: fontSize.body,
           textAlign: "center",
+          marginBottom: spacing.xs,
         }}
       >
         {message}
@@ -609,7 +606,6 @@ function SoonPlaceholder({ message }: { message: string }) {
           fontFamily: fontFamily.inter,
           fontSize: fontSize.caption,
           textAlign: "center",
-          marginTop: spacing.sm,
         }}
       >
         El módulo de exámenes se habilitará en breve.

@@ -30,6 +30,10 @@ from app.models import (  # noqa: F401, E402
     puntaje,
     apunte,
     evento_calendario,
+    programa,
+    foro,
+    horario,
+    refresh_token,
     recordatorio_docente,
     pensum_materia,
     correlatividad,
@@ -37,6 +41,11 @@ from app.models import (  # noqa: F401, E402
     expediente_materia,
     expediente_semestre,
     regularidad_alumno,
+    financiero,
+    pasantia,
+    graduacion,
+    equivalencia,
+    examen,
     tramites,
 )
 
@@ -70,4 +79,4 @@ def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrat
+    run_migrations_online()

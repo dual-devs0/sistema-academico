@@ -170,7 +170,7 @@ export default function PasantiasAdmin() {
     if (!selected) return
     setProcessing(true)
     try {
-      await api.put(`/pasantias/${selected.id}/rechazar`, { motivo })
+      await api.put(`/pasantias/${selected.id}/rechazar?motivo=${encodeURIComponent(motivo)}`, {})
       emitToast('Pasantía rechazada', 'success')
       setShowReject(false)
       setSelected(null)

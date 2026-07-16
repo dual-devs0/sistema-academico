@@ -116,9 +116,11 @@ export const shadow = {
 } as const;
 
 export const tabBar = {
-  height: 68,
-  qrButtonSize: 64,
-  qrButtonLift: 12,
+  height: 60,
+  barBg: "#0f172a",
+  active: "#06b6d4",
+  inactive: "#6b7280",
+  qrButtonSize: 56,
 } as const;
 
 export type ColorToken = keyof typeof colors;

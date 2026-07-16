@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import sqlite3
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -39,6 +38,7 @@ from app.routers import (  # noqa: E402
     equivalencias,
     examenes,
     notificaciones,
+    notas,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -121,64 +121,8 @@ app.include_router(graduacion.router)
 app.include_router(equivalencias.router)
 app.include_router(examenes.router)
 app.include_router(notificaciones.router)
+app.include_router(notas.router)
 app.include_router(test_router.router)
-
-
-def _apply_db_migrations():
-    """Safe incremental migrations for SQLite (ADD COLUMN only)."""
-    db_url = os.getenv("DATABASE_URL", "sqlite:///./sistema_academico.db")
-    if "sqlite" not in db_url:
-        return
-    db_path = db_url.replace("sqlite:///", "")
-    if not os.path.exists(db_path):
-        return
-    pending = {
-        "asistencias": [
-            ("motivo", "VARCHAR"),
-        ],
-        "apuntes": [
-            ("descripcion", "TEXT"),
-            ("tipo_contenido", "VARCHAR(50) DEFAULT 'pdf'"),
-            ("likes", "INTEGER DEFAULT 0"),
-            ("descargas", "INTEGER DEFAULT 0"),
-            ("visibilidad", "VARCHAR(20) DEFAULT 'publico'"),
-            ("fecha_subida", "DATETIME"),
-        ],
-        "eventos_calendario": [
-            ("fecha_fin", "DATE"),
-            ("anio", "INTEGER"),
-            ("semestre", "INTEGER"),
-            ("archivo_pdf", "TEXT"),
-        ],
-        "materias": [
-            ("creditos", "INTEGER DEFAULT 4"),
-            ("cupos", "INTEGER DEFAULT 40"),
-            ("horario", "VARCHAR"),
-            ("secciones", "INTEGER DEFAULT 1"),
-        ],
-        "users": [
-            ("foto_url", "VARCHAR"),
-        ],
-    }
-    try:
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        for table, columns in pending.items():
-            c.execute(f"PRAGMA table_info({table})")
-            existing = {row[1] for row in c.fetchall()}
-            if not existing:
-                continue  # table doesn't exist yet; create_all handles it
-            for col, coltype in columns:
-                if col not in existing:
-                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {coltype}")
-                    print(f"[migration] Added column: {table}.{col}")
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[migration] Warning: {e}")
-
-
-_apply_db_migrations()
 
 
 @app.get(

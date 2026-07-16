@@ -608,3 +608,264 @@ def verificar_qr_asistencia(
         presentes=presentes,
         ausentes=ausentes,
     )
+
+
+# ─── Endpoints para ProfesorView del frontend ────────────────────────────────
+
+
+@router.get(
+    "/profesor/carreras",
+    summary="Carreras donde el profesor dicta clases",
+)
+def profesor_carreras(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    carreras_con_materias = (
+        db.query(models.carrera.Carrera)
+        .join(models.materia.Materia)
+        .join(
+            models.oferta_materia.OfertaMateria,
+            models.oferta_materia.OfertaMateria.materia_id == models.materia.Materia.id,
+        )
+        .filter(
+            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id,
+            models.oferta_materia.OfertaMateria.activa == True,
+        )
+        .distinct()
+        .all()
+    )
+    if current_user.role == "admin":
+        carreras_con_materias = db.query(models.carrera.Carrera).all()
+    return [{"id": c.id, "nombre": c.nombre} for c in carreras_con_materias]
+
+
+@router.get(
+    "/profesor/materias",
+    summary="Materias del profesor filtradas por carrera",
+)
+def profesor_materias(
+    carrera_id: int = Query(...),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    query = db.query(models.materia.Materia).filter(
+        models.materia.Materia.carrera_id == carrera_id
+    )
+    if current_user.role == "profesor":
+        query = query.join(
+            models.oferta_materia.OfertaMateria,
+            models.oferta_materia.OfertaMateria.materia_id == models.materia.Materia.id,
+        ).filter(
+            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id,
+            models.oferta_materia.OfertaMateria.activa == True,
+        )
+    return [
+        {"id": m.id, "nombre": m.nombre, "codigo": str(m.id)}
+        for m in query.all()
+    ]
+
+
+@router.get(
+    "/profesor/alumnos",
+    response_model=schemas.asistencia.ProfesorAlumnosResponse,
+    summary="Alumnos de una materia con asistencia en una fecha",
+)
+def profesor_alumnos(
+    materia_id: int = Query(...),
+    fecha: str = Query(...),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == materia_id)
+        .first()
+    )
+    if not materia:
+        raise HTTPException(status_code=404, detail="Materia no encontrada")
+
+    ofertas_ids = [
+        o.id
+        for o in db.query(models.oferta_materia.OfertaMateria.id)
+        .filter(models.oferta_materia.OfertaMateria.materia_id == materia_id)
+        .all()
+    ]
+    inscripciones = (
+        db.query(models.inscripcion.Inscripcion)
+        .filter(models.inscripcion.Inscripcion.oferta_materia_id.in_(ofertas_ids))
+        .all()
+    )
+    alumno_ids = [i.alumno_id for i in inscripciones]
+    alumnos = (
+        db.query(models.user.User)
+        .filter(models.user.User.id.in_(alumno_ids))
+        .all()
+    )
+
+    fecha_date = date.fromisoformat(fecha) if fecha else date.today()
+    result = []
+    for a in alumnos:
+        asistencia = (
+            db.query(models.asistencia.Asistencia)
+            .filter(
+                models.asistencia.Asistencia.user_id == a.id,
+                models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
+                models.asistencia.Asistencia.fecha == fecha_date,
+            )
+            .first()
+        )
+        result.append(
+            schemas.asistencia.ProfesorAlumnoOut(
+                id=a.id,
+                nombre=a.nombre or a.username,
+                documento=a.username,
+                asistencia_id=asistencia.id if asistencia else None,
+                presente=asistencia.presente if asistencia else None,
+                es_becado=a.es_becado or False,
+                motivo=getattr(asistencia, "motivo", None) if asistencia else None,
+            )
+        )
+
+    return schemas.asistencia.ProfesorAlumnosResponse(
+        fecha=fecha,
+        materia=materia.nombre,
+        alumnos=result,
+    )
+
+
+@router.get(
+    "/qr/{materia_id}",
+    response_model=schemas.asistencia.QrGenerateResponse,
+    summary="Generar QR de asistencia para una materia",
+)
+def generar_qr(
+    materia_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == materia_id)
+        .first()
+    )
+    if not materia:
+        raise HTTPException(status_code=404, detail="Materia no encontrada")
+    oferta_id = _oferta_activa_id(db, materia_id)
+    if oferta_id is None:
+        raise HTTPException(
+            status_code=404, detail="No hay oferta activa para esta materia"
+        )
+
+    import io
+    import qrcode
+    import base64
+
+    token = create_qr_token(materia_id, oferta_id)
+    expira_en = QR_TOKEN_TTL_MINUTES * 60
+
+    qr = qrcode.make(token)
+    buf = io.BytesIO()
+    qr.save(buf, format="PNG")
+    qr_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    scan_url = f"/asistencia/scan?token={token}"
+
+    return schemas.asistencia.QrGenerateResponse(
+        qr_base64=qr_base64,
+        token=token,
+        scan_url=scan_url,
+        expira_en=expira_en,
+    )
+
+
+@router.put(
+    "/profesor/toggle/{asistencia_id}",
+    summary="Toggle presente/ausente de una asistencia existente",
+)
+def profesor_toggle_asistencia(
+    asistencia_id: int,
+    presente: bool = Query(...),
+    motivo: str | None = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    existing = (
+        db.query(models.asistencia.Asistencia)
+        .filter(models.asistencia.Asistencia.id == asistencia_id)
+        .first()
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Asistencia no encontrada")
+    existing.presente = presente
+    if motivo is not None:
+        existing.motivo = motivo
+    db.commit()
+    db.refresh(existing)
+    return {"id": existing.id, "presente": existing.presente, "motivo": getattr(existing, "motivo", None)}
+
+
+@router.post(
+    "/profesor/marcar",
+    summary="Crear registro de asistencia para un alumno",
+)
+def profesor_marcar_asistencia(
+    materia_id: int = Query(...),
+    alumno_id: int = Query(...),
+    fecha_str: str = Query(..., alias="fecha"),
+    presente: bool = Query(...),
+    motivo: str | None = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    oferta_id = _oferta_activa_id(db, materia_id)
+    if oferta_id is None:
+        raise HTTPException(
+            status_code=404, detail="No hay oferta activa para esta materia"
+        )
+    fecha_date = date.fromisoformat(fecha_str) if fecha_str else date.today()
+
+    alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Alumno no encontrado")
+
+    existing = (
+        db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.user_id == alumno_id,
+            models.asistencia.Asistencia.oferta_materia_id == oferta_id,
+            models.asistencia.Asistencia.fecha == fecha_date,
+        )
+        .first()
+    )
+    if existing:
+        existing.presente = presente
+        if motivo is not None:
+            existing.motivo = motivo
+        db.commit()
+        db.refresh(existing)
+        return {"id": existing.id, "presente": existing.presente, "motivo": getattr(existing, "motivo", None)}
+
+    nueva = models.asistencia.Asistencia(
+        user_id=alumno_id,
+        oferta_materia_id=oferta_id,
+        fecha=fecha_date,
+        presente=presente,
+        es_becado=alumno.es_becado or False,
+    )
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return {"id": nueva.id, "presente": nueva.presente, "motivo": None}

@@ -102,6 +102,15 @@ def subir_informe(
     return informe
 
 
+def rechazar_pasantia(pasantia_id: int, db: Session, motivo: str | None = None) -> Pasantia:
+    pasantia = db.query(Pasantia).filter(Pasantia.id == pasantia_id).first()
+    if not pasantia:
+        raise ValueError("Pasantía no encontrada")
+    pasantia.estado = "rechazada"
+    db.flush()
+    return pasantia
+
+
 def finalizar_pasantia(pasantia_id: int, db: Session) -> Pasantia:
     pasantia = db.query(Pasantia).filter(Pasantia.id == pasantia_id).first()
     if not pasantia:
