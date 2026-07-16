@@ -25,6 +25,8 @@ export interface UserInfo {
   nombre: string | null;
   email: string | null;
   carrera_id: number | null;
+  carrera_nombre?: string | null;
+  semestre?: number | null;
   es_becado: boolean | null;
   foto_url: string | null;
 }

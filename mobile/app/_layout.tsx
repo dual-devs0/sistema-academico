@@ -17,7 +17,7 @@ import {
   JetBrainsMono_700Bold,
 } from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider, useAuth } from "../hooks/useAuth";
-import { ThemeProvider } from "../hooks/useTheme";
+import { ThemeProvider, useTheme } from "../hooks/useTheme";
 import { SplashAnimated } from "../components/SplashAnimated";
 import { colors } from "../constants/design";
 import "../global.css";
@@ -91,6 +91,11 @@ function AppGate() {
   );
 }
 
+function ThemeStatusBar() {
+  const { effective } = useTheme();
+  return <StatusBar style="light" />;
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -118,7 +123,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <ThemeProvider>
         <AuthProvider>
-          <StatusBar style="light" />
+          <ThemeStatusBar />
           <AppGate />
         </AuthProvider>
       </ThemeProvider>

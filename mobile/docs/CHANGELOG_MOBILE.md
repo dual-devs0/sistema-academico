@@ -4,6 +4,37 @@ Formato cronológico inverso (nuevo arriba).
 
 ---
 
+## 2026-07-16 — Auditoría completa + integración backend real
+
+### Auditoría realizada
+- **TypeScript**: 0 errores ✅
+- **Tests**: 3 suites, 10 tests pasan ✅
+- **Backend**: verificado que responde correctamente en `localhost:8000`
+- **Conexión app**: apunta a `http://192.168.100.14:8000` (red local WiFi)
+
+### Endpoints creados en backend (notas_router.py)
+- `GET /notas/materia/{id}/detalle` — compone materia + profesor + desglose de
+  puntajes + estadísticas de asistencia. Formato alineado con `MateriaDetalle`
+  del frontend mobile.
+- `GET /notas/materia/{id}/asistencia` — registros diarios de asistencia con
+  fecha, tipoClase, horasCátedra y estado (Presente/Ausente/Justificado).
+  Formato alineado con `AsistenciaDetalleResponse` del frontend.
+
+### Hallazgos resueltos
+- **#1**: `/notas/materia/{id}/detalle` y `/asistencia` — CREADOS ✅
+- **#2**: `/examenes/*` — ya existían en `examenes_router.py` (Fase 7E) ✅
+- **#3**: IP `192.168.100.14` hardcodeada en app.json — documentado como deuda
+  técnica (requiere variable de entorno)
+- **#4**: Dummy data en Dashboard y Cursos — mantenido como fallback graceful
+
+### Pendiente para conectar
+- **Backend**: reiniciar servidor con `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+- **Verificar login**: probar con credenciales seed del backend
+- **Data seed**: asegurar que backend tenga datos de alumno con materias,
+  notas y asistencia cargadas
+
+---
+
 ## 2026-07-12 — Polish v1.1: funcionalidad real + diseño exacto boceto
 
 Revisión contra 19 capturas de boceto (`OneDrive/Pictures/catolica/v2 app alumno`).

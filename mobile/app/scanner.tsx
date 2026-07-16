@@ -139,13 +139,13 @@ export default function ScannerScreen() {
       <ConfirmedScreen
         data={confirmData}
         onGoHome={close}
-        onOpenReport={() => router.replace("/(tabs)/notas")}
+        onOpenReport={() => router.replace("/(tabs)/cursos")}
       />
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
       <CameraView
         style={{ ...StyleSheetAbs.fill }}
         facing="back"
@@ -185,7 +185,7 @@ export default function ScannerScreen() {
         </View>
       </View>
 
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+      <View style={{ flex: 1 }}>
         <View
           style={{
             flexDirection: "row",
@@ -337,8 +337,8 @@ export default function ScannerScreen() {
             </View>
           </ScrollView>
         </View>
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -502,8 +502,8 @@ function ConfirmedScreen({
   onOpenReport: () => void;
 }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+      <View style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: spacing.xl }}>
           <Animated.View
             entering={ZoomIn.duration(320).easing(Easing.out(Easing.cubic))}
@@ -705,8 +705,8 @@ function ConfirmedScreen({
             </Pressable>
           </Animated.View>
         </ScrollView>
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -753,8 +753,8 @@ function PermissionSplash({
   onClose?: () => void;
 }) {
   return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
-      <SafeAreaView style={{ flex: 1, padding: spacing.xl, justifyContent: "space-between" }}>
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1, padding: spacing.xl, justifyContent: "space-between" }}>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <Text
             style={{
@@ -815,8 +815,8 @@ function PermissionSplash({
             </Pressable>
           ) : null}
         </View>
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 

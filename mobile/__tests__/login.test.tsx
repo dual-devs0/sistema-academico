@@ -32,10 +32,11 @@ describe('LoginScreen', () => {
     mockLogin.mockReset()
   })
 
-  it('renderiza inputs de usuario y contraseña', () => {
-    const { getByPlaceholderText } = renderLogin()
+  it('renderiza inputs de documento y contraseña', () => {
+    const { getByPlaceholderText, getAllByText } = renderLogin()
     expect(getByPlaceholderText(/documento/i)).toBeTruthy()
-    expect(getByPlaceholderText(/contraseña/i)).toBeTruthy()
+    expect(getByPlaceholderText('••••••••••')).toBeTruthy()
+    expect(getAllByText(/contraseña/i).length).toBeGreaterThan(0)
   })
 
   it('botón "Ingresar" está deshabilitado con campos vacíos', () => {
@@ -51,7 +52,7 @@ describe('LoginScreen', () => {
     mockLogin.mockResolvedValueOnce(undefined)
     const { getByPlaceholderText, getByText } = renderLogin()
     fireEvent.changeText(getByPlaceholderText(/documento/i), '12345678')
-    fireEvent.changeText(getByPlaceholderText(/contraseña/i), 'Alumno1234!')
+    fireEvent.changeText(getByPlaceholderText('••••••••••'), 'Alumno1234!')
     fireEvent.press(getByText(/ingresar/i))
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith({
@@ -68,7 +69,7 @@ describe('LoginScreen', () => {
     mockLogin.mockRejectedValueOnce(err)
     const { getByPlaceholderText, getByText } = renderLogin()
     fireEvent.changeText(getByPlaceholderText(/documento/i), '00000000')
-    fireEvent.changeText(getByPlaceholderText(/contraseña/i), 'wrongpass')
+    fireEvent.changeText(getByPlaceholderText('••••••••••'), 'wrongpass')
     fireEvent.press(getByText(/ingresar/i))
     await waitFor(() => {
       expect(getByText(/credenciales inválidas/i)).toBeTruthy()

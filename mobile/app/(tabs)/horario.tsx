@@ -13,15 +13,10 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { CyanBadge } from "../../components/ui/CyanBadge";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  spacing,
+  colors, fontFamily, fontSize, radius, spacing,
 } from "../../constants/design";
 import {
   buildMonthGrid,
-  fetchEventosDelMes,
   fetchProximosEventos,
   formatDiaLargo,
   formatDayMonthShort,
@@ -34,64 +29,100 @@ import {
   type EventoOut,
   type TipoEvento,
 } from "../../services/calendarioService";
-
-/**
- * Pantalla Horario / Calendario.
- *
- * Calendario mensual manual (grid 6×7, sin dependencias externas):
- * - Días con eventos: punto cian debajo del número.
- * - Día actual: círculo cian sólido.
- * - Día seleccionado: círculo glass con borde cian.
- * - Días fuera del mes actual: opacidad reducida.
- *
- * Sección "día seleccionado" muestra eventos del día en cards con borde
- * izquierdo cian. Hora en JetBrains Mono cuando existe (backend hoy no
- * expone hora — solo fecha —, mostramos "TODO EL DÍA").
- *
- * "Próximos Eventos" es scroll horizontal de mini-cards.
- */
+import { api } from "../../services/api";
 
 const TODAY = new Date();
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const TIPO_LABEL: Record<TipoEvento, string> = {
+  parcial:   "PARCIAL",
+  final:     "FINAL",
+  entrega:   "ENTREGA",
+  actividad: "ACTIVIDAD",
+  feriado:   "FERIADO",
+  asueto:    "ASUETO",
+};
+
+const TIPO_COLOR: Record<TipoEvento, string> = {
+  parcial:   "#ef4444",
+  final:     "#ef4444",
+  entrega:   "#f59e0b",
+  actividad: "#13D6FF",
+  feriado:   "#22c55e",
+  asueto:    "#22c55e",
+};
+
+const TIPO_EMOJI: Record<TipoEvento, string> = {
+  parcial:   "📝",
+  final:     "🎓",
+  entrega:   "📦",
+  actividad: "📌",
+  feriado:   "🏖️",
+  asueto:    "🏖️",
+};
+
+function cuatrimestre(mes: number): string {
+  if (mes <= 4)  return "Primer Cuatrimestre";
+  if (mes <= 8)  return "Segundo Cuatrimestre";
+  return "Tercer Cuatrimestre";
+}
+
+function formatHora(hora: string | null | undefined): { time: string; period: string } | null {
+  if (!hora) return null;
+  const [h, m] = hora.split(":").map(Number);
+  const period = h < 12 ? "AM" : "PM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return { time: `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")}`, period };
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function HorarioScreen() {
-  const [cursor, setCursor] = useState<{ anio: number; mes: number }>({
-    anio: TODAY.getFullYear(),
-    mes: TODAY.getMonth() + 1,
-  });
+  const [cursor, setCursor] = useState({ anio: TODAY.getFullYear(), mes: TODAY.getMonth() + 1 });
   const [selectedIso, setSelectedIso] = useState<string>(toIso(TODAY));
-  const [eventosMes, setEventosMes] = useState<EventoOut[]>([]);
+  const [allEventos, setAllEventos] = useState<EventoOut[]>([]);
   const [proximos, setProximos] = useState<EventoOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [mes, prox] = await Promise.all([
-        fetchEventosDelMes(cursor.anio, cursor.mes),
+      const ahora = new Date();
+      const desde = new Date(ahora.getFullYear(), ahora.getMonth() - 6, 1);
+      const hasta = new Date(ahora.getFullYear(), ahora.getMonth() + 13, 0);
+
+      const [eventos, prox] = await Promise.all([
+        api.get<EventoOut[]>("/eventos/", {
+          params: { desde: toIso(desde), hasta: toIso(hasta) },
+        }).then((r) => r.data),
         fetchProximosEventos(30),
       ]);
-      setEventosMes(mes);
+      setAllEventos(eventos);
       setProximos(prox);
     } catch {
       setError("No se pudieron cargar los eventos.");
     }
-  }, [cursor]);
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await load();
-      setLoading(false);
-    })();
+    (async () => { setLoading(true); await load(); setLoading(false); })();
   }, [load]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
+    setRefreshing(true); await load(); setRefreshing(false);
   }, [load]);
+
+  const eventosMes = useMemo(
+    () => allEventos.filter((e) => {
+      const d = parseIsoDate(e.fecha);
+      return d.getFullYear() === cursor.anio && d.getMonth() + 1 === cursor.mes;
+    }),
+    [allEventos, cursor],
+  );
 
   const grid = useMemo(
     () => buildMonthGrid(cursor.anio, cursor.mes, eventosMes),
@@ -103,57 +134,45 @@ export default function HorarioScreen() {
     [grid, selectedIso],
   );
 
-  const goPrevMonth = () =>
-    setCursor((c) =>
-      c.mes === 1 ? { anio: c.anio - 1, mes: 12 } : { anio: c.anio, mes: c.mes - 1 },
-    );
-  const goNextMonth = () =>
-    setCursor((c) =>
-      c.mes === 12 ? { anio: c.anio + 1, mes: 1 } : { anio: c.anio, mes: c.mes + 1 },
-    );
+  const goPrev = () => setCursor((c) =>
+    c.mes === 1  ? { anio: c.anio - 1, mes: 12 } : { anio: c.anio, mes: c.mes - 1 }
+  );
+  const goNext = () => setCursor((c) =>
+    c.mes === 12 ? { anio: c.anio + 1, mes: 1  } : { anio: c.anio, mes: c.mes + 1 }
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <ScreenHeader title="Calendario" />
+      <ScreenHeader title="Calendario" name="María García" avatarInitials="MG" hideAvatar />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.cyan}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.cyan} />
         }
       >
-        {loading ? (
-          <LoadingBody />
-        ) : error ? (
-          <ErrorBody message={error} onRetry={load} />
-        ) : (
+        {loading ? <LoadingBody /> : error ? <ErrorBody message={error} onRetry={load} /> : (
           <>
-            <MonthHeader
+            <CalendarCard
               anio={cursor.anio}
               mes={cursor.mes}
-              onPrev={goPrevMonth}
-              onNext={goNextMonth}
-            />
-            <WeekDays />
-            <MonthGrid
               grid={grid}
               selectedIso={selectedIso}
               onSelect={setSelectedIso}
+              onPrev={goPrev}
+              onNext={goNext}
             />
 
             <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.xl }}>
-              <SelectedDaySection
-                selectedIso={selectedIso}
-                eventos={eventosDelDia}
-              />
+              <SelectedDaySection selectedIso={selectedIso} eventos={eventosDelDia} />
             </View>
 
             <View style={{ marginTop: spacing.xl }}>
-              <UpcomingEventsSection eventos={proximos} />
+              <UpcomingSection
+                eventos={proximos}
+                showAll={showAllUpcoming}
+                onToggleShowAll={() => setShowAllUpcoming((p) => !p)}
+              />
             </View>
           </>
         )}
@@ -162,121 +181,127 @@ export default function HorarioScreen() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Month header + week days
-// ---------------------------------------------------------------------------
+// ─── Calendario en card ───────────────────────────────────────────────────────
 
-function MonthHeader({
-  anio,
-  mes,
-  onPrev,
-  onNext,
+function CalendarCard({
+  anio, mes, grid, selectedIso, onSelect, onPrev, onNext,
 }: {
-  anio: number;
-  mes: number;
-  onPrev: () => void;
-  onNext: () => void;
+  anio: number; mes: number;
+  grid: CalendarCell[];
+  selectedIso: string;
+  onSelect: (iso: string) => void;
+  onPrev: () => void; onNext: () => void;
 }) {
   return (
     <View
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: spacing.xl,
+        marginHorizontal: spacing.xl,
         marginTop: spacing.md,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 20,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
+        overflow: "hidden",
       }}
     >
-      <Pressable onPress={onPrev} hitSlop={12} style={navButtonStyle}>
-        <Text style={{ color: colors.textPrimary, fontSize: fontSize.headline }}>‹</Text>
-      </Pressable>
-      <View style={{ alignItems: "center" }}>
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontFamily: fontFamily.interBold,
-            fontSize: fontSize.headline,
-          }}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: spacing.md,
+          paddingBottom: spacing.sm,
+        }}
+      >
+        <Pressable
+          onPress={onPrev}
+          hitSlop={12}
+          style={({ pressed }) => ({
+            width: 34, height: 34, borderRadius: 10,
+            backgroundColor: pressed ? colors.border : "transparent",
+            borderWidth: 1, borderColor: colors.border,
+            alignItems: "center", justifyContent: "center",
+          })}
         >
-          {MESES[mes - 1]}
-        </Text>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontFamily: fontFamily.mono,
-            fontSize: fontSize.caption,
-          }}
-        >
-          {anio}
-        </Text>
-      </View>
-      <Pressable onPress={onNext} hitSlop={12} style={navButtonStyle}>
-        <Text style={{ color: colors.textPrimary, fontSize: fontSize.headline }}>›</Text>
-      </Pressable>
-    </View>
-  );
-}
+          <Text style={{ color: colors.textPrimary, fontSize: 20, lineHeight: 24 }}>‹</Text>
+        </Pressable>
 
-const navButtonStyle = {
-  width: 36,
-  height: 36,
-  borderRadius: radius.pill,
-  alignItems: "center" as const,
-  justifyContent: "center" as const,
-  backgroundColor: colors.glassBg,
-  borderWidth: 1,
-  borderColor: colors.border,
-};
-
-function WeekDays() {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        paddingHorizontal: spacing.xl,
-        marginTop: spacing.lg,
-        marginBottom: spacing.sm,
-      }}
-    >
-      {DIAS_CORTOS.map((d) => (
-        <View key={d} style={{ flex: 1, alignItems: "center" }}>
+        <View style={{ alignItems: "center" }}>
           <Text
             style={{
-              color: colors.textSecondary,
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.caption,
-              letterSpacing: 1.2,
+              color: colors.textPrimary,
+              fontFamily: fontFamily.interBold,
+              fontSize: 20,
+              letterSpacing: -0.3,
             }}
           >
-            {d.slice(0, 3)}
+            {MESES[mes - 1]} {anio}
+          </Text>
+          <Text
+            style={{
+              color: colors.cyan,
+              fontFamily: fontFamily.interMedium,
+              fontSize: 11,
+              letterSpacing: 0.3,
+              marginTop: 1,
+            }}
+          >
+            {cuatrimestre(mes)}
           </Text>
         </View>
-      ))}
+
+        <Pressable
+          onPress={onNext}
+          hitSlop={12}
+          style={({ pressed }) => ({
+            width: 34, height: 34, borderRadius: 10,
+            backgroundColor: pressed ? colors.border : "transparent",
+            borderWidth: 1, borderColor: colors.border,
+            alignItems: "center", justifyContent: "center",
+          })}
+        >
+          <Text style={{ color: colors.textPrimary, fontSize: 20, lineHeight: 24 }}>›</Text>
+        </Pressable>
+      </View>
+
+      <View style={{ flexDirection: "row", marginBottom: spacing.sm }}>
+        {DIAS_CORTOS.map((d) => (
+          <View key={d} style={{ flex: 1, alignItems: "center" }}>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontFamily: fontFamily.interSemibold,
+                fontSize: 11,
+                letterSpacing: 1,
+              }}
+            >
+              {d.slice(0, 3).toUpperCase()}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <MonthGrid grid={grid} selectedIso={selectedIso} onSelect={onSelect} />
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Grid
-// ---------------------------------------------------------------------------
+// ─── Grid ─────────────────────────────────────────────────────────────────────
 
-function MonthGrid({
-  grid,
-  selectedIso,
-  onSelect,
-}: {
+function MonthGrid({ grid, selectedIso, onSelect }: {
   grid: CalendarCell[];
   selectedIso: string;
   onSelect: (iso: string) => void;
 }) {
-  // 6 rows × 7 cols
   const rows: CalendarCell[][] = [];
   for (let i = 0; i < 6; i++) rows.push(grid.slice(i * 7, i * 7 + 7));
 
   return (
-    <View style={{ paddingHorizontal: spacing.lg }}>
+    <View>
       {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: "row", marginBottom: 4 }}>
+        <View key={ri} style={{ flexDirection: "row", marginBottom: 2 }}>
           {row.map((cell) => (
             <DayCell
               key={cell.isoDate}
@@ -291,68 +316,65 @@ function MonthGrid({
   );
 }
 
-function DayCell({
-  cell,
-  selected,
-  onPress,
-}: {
-  cell: CalendarCell;
-  selected: boolean;
-  onPress: () => void;
+function DayCell({ cell, selected, onPress }: {
+  cell: CalendarCell; selected: boolean; onPress: () => void;
 }) {
   const isToday = isSameDay(cell.date, TODAY);
-
-  const numberStyle = {
-    color: !cell.inMonth
-      ? "rgba(156,163,175,0.4)"
-      : isToday
-        ? "#0a0e17"
-        : selected
-          ? colors.cyan
-          : colors.textPrimary,
-    fontFamily: isToday ? fontFamily.interBold : fontFamily.interMedium,
-    fontSize: fontSize.body,
-  };
+  const dotColor = cell.eventos?.length
+    ? TIPO_COLOR[cell.eventos[0].tipo as TipoEvento] ?? colors.cyan
+    : colors.cyan;
 
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        flex: 1,
-        aspectRatio: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 2,
-      }}
+      style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 3 }}
     >
       <View
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
+          width: 34, height: 34,
+          borderRadius: 17,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: isToday
             ? colors.cyan
             : selected
-              ? colors.glassBg
-              : "transparent",
-          borderWidth: selected && !isToday ? 1 : 0,
+            ? "transparent"
+            : "transparent",
+          borderWidth: selected && !isToday ? 1.5 : 0,
           borderColor: colors.cyan,
         }}
       >
-        <Text style={numberStyle}>{cell.date.getDate()}</Text>
-      </View>
-      {cell.hasEvents && !isToday ? (
-        <View
+        <Text
           style={{
-            width: 4,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: colors.cyan,
-            marginTop: 2,
+            color: !cell.inMonth
+              ? "rgba(156,163,175,0.3)"
+              : isToday
+              ? "#0a0e17"
+              : selected
+              ? colors.cyan
+              : colors.textPrimary,
+            fontFamily: isToday || selected
+              ? fontFamily.interBold
+              : fontFamily.interMedium,
+            fontSize: 14,
           }}
-        />
+        >
+          {cell.date.getDate()}
+        </Text>
+      </View>
+
+      {cell.hasEvents && !isToday ? (
+        <View style={{ flexDirection: "row", gap: 2, marginTop: 2, height: 5 }}>
+          {(cell.eventos ?? []).slice(0, 2).map((e, i) => (
+            <View
+              key={i}
+              style={{
+                width: 4, height: 4, borderRadius: 2,
+                backgroundColor: TIPO_COLOR[e.tipo as TipoEvento] ?? colors.cyan,
+              }}
+            />
+          ))}
+        </View>
       ) : (
         <View style={{ height: 6 }} />
       )}
@@ -360,64 +382,47 @@ function DayCell({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Sección día seleccionado
-// ---------------------------------------------------------------------------
+// ─── Sección día seleccionado ─────────────────────────────────────────────────
 
-const TIPO_LABEL: Record<TipoEvento, string> = {
-  parcial: "PARCIAL",
-  final: "FINAL",
-  entrega: "ENTREGA",
-  actividad: "ACTIVIDAD",
-  feriado: "FERIADO",
-  asueto: "ASUETO",
-};
-
-const TIPO_COLOR: Record<TipoEvento, string> = {
-  parcial: colors.error,
-  final: colors.error,
-  entrega: colors.warning,
-  actividad: colors.cyan,
-  feriado: colors.success,
-  asueto: colors.success,
-};
-
-function SelectedDaySection({
-  selectedIso,
-  eventos,
-}: {
-  selectedIso: string;
-  eventos: EventoOut[];
+function SelectedDaySection({ selectedIso, eventos }: {
+  selectedIso: string; eventos: EventoOut[];
 }) {
-  const isToday = isSameDay(parseIsoDate(selectedIso), TODAY);
-
   return (
     <View>
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: spacing.md,
+          justifyContent: "flex-start",
           marginBottom: spacing.md,
         }}
       >
         <Text
           style={{
             color: colors.textPrimary,
-            fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.body,
-            flex: 1,
+            fontFamily: fontFamily.interBold,
+            fontSize: 17,
           }}
-          numberOfLines={1}
         >
           {formatDiaLargo(selectedIso)}
         </Text>
-        {isToday ? <CyanBadge label="Hoy" variant="filled" size="sm" /> : null}
+
       </View>
 
       {eventos.length === 0 ? (
         <Animated.View entering={FadeIn.duration(240)}>
-          <GlassCard contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
+          <View
+            style={{
+              backgroundColor: colors.glassBg,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 14,
+              padding: spacing.xl,
+              alignItems: "center",
+              gap: spacing.md,
+            }}
+          >
+            <Text style={{ fontSize: 36 }}>📅</Text>
             <Text
               style={{
                 color: colors.textSecondary,
@@ -428,68 +433,16 @@ function SelectedDaySection({
             >
               Sin eventos programados para este día.
             </Text>
-          </GlassCard>
+          </View>
         </Animated.View>
       ) : (
         <View style={{ gap: spacing.sm }}>
           {eventos.map((e, i) => (
             <Animated.View
               key={e.id}
-              entering={FadeInDown.delay(i * 50).duration(280)}
+              entering={FadeInDown.delay(i * 50).duration(260)}
             >
-              <GlassCard variant="leftAccent" contentStyle={{ padding: spacing.lg }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: spacing.xs,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: TIPO_COLOR[e.tipo],
-                      fontFamily: fontFamily.interSemibold,
-                      fontSize: fontSize.caption,
-                      letterSpacing: 1.5,
-                    }}
-                  >
-                    {TIPO_LABEL[e.tipo]}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.textSecondary,
-                      fontFamily: fontFamily.mono,
-                      fontSize: fontSize.caption,
-                    }}
-                  >
-                    TODO EL DÍA
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontFamily: fontFamily.interBold,
-                    fontSize: fontSize.body,
-                  }}
-                  numberOfLines={2}
-                >
-                  {e.titulo}
-                </Text>
-                {e.descripcion ? (
-                  <Text
-                    style={{
-                      color: colors.textSecondary,
-                      fontFamily: fontFamily.inter,
-                      fontSize: fontSize.caption,
-                      marginTop: spacing.xs,
-                    }}
-                    numberOfLines={2}
-                  >
-                    {e.descripcion}
-                  </Text>
-                ) : null}
-              </GlassCard>
+              <EventoDiaCard evento={e} />
             </Animated.View>
           ))}
         </View>
@@ -498,20 +451,162 @@ function SelectedDaySection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Próximos Eventos — scroll horizontal
-// ---------------------------------------------------------------------------
+// ─── Card evento del día ──────────────────────────────────────────────────────
 
-function UpcomingEventsSection({ eventos }: { eventos: EventoOut[] }) {
+function EventoDiaCard({ evento }: { evento: EventoOut }) {
+  const hora = formatHora((evento as any).hora ?? null);
+  const accentColor = TIPO_COLOR[evento.tipo];
+  const esUrgente = evento.tipo === "entrega" || evento.tipo === "final";
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 14,
+        overflow: "hidden",
+      }}
+    >
+      <View style={{ width: 3, backgroundColor: accentColor }} />
+
+      <View
+        style={{
+          width: 52,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: spacing.md,
+          borderRightWidth: 1,
+          borderRightColor: colors.border,
+        }}
+      >
+        {hora ? (
+          <>
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontFamily: fontFamily.monoMedium,
+                fontSize: 13,
+                letterSpacing: -0.3,
+              }}
+            >
+              {hora.time}
+            </Text>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontFamily: fontFamily.mono,
+                fontSize: 9,
+                letterSpacing: 0.5,
+              }}
+            >
+              {hora.period}
+            </Text>
+          </>
+        ) : (
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.mono,
+              fontSize: 8,
+              letterSpacing: 0.3,
+              textAlign: "center",
+              lineHeight: 11,
+            }}
+          >
+            TODO{"\n"}EL DÍA
+          </Text>
+        )}
+      </View>
+
+      <View style={{ flex: 1, padding: spacing.md, gap: 4 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text
+            style={{
+              color: accentColor,
+              fontFamily: fontFamily.interSemibold,
+              fontSize: 10,
+              letterSpacing: 1.5,
+            }}
+          >
+            {TIPO_LABEL[evento.tipo]}
+          </Text>
+          {esUrgente && (
+            <View
+              style={{
+                width: 20, height: 20, borderRadius: 10,
+                backgroundColor: accentColor + "30",
+                borderWidth: 1,
+                borderColor: accentColor + "60",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: accentColor, fontSize: 11, fontFamily: fontFamily.interBold }}>
+                !
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontFamily: fontFamily.interSemibold,
+            fontSize: 14,
+            lineHeight: 18,
+          }}
+          numberOfLines={2}
+        >
+          {evento.titulo}
+        </Text>
+
+        {(evento as any).ubicacion && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <Text style={{ fontSize: 10 }}>📍</Text>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontFamily: fontFamily.inter,
+                fontSize: 11,
+              }}
+              numberOfLines={1}
+            >
+              {(evento as any).ubicacion}
+            </Text>
+          </View>
+        )}
+
+        {evento.descripcion && !(evento as any).ubicacion && (
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.inter,
+              fontSize: 11,
+              marginTop: 2,
+            }}
+            numberOfLines={1}
+          >
+            {evento.descripcion}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─── Próximos eventos ─────────────────────────────────────────────────────────
+
+function UpcomingSection({ eventos, showAll, onToggleShowAll }: {
+  eventos: EventoOut[];
+  showAll: boolean;
+  onToggleShowAll: () => void;
+}) {
   const filtrados = eventos
-    .filter(
-      (e) =>
-        e.tipo === "parcial" ||
-        e.tipo === "final" ||
-        e.tipo === "entrega" ||
-        e.tipo === "actividad",
-    )
-    .slice(0, 10);
+    .filter((e) => ["parcial","final","entrega","actividad"].includes(e.tipo));
+
+  const mostrados = showAll ? filtrados : filtrados.slice(0, 10);
 
   return (
     <View>
@@ -519,7 +614,7 @@ function UpcomingEventsSection({ eventos }: { eventos: EventoOut[] }) {
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
-          alignItems: "baseline",
+          alignItems: "center",
           paddingHorizontal: spacing.xl,
           marginBottom: spacing.md,
         }}
@@ -533,40 +628,58 @@ function UpcomingEventsSection({ eventos }: { eventos: EventoOut[] }) {
         >
           Próximos Eventos
         </Text>
-        <Text
-          style={{
-            color: colors.cyan,
-            fontFamily: fontFamily.interMedium,
-            fontSize: fontSize.caption,
-          }}
-        >
-          Ver todos
-        </Text>
+        {filtrados.length > 10 && (
+          <Pressable
+            onPress={onToggleShowAll}
+            style={({ pressed }) => ({
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 8,
+              backgroundColor: pressed ? colors.cyan + "22" : "transparent",
+              borderWidth: 1,
+              borderColor: pressed ? colors.cyan + "44" : "transparent",
+            })}
+          >
+            <Text
+              style={{
+                color: colors.cyan,
+                fontFamily: fontFamily.interMedium,
+                fontSize: fontSize.caption,
+              }}
+            >
+              {showAll ? "Menos" : `Ver todos (${filtrados.length})`}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {filtrados.length === 0 ? (
         <View style={{ paddingHorizontal: spacing.xl }}>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontFamily: fontFamily.inter,
-              fontSize: fontSize.caption,
-            }}
-          >
-            No hay eventos importantes en los próximos 30 días.
-          </Text>
+          <View style={{ alignItems: "center", gap: spacing.sm }}>
+            <Text style={{ fontSize: 36, marginBottom: spacing.sm }}>📅</Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: fontFamily.inter, fontSize: fontSize.caption, textAlign: "center" }}>
+              No hay eventos importantes en los próximos 30 días.
+            </Text>
+          </View>
+        </View>
+      ) : showAll ? (
+        <View style={{ paddingHorizontal: spacing.xl, gap: spacing.sm, paddingBottom: spacing.sm }}>
+          {mostrados.map((e, i) => (
+            <Animated.View key={e.id} entering={FadeInDown.delay(i * 30).duration(240)}>
+              <UpcomingCardFull evento={e} />
+            </Animated.View>
+          ))}
         </View>
       ) : (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xl,
-            gap: spacing.md,
-          }}
+          contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.sm }}
         >
-          {filtrados.map((e) => (
-            <UpcomingCard key={e.id} evento={e} />
+          {mostrados.map((e, i) => (
+            <Animated.View key={e.id} entering={FadeInDown.delay(i * 40).duration(240)}>
+              <UpcomingCard evento={e} />
+            </Animated.View>
           ))}
         </ScrollView>
       )}
@@ -574,33 +687,118 @@ function UpcomingEventsSection({ eventos }: { eventos: EventoOut[] }) {
   );
 }
 
+function UpcomingCardFull({ evento }: { evento: EventoOut }) {
+  const { day, month } = formatDayMonthShort(evento.fecha);
+  const accentColor = TIPO_COLOR[evento.tipo];
+  const emoji = TIPO_EMOJI[evento.tipo];
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 14,
+        overflow: "hidden",
+      }}
+    >
+      <View style={{ width: 3, backgroundColor: accentColor + "90" }} />
+      <View
+        style={{
+          width: 48, alignItems: "center", justifyContent: "center",
+          backgroundColor: accentColor + "10",
+          borderRightWidth: 1, borderRightColor: colors.border,
+        }}
+      >
+        <Text style={{ fontSize: 20 }}>{emoji}</Text>
+      </View>
+      <View style={{ flex: 1, padding: spacing.md, gap: 3 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text
+            style={{
+              color: accentColor,
+              fontFamily: fontFamily.interSemibold,
+              fontSize: 10, letterSpacing: 1.5,
+            }}
+          >
+            {TIPO_LABEL[evento.tipo]}
+          </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.inter,
+              fontSize: 10,
+            }}
+          >
+            {day} {month}
+          </Text>
+        </View>
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontFamily: fontFamily.interSemibold,
+            fontSize: 13,
+            lineHeight: 17,
+          }}
+          numberOfLines={2}
+        >
+          {evento.titulo}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function UpcomingCard({ evento }: { evento: EventoOut }) {
   const { day, month } = formatDayMonthShort(evento.fecha);
+  const accentColor = TIPO_COLOR[evento.tipo];
+  const emoji = TIPO_EMOJI[evento.tipo];
+
   return (
-    <View style={{ width: 180 }}>
-      <GlassCard contentStyle={{ padding: spacing.md }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing.sm,
-            marginBottom: spacing.sm,
-          }}
-        >
+    <View
+      style={{
+        width: 160,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 16,
+        overflow: "hidden",
+      }}
+    >
+      <View style={{ height: 3, backgroundColor: accentColor + "90" }} />
+
+      <View style={{ padding: spacing.md, gap: spacing.sm }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View
             style={{
-              backgroundColor: colors.cyanDim,
-              paddingHorizontal: spacing.sm,
-              paddingVertical: 2,
-              borderRadius: radius.sm,
+              width: 38, height: 38,
+              borderRadius: 10,
+              backgroundColor: accentColor + "20",
+              borderWidth: 1,
+              borderColor: accentColor + "40",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>{emoji}</Text>
+          </View>
+
+          <View
+            style={{
+              backgroundColor: colors.cyan + "18",
+              borderRadius: 8,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
               alignItems: "center",
             }}
           >
             <Text
               style={{
                 color: colors.cyan,
-                fontFamily: fontFamily.monoBold,
-                fontSize: fontSize.caption,
+                fontFamily: fontFamily.interBold,
+                fontSize: 14,
+                lineHeight: 16,
               }}
             >
               {day}
@@ -616,44 +814,44 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
               {month}
             </Text>
           </View>
-          <Text
-            style={{
-              color: TIPO_COLOR[evento.tipo],
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.caption,
-              letterSpacing: 1.5,
-            }}
-            numberOfLines={1}
-          >
-            {TIPO_LABEL[evento.tipo]}
-          </Text>
         </View>
+
+        <Text
+          style={{
+            color: accentColor,
+            fontFamily: fontFamily.interSemibold,
+            fontSize: 10,
+            letterSpacing: 1.5,
+          }}
+        >
+          {TIPO_LABEL[evento.tipo]}
+        </Text>
+
         <Text
           style={{
             color: colors.textPrimary,
             fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.caption,
+            fontSize: 12,
+            lineHeight: 16,
           }}
           numberOfLines={2}
         >
           {evento.titulo}
         </Text>
-      </GlassCard>
+      </View>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Loading / error
-// ---------------------------------------------------------------------------
+// ─── Loading / Error ──────────────────────────────────────────────────────────
 
 function LoadingBody() {
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, marginTop: spacing.lg }}>
-      <SkeletonLoader height={30} width="40%" />
-      <SkeletonLoader height={260} />
-      <SkeletonLoader height={120} />
-      <SkeletonLoader height={80} />
+      <SkeletonLoader height={320} radius={20} />
+      <SkeletonLoader height={30} width="50%" radius={8} />
+      <SkeletonLoader height={80} radius={14} />
+      <SkeletonLoader height={80} radius={14} />
     </View>
   );
 }
@@ -662,46 +860,21 @@ function ErrorBody({ message, onRetry }: { message: string; onRetry: () => void 
   return (
     <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg }}>
       <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>
-        <Text
-          style={{
-            color: colors.error,
-            fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.caption,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-          }}
-        >
+        <Text style={{ color: colors.error, fontFamily: fontFamily.interSemibold, fontSize: fontSize.caption, letterSpacing: 1.5, textTransform: "uppercase" }}>
           Error
         </Text>
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontFamily: fontFamily.inter,
-            fontSize: fontSize.body,
-            marginTop: spacing.sm,
-            marginBottom: spacing.lg,
-          }}
-        >
+        <Text style={{ color: colors.textPrimary, fontFamily: fontFamily.inter, fontSize: fontSize.body, marginTop: spacing.sm, marginBottom: spacing.lg }}>
           {message}
         </Text>
         <Pressable
           onPress={onRetry}
           style={({ pressed }) => ({
-            alignSelf: "flex-start",
-            backgroundColor: colors.cyan,
-            borderRadius: radius.md,
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.sm,
-            opacity: pressed ? 0.85 : 1,
+            alignSelf: "flex-start", backgroundColor: colors.cyan,
+            borderRadius: radius.md, paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm, opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text
-            style={{
-              color: "#0a0e17",
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.caption,
-            }}
-          >
+          <Text style={{ color: "#0a0e17", fontFamily: fontFamily.interSemibold, fontSize: fontSize.caption }}>
             Reintentar
           </Text>
         </Pressable>

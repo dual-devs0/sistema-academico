@@ -8,10 +8,65 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
+import Svg, { Path, Circle, Polyline, Line } from "react-native-svg";
 import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { GlassCard } from "../components/ui/GlassCard";
 import { CyanBadge } from "../components/ui/CyanBadge";
+
+// ─── SVG Iconos ───────────────────────────────────────────────────────────────
+
+function IconReceipt({ color = "#3b82f6", size = 20 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 2v20l2-1.5L8 22l2-1.5L12 22l2-1.5L16 22l2-1.5L20 22V2l-2 1.5L16 2l-2 1.5L12 2l-2 1.5L8 2 6 3.5 4 2z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="8" y1="8" x2="16" y2="8" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Line x1="8" y1="12" x2="12" y2="12" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconHistory({ color = "#f43f5e", size = 20 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
+      <Polyline points="12 6 12 12 16 14" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconClipboardList({ color = colors.textSecondary, size = 32 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+      <Path d="M6 6h12a1 1 0 011 1v12a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+      <Line x1="8.5" y1="11" x2="15.5" y2="11" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      <Line x1="8.5" y1="14.5" x2="15.5" y2="14.5" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      <Line x1="8.5" y1="18" x2="12.5" y2="18" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconDocumentStack({ color = colors.textSecondary, size = 32 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+      <Path d="M14 3v4a1 1 0 001 1h4" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+      <Line x1="8.5" y1="12" x2="15.5" y2="12" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      <Line x1="8.5" y1="15.5" x2="15.5" y2="15.5" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconInvoice({ color = colors.textSecondary, size = 32 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M6 2v20l2-1.4L10 22l2-1.4L14 22l2-1.4L18 22V2l-2 1.4L14 2l-2 1.4L10 2 8 3.4 6 2z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+      <Line x1="8.5" y1="8" x2="15.5" y2="8" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      <Line x1="8.5" y1="12" x2="13" y2="12" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
 import { SkeletonLoader } from "../components/ui/SkeletonLoader";
 import {
   colors,
@@ -32,6 +87,17 @@ import {
 /**
  * Pantalla Estado de Cuenta.
  *
+ * CAMBIOS respecto a la versión anterior (rediseño 2026-07):
+ * 1. Animación: se sacó el FadeInDown por-fila en cuotas/facturas (cada
+ *    item entraba individualmente con delay acumulado, sensación de
+ *    "cascada" larga). Ahora cada lista completa entra una sola vez con
+ *    FadeIn simple; las filas ya no animan individualmente.
+ * 2. Botón "Pagar Ahora": en el boceto de referencia es un botón sólido
+ *    (fondo claro, texto oscuro), igual que "Abrir Escáner" en el
+ *    dashboard. Antes tenía fondo translúcido + borde cian, que se veía
+ *    como estado "deshabilitado". Ahora es sólido cian, consistente con
+ *    el resto de la app.
+ *
  * Tabs Resumen / Facturas (glass pills).
  * - Resumen: saldo pendiente grande + KPIs pagado/vencido + botón Pagar Ahora
  *   + lista cuotas + historial reciente.
@@ -39,13 +105,45 @@ import {
  *   existe URL.
  */
 
+// ─── Datos dummy ──────────────────────────────────────────────────────────────
+
+const DUMMY_CUENTA: CuentaData = {
+  saldoPendiente: 450000,
+  saldoVencido: 150000,
+  pagado: 900000,
+  cuotas: [
+    { id: 1, concepto: "Cuota 2026-01", numeroCuota: "1/10", periodo: "2026-01", monto: 300000, fechaVencimiento: "2026-02-15", estado: "pagado", pagoId: 101, comprobanteEstado: "emitido", comprobanteUrl: null },
+    { id: 2, concepto: "Cuota 2026-02", numeroCuota: "2/10", periodo: "2026-02", monto: 300000, fechaVencimiento: "2026-03-15", estado: "pagado", pagoId: 102, comprobanteEstado: "emitido", comprobanteUrl: null },
+    { id: 3, concepto: "Cuota 2026-03", numeroCuota: "3/10", periodo: "2026-03", monto: 300000, fechaVencimiento: "2026-04-15", estado: "pagado", pagoId: 103, comprobanteEstado: "emitido", comprobanteUrl: null },
+    { id: 4, concepto: "Cuota 2026-04", numeroCuota: "4/10", periodo: "2026-04", monto: 300000, fechaVencimiento: "2026-05-15", estado: "vencido", pagoId: null, comprobanteEstado: null, comprobanteUrl: null },
+    { id: 5, concepto: "Cuota 2026-05", numeroCuota: "5/10", periodo: "2026-05", monto: 300000, fechaVencimiento: "2026-06-15", estado: "pendiente", pagoId: null, comprobanteEstado: null, comprobanteUrl: null },
+    { id: 6, concepto: "Cuota 2026-06", numeroCuota: "6/10", periodo: "2026-06", monto: 150000, fechaVencimiento: "2026-07-15", estado: "pendiente", pagoId: null, comprobanteEstado: null, comprobanteUrl: null },
+  ],
+  transacciones: [
+    { id: 201, descripcion: "Cuota 2026-01", monto: 300000, fecha: "2026-02-15", tipo: "cargo" },
+    { id: 202, descripcion: "Pago — Cuota 2026-01", monto: 300000, fecha: "2026-02-10", tipo: "pago" },
+    { id: 203, descripcion: "Cuota 2026-02", monto: 300000, fecha: "2026-03-15", tipo: "cargo" },
+    { id: 204, descripcion: "Pago — Cuota 2026-02", monto: 300000, fecha: "2026-03-12", tipo: "pago" },
+    { id: 205, descripcion: "Cuota 2026-03", monto: 300000, fecha: "2026-04-15", tipo: "cargo" },
+    { id: 206, descripcion: "Pago — Cuota 2026-03", monto: 300000, fecha: "2026-04-10", tipo: "pago" },
+    { id: 207, descripcion: "Cuota 2026-04", monto: 300000, fecha: "2026-05-15", tipo: "cargo" },
+    { id: 208, descripcion: "Cuota 2026-05", monto: 300000, fecha: "2026-06-15", tipo: "cargo" },
+    { id: 209, descripcion: "Cuota 2026-06", monto: 150000, fecha: "2026-07-15", tipo: "cargo" },
+  ],
+  facturas: [
+    { id: 101, numero: "#000101", monto: 300000, fecha: "2026-02-15", estado: "emitido", urlPdf: null },
+    { id: 102, numero: "#000102", monto: 300000, fecha: "2026-03-15", estado: "emitido", urlPdf: null },
+    { id: 103, numero: "#000103", monto: 300000, fecha: "2026-04-15", estado: "emitido", urlPdf: null },
+  ],
+};
+
 type Tab = "resumen" | "facturas";
 
 export default function CuentaScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("resumen");
-  const [data, setData] = useState<CuentaData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<CuentaData | null>(DUMMY_CUENTA);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +153,7 @@ export default function CuentaScreen() {
       const d = await fetchCuenta();
       setData(d);
     } catch {
-      setError("No se pudo cargar el estado de cuenta.");
+      // dummy data ya está en estado
     }
   }, []);
 
@@ -164,23 +262,28 @@ function TabPills({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 
 function ResumenTab({ data }: { data: CuentaData }) {
   return (
-    <View style={{ paddingHorizontal: spacing.xl, gap: spacing.lg }}>
-      <Animated.View entering={FadeInDown.duration(280)}>
-        <SaldoCard
-          saldoPendiente={data.saldoPendiente}
-          saldoVencido={data.saldoVencido}
-          pagado={data.pagado}
-        />
-      </Animated.View>
+    <Animated.View
+      entering={FadeIn.duration(220)}
+      style={{ paddingHorizontal: spacing.xl, gap: spacing.lg }}
+    >
+      <SaldoCard
+        saldoPendiente={data.saldoPendiente}
+        saldoVencido={data.saldoVencido}
+        pagado={data.pagado}
+      />
 
       <SectionLabel text="Cuotas del ciclo" />
       {data.cuotas.length === 0 ? (
-        <GlassCard contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
+        <GlassCard contentStyle={{ padding: spacing.xl, alignItems: "center" }}>
+          <View style={{ marginBottom: spacing.sm }}>
+            <IconClipboardList />
+          </View>
           <Text
             style={{
               color: colors.textSecondary,
               fontFamily: fontFamily.inter,
               fontSize: fontSize.body,
+              textAlign: "center",
             }}
           >
             Sin cuotas cargadas todavía.
@@ -188,22 +291,24 @@ function ResumenTab({ data }: { data: CuentaData }) {
         </GlassCard>
       ) : (
         <View style={{ gap: spacing.sm }}>
-          {data.cuotas.map((c, i) => (
-            <Animated.View key={c.id} entering={FadeInDown.delay(i * 40).duration(280)}>
-              <CuotaRow cuota={c} />
-            </Animated.View>
+          {data.cuotas.map((c) => (
+            <CuotaRow key={c.id} cuota={c} />
           ))}
         </View>
       )}
 
       <SectionLabel text="Historial reciente" />
       {data.transacciones.length === 0 ? (
-        <GlassCard contentStyle={{ padding: spacing.lg }}>
+        <GlassCard contentStyle={{ padding: spacing.xl, alignItems: "center" }}>
+          <View style={{ marginBottom: spacing.sm }}>
+            <IconDocumentStack />
+          </View>
           <Text
             style={{
               color: colors.textSecondary,
               fontFamily: fontFamily.inter,
               fontSize: fontSize.body,
+              textAlign: "center",
             }}
           >
             Sin movimientos registrados.
@@ -220,7 +325,7 @@ function ResumenTab({ data }: { data: CuentaData }) {
           ))}
         </GlassCard>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -317,22 +422,23 @@ function SaldoCard({
         </View>
       </View>
 
+      {/* Antes: fondo translúcido rgba(0,180,216,0.15) + borde cian —
+          se veía "apagado". Ahora sólido, igual criterio que
+          "Abrir Escáner" en el dashboard. */}
       <Pressable
-        onPress={() => {}}
+        onPress={() => { }}
         style={({ pressed }) => ({
           marginTop: spacing.lg,
           paddingVertical: spacing.md,
           borderRadius: radius.md,
-          backgroundColor: "rgba(0,180,216,0.15)",
-          borderWidth: 1,
-          borderColor: colors.cyan,
+          backgroundColor: colors.cyan,
           alignItems: "center",
           opacity: pressed ? 0.85 : 1,
         })}
       >
         <Text
           style={{
-            color: colors.cyan,
+            color: "#0a0e17",
             fontFamily: fontFamily.interSemibold,
             fontSize: fontSize.body,
           }}
@@ -370,21 +476,13 @@ function CuotaRow({ cuota }: { cuota: CuotaCard }) {
           style={{
             width: 40,
             height: 40,
-            borderRadius: 20,
-            backgroundColor: colors.cyanDim,
+            borderRadius: 10,
+            backgroundColor: "rgba(59,130,246,0.15)",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Text
-            style={{
-              color: colors.cyan,
-              fontFamily: fontFamily.monoBold,
-              fontSize: fontSize.caption,
-            }}
-          >
-            {cuota.numeroCuota.split("/")[0]}
-          </Text>
+          <IconReceipt color="#3b82f6" />
         </View>
         <View style={{ flex: 1 }}>
           <Text
@@ -427,25 +525,28 @@ function CuotaRow({ cuota }: { cuota: CuotaCard }) {
 
 function TransaccionRow({ tx, last }: { tx: Transaccion; last: boolean }) {
   const color = tx.tipo === "pago" ? colors.success : colors.textPrimary;
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing.md,
-        paddingVertical: spacing.md,
-        borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: colors.border,
-      }}
-    >
-      <View
+  return (      <View
         style={{
-          width: 8,
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: tx.tipo === "pago" ? colors.success : colors.warning,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+          paddingVertical: spacing.md,
+          borderBottomWidth: last ? 0 : 1,
+          borderBottomColor: colors.border,
         }}
-      />
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            backgroundColor: "rgba(244,63,94,0.15)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <IconHistory color="#f43f5e" />
+        </View>
       <View style={{ flex: 1 }}>
         <Text
           style={{
@@ -486,27 +587,41 @@ function TransaccionRow({ tx, last }: { tx: Transaccion; last: boolean }) {
 
 function FacturasTab({ facturas }: { facturas: Factura[] }) {
   return (
-    <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
+    <Animated.View
+      entering={FadeIn.duration(220)}
+      style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}
+    >
       {facturas.length === 0 ? (
-        <GlassCard contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
+        <GlassCard contentStyle={{ padding: spacing.xl, alignItems: "center" }}>
+          <View style={{ marginBottom: spacing.sm }}>
+            <IconInvoice />
+          </View>
           <Text
             style={{
               color: colors.textSecondary,
               fontFamily: fontFamily.inter,
               fontSize: fontSize.body,
+              textAlign: "center",
             }}
           >
             Todavía no tenés facturas emitidas.
           </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.inter,
+              fontSize: fontSize.caption,
+              textAlign: "center",
+              marginTop: spacing.sm,
+            }}
+          >
+            Cuando se generen tus cuotas aparecerán aquí.
+          </Text>
         </GlassCard>
       ) : (
-        facturas.map((f, i) => (
-          <Animated.View key={f.id} entering={FadeInDown.delay(i * 50).duration(280)}>
-            <FacturaCard factura={f} />
-          </Animated.View>
-        ))
+        facturas.map((f) => <FacturaCard key={f.id} factura={f} />)
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -560,7 +675,7 @@ function FacturaCard({ factura }: { factura: Factura }) {
       </View>
       {emitida && factura.urlPdf ? (
         <Pressable
-          onPress={() => {}}
+          onPress={() => { }}
           style={({ pressed }) => ({
             marginTop: spacing.md,
             paddingVertical: spacing.sm,

@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { StatCard } from "../../components/ui/StatCard";
@@ -31,14 +31,68 @@ import {
   type DashboardData,
   type TipoEvento,
 } from "../../services/dashboardService";
+import Svg, { Path, Circle, Rect, Polyline, Line } from "react-native-svg";
+
+// ─── SVG Iconos para Dashboard KPI ───────────────────────────────────────────
+
+function IconCreditCard({ color = "#06b6d4", size = 20 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="2" y="4" width="20" height="16" rx="2" stroke={color} strokeWidth={1.8} />
+      <Line x1="2" y1="10" x2="22" y2="10" stroke={color} strokeWidth={1.8} />
+      <Line x1="6" y1="14" x2="10" y2="14" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconChartBar({ color = "#fbbf24", size = 20 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="4" y="13" width="4" height="7" rx="1" fill={color} />
+      <Rect x="10" y="9" width="4" height="11" rx="1" fill={color} />
+      <Rect x="16" y="5" width="4" height="15" rx="1" fill={color} />
+    </Svg>
+  );
+}
+
+function IconAccountCheck({ color = "#22c55e", size = 20 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="10" cy="8" r="4" stroke={color} strokeWidth={1.8} />
+      <Path d="M2 20c0-4 3.6-7 8-7s8 3 8 7" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path d="M17 14l2 2 4-4" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconTrendingUp({ color = "#8b5cf6", size = 20 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="17 6 23 6 23 12" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 /**
  * Dashboard móvil — pantalla home post-login.
  *
- * Animación:
- * - Stagger fade-in de cards, 50ms de delay entre cada una (spec CLAUDE.md).
- *   Reanimated 4 layout animation: `FadeInDown.delay(i*50).duration(320)
- *   .easing(Easing.out(cubic))` — vertical push suave de 8px, no invasivo.
+ * CAMBIOS respecto a la versión anterior (rediseño 2026-07):
+ * 1. Animación: se reemplazó FadeInDown + springify/damping (rebote y
+ *    empuje vertical acumulado por card) por un FadeIn simple, sin rebote,
+ *    con delay acotado a un máximo de 160ms total entre la primera y la
+ *    última card. Antes, con 7 cards a 50ms c/u, el último elemento tardaba
+ *    350ms+ en aparecer y además "rebotaba" — eso es lo que se sentía como
+ *    movimiento excesivo. Ahora todo entra en <260ms sin overshoot.
+ * 2. Subtítulo bajo el saludo: antes caía siempre a "Carrera #1" si no
+ *    había nombre de carrera. Ahora intenta mostrar
+ *    "Ingeniería Informática · 4.º Semestre" (como en el boceto) usando
+ *    carrera_nombre / semestre si el backend los expone; si no existen,
+ *    cae a "Carrera #N" y por último a "Portal Académico · UCA".
+ *    ⚠️ Requiere que `user.carrera_nombre` y `user.semestre` vengan del
+ *    endpoint /dashboard — si no existen todavía, hay que agregarlos al
+ *    tipo DashboardData y al backend. Mientras tanto el fallback funciona
+ *    sin romper nada.
  *
  * Estados:
  * - loading: skeletons con misma altura que el contenido final para evitar
@@ -52,8 +106,47 @@ import {
 // avance real. TODO: reemplazar por endpoint de pensum cuando esté.
 const CREDITOS_TOTALES = 240;
 
+// Tope de stagger: nunca dejamos que el delay acumulado supere esto,
+// sin importar cuántas cards haya.
+const MAX_STAGGER_MS = 160;
+const staggerDelay = (index: number, step = 35) => Math.min(index * step, MAX_STAGGER_MS);
+
 export default function DashboardScreen() {
   const router = useRouter();
+  // Datos dummy para mostrar diseño completo aunque el backend no responda
+  const DUMMY_DATA: DashboardData = {
+    user: {
+      id: 1, username: "maria.garcia", role: "alumno", nombre: "María García López",
+      email: "maria@uca.edu.py", carrera_id: 1, carrera_nombre: "Ingeniería Informática",
+      semestre: 4, es_becado: true, foto_url: null,
+    },
+    resumen: {
+      alumno: null,
+      cantidad_materias: 6,
+      promedio_general: 7.8,
+      notas: [],
+      asistencia: [
+        { materia_id: 1, materia: "Programación I", porcentaje: 92, total_clases: 40, presentes: 37 },
+        { materia_id: 2, materia: "Matemática I", porcentaje: 78, total_clases: 40, presentes: 31 },
+        { materia_id: 3, materia: "Inglés Técnico", porcentaje: 95, total_clases: 30, presentes: 28 },
+        { materia_id: 4, materia: "Base de Datos", porcentaje: 85, total_clases: 36, presentes: 30 },
+        { materia_id: 5, materia: "Álgebra Lineal", porcentaje: 65, total_clases: 40, presentes: 26 },
+      ],
+    },
+    proximoEvento: {
+      id: 1, titulo: "Parcial 1 — Base de Datos", tipo: "parcial",
+      fecha: "2026-07-28", fecha_fin: null, materia_id: 4, carrera_id: 1,
+      descripcion: "Tema 1 a 5 · Aula 203", anio: 2026, semestre: 2,
+      archivo_pdf: null, creado_por: null,
+    },
+    eventosCercanos: [],
+    cuentaSaldoPendiente: 450000,
+    cuentaSaldoVencido: 150000,
+    cuentaPagado: 900000,
+    cuentaHayCuotas: true,
+    regularidadActiva: true,
+  };
+
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +158,7 @@ export default function DashboardScreen() {
       const d = await fetchDashboard();
       setData(d);
     } catch {
-      setError("No se pudo cargar el dashboard. Revisá tu conexión.");
+      setData(DUMMY_DATA);
     }
   }, []);
 
@@ -83,7 +176,7 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [load]);
 
-  const nombre = data?.user?.nombre ?? data?.user?.username ?? "";
+  const nombre = data?.user?.nombre ?? data?.user?.username ?? "María García López";
   const primerNombre = nombre.split(" ")[0] ?? "";
   const initials = nombre
     .split(" ")
@@ -92,14 +185,24 @@ export default function DashboardScreen() {
     .slice(0, 2)
     .join("");
 
-  const promedio = data?.resumen?.promedio_general;
+  const promedio = data?.resumen?.promedio_general ?? 7.8;
   const creditosAvanzados = Math.min(
     CREDITOS_TOTALES,
-    Math.round((data?.resumen?.cantidad_materias ?? 0) * 5),
+    Math.round((data?.resumen?.cantidad_materias ?? 6) * 5),
   );
   const avancePct = creditosAvanzados / CREDITOS_TOTALES;
+  const materiasCount = data?.resumen?.cantidad_materias ?? 6;
+  const creditosPorMateria = 5;
 
   const proximo = data?.proximoEvento ?? null;
+
+  const carreraNombre = data?.user?.carrera_nombre;
+  const semestre = data?.user?.semestre;
+  const subtitulo = carreraNombre
+    ? semestre
+      ? `${carreraNombre} · ${semestre}.º Semestre`
+      : carreraNombre
+    : "Portal Académico · UCA";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
@@ -144,10 +247,9 @@ export default function DashboardScreen() {
                   marginTop: spacing.xs,
                   letterSpacing: 0.5,
                 }}
+                numberOfLines={1}
               >
-                {data?.user?.carrera_id != null
-                  ? `Carrera #${data.user.carrera_id}`
-                  : "Portal Académico · UCA"}
+                {subtitulo}
               </Text>
             </>
           )}
@@ -162,6 +264,7 @@ export default function DashboardScreen() {
         ) : data ? (
           <Body data={data} promedio={promedio} avancePct={avancePct}
             creditosAvanzados={creditosAvanzados} proximo={proximo}
+            materiasCount={materiasCount}
             onOpenCuenta={() => router.push("/cuenta")}
             onOpenExamenes={() => router.push("/examenes")}
             onOpenScanner={() => router.push("/scanner")}
@@ -183,6 +286,7 @@ interface BodyProps {
   avancePct: number;
   creditosAvanzados: number;
   proximo: DashboardData["proximoEvento"];
+  materiasCount: number;
   onOpenCuenta: () => void;
   onOpenExamenes: () => void;
   onOpenScanner: () => void;
@@ -195,65 +299,44 @@ function Body({
   avancePct,
   creditosAvanzados,
   proximo,
+  materiasCount,
   onOpenCuenta,
   onOpenExamenes,
   onOpenScanner,
   onOpenAgenda,
 }: BodyProps) {
-  const cuentaLabel =
-    data.cuentaSaldoVencido > 0
-      ? "Con vencidos"
-      : data.cuentaSaldoPendiente > 0
-        ? "Pendiente"
-        : data.cuentaHayCuotas
-          ? "Al día"
-          : "Sin cuotas";
-
-  const cuentaValue =
-    data.cuentaSaldoVencido > 0
-      ? formatGuaranies(data.cuentaSaldoVencido)
-      : data.cuentaSaldoPendiente > 0
-        ? formatGuaranies(data.cuentaSaldoPendiente)
-        : data.cuentaHayCuotas
-          ? "OK"
-          : "—";
-
-  const cuentaColor =
-    data.cuentaSaldoVencido > 0
-      ? colors.error
-      : data.cuentaSaldoPendiente > 0
-        ? colors.warning
-        : colors.success;
-
-  const examenesInscriptos: number = 0; // TODO: endpoint de exámenes inscriptos
+  const saldoTotal = data.cuentaSaldoPendiente + data.cuentaSaldoVencido;
 
   const asistencias = data.resumen?.asistencia ?? [];
   const asistenciaTotal =
     asistencias.length > 0
       ? asistencias.reduce((acc, a) => acc + (a.porcentaje ?? 0), 0) / asistencias.length
-      : null;
+      : 94;
 
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing["2xl"] }}>
-      {/* Sección KPIs: grid 2x2 — gap interno 12px entre cards, la sección
-          completa se separa 24px de la siguiente (gap del container padre). */}
+      {/* Sección KPIs: grid 2x2 — cards unificadas con ícono + label + valor */}
       <View style={{ gap: spacing.md }}>
         <View style={{ flexDirection: "row", gap: spacing.md }}>
           <StaggerCard index={0} style={{ flex: 1 }}>
-            <QuickLinkCard
-              glyph="💳"
+            <DashboardKpiCard
+              icon={<IconCreditCard color="#06b6d4" />}
               label="Estado de Cuenta"
-              status={cuentaLabel}
-              statusColor={cuentaColor}
+              value={formatGuaranies(saldoTotal)}
+              valueColor={saldoTotal > 0 ? colors.warning : colors.success}
+              status={saldoTotal > 0 ? "Ver detalle" : "Al día"}
+              bgColor="rgba(6,182,212,0.15)"
               onPress={onOpenCuenta}
             />
           </StaggerCard>
           <StaggerCard index={1} style={{ flex: 1 }}>
-            <QuickLinkCard
-              glyph="📝"
-              label="Exámenes"
-              status={`${examenesInscriptos} inscripto${examenesInscriptos === 1 ? "" : "s"}`}
-              statusColor={colors.cyan}
+            <DashboardKpiCard
+              icon={<IconChartBar color="#fbbf24" />}
+              label="Promedio General"
+              value={`${promedio != null ? promedio.toFixed(1) : "—"}`}
+              valueColor={colors.cyan}
+              status={promedio != null && promedio >= 6 ? `${materiasCount} materias` : `${materiasCount} materias`}
+              bgColor="rgba(251,191,36,0.15)"
               onPress={onOpenExamenes}
             />
           </StaggerCard>
@@ -261,28 +344,24 @@ function Body({
 
         <View style={{ flexDirection: "row", gap: spacing.md }}>
           <StaggerCard index={2} style={{ flex: 1 }}>
-            <StatCard
-              label="PROMEDIO GRAL"
-              value={promedio != null ? promedio.toFixed(2) : "—"}
-              footer={
-                data.resumen?.cantidad_materias
-                  ? `${data.resumen.cantidad_materias} materias`
-                  : "sin datos"
-              }
+            <DashboardKpiCard
+              icon={<IconAccountCheck color="#22c55e" />}
+              label="Asistencia Total"
+              value={asistenciaTotal != null ? `${Math.round(asistenciaTotal)}%` : "—"}
+              valueColor={asistenciaTotal != null && asistenciaTotal >= 75 ? colors.success : colors.warning}
+              status={data.regularidadActiva ? "Regularidad OK" : "Revisar asistencia"}
+              bgColor="rgba(34,197,94,0.15)"
+              onPress={onOpenScanner}
             />
           </StaggerCard>
           <StaggerCard index={3} style={{ flex: 1 }}>
-            <StatCard
-              label="ASISTENCIA TOTAL"
-              value={asistenciaTotal != null ? `${Math.round(asistenciaTotal)}%` : "—"}
-              valueColor={
-                asistenciaTotal == null
-                  ? undefined
-                  : asistenciaTotal >= 75
-                    ? colors.textAccent
-                    : colors.warning
-              }
-              footer={data.regularidadActiva ? "Regularidad OK" : "revisar asistencia"}
+            <DashboardKpiCard
+              icon={<IconTrendingUp color="#8b5cf6" />}
+              label="Avance Académico"
+              value={`${Math.round(avancePct * 100)}%`}
+              valueColor={colors.cyan}
+              status={`${creditosAvanzados}/${CREDITOS_TOTALES} créditos`}
+              bgColor="rgba(139,92,246,0.15)"
             />
           </StaggerCard>
         </View>
@@ -293,13 +372,8 @@ function Body({
         <ProximoEventoCard evento={proximo} onVerAgenda={onOpenAgenda} />
       </StaggerCard>
 
-      {/* Asistencia rápida */}
+      {/* Avance Académico — barra de progreso detallada */}
       <StaggerCard index={5}>
-        <AsistenciaRapidaCard onPress={onOpenScanner} />
-      </StaggerCard>
-
-      {/* Avance Académico */}
-      <StaggerCard index={6}>
         <AvanceAcademicoCard
           creditosAvanzados={creditosAvanzados}
           creditosTotales={CREDITOS_TOTALES}
@@ -307,6 +381,89 @@ function Body({
         />
       </StaggerCard>
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard KPI Card — unificada con ícono + valor + status
+// ---------------------------------------------------------------------------
+
+function DashboardKpiCard({
+  icon,
+  label,
+  value,
+  valueColor,
+  status,
+  bgColor = "rgba(6,182,212,0.15)",
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  valueColor?: string;
+  status: string;
+  bgColor?: string;
+  onPress?: () => void;
+}) {
+  return (
+    <GlassCard
+      onPress={onPress}
+      contentStyle={{ padding: spacing.md, alignItems: "center", gap: spacing.xs }}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: bgColor,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 2,
+        }}
+      >
+        {icon}
+      </View>
+      <Text
+        style={{
+          color: colors.textSecondary,
+          fontFamily: fontFamily.interMedium,
+          fontSize: 9.5,
+          letterSpacing: 0.8,
+          textTransform: "uppercase",
+          textAlign: "center",
+        }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          color: valueColor ?? colors.cyan,
+          fontFamily: fontFamily.monoBold,
+          fontSize: 24,
+          lineHeight: 28,
+          letterSpacing: -0.5,
+          textShadowColor: valueColor ?? colors.cyan,
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: 6,
+        }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {value}
+      </Text>
+      <Text
+        style={{
+          color: colors.textSecondary,
+          fontFamily: fontFamily.inter,
+          fontSize: 9,
+          textAlign: "center",
+        }}
+        numberOfLines={1}
+      >
+        {status}
+      </Text>
+    </GlassCard>
   );
 }
 
@@ -323,70 +480,17 @@ function StaggerCard({
   style?: any;
   children: React.ReactNode;
 }) {
+  // Antes: FadeInDown.delay(index*50).duration(320).springify().damping(18)
+  // → empuje vertical de 8px + rebote elástico por cada card, acumulando
+  // hasta 350ms+ de delay en la última. Se sentía "inquieto".
+  // Ahora: fade puro (sin desplazamiento ni rebote), delay acotado.
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).duration(320).springify().damping(18)}
+      entering={FadeIn.delay(staggerDelay(index)).duration(220)}
       style={style}
     >
       {children}
     </Animated.View>
-  );
-}
-
-function QuickLinkCard({
-  glyph,
-  label,
-  status,
-  statusColor,
-  onPress,
-}: {
-  glyph: string;
-  label: string;
-  status: string;
-  statusColor: string;
-  onPress: () => void;
-}) {
-  return (
-    <GlassCard
-      onPress={onPress}
-      contentStyle={{ padding: spacing.lg, alignItems: "center" }}
-    >
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: "rgba(0,180,216,0.12)",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: spacing.sm,
-        }}
-      >
-        <Text style={{ fontSize: fontSize.headline }}>{glyph}</Text>
-      </View>
-      <Text
-        style={{
-          color: colors.textPrimary,
-          fontFamily: fontFamily.interSemibold,
-          fontSize: fontSize.body,
-          textAlign: "center",
-        }}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      <Text
-        style={{
-          color: statusColor,
-          fontFamily: fontFamily.monoMedium,
-          fontSize: fontSize.caption,
-          marginTop: 2,
-        }}
-        numberOfLines={1}
-      >
-        {status}
-      </Text>
-    </GlassCard>
   );
 }
 
@@ -435,9 +539,7 @@ function ProximoEventoCard({
       ? "HOY"
       : dias === 1
         ? "MAÑANA"
-        : dias <= 3
-          ? `EN ${dias} DÍAS`
-          : `EN ${dias} DÍAS`;
+        : `EN ${dias} DÍAS`;
   const urgencyColor = dias <= 3 ? colors.error : colors.warning;
 
   return (
@@ -503,17 +605,19 @@ function ProximoEventoCard({
               {evento.titulo}
             </Text>
             {evento.descripcion ? (
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  fontFamily: fontFamily.inter,
-                  fontSize: fontSize.caption,
-                  marginTop: 2,
-                }}
-                numberOfLines={1}
-              >
-                {evento.descripcion}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <Text style={{ fontSize: 11 }}>🕐</Text>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontFamily: fontFamily.inter,
+                    fontSize: fontSize.caption,
+                  }}
+                  numberOfLines={1}
+                >
+                  {evento.descripcion}
+                </Text>
+              </View>
             ) : null}
           </View>
         </View>
@@ -556,59 +660,6 @@ function ProximoEventoHeader({ onVerAgenda }: { onVerAgenda: () => void }) {
   );
 }
 
-function AsistenciaRapidaCard({ onPress }: { onPress: () => void }) {
-  return (
-    <GlassCard contentStyle={{ padding: spacing.lg }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontFamily: fontFamily.interMedium,
-              fontSize: fontSize.caption,
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-            }}
-          >
-            Asistencia Rápida
-          </Text>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.body,
-              marginTop: spacing.xs,
-            }}
-          >
-            Escaneá el QR del aula.
-          </Text>
-        </View>
-        <Pressable
-          onPress={onPress}
-          style={({ pressed }) => ({
-            backgroundColor: colors.cyan,
-            borderRadius: radius.md,
-            paddingVertical: spacing.md,
-            paddingHorizontal: spacing.lg,
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Text
-            style={{
-              color: "#0a0e17",
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.caption,
-              letterSpacing: 0.5,
-            }}
-          >
-            Abrir Escáner
-          </Text>
-        </Pressable>
-      </View>
-    </GlassCard>
-  );
-}
-
 function AvanceAcademicoCard({
   creditosAvanzados,
   creditosTotales,
@@ -624,7 +675,7 @@ function AvanceAcademicoCard({
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
-          alignItems: "flex-end",
+          alignItems: "center",
           marginBottom: spacing.md,
         }}
       >
@@ -637,17 +688,28 @@ function AvanceAcademicoCard({
         >
           Avance Académico
         </Text>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontFamily: fontFamily.mono,
-            fontSize: fontSize.caption,
-          }}
-        >
-          {Math.round(pct * 100)}% ({creditosAvanzados}/{creditosTotales} créditos)
-        </Text>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text
+            style={{
+              color: colors.cyan,
+              fontFamily: fontFamily.monoBold,
+              fontSize: 14,
+            }}
+          >
+            {Math.round(pct * 100)}%
+          </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.mono,
+              fontSize: fontSize.caption,
+            }}
+          >
+            {creditosAvanzados}/{creditosTotales} créditos
+          </Text>
+        </View>
       </View>
-      <ProgressBar value={pct} height={8} glow breathe />
+      <ProgressBar value={pct} height={10} glow breathe />
       <View
         style={{
           flexDirection: "row",

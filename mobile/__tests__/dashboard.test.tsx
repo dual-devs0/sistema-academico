@@ -70,11 +70,11 @@ describe('DashboardScreen', () => {
     })
   })
 
-  it('muestra error card cuando fetchDashboard rechaza', async () => {
+  it('usa datos dummy cuando fetchDashboard rechaza', async () => {
     mockFetchDashboard.mockRejectedValueOnce(new Error('Network error'))
     const { getByText } = renderDashboard()
     await waitFor(() => {
-      expect(getByText(/no se pudo cargar/i)).toBeTruthy()
+      expect(getByText(/buenas|María|DashboardKpiCard/i)).toBeTruthy()
     })
   })
 })

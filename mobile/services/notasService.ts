@@ -50,10 +50,15 @@ export interface AsistenciaBackend {
 export type NotaTipo = "parcial1" | "parcial2" | "practico" | "final";
 
 export interface DesgloseItem {
-  tipo: NotaTipo;
+  tipo: string;
   label: string;
-  peso: number; // 0..1
+  peso: number;
   nota: number | null;
+  puntajeActividad: number | null;
+  puntajeLogrado: number | null;
+  fecha: string | null;
+  hora: string | null;
+  profesor: string | null;
 }
 
 export interface MateriaCard {
@@ -74,6 +79,15 @@ export interface NotasCompleto {
   semestresDisponibles: number[];
   promedioAnual: number | null;
 }
+
+export const PUNTAJE_POR_TIPO: Record<string, number> = {
+  parcial1: 100,
+  parcial2: 100,
+  practico: 60,
+  final1: 50,
+  final2: 50,
+  final3: 50,
+};
 
 // ---------------------------------------------------------------------------
 // Fetchers
@@ -119,6 +133,11 @@ function buildDesglose(nota: NotaBackend | undefined): DesgloseItem[] {
     label: LABEL[t],
     peso: PESO[t],
     nota: nota?.[t] ?? null,
+    puntajeActividad: null,
+    puntajeLogrado: null,
+    fecha: null,
+    hora: null,
+    profesor: null,
   }));
 }
 
@@ -189,4 +208,45 @@ export function computePromedioSemestre(
     .filter((p): p is number => p != null);
   if (promedios.length === 0) return null;
   return Math.round((promedios.reduce((a, b) => a + b, 0) / promedios.length) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Tipos para detalle de materia
+// ---------------------------------------------------------------------------
+
+export type MateriaDetalle = {
+  materiaId: number;
+  nombre: string;
+  profesor: string | null;
+  semestre: number;
+  asistenciaPct: number | null;
+  totalClases: number;
+  presentes: number;
+  desglose: DesgloseItem[];
+};
+
+export type AsistenciaRegistro = {
+  fecha: string;
+  tipoClase: string;
+  horasCatedra: number;
+  asistenciaCargada: string;
+};
+
+export type AsistenciaDetalleResponse = {
+  nombre: string;
+  registros: AsistenciaRegistro[];
+};
+
+// ---------------------------------------------------------------------------
+// Fetchers de detalle
+// ---------------------------------------------------------------------------
+
+export async function fetchMateriaDetalle(id: number): Promise<MateriaDetalle> {
+  const { data } = await api.get<MateriaDetalle>(`/notas/materia/${id}/detalle`);
+  return data;
+}
+
+export async function fetchAsistenciaDetalle(id: number): Promise<AsistenciaDetalleResponse> {
+  const { data } = await api.get<AsistenciaDetalleResponse>(`/notas/materia/${id}/asistencia`);
+  return data;
 }

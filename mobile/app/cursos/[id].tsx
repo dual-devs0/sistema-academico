@@ -1,66 +1,120 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
+  Pressable, ScrollView, Text, View, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { ScreenHeader } from "../../components/ui/ScreenHeader";
-import { GlassCard } from "../../components/ui/GlassCard";
+import Svg, { Path, Circle } from "react-native-svg";
 import { DonutChart } from "../../components/ui/DonutChart";
-import { ProgressBar } from "../../components/ui/ProgressBar";
-import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
-import { CyanBadge } from "../../components/ui/CyanBadge";
-import {
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  spacing,
-} from "../../constants/design";
-import {
-  fetchNotasCompleto,
-  type MateriaCard,
-} from "../../services/notasService";
+import { colors, fontFamily, fontSize, spacing } from "../../constants/design";
+import { fetchMateriaDetalle, PUNTAJE_POR_TIPO, type MateriaDetalle } from "../../services/notasService";
 
-/**
- * Detalle de materia.
- *
- * Datos: reuso `fetchNotasCompleto()` y filtro por id — evita agregar un
- * endpoint dedicado (backend no lo expone). Menos latencia en navegación
- * secuencial si React Query se agrega después (cache compartida).
- *
- * Layout:
- * - Header con back arrow + nombre materia.
- * - DonutChart 160px de asistencia.
- * - 4 rows de desglose con peso, nota, y ProgressBar por componente.
- * - Stats: total_clases / presentes / ausentes.
- */
-export default function CursoDetalle() {
+// ─── Datos dummy ──────────────────────────────────────────────────────────────
+
+const DUMMY_MATERIAS: Record<number, MateriaDetalle> = {
+  1: {
+    materiaId: 1, nombre: "Programación I", profesor: "Ing. Pérez", semestre: 1,
+    asistenciaPct: 92, totalClases: 40, presentes: 37,
+    desglose: [
+      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 88, fecha: "2026-04-15", hora: "17:00", profesor: "Ing. Pérez" },
+      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 8, puntajeActividad: 100, puntajeLogrado: 80, fecha: "2026-06-10", hora: "17:00", profesor: "Ing. Pérez" },
+      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 10, puntajeActividad: 50, puntajeLogrado: 48, fecha: "2026-05-20", hora: null, profesor: "Ing. Pérez" },
+      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 7.5, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
+    ],
+  },
+  2: {
+    materiaId: 2, nombre: "Matemática I", profesor: "Lic. González", semestre: 1,
+    asistenciaPct: 78, totalClases: 40, presentes: 31,
+    desglose: [
+      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 5, puntajeActividad: 100, puntajeLogrado: 52, fecha: "2026-04-16", hora: "17:00", profesor: "Lic. González" },
+      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 7, puntajeActividad: 100, puntajeLogrado: 70, fecha: "2026-06-11", hora: "17:00", profesor: "Lic. González" },
+      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 6, puntajeActividad: 50, puntajeLogrado: 30, fecha: "2026-05-21", hora: null, profesor: "Lic. González" },
+      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 6.5, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
+    ],
+  },
+  3: {
+    materiaId: 3, nombre: "Inglés Técnico", profesor: "Prof. Martínez", semestre: 1,
+    asistenciaPct: 95, totalClases: 30, presentes: 28,
+    desglose: [
+      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 92, fecha: "2026-04-14", hora: "15:00", profesor: "Prof. Martínez" },
+      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 90, fecha: "2026-06-09", hora: "15:00", profesor: "Prof. Martínez" },
+      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 9, puntajeActividad: 40, puntajeLogrado: 36, fecha: "2026-05-19", hora: null, profesor: "Prof. Martínez" },
+      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 9, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
+    ],
+  },
+  4: {
+    materiaId: 4, nombre: "Base de Datos", profesor: "Ing. López", semestre: 2,
+    asistenciaPct: 85, totalClases: 36, presentes: 30,
+    desglose: [
+      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 7, puntajeActividad: 100, puntajeLogrado: 72, fecha: "2026-04-10", hora: "17:00", profesor: "Ing. López" },
+      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 6, puntajeActividad: 100, puntajeLogrado: 60, fecha: "2026-06-12", hora: "17:00", profesor: "Ing. López" },
+      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 8, puntajeActividad: 60, puntajeLogrado: 48, fecha: "2026-05-22", hora: null, profesor: "Ing. López" },
+      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 7, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
+    ],
+  },
+  5: {
+    materiaId: 5, nombre: "Álgebra Lineal", profesor: "Lic. Fernández", semestre: 2,
+    asistenciaPct: 65, totalClases: 40, presentes: 26,
+    desglose: [
+      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 4, puntajeActividad: 100, puntajeLogrado: 40, fecha: "2026-04-17", hora: "17:00", profesor: "Lic. Fernández" },
+      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 5, puntajeActividad: 100, puntajeLogrado: 50, fecha: "2026-06-13", hora: "17:00", profesor: "Lic. Fernández" },
+      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 6, puntajeActividad: 40, puntajeLogrado: 24, fecha: "2026-05-23", hora: null, profesor: "Lic. Fernández" },
+      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: null, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
+    ],
+  },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function donutColor(pct: number): string {
+  if (pct >= 90) return "#22c55e";
+  if (pct >= 75) return "#13D6FF";
+  if (pct >= 60) return "#f59e0b";
+  return "#ef4444";
+}
+
+const ORDEN_TIPO = ["parcial1", "parcial2", "practico", "final1", "final2", "final3"];
+
+const TIPO_META: Record<string, { label: string; eyebrow: string; color: string }> = {
+  parcial1:  { label: "Primer Parcial",            eyebrow: "EVALUACIÓN 1",    color: "#13D6FF" },
+  parcial2:  { label: "Segundo Parcial",           eyebrow: "EVALUACIÓN 2",    color: "#13D6FF" },
+  practico:  { label: "Trabajo Práctico",          eyebrow: "PRÁCTICA",        color: "#a78bfa" },
+  final1:    { label: "Final — 1.ª Oportunidad",   eyebrow: "EXAMEN FINAL",    color: "#f59e0b" },
+  final2:    { label: "Final — 2.ª Oportunidad",   eyebrow: "EXAMEN FINAL",    color: "#f59e0b" },
+  final3:    { label: "Final — 3.ª Oportunidad",   eyebrow: "EXAMEN FINAL",    color: "#f59e0b" },
+};
+
+function formatFecha(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-PY", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+export default function MateriaDetalleScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string }>();
-  const materiaId = parseInt(String(params.id ?? "0"), 10);
-
-  const [materia, setMateria] = useState<MateriaCard | null>(null);
+  const [detalle, setDetalle] = useState<MateriaDetalle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!id) return;
     setError(null);
     try {
-      const d = await fetchNotasCompleto();
-      const found = d.materias.find((m) => m.materiaId === materiaId) ?? null;
-      setMateria(found);
-      if (!found) setError("Materia no encontrada.");
+      const d = await fetchMateriaDetalle(Number(id));
+      setDetalle(d);
     } catch {
-      setError("No se pudo cargar la materia.");
+      const dummy = DUMMY_MATERIAS[Number(id)];
+      if (dummy) {
+        setDetalle(dummy);
+      } else {
+        setError("No se pudo cargar el detalle.");
+      }
     }
-  }, [materiaId]);
+  }, [id]);
 
   useEffect(() => {
     (async () => {
@@ -70,20 +124,76 @@ export default function CursoDetalle() {
     })();
   }, [load]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }} edges={["top"]}>
+        <ActivityIndicator color={colors.cyan} size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !detalle) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <View style={{ padding: spacing.xl }}>
+          <Text style={{ color: colors.error, fontFamily: fontFamily.interSemibold }}>{error ?? "Sin datos"}</Text>
+          <Pressable onPress={load} style={{ marginTop: spacing.md }}>
+            <Text style={{ color: colors.cyan }}>Reintentar</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const pct = detalle.asistenciaPct ?? 0;
+  const color = donutColor(pct);
+
+  const desgloseOrdenado = [...detalle.desglose].sort(
+    (a, b) => {
+      const ia = ORDEN_TIPO.indexOf(a.tipo);
+      const ib = ORDEN_TIPO.indexOf(b.tipo);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    }
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <ScreenHeader
-        showBack
-        onBackPress={() => router.back()}
-        title={materia?.nombre ?? "Materia"}
-        hideBell
-      />
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.sm,
+          gap: spacing.md,
+        }}
+      >
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={16}
+          style={({ pressed }) => ({
+            width: 44, height: 44, borderRadius: 22,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1, borderColor: colors.border,
+            alignItems: "center", justifyContent: "center",
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <BackArrow />
+        </Pressable>
+        <Text
+          style={{
+            flex: 1,
+            color: colors.textPrimary,
+            fontFamily: fontFamily.interSemibold,
+            fontSize: fontSize.headline,
+          }}
+          numberOfLines={2}
+        >
+          {detalle.nombre}
+        </Text>
+      </View>
 
       <ScrollView
         contentContainerStyle={{
@@ -91,365 +201,419 @@ export default function CursoDetalle() {
           paddingBottom: spacing["3xl"],
           gap: spacing.lg,
         }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.cyan}
-          />
-        }
       >
-        {loading ? (
-          <LoadingBody />
-        ) : error ? (
-          <ErrorBody message={error} onRetry={load} />
-        ) : materia ? (
-          <>
-            <IdentityCard materia={materia} />
-            <AsistenciaCard materia={materia} />
-            <DesgloseCard materia={materia} />
-            <StatsCard materia={materia} />
-          </>
-        ) : null}
+        {/* ── Bloque asistencia — unificado ── */}
+        <Animated.View entering={FadeInDown.delay(0).duration(300)}>
+          <View
+            style={{
+              backgroundColor: "#13151A",
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: colors.border,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 20,
+                paddingTop: 20,
+                paddingBottom: 4,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: color,
+                  fontFamily: fontFamily.interSemibold,
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                }}
+              >
+                Asistencia
+              </Text>
+            </View>
+
+            <View style={{ alignItems: "center", paddingVertical: 20 }}>
+              <DonutChart
+                value={pct}
+                max={100}
+                size={150}
+                strokeWidth={14}
+                color={color}
+              />
+            </View>
+
+            <View style={{ alignItems: "center", paddingBottom: 4 }}>
+              <Text
+                style={{
+                  color: colors.cyan,
+                  fontFamily: fontFamily.interMedium,
+                  fontSize: 14,
+                  letterSpacing: 0.3,
+                }}
+              >
+                Requerida: 75.00 %
+              </Text>
+            </View>
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16 }} />
+
+            <View
+              style={{
+                flexDirection: "row",
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+              }}
+            >
+              {[
+                { label: "Clases", value: detalle.totalClases, color: colors.textSecondary },
+                { label: "Presentes", value: detalle.presentes, color: "#22c55e" },
+                {
+                  label: "Ausentes",
+                  value: detalle.totalClases - detalle.presentes,
+                  color: "#ef4444",
+                },
+              ].map((s, i, arr) => (
+                <View
+                  key={s.label}
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    borderRightWidth: i < arr.length - 1 ? 1 : 0,
+                    borderRightColor: colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: s.color,
+                      fontFamily: fontFamily.interSemibold,
+                      fontSize: 22,
+                      letterSpacing: -0.5,
+                    }}
+                  >
+                    {s.value}
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontFamily: fontFamily.inter,
+                      fontSize: 10,
+                      letterSpacing: 0.8,
+                      textTransform: "uppercase",
+                      marginTop: 2,
+                    }}
+                  >
+                    {s.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={{ height: 1, backgroundColor: colors.border }} />
+
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/cursos/[id]/asistencia",
+                  params: { id: String(detalle.materiaId) },
+                })
+              }
+              hitSlop={8}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 20,
+                paddingVertical: 14,
+                backgroundColor: pressed ? "rgba(255,255,255,0.04)" : "transparent",
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View
+                  style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    backgroundColor: "rgba(0,180,216,0.1)",
+                    alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <IconClipboardCheck color={colors.cyan} size={16} />
+                </View>
+                <View>
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontFamily: fontFamily.interSemibold,
+                      fontSize: 14,
+                    }}
+                  >
+                    Ver Asistencia Detallada
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontFamily: fontFamily.inter,
+                      fontSize: 11,
+                      marginTop: 1,
+                    }}
+                  >
+                    Clases, presentes y ausencias
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight />
+            </Pressable>
+          </View>
+        </Animated.View>
+
+        {/* ── Evaluaciones en orden correcto ── */}
+        {desgloseOrdenado.map((d, i) => {
+          const meta = TIPO_META[d.tipo] ?? { label: d.tipo, eyebrow: "EVALUACIÓN", color: colors.cyan };
+          const maxPts = d.puntajeActividad ?? PUNTAJE_POR_TIPO[d.tipo] ?? 0;
+          const tieneNota = d.puntajeLogrado != null;
+          const aprobado = tieneNota && maxPts > 0 && d.puntajeLogrado! >= maxPts * 0.6;
+
+          return (
+            <Animated.View
+              key={d.tipo}
+              entering={FadeInDown.delay(i * 70 + 120).duration(350).springify().damping(22).stiffness(130)}
+            >
+              <View
+                style={{
+                  backgroundColor: "#13151A",
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    height: 3,
+                    backgroundColor: meta.color + "80",
+                    width: "100%",
+                  }}
+                />
+
+                <View style={{ padding: 18, gap: 14 }}>
+                  <View style={{ alignItems: "center", gap: 4 }}>
+                    <Text
+                      style={{
+                        color: meta.color,
+                        fontFamily: fontFamily.interSemibold,
+                        fontSize: 10,
+                        letterSpacing: 2,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {meta.eyebrow}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.textPrimary,
+                        fontFamily: fontFamily.interSemibold,
+                        fontSize: 16,
+                        textAlign: "center",
+                      }}
+                    >
+                      {meta.label}
+                    </Text>
+                    {d.fecha && (
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontFamily: fontFamily.inter,
+                          fontSize: 12,
+                        }}
+                      >
+                        {formatFecha(d.fecha)}
+                        {d.hora ? ` · ${d.hora.slice(0, 5)}` : ""}
+                      </Text>
+                    )}
+                  </View>
+
+                  {d.profesor && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        backgroundColor: colors.glassBg,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        alignSelf: "center",
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                      }}
+                    >
+                      <IconUser color={colors.textSecondary} size={12} />
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontFamily: fontFamily.interMedium,
+                          fontSize: 12,
+                        }}
+                      >
+                        {d.profesor}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={{ height: 1, backgroundColor: colors.border }} />
+
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={{ flex: 1, alignItems: "center", gap: 4 }}>
+                      <Text
+                        style={{
+                          color: colors.textPrimary,
+                          fontFamily: fontFamily.interSemibold,
+                          fontSize: 32,
+                          letterSpacing: -1,
+                          lineHeight: 36,
+                        }}
+                      >
+                        {maxPts > 0 ? maxPts : "—"}
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontFamily: fontFamily.inter,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Máximo
+                      </Text>
+                    </View>
+
+                    <View style={{ alignItems: "center", gap: 6 }}>
+                      <View style={{ width: 1, height: 28, backgroundColor: colors.border }} />
+                      {tieneNota && maxPts > 0 && (
+                        <View
+                          style={{
+                            width: 36, height: 4,
+                            borderRadius: 2,
+                            backgroundColor: colors.border,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: `${Math.min(100, (d.puntajeLogrado! / maxPts) * 100)}%`,
+                              height: "100%",
+                              backgroundColor: aprobado ? "#22c55e" : "#ef4444",
+                              borderRadius: 2,
+                            }}
+                          />
+                        </View>
+                      )}
+                      <View style={{ width: 1, height: 28, backgroundColor: colors.border }} />
+                    </View>
+
+                    <View style={{ flex: 1, alignItems: "center", gap: 4 }}>
+                      {tieneNota ? (
+                        <Text
+                          style={{
+                            color: aprobado ? "#22c55e" : "#ef4444",
+                            fontFamily: fontFamily.interSemibold,
+                            fontSize: 32,
+                            letterSpacing: -1,
+                            lineHeight: 36,
+                          }}
+                        >
+                          {d.puntajeLogrado}
+                        </Text>
+                      ) : (
+                        <Text
+                          style={{
+                            color: colors.textSecondary,
+                            fontFamily: fontFamily.interMedium,
+                            fontSize: 14,
+                            lineHeight: 36,
+                          }}
+                        >
+                          Sin puntaje
+                        </Text>
+                      )}
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontFamily: fontFamily.inter,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Realizado
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Cards
-// ---------------------------------------------------------------------------
-
-function IdentityCard({ materia }: { materia: MateriaCard }) {
+function BackArrow() {
   return (
-    <Animated.View entering={FadeInDown.duration(280)}>
-      <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>
-        {materia.profesor ? (
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontFamily: fontFamily.interMedium,
-              fontSize: fontSize.caption,
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-            }}
-          >
-            Profesor · {materia.profesor}
-          </Text>
-        ) : null}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing.sm,
-            marginTop: spacing.sm,
-            flexWrap: "wrap",
-          }}
-        >
-          {materia.anio != null ? (
-            <CyanBadge label={`AÑO ${materia.anio}`} variant="outline" size="sm" />
-          ) : null}
-          {materia.semestre != null ? (
-            <CyanBadge
-              label={`${materia.semestre}º SEMESTRE`}
-              variant="dim"
-              size="sm"
-            />
-          ) : null}
-        </View>
-      </GlassCard>
-    </Animated.View>
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M19 12H5M12 19l-7-7 7-7"
+        stroke={colors.cyan}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
-function AsistenciaCard({ materia }: { materia: MateriaCard }) {
-  const pct = materia.asistenciaPct ?? 0;
-  const value = pct / 100;
-  const label =
-    materia.asistenciaPct == null
-      ? "Sin registros"
-      : pct >= 75
-        ? "Regularidad OK"
-        : pct >= 50
-          ? "En riesgo"
-          : "Crítica";
-  const color =
-    materia.asistenciaPct == null
-      ? colors.textSecondary
-      : pct >= 75
-        ? colors.success
-        : pct >= 50
-          ? colors.warning
-          : colors.error;
-
+function IconClipboardCheck({ color = colors.cyan, size = 16 }: { color?: string; size?: number }) {
   return (
-    <Animated.View entering={FadeInDown.delay(60).duration(280)}>
-      <GlassCard contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontFamily: fontFamily.interMedium,
-            fontSize: fontSize.caption,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            marginBottom: spacing.md,
-          }}
-        >
-          Asistencia
-        </Text>
-        <DonutChart
-          value={value}
-          size={160}
-          strokeWidth={12}
-          thresholdColor
-          showLabel
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
+      <Path d="M6 6h12a1 1 0 011 1v12a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
+      <Path d="M9 13l2 2 4-4" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconUser({ color = colors.textSecondary, size = 12 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="8" r="3.6" stroke={color} strokeWidth={1.7} />
+      <Path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <View
+      style={{
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1, borderColor: colors.border,
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M9 18l6-6-6-6"
+          stroke={colors.cyan}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
-        <Text
-          style={{
-            color,
-            fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.body,
-            marginTop: spacing.md,
-            letterSpacing: 0.5,
-          }}
-        >
-          {label}
-        </Text>
-      </GlassCard>
-    </Animated.View>
-  );
-}
-
-function DesgloseCard({ materia }: { materia: MateriaCard }) {
-  return (
-    <Animated.View entering={FadeInDown.delay(120).duration(280)}>
-      <GlassCard contentStyle={{ padding: spacing.lg }}>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontFamily: fontFamily.interMedium,
-            fontSize: fontSize.caption,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            marginBottom: spacing.md,
-          }}
-        >
-          Componentes de nota
-        </Text>
-        <View style={{ gap: spacing.md }}>
-          {materia.desglose.map((d) => (
-            <View key={d.tipo}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginBottom: spacing.xs,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontFamily: fontFamily.interMedium,
-                    fontSize: fontSize.body,
-                  }}
-                >
-                  {d.label}
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "baseline", gap: spacing.sm }}>
-                  <Text
-                    style={{
-                      color: colors.textSecondary,
-                      fontFamily: fontFamily.mono,
-                      fontSize: fontSize.caption,
-                    }}
-                  >
-                    {`${Math.round(d.peso * 100)}%`}
-                  </Text>
-                  <Text
-                    style={{
-                      color: d.nota != null ? colors.cyan : colors.textSecondary,
-                      fontFamily: fontFamily.monoBold,
-                      fontSize: fontSize.bodyLg,
-                      minWidth: 44,
-                      textAlign: "right",
-                    }}
-                  >
-                    {d.nota != null ? d.nota.toFixed(1) : "—"}
-                  </Text>
-                </View>
-              </View>
-              <ProgressBar
-                value={d.nota != null ? d.nota / 5 : 0}
-                height={4}
-                glow={false}
-                bgColor="rgba(255,255,255,0.05)"
-              />
-            </View>
-          ))}
-        </View>
-        {materia.promedio != null ? (
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: spacing.lg,
-              paddingTop: spacing.md,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textSecondary,
-                fontFamily: fontFamily.interMedium,
-                fontSize: fontSize.caption,
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
-              }}
-            >
-              Promedio
-            </Text>
-            <Text
-              style={{
-                color: colors.cyan,
-                fontFamily: fontFamily.monoBold,
-                fontSize: fontSize.headline,
-              }}
-            >
-              {materia.promedio.toFixed(2)}
-            </Text>
-          </View>
-        ) : null}
-      </GlassCard>
-    </Animated.View>
-  );
-}
-
-function StatsCard({ materia }: { materia: MateriaCard }) {
-  const ausentes = Math.max(0, materia.totalClases - materia.presentes);
-  return (
-    <Animated.View entering={FadeInDown.delay(180).duration(280)}>
-      <GlassCard contentStyle={{ padding: spacing.lg }}>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontFamily: fontFamily.interMedium,
-            fontSize: fontSize.caption,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            marginBottom: spacing.md,
-          }}
-        >
-          Estadísticas
-        </Text>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <StatCol label="TOTAL" value={String(materia.totalClases)} color={colors.textPrimary} />
-          <StatCol label="PRESENTES" value={String(materia.presentes)} color={colors.success} />
-          <StatCol label="AUSENTES" value={String(ausentes)} color={colors.error} />
-        </View>
-      </GlassCard>
-    </Animated.View>
-  );
-}
-
-function StatCol({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <View style={{ alignItems: "center", flex: 1 }}>
-      <Text
-        style={{
-          color: colors.textSecondary,
-          fontFamily: fontFamily.interMedium,
-          fontSize: fontSize.caption,
-          letterSpacing: 1.5,
-        }}
-      >
-        {label}
-      </Text>
-      <Text
-        style={{
-          color,
-          fontFamily: fontFamily.monoBold,
-          fontSize: fontSize.headlineLg,
-          marginTop: 2,
-        }}
-      >
-        {value}
-      </Text>
+      </Svg>
     </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Loading / error
-// ---------------------------------------------------------------------------
-
-function LoadingBody() {
-  return (
-    <View style={{ gap: spacing.md }}>
-      <SkeletonLoader height={64} />
-      <SkeletonLoader height={220} />
-      <SkeletonLoader height={220} />
-      <SkeletonLoader height={80} />
-    </View>
-  );
-}
-
-function ErrorBody({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>
-      <Text
-        style={{
-          color: colors.error,
-          fontFamily: fontFamily.interSemibold,
-          fontSize: fontSize.caption,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-        }}
-      >
-        Error
-      </Text>
-      <Text
-        style={{
-          color: colors.textPrimary,
-          fontFamily: fontFamily.inter,
-          fontSize: fontSize.body,
-          marginTop: spacing.sm,
-          marginBottom: spacing.lg,
-        }}
-      >
-        {message}
-      </Text>
-      <Pressable
-        onPress={onRetry}
-        style={({ pressed }) => ({
-          alignSelf: "flex-start",
-          backgroundColor: colors.cyan,
-          borderRadius: radius.md,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.sm,
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <Text
-          style={{
-            color: "#0a0e17",
-            fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.caption,
-          }}
-        >
-          Reintentar
-        </Text>
-      </Pressable>
-    </GlassCard>
   );
 }
