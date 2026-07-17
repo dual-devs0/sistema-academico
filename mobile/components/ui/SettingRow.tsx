@@ -1,5 +1,7 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { Pressable, Switch, Text, View } from "react-native";
-import { colors, fontFamily, fontSize, radius, spacing } from "../../constants/design";
+import { fontFamily, fontSize, radius, spacing } from "../../constants/design";
 
 /**
  * SettingRow — fila glass reusable para pantallas de ajustes.
@@ -35,7 +37,8 @@ export function SettingRow({
   right,
   disabled,
 }: Props) {
-  const inner = (
+  const { colors } = useTheme();
+const inner = (
     <View
       style={{
         flexDirection: "row",
@@ -108,6 +111,7 @@ export function SettingRow({
   );
 
   if (variant === "chevron" && onPress) {
+  const { colors } = useTheme();
     return (
       <Pressable onPress={onPress} disabled={disabled}>
         {inner}

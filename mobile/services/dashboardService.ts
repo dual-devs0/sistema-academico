@@ -25,9 +25,11 @@ export interface UserInfo {
   nombre: string | null;
   email: string | null;
   carrera_id: number | null;
-  carrera_nombre?: string | null;
-  semestre?: number | null;
-  es_becado: boolean | null;
+  carrera_nombre: string | null;
+  semestre: number | null;
+  es_becado: boolean;
+  fuente_beca?: string | null;
+  legajo?: string;
   foto_url: string | null;
 }
 
@@ -57,6 +59,20 @@ export interface MiResumen {
   promedio_general: number | null;
   notas: MateriaNota[];
   asistencia: MateriaAsistencia[];
+}
+
+export interface StudentSummary {
+  creditos_aprobados: number;
+  creditos_pendientes: number;
+  creditos_totales: number;
+  promedio_general: number | null;
+  asistencia_promedio: number | null;
+  avance_porcentaje: number;
+  estado_financiero: string;
+  regularidad_activa: boolean;
+  materias_cursando: number;
+  carrera_nombre: string | null;
+  semestre_actual: number | null;
 }
 
 export type TipoEvento =
@@ -105,6 +121,7 @@ export interface CuotaOut {
 export interface DashboardData {
   user: UserInfo | null;
   resumen: MiResumen | null;
+  summary: StudentSummary | null;
   proximoEvento: EventoOut | null;
   eventosCercanos: EventoOut[];
   cuentaSaldoPendiente: number;
@@ -145,6 +162,11 @@ export async function fetchResumen(): Promise<MiResumen> {
   return data;
 }
 
+export async function fetchStudentSummary(): Promise<StudentSummary> {
+  const { data } = await api.get<StudentSummary>("/alumno/summary");
+  return data;
+}
+
 export async function fetchEventosProximos(dias = 30): Promise<EventoOut[]> {
   const hoy = new Date();
   const hasta = new Date(hoy);
@@ -170,8 +192,9 @@ export async function fetchDashboard(): Promise<DashboardData> {
   const alumnoId = perfil?.id ?? null;
 
   // Resto en paralelo. Cualquier fallo → null / vacío.
-  const [resumen, eventos, cuotas] = await Promise.all([
+  const [resumen, summary, eventos, cuotas] = await Promise.all([
     fetchResumen().catch(() => null),
+    fetchStudentSummary().catch(() => null),
     fetchEventosProximos(30).catch<EventoOut[]>(() => []),
     alumnoId
       ? fetchCuotas(alumnoId).catch<CuotaOut[]>(() => [])
@@ -198,17 +221,13 @@ export async function fetchDashboard(): Promise<DashboardData> {
     else if (c.estado === "pendiente") cuentaSaldoPendiente += monto;
   }
 
-  // Regularidad activa: asistencia promedio ≥ 70% en TODAS las materias.
-  // Definición conservadora — el backend no expone este flag hoy.
-  const asistencias = resumen?.asistencia ?? [];
-  const regularidadActiva =
-    asistencias.length === 0
-      ? true
-      : asistencias.every((a) => (a.porcentaje ?? 100) >= 70);
+  // Regularidad activa: usamos el endpoint summary, o fallamos a true
+  const regularidadActiva = summary ? summary.regularidad_activa : true;
 
   return {
     user: perfil,
     resumen,
+    summary,
     proximoEvento,
     eventosCercanos: eventos,
     cuentaSaldoPendiente,

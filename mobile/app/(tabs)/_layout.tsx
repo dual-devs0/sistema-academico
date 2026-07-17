@@ -1,10 +1,12 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Rect, Circle } from "react-native-svg";
-import { colors, tabBar } from "../../constants/design";
+import { tabBar } from "../../constants/design";
 
 type TabBarProps = React.ComponentProps<typeof Tabs>["tabBar"] extends
   | ((props: infer P) => React.ReactNode)
@@ -13,7 +15,8 @@ type TabBarProps = React.ComponentProps<typeof Tabs>["tabBar"] extends
   : never;
 
 export default function TabsLayout() {
-  return (
+  const { colors } = useTheme();
+return (
     <Tabs
       tabBar={(props) => <UcaTabBar {...props} />}
       screenOptions={{
@@ -32,6 +35,8 @@ export default function TabsLayout() {
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 
 function IconHome({ color, size = 20 }: { color: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -44,6 +49,8 @@ function IconHome({ color, size = 20 }: { color: string; size?: number }) {
 }
 
 function IconCursos({ color, size = 20 }: { color: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -62,6 +69,8 @@ function IconCursos({ color, size = 20 }: { color: string; size?: number }) {
 }
 
 function IconHorario({ color, size = 20 }: { color: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth={1.8} />
@@ -76,6 +85,8 @@ function IconHorario({ color, size = 20 }: { color: string; size?: number }) {
 }
 
 function IconPerfil({ color, size = 20 }: { color: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="8" r="4" stroke={color} strokeWidth={1.8} />
@@ -104,17 +115,22 @@ const ALL_TABS: TabDef[] = [
 // ─── Bar ──────────────────────────────────────────────────────────────────────
 
 function UcaTabBar({ state, navigation }: TabBarProps) {
+  const { colors } = useTheme();
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const currentRouteName = state.routes[state.index]?.name;
 
   function goto(routeName: string, isFocused: boolean) {
+  const { colors } = useTheme();
+
     const event = navigation.emit({
       type: "tabPress",
       target: routeName,
       canPreventDefault: true,
     });
     if (!isFocused && !event.defaultPrevented) {
+  const { colors } = useTheme();
       navigation.navigate(routeName);
     }
   }
@@ -198,6 +214,7 @@ function TabItem({
   focused: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
   const iconColor = focused ? tabBar.active : tabBar.inactive;
 
   return (
@@ -219,6 +236,7 @@ function TabItem({
 // ─── QR — círculo de 56px, sobresale 20px ────────────────────────────────────
 
 function QrCenterButton({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
   const SIZE = tabBar.qrButtonSize;
 
   return (

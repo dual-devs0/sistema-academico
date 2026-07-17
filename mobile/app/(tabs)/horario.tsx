@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
@@ -13,7 +15,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { CyanBadge } from "../../components/ui/CyanBadge";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
-  colors, fontFamily, fontSize, radius, spacing,
+  fontFamily, fontSize, radius, spacing,
 } from "../../constants/design";
 import {
   buildMonthGrid,
@@ -79,7 +81,8 @@ function formatHora(hora: string | null | undefined): { time: string; period: st
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HorarioScreen() {
-  const [cursor, setCursor] = useState({ anio: TODAY.getFullYear(), mes: TODAY.getMonth() + 1 });
+  const { colors } = useTheme();
+const [cursor, setCursor] = useState({ anio: TODAY.getFullYear(), mes: TODAY.getMonth() + 1 });
   const [selectedIso, setSelectedIso] = useState<string>(toIso(TODAY));
   const [allEventos, setAllEventos] = useState<EventoOut[]>([]);
   const [proximos, setProximos] = useState<EventoOut[]>([]);
@@ -143,7 +146,7 @@ export default function HorarioScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <ScreenHeader title="Calendario" name="María García" avatarInitials="MG" hideAvatar />
+      <ScreenHeader title="Calendario" hideAvatar />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
@@ -192,6 +195,7 @@ function CalendarCard({
   onSelect: (iso: string) => void;
   onPrev: () => void; onNext: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -295,6 +299,7 @@ function MonthGrid({ grid, selectedIso, onSelect }: {
   selectedIso: string;
   onSelect: (iso: string) => void;
 }) {
+  const { colors } = useTheme();
   const rows: CalendarCell[][] = [];
   for (let i = 0; i < 6; i++) rows.push(grid.slice(i * 7, i * 7 + 7));
 
@@ -319,6 +324,7 @@ function MonthGrid({ grid, selectedIso, onSelect }: {
 function DayCell({ cell, selected, onPress }: {
   cell: CalendarCell; selected: boolean; onPress: () => void;
 }) {
+  const { colors } = useTheme();
   const isToday = isSameDay(cell.date, TODAY);
   const dotColor = cell.eventos?.length
     ? TIPO_COLOR[cell.eventos[0].tipo as TipoEvento] ?? colors.cyan
@@ -387,6 +393,8 @@ function DayCell({ cell, selected, onPress }: {
 function SelectedDaySection({ selectedIso, eventos }: {
   selectedIso: string; eventos: EventoOut[];
 }) {
+  const { colors } = useTheme();
+
   return (
     <View>
       <View
@@ -454,7 +462,9 @@ function SelectedDaySection({ selectedIso, eventos }: {
 // ─── Card evento del día ──────────────────────────────────────────────────────
 
 function EventoDiaCard({ evento }: { evento: EventoOut }) {
-  const hora = formatHora((evento as any).hora ?? null);
+  const { colors } = useTheme();
+
+  const hora = formatHora(evento.hora ?? null);
   const accentColor = TIPO_COLOR[evento.tipo];
   const esUrgente = evento.tipo === "entrega" || evento.tipo === "final";
 
@@ -562,7 +572,7 @@ function EventoDiaCard({ evento }: { evento: EventoOut }) {
           {evento.titulo}
         </Text>
 
-        {(evento as any).ubicacion && (
+        {evento.ubicacion && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
             <Text style={{ fontSize: 10 }}>📍</Text>
             <Text
@@ -573,12 +583,12 @@ function EventoDiaCard({ evento }: { evento: EventoOut }) {
               }}
               numberOfLines={1}
             >
-              {(evento as any).ubicacion}
+              {evento.ubicacion}
             </Text>
           </View>
         )}
 
-        {evento.descripcion && !(evento as any).ubicacion && (
+        {evento.descripcion && !evento.ubicacion && (
           <Text
             style={{
               color: colors.textSecondary,
@@ -603,6 +613,7 @@ function UpcomingSection({ eventos, showAll, onToggleShowAll }: {
   showAll: boolean;
   onToggleShowAll: () => void;
 }) {
+  const { colors } = useTheme();
   const filtrados = eventos
     .filter((e) => ["parcial","final","entrega","actividad"].includes(e.tipo));
 
@@ -688,6 +699,8 @@ function UpcomingSection({ eventos, showAll, onToggleShowAll }: {
 }
 
 function UpcomingCardFull({ evento }: { evento: EventoOut }) {
+  const { colors } = useTheme();
+
   const { day, month } = formatDayMonthShort(evento.fecha);
   const accentColor = TIPO_COLOR[evento.tipo];
   const emoji = TIPO_EMOJI[evento.tipo];
@@ -751,6 +764,8 @@ function UpcomingCardFull({ evento }: { evento: EventoOut }) {
 }
 
 function UpcomingCard({ evento }: { evento: EventoOut }) {
+  const { colors } = useTheme();
+
   const { day, month } = formatDayMonthShort(evento.fecha);
   const accentColor = TIPO_COLOR[evento.tipo];
   const emoji = TIPO_EMOJI[evento.tipo];
@@ -846,6 +861,8 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
 // ─── Loading / Error ──────────────────────────────────────────────────────────
 
 function LoadingBody() {
+  const { colors } = useTheme();
+
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, marginTop: spacing.lg }}>
       <SkeletonLoader height={320} radius={20} />
@@ -857,6 +874,7 @@ function LoadingBody() {
 }
 
 function ErrorBody({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { colors } = useTheme();
   return (
     <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg }}>
       <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>

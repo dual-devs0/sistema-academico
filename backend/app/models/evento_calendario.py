@@ -19,3 +19,5 @@ class EventoCalendario(Base):
     anio = Column(Integer, nullable=True)
     semestre = Column(Integer, nullable=True)
     archivo_pdf = Column(Text, nullable=True)
+    hora = Column(String(5), nullable=True)         # HH:MM formato 24h
+    ubicacion = Column(String(200), nullable=True)  # Ej. "Aula 203"

@@ -1,3 +1,4 @@
+import { colors } from "../../constants/design";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -18,7 +19,6 @@ import { StatCard } from "../../components/ui/StatCard";
 import { SettingRow } from "../../components/ui/SettingRow";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
-  colors,
   fontFamily,
   fontSize,
   radius,
@@ -38,13 +38,11 @@ import {
  * Pantalla Perfil (reemplaza stub).
  *
  * Datos: reusa `fetchPerfil` y `fetchResumen` de dashboardService.
- * BACKEND TODO: no hay endpoint que devuelva `fuente_beca` en /alumno/mi-perfil.
- * Hoy solo llega `es_becado: boolean`. Mostramos "BECADO INSTITUCIONAL" por
- * defecto cuando `es_becado=true`; cuando el backend agregue `fuente_beca`
- * (ej. "itaipu" / "institucional") switchamos el label.
+ * BACKEND TODO: resuelto, el backend ya expone `fuente_beca` y `legajo`.
  */
 export default function PerfilScreen() {
-  const { logout } = useAuth();
+  const { colors } = useTheme();
+const { logout } = useAuth();
   const theme = useTheme();
   const biometry = useBiometry();
 
@@ -79,7 +77,7 @@ export default function PerfilScreen() {
   }, [load]);
 
   const nombre = user?.nombre ?? user?.username ?? "";
-  const legajo = user ? formatLegajo(user.id) : "————";
+  const legajo = user?.legajo ?? "————";
   const promedio = resumen?.promedio_general;
   const asistencias = resumen?.asistencia ?? [];
   const regularidadActiva =
@@ -92,6 +90,8 @@ export default function PerfilScreen() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function showToast(msg: string) {
+  const { colors } = useTheme();
+
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
@@ -101,6 +101,7 @@ export default function PerfilScreen() {
 
   const handleBiometryToggle = async (v: boolean) => {
     if (!biometry.available) {
+  const { colors } = useTheme();
       showToast("Biometría no disponible en este dispositivo");
       return;
     }
@@ -135,6 +136,7 @@ export default function PerfilScreen() {
               carrera={carreraLabel(user)}
               legajo={legajo}
               esBecado={!!user?.es_becado}
+              fuenteBeca={user?.fuente_beca}
             />
 
             <SectionLabel text="Resumen académico" />
@@ -168,17 +170,28 @@ export default function PerfilScreen() {
             <View style={{ paddingHorizontal: spacing.xl, gap: spacing.sm }}>
               <SettingRow
                 glyph="☾"
-                label="Modo Oscuro"
+                label="Apariencia"
                 hint={
                   theme.preference === "dark"
-                    ? "Forzado — siempre oscuro"
-                    : "Siguiendo el sistema"
+                    ? "Oscuro"
+                    : theme.preference === "light"
+                      ? "Claro"
+                      : "Siguiendo el sistema"
                 }
-                variant="toggle"
-                toggled={theme.preference === "dark"}
-                onToggle={(v) => {
-                  void theme.setPreference(v ? "dark" : "system");
+                variant="chevron"
+                onPress={() => {
+                  const next: Record<string, "system" | "dark" | "light"> = {
+                    dark: "light",
+                    light: "system",
+                    system: "dark",
+                  };
+                  void theme.setPreference(next[theme.preference]);
                 }}
+                right={
+                  <Text style={{ color: colors.cyan, fontFamily: fontFamily.interMedium, fontSize: fontSize.caption }}>
+                    {theme.preference === "dark" ? "OSCURO" : theme.preference === "light" ? "CLARO" : "SISTEMA"}
+                  </Text>
+                }
               />
               <SettingRow
                 glyph="◈"
@@ -311,13 +324,17 @@ function IdentitySection({
   carrera,
   legajo,
   esBecado,
+  fuenteBeca,
 }: {
   nombre: string;
   carrera: string;
   legajo: string;
   esBecado: boolean;
+  fuenteBeca?: string | null;
 }) {
-  const becaLabel = esBecado ? "BECADO INSTITUCIONAL" : null;
+  const { colors } = useTheme();
+
+  const becaLabel = esBecado ? (fuenteBeca ? `BECADO ${fuenteBeca.toUpperCase()}` : "BECADO INSTITUCIONAL") : null;
   return (
     <Animated.View
       entering={FadeInDown.duration(300)}
@@ -433,6 +450,8 @@ function IdentitySection({
 // ---------------------------------------------------------------------------
 
 function SectionLabel({ text }: { text: string }) {
+  const { colors } = useTheme();
+
   return (
     <Text
       style={{
@@ -452,6 +471,8 @@ function SectionLabel({ text }: { text: string }) {
 }
 
 function LoadingBody() {
+  const { colors } = useTheme();
+
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, alignItems: "center" }}>
       <SkeletonLoader shape="circle" height={80} width={80} />
@@ -497,6 +518,7 @@ const FAQ_ITEMS: {
 ];
 
 function FaqModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { colors } = useTheme();
   return (
     <SupportModal visible={visible} onClose={onClose} title="Ayuda y preguntas frecuentes">
       <View style={{ gap: spacing.md }}>
@@ -603,6 +625,7 @@ function FaqModal({ visible, onClose }: { visible: boolean; onClose: () => void 
 }
 
 function TermsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { colors } = useTheme();
   return (
     <SupportModal visible={visible} onClose={onClose} title="Términos y privacidad">
       <View style={{ gap: spacing.lg }}>
@@ -745,6 +768,7 @@ function SupportModal({
   title: string;
   children: React.ReactNode;
 }) {
+  const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
@@ -817,6 +841,8 @@ function SupportModal({
 // ---------------------------------------------------------------------------
 
 function ChevronIcon() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
       <Path
@@ -831,6 +857,8 @@ function ChevronIcon() {
 }
 
 function LogoutIcon() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Path
@@ -871,6 +899,7 @@ function LogoutConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable
@@ -992,11 +1021,6 @@ function LogoutConfirmModal({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatLegajo(userId: number): string {
-  const s = String(userId).padStart(8, "0");
-  return `${s.slice(0, 4)}-${s.slice(4)}`;
-}
 
 function carreraLabel(user: UserInfo | null): string {
   if (!user) return "—";

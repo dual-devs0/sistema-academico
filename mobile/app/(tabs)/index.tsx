@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
@@ -5,6 +7,7 @@ import {
   ScrollView,
   Text,
   View,
+  ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -16,7 +19,6 @@ import { ProgressBar } from "../../components/ui/ProgressBar";
 import { CyanBadge } from "../../components/ui/CyanBadge";
 import { SkeletonLoader, SkeletonGroup } from "../../components/ui/SkeletonLoader";
 import {
-  colors,
   fontFamily,
   fontSize,
   spacing,
@@ -46,6 +48,8 @@ function IconCreditCard({ color = "#06b6d4", size = 20 }: { color?: string; size
 }
 
 function IconChartBar({ color = "#fbbf24", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x="4" y="13" width="4" height="7" rx="1" fill={color} />
@@ -56,6 +60,8 @@ function IconChartBar({ color = "#fbbf24", size = 20 }: { color?: string; size?:
 }
 
 function IconAccountCheck({ color = "#22c55e", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="10" cy="8" r="4" stroke={color} strokeWidth={1.8} />
@@ -66,6 +72,8 @@ function IconAccountCheck({ color = "#22c55e", size = 20 }: { color?: string; si
 }
 
 function IconTrendingUp({ color = "#8b5cf6", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -102,51 +110,14 @@ function IconTrendingUp({ color = "#8b5cf6", size = 20 }: { color?: string; size
  *   ("Sin eventos programados", "Sin cuotas cargadas", etc.).
  */
 
-// Créditos por semestre — aproximación. El backend todavía no expone
-// avance real. TODO: reemplazar por endpoint de pensum cuando esté.
-const CREDITOS_TOTALES = 240;
-
 // Tope de stagger: nunca dejamos que el delay acumulado supere esto,
 // sin importar cuántas cards haya.
 const MAX_STAGGER_MS = 160;
 const staggerDelay = (index: number, step = 35) => Math.min(index * step, MAX_STAGGER_MS);
 
 export default function DashboardScreen() {
-  const router = useRouter();
-  // Datos dummy para mostrar diseño completo aunque el backend no responda
-  const DUMMY_DATA: DashboardData = {
-    user: {
-      id: 1, username: "maria.garcia", role: "alumno", nombre: "María García López",
-      email: "maria@uca.edu.py", carrera_id: 1, carrera_nombre: "Ingeniería Informática",
-      semestre: 4, es_becado: true, foto_url: null,
-    },
-    resumen: {
-      alumno: null,
-      cantidad_materias: 6,
-      promedio_general: 7.8,
-      notas: [],
-      asistencia: [
-        { materia_id: 1, materia: "Programación I", porcentaje: 92, total_clases: 40, presentes: 37 },
-        { materia_id: 2, materia: "Matemática I", porcentaje: 78, total_clases: 40, presentes: 31 },
-        { materia_id: 3, materia: "Inglés Técnico", porcentaje: 95, total_clases: 30, presentes: 28 },
-        { materia_id: 4, materia: "Base de Datos", porcentaje: 85, total_clases: 36, presentes: 30 },
-        { materia_id: 5, materia: "Álgebra Lineal", porcentaje: 65, total_clases: 40, presentes: 26 },
-      ],
-    },
-    proximoEvento: {
-      id: 1, titulo: "Parcial 1 — Base de Datos", tipo: "parcial",
-      fecha: "2026-07-28", fecha_fin: null, materia_id: 4, carrera_id: 1,
-      descripcion: "Tema 1 a 5 · Aula 203", anio: 2026, semestre: 2,
-      archivo_pdf: null, creado_por: null,
-    },
-    eventosCercanos: [],
-    cuentaSaldoPendiente: 450000,
-    cuentaSaldoVencido: 150000,
-    cuentaPagado: 900000,
-    cuentaHayCuotas: true,
-    regularidadActiva: true,
-  };
-
+  const { colors } = useTheme();
+const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -157,8 +128,8 @@ export default function DashboardScreen() {
     try {
       const d = await fetchDashboard();
       setData(d);
-    } catch {
-      setData(DUMMY_DATA);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron cargar los datos.");
     }
   }, []);
 
@@ -185,14 +156,13 @@ export default function DashboardScreen() {
     .slice(0, 2)
     .join("");
 
-  const promedio = data?.resumen?.promedio_general ?? 7.8;
-  const creditosAvanzados = Math.min(
-    CREDITOS_TOTALES,
-    Math.round((data?.resumen?.cantidad_materias ?? 6) * 5),
-  );
-  const avancePct = creditosAvanzados / CREDITOS_TOTALES;
-  const materiasCount = data?.resumen?.cantidad_materias ?? 6;
-  const creditosPorMateria = 5;
+  const promedio = data?.summary?.promedio_general ?? data?.resumen?.promedio_general;
+  const creditosTotales = data?.summary?.creditos_totales ?? 0;
+  const creditosAvanzados = data?.summary?.creditos_aprobados ?? 0;
+  const avancePct = creditosTotales > 0
+    ? (data?.summary?.avance_porcentaje ?? 0) / 100
+    : 0;
+  const materiasCount = data?.summary?.materias_cursando ?? data?.resumen?.cantidad_materias ?? 0;
 
   const proximo = data?.proximoEvento ?? null;
 
@@ -265,6 +235,7 @@ export default function DashboardScreen() {
           <Body data={data} promedio={promedio} avancePct={avancePct}
             creditosAvanzados={creditosAvanzados} proximo={proximo}
             materiasCount={materiasCount}
+            creditosTotales={creditosTotales}
             onOpenCuenta={() => router.push("/cuenta")}
             onOpenExamenes={() => router.push("/examenes")}
             onOpenScanner={() => router.push("/scanner")}
@@ -285,6 +256,7 @@ interface BodyProps {
   promedio: number | null | undefined;
   avancePct: number;
   creditosAvanzados: number;
+  creditosTotales: number;
   proximo: DashboardData["proximoEvento"];
   materiasCount: number;
   onOpenCuenta: () => void;
@@ -298,6 +270,7 @@ function Body({
   promedio,
   avancePct,
   creditosAvanzados,
+  creditosTotales,
   proximo,
   materiasCount,
   onOpenCuenta,
@@ -305,6 +278,8 @@ function Body({
   onOpenScanner,
   onOpenAgenda,
 }: BodyProps) {
+  const { colors } = useTheme();
+
   const saldoTotal = data.cuentaSaldoPendiente + data.cuentaSaldoVencido;
 
   const asistencias = data.resumen?.asistencia ?? [];
@@ -360,7 +335,7 @@ function Body({
               label="Avance Académico"
               value={`${Math.round(avancePct * 100)}%`}
               valueColor={colors.cyan}
-              status={`${creditosAvanzados}/${CREDITOS_TOTALES} créditos`}
+              status={`${creditosAvanzados}/${creditosTotales} créditos`}
               bgColor="rgba(139,92,246,0.15)"
             />
           </StaggerCard>
@@ -376,7 +351,7 @@ function Body({
       <StaggerCard index={5}>
         <AvanceAcademicoCard
           creditosAvanzados={creditosAvanzados}
-          creditosTotales={CREDITOS_TOTALES}
+          creditosTotales={creditosTotales}
           pct={avancePct}
         />
       </StaggerCard>
@@ -405,6 +380,7 @@ function DashboardKpiCard({
   bgColor?: string;
   onPress?: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <GlassCard
       onPress={onPress}
@@ -477,9 +453,11 @@ function StaggerCard({
   children,
 }: {
   index: number;
-  style?: any;
+  style?: ViewStyle | undefined;
   children: React.ReactNode;
 }) {
+  const { colors } = useTheme();
+
   // Antes: FadeInDown.delay(index*50).duration(320).springify().damping(18)
   // → empuje vertical de 8px + rebote elástico por cada card, acumulando
   // hasta 350ms+ de delay en la última. Se sentía "inquieto".
@@ -510,6 +488,7 @@ function ProximoEventoCard({
   evento: DashboardData["proximoEvento"];
   onVerAgenda: () => void;
 }) {
+  const { colors } = useTheme();
   if (!evento) {
     return (
       <View>
@@ -627,6 +606,7 @@ function ProximoEventoCard({
 }
 
 function ProximoEventoHeader({ onVerAgenda }: { onVerAgenda: () => void }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -669,6 +649,8 @@ function AvanceAcademicoCard({
   creditosTotales: number;
   pct: number;
 }) {
+  const { colors } = useTheme();
+
   return (
     <GlassCard contentStyle={{ padding: spacing.lg }}>
       <View
@@ -725,6 +707,7 @@ function AvanceAcademicoCard({
 }
 
 function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { colors } = useTheme();
   return (
     <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>
       <Text
@@ -779,6 +762,8 @@ function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void 
 // ---------------------------------------------------------------------------
 
 function LoadingBody() {
+  const { colors } = useTheme();
+
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
       <View style={{ flexDirection: "row", gap: spacing.md }}>

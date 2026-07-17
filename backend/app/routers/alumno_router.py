@@ -19,7 +19,31 @@ def mi_perfil(
     )
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return user
+        
+    carrera_nombre = None
+    if user.carrera_id:
+        carrera = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id == user.carrera_id).first()
+        if carrera:
+            carrera_nombre = carrera.nombre
+
+    # Enriquecer datos para el UserOut
+    user_data = {
+        "id": user.id,
+        "username": user.username,
+        "role": user.role,
+        "nombre": user.nombre,
+        "email": user.email,
+        "carrera_id": user.carrera_id,
+        "carrera_nombre": carrera_nombre,
+        "semestre": 5,  # Dummy value until we track student progress
+        "legajo": user.username,  # El username actúa como legajo
+        "fuente_beca": "Institucional" if user.es_becado else None,
+        "es_becado": user.es_becado,
+        "foto_url": user.foto_url,
+        "created_at": user.created_at,
+    }
+    
+    return user_data
 
 
 @router.patch("/mi-perfil", response_model=schemas.user.UserOut)
@@ -215,4 +239,59 @@ def mi_resumen(
         "promedio_general": prom_general,
         "notas": notas,
         "asistencia": asistencia,
+    }
+
+
+@router.get("/summary", response_model=schemas.user.StudentSummary)
+def student_summary(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Resumen académico y financiero para el Dashboard."""
+    user = db.query(models.user.User).filter(models.user.User.id == current_user.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    carrera_nombre = None
+    if user.carrera_id:
+        carrera = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id == user.carrera_id).first()
+        if carrera:
+            carrera_nombre = carrera.nombre
+
+    # Promedio
+    notas = mis_notas(db, current_user) or []
+    promedios = [n.get("promedio") for n in notas if n.get("promedio") is not None]
+    prom_general = round(sum(promedios) / len(promedios), 2) if promedios else None
+
+    # Asistencia
+    asistencia = mi_asistencia(db, current_user) or []
+    porcentajes_asistencia = [a.get("porcentaje") for a in asistencia if a.get("porcentaje") is not None]
+    asistencia_prom = round(sum(porcentajes_asistencia) / len(porcentajes_asistencia), 2) if porcentajes_asistencia else None
+    
+    regularidad_activa = True
+    if porcentajes_asistencia and any(p < 70 for p in porcentajes_asistencia):
+        regularidad_activa = False
+
+    # Financiero dummy check for now (we'll assume all good if no debts found, or just 'al_dia')
+    # In a full implementation, this would check finanzas service
+    estado_financiero = "al_dia"
+
+    # Créditos (dummy for now, but dynamic from backend)
+    creditos_totales = 240
+    creditos_aprobados = 120
+    creditos_pendientes = creditos_totales - creditos_aprobados
+    avance_pct = round((creditos_aprobados / creditos_totales) * 100, 1) if creditos_totales > 0 else 0
+
+    return {
+        "creditos_aprobados": creditos_aprobados,
+        "creditos_pendientes": creditos_pendientes,
+        "creditos_totales": creditos_totales,
+        "promedio_general": prom_general,
+        "asistencia_promedio": asistencia_prom,
+        "avance_porcentaje": avance_pct,
+        "estado_financiero": estado_financiero,
+        "regularidad_activa": regularidad_activa,
+        "materias_cursando": len(notas),
+        "carrera_nombre": carrera_nombre,
+        "semestre_actual": 5,
     }

@@ -1,7 +1,9 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Line, Polyline, Rect } from "react-native-svg";
-import { colors, fontFamily, fontSize, radius, spacing } from "../../constants/design";
+import { fontFamily, fontSize, radius, spacing } from "../../constants/design";
 
 type Notification = {
   id: number;
@@ -14,6 +16,8 @@ type Notification = {
 // ─── SVG Iconos para notificaciones ───────────────────────────────────────────
 
 function IconPencil({ color = "#fbbf24", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -22,6 +26,8 @@ function IconPencil({ color = "#fbbf24", size = 20 }: { color?: string; size?: n
 }
 
 function IconChartLine({ color = "#3b82f6", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -31,6 +37,8 @@ function IconChartLine({ color = "#3b82f6", size = 20 }: { color?: string; size?
 }
 
 function IconCheckCircle({ color = "#22c55e", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
@@ -40,6 +48,8 @@ function IconCheckCircle({ color = "#22c55e", size = 20 }: { color?: string; siz
 }
 
 function IconAlert({ color = "#f43f5e", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M12 2L1 21h22L12 2z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -50,6 +60,8 @@ function IconAlert({ color = "#f43f5e", size = 20 }: { color?: string; size?: nu
 }
 
 function IconBell({ color = "#06b6d4", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -59,6 +71,8 @@ function IconBell({ color = "#06b6d4", size = 20 }: { color?: string; size?: num
 }
 
 function IconCalendarStar({ color = "#8b5cf6", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth={1.8} />
@@ -87,6 +101,8 @@ function formatRelativa(fecha: string): string {
 }
 
 function BellIcon() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
@@ -108,6 +124,8 @@ function BellIcon() {
 }
 
 function CheckIcon() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
       <Path
@@ -132,6 +150,7 @@ export function NotificationsSheet({
   onClose: () => void;
   onMarkAllRead: () => void;
 }) {
+  const { colors } = useTheme();
   const unread = notifications.filter((n) => !n.leida).length;
 
   if (!visible) return null;

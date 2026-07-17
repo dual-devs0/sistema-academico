@@ -1,3 +1,5 @@
+import { colors } from "../constants/design";
+import { useTheme } from "../hooks/useTheme";
 import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
@@ -5,6 +7,8 @@ import {
   ScrollView,
   Text,
   View,
+  Linking,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -17,6 +21,8 @@ import { CyanBadge } from "../components/ui/CyanBadge";
 // ─── SVG Iconos ───────────────────────────────────────────────────────────────
 
 function IconReceipt({ color = "#3b82f6", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M4 2v20l2-1.5L8 22l2-1.5L12 22l2-1.5L16 22l2-1.5L20 22V2l-2 1.5L16 2l-2 1.5L12 2l-2 1.5L8 2 6 3.5 4 2z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -27,6 +33,8 @@ function IconReceipt({ color = "#3b82f6", size = 20 }: { color?: string; size?: 
 }
 
 function IconHistory({ color = "#f43f5e", size = 20 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
@@ -36,6 +44,8 @@ function IconHistory({ color = "#f43f5e", size = 20 }: { color?: string; size?: 
 }
 
 function IconClipboardList({ color = colors.textSecondary, size = 32 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
@@ -48,6 +58,8 @@ function IconClipboardList({ color = colors.textSecondary, size = 32 }: { color?
 }
 
 function IconDocumentStack({ color = colors.textSecondary, size = 32 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
@@ -59,6 +71,8 @@ function IconDocumentStack({ color = colors.textSecondary, size = 32 }: { color?
 }
 
 function IconInvoice({ color = colors.textSecondary, size = 32 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M6 2v20l2-1.4L10 22l2-1.4L14 22l2-1.4L18 22V2l-2 1.4L14 2l-2 1.4L10 2 8 3.4 6 2z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
@@ -69,7 +83,6 @@ function IconInvoice({ color = colors.textSecondary, size = 32 }: { color?: stri
 }
 import { SkeletonLoader } from "../components/ui/SkeletonLoader";
 import {
-  colors,
   fontFamily,
   fontSize,
   radius,
@@ -77,6 +90,7 @@ import {
 } from "../constants/design";
 import {
   fetchCuenta,
+  iniciarPagoOnline,
   formatGuaranies,
   type CuentaData,
   type CuotaCard,
@@ -105,47 +119,17 @@ import {
  *   existe URL.
  */
 
-// ─── Datos dummy ──────────────────────────────────────────────────────────────
-
-const DUMMY_CUENTA: CuentaData = {
-  saldoPendiente: 450000,
-  saldoVencido: 150000,
-  pagado: 900000,
-  cuotas: [
-    { id: 1, concepto: "Cuota 2026-01", numeroCuota: "1/10", periodo: "2026-01", monto: 300000, fechaVencimiento: "2026-02-15", estado: "pagado", pagoId: 101, comprobanteEstado: "emitido", comprobanteUrl: null },
-    { id: 2, concepto: "Cuota 2026-02", numeroCuota: "2/10", periodo: "2026-02", monto: 300000, fechaVencimiento: "2026-03-15", estado: "pagado", pagoId: 102, comprobanteEstado: "emitido", comprobanteUrl: null },
-    { id: 3, concepto: "Cuota 2026-03", numeroCuota: "3/10", periodo: "2026-03", monto: 300000, fechaVencimiento: "2026-04-15", estado: "pagado", pagoId: 103, comprobanteEstado: "emitido", comprobanteUrl: null },
-    { id: 4, concepto: "Cuota 2026-04", numeroCuota: "4/10", periodo: "2026-04", monto: 300000, fechaVencimiento: "2026-05-15", estado: "vencido", pagoId: null, comprobanteEstado: null, comprobanteUrl: null },
-    { id: 5, concepto: "Cuota 2026-05", numeroCuota: "5/10", periodo: "2026-05", monto: 300000, fechaVencimiento: "2026-06-15", estado: "pendiente", pagoId: null, comprobanteEstado: null, comprobanteUrl: null },
-    { id: 6, concepto: "Cuota 2026-06", numeroCuota: "6/10", periodo: "2026-06", monto: 150000, fechaVencimiento: "2026-07-15", estado: "pendiente", pagoId: null, comprobanteEstado: null, comprobanteUrl: null },
-  ],
-  transacciones: [
-    { id: 201, descripcion: "Cuota 2026-01", monto: 300000, fecha: "2026-02-15", tipo: "cargo" },
-    { id: 202, descripcion: "Pago — Cuota 2026-01", monto: 300000, fecha: "2026-02-10", tipo: "pago" },
-    { id: 203, descripcion: "Cuota 2026-02", monto: 300000, fecha: "2026-03-15", tipo: "cargo" },
-    { id: 204, descripcion: "Pago — Cuota 2026-02", monto: 300000, fecha: "2026-03-12", tipo: "pago" },
-    { id: 205, descripcion: "Cuota 2026-03", monto: 300000, fecha: "2026-04-15", tipo: "cargo" },
-    { id: 206, descripcion: "Pago — Cuota 2026-03", monto: 300000, fecha: "2026-04-10", tipo: "pago" },
-    { id: 207, descripcion: "Cuota 2026-04", monto: 300000, fecha: "2026-05-15", tipo: "cargo" },
-    { id: 208, descripcion: "Cuota 2026-05", monto: 300000, fecha: "2026-06-15", tipo: "cargo" },
-    { id: 209, descripcion: "Cuota 2026-06", monto: 150000, fecha: "2026-07-15", tipo: "cargo" },
-  ],
-  facturas: [
-    { id: 101, numero: "#000101", monto: 300000, fecha: "2026-02-15", estado: "emitido", urlPdf: null },
-    { id: 102, numero: "#000102", monto: 300000, fecha: "2026-03-15", estado: "emitido", urlPdf: null },
-    { id: 103, numero: "#000103", monto: 300000, fecha: "2026-04-15", estado: "emitido", urlPdf: null },
-  ],
-};
-
 type Tab = "resumen" | "facturas";
 
 export default function CuentaScreen() {
-  const router = useRouter();
+  const { colors } = useTheme();
+const router = useRouter();
   const [tab, setTab] = useState<Tab>("resumen");
-  const [data, setData] = useState<CuentaData | null>(DUMMY_CUENTA);
+  const [data, setData] = useState<CuentaData | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -153,7 +137,7 @@ export default function CuentaScreen() {
       const d = await fetchCuenta();
       setData(d);
     } catch {
-      // dummy data ya está en estado
+      setError("No se pudieron cargar los datos de cuenta.");
     }
   }, []);
 
@@ -170,6 +154,25 @@ export default function CuentaScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const handlePagarAhora = async () => {
+    if (!data) return;
+    const pendientes = data.cuotas.filter((c) => c.estado === "pendiente" || c.estado === "vencido");
+    if (pendientes.length === 0) {
+  const { colors } = useTheme();
+      Alert.alert("Al día", "No tenés cuotas pendientes de pago.");
+      return;
+    }
+    setPaying(true);
+    try {
+      const url = await iniciarPagoOnline(pendientes.map((c) => c.id));
+      if (url) await Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert("Error", "No se pudo iniciar el pago. Intentá más tarde.");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
@@ -197,7 +200,7 @@ export default function CuentaScreen() {
           <ErrorBody message={error} onRetry={load} />
         ) : data ? (
           tab === "resumen" ? (
-            <ResumenTab data={data} />
+            <ResumenTab data={data} onPagarAhora={handlePagarAhora} paying={paying} />
           ) : (
             <FacturasTab facturas={data.facturas} />
           )
@@ -212,6 +215,7 @@ export default function CuentaScreen() {
 // ---------------------------------------------------------------------------
 
 function TabPills({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -260,7 +264,8 @@ function TabPills({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 // Resumen
 // ---------------------------------------------------------------------------
 
-function ResumenTab({ data }: { data: CuentaData }) {
+function ResumenTab({ data, onPagarAhora, paying }: { data: CuentaData; onPagarAhora: () => void; paying: boolean }) {
+  const { colors } = useTheme();
   return (
     <Animated.View
       entering={FadeIn.duration(220)}
@@ -270,6 +275,8 @@ function ResumenTab({ data }: { data: CuentaData }) {
         saldoPendiente={data.saldoPendiente}
         saldoVencido={data.saldoVencido}
         pagado={data.pagado}
+        onPagar={onPagarAhora}
+        paying={paying}
       />
 
       <SectionLabel text="Cuotas del ciclo" />
@@ -333,11 +340,16 @@ function SaldoCard({
   saldoPendiente,
   saldoVencido,
   pagado,
+  onPagar,
+  paying,
 }: {
   saldoPendiente: number;
   saldoVencido: number;
   pagado: number;
+  onPagar: () => void;
+  paying: boolean;
 }) {
+  const { colors } = useTheme();
   const saldo = saldoPendiente + saldoVencido;
   return (
     <GlassCard variant="accent" contentStyle={{ padding: spacing.xl }}>
@@ -426,14 +438,15 @@ function SaldoCard({
           se veía "apagado". Ahora sólido, igual criterio que
           "Abrir Escáner" en el dashboard. */}
       <Pressable
-        onPress={() => { }}
+        onPress={onPagar}
+        disabled={paying}
         style={({ pressed }) => ({
           marginTop: spacing.lg,
           paddingVertical: spacing.md,
           borderRadius: radius.md,
           backgroundColor: colors.cyan,
           alignItems: "center",
-          opacity: pressed ? 0.85 : 1,
+          opacity: pressed || paying ? 0.85 : 1,
         })}
       >
         <Text
@@ -443,7 +456,7 @@ function SaldoCard({
             fontSize: fontSize.body,
           }}
         >
-          Pagar Ahora
+          {paying ? "Procesando..." : "Pagar Ahora"}
         </Text>
       </Pressable>
     </GlassCard>
@@ -451,6 +464,8 @@ function SaldoCard({
 }
 
 function CuotaRow({ cuota }: { cuota: CuotaCard }) {
+  const { colors } = useTheme();
+
   const variant =
     cuota.estado === "vencido"
       ? "error"
@@ -524,6 +539,8 @@ function CuotaRow({ cuota }: { cuota: CuotaCard }) {
 }
 
 function TransaccionRow({ tx, last }: { tx: Transaccion; last: boolean }) {
+  const { colors } = useTheme();
+
   const color = tx.tipo === "pago" ? colors.success : colors.textPrimary;
   return (      <View
         style={{
@@ -586,6 +603,8 @@ function TransaccionRow({ tx, last }: { tx: Transaccion; last: boolean }) {
 // ---------------------------------------------------------------------------
 
 function FacturasTab({ facturas }: { facturas: Factura[] }) {
+  const { colors } = useTheme();
+
   return (
     <Animated.View
       entering={FadeIn.duration(220)}
@@ -626,6 +645,8 @@ function FacturasTab({ facturas }: { facturas: Factura[] }) {
 }
 
 function FacturaCard({ factura }: { factura: Factura }) {
+  const { colors } = useTheme();
+
   const emitida = factura.estado === "emitido";
   const badgeVariant = emitida
     ? "success"
@@ -707,6 +728,8 @@ function FacturaCard({ factura }: { factura: Factura }) {
 // ---------------------------------------------------------------------------
 
 function SectionLabel({ text }: { text: string }) {
+  const { colors } = useTheme();
+
   return (
     <Text
       style={{
@@ -724,6 +747,8 @@ function SectionLabel({ text }: { text: string }) {
 }
 
 function LoadingBody() {
+  const { colors } = useTheme();
+
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
       <SkeletonLoader height={180} />
@@ -736,6 +761,7 @@ function LoadingBody() {
 }
 
 function ErrorBody({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { colors } = useTheme();
   return (
     <View style={{ paddingHorizontal: spacing.xl }}>
       <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>

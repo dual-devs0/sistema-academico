@@ -1,3 +1,5 @@
+import { colors } from "../constants/design";
+import { useTheme } from "../hooks/useTheme";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
@@ -24,7 +26,7 @@ import Animated, {
 import Svg, { Path } from "react-native-svg";
 import { DonutChart } from "../components/ui/DonutChart";
 import { GlassCard } from "../components/ui/GlassCard";
-import { colors, fontFamily, fontSize, radius, spacing } from "../constants/design";
+import { fontFamily, fontSize, radius, spacing } from "../constants/design";
 import {
   fetchMateriasHoy,
   verifyQrToken,
@@ -61,13 +63,24 @@ const CORNER_STROKE = 3;
 type Phase = "camera" | "confirming" | "confirmed";
 
 export default function ScannerScreen() {
-  const router = useRouter();
+  const { colors } = useTheme();
+const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<Phase>("camera");
   const [confirmData, setConfirmData] = useState<QrVerifyResponse | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [materiasHoy, setMateriasHoy] = useState<MateriaHoy[]>([]);
+  const [timedOut, setTimedOut] = useState(false);
   const scanCooldownRef = useRef(false);
+
+  const close = useCallback(() => router.back(), [router]);
+
+  // Timeout 60s
+  useEffect(() => {
+    if (phase !== "camera") return;
+    const t = setTimeout(() => setTimedOut(true), 60_000);
+    return () => clearTimeout(t);
+  }, [phase]);
 
   useEffect(() => {
     (async () => {
@@ -78,6 +91,7 @@ export default function ScannerScreen() {
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
+  const { colors } = useTheme();
       requestPermission();
     }
   }, [permission, requestPermission]);
@@ -110,8 +124,6 @@ export default function ScannerScreen() {
     },
     [phase],
   );
-
-  const close = useCallback(() => router.back(), [router]);
 
   if (!permission) {
     return <PermissionSplash message="Preparando cámara…" />;
@@ -254,7 +266,66 @@ export default function ScannerScreen() {
           ) : null}
         </View>
 
-        {inlineError ? (
+        {timedOut ? (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={{
+              marginHorizontal: spacing.xl,
+              padding: spacing.lg,
+              borderRadius: radius.md,
+              backgroundColor: "rgba(239,68,68,0.15)",
+              borderWidth: 1,
+              borderColor: "rgba(239,68,68,0.4)",
+              gap: spacing.md,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                color: colors.error,
+                fontFamily: fontFamily.interSemibold,
+                fontSize: fontSize.body,
+                textAlign: "center",
+              }}
+            >
+              No se detectó ningún código QR en 60 segundos.
+            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.md }}>
+              <Pressable
+                onPress={() => { setTimedOut(false); scanCooldownRef.current = false; }}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.md,
+                  backgroundColor: colors.cyan,
+                  alignItems: "center",
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <Text style={{ color: "#0a0e17", fontFamily: fontFamily.interSemibold, fontSize: fontSize.caption }}>
+                  Reintentar
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={close}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.md,
+                  backgroundColor: "rgba(255,255,255,0.08)",
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: "center",
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <Text style={{ color: colors.textPrimary, fontFamily: fontFamily.interSemibold, fontSize: fontSize.caption }}>
+                  Volver
+                </Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        ) : inlineError ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(200)}
@@ -347,6 +418,8 @@ export default function ScannerScreen() {
 // ---------------------------------------------------------------------------
 
 function ScanCorners() {
+  const { colors } = useTheme();
+
   const p = CORNER;
   const s = FRAME_SIZE;
   const c = colors.cyan;
@@ -382,6 +455,8 @@ function ScanCorners() {
 }
 
 function ScanLine() {
+  const { colors } = useTheme();
+
   const y = useSharedValue(0);
 
   useEffect(() => {
@@ -432,6 +507,8 @@ function ScanLine() {
 // ---------------------------------------------------------------------------
 
 function MateriaHoyRow({ materia }: { materia: MateriaHoy }) {
+  const { colors } = useTheme();
+
   return (
     <View
       style={{
@@ -501,6 +578,7 @@ function ConfirmedScreen({
   onGoHome: () => void;
   onOpenReport: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
       <View style={{ flex: 1 }}>
@@ -711,6 +789,8 @@ function ConfirmedScreen({
 }
 
 function StatBlock({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+
   return (
     <View>
       <Text
@@ -752,6 +832,7 @@ function PermissionSplash({
   onAction?: () => void;
   onClose?: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={{ flex: 1, padding: spacing.xl, justifyContent: "space-between" }}>

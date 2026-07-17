@@ -191,6 +191,13 @@ export async function fetchCuenta(): Promise<CuentaData> {
   };
 }
 
+export async function iniciarPagoOnline(cuotaIds: number[]): Promise<string> {
+  const { data } = await api.post<{ gateway_url: string }>("/finanzas/pagos/online/iniciar", {
+    cuota_ids: cuotaIds
+  });
+  return data.gateway_url;
+}
+
 // ---------------------------------------------------------------------------
 // Formatter
 // ---------------------------------------------------------------------------

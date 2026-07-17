@@ -30,6 +30,10 @@ export interface EventoOut {
   descripcion: string | null;
   anio: number | null;
   semestre: number | null;
+  hora: string | null;
+  ubicacion: string | null;
+  profesor_nombre: string | null;
+  carrera_nombre: string | null;
   archivo_pdf: string | null;
   creado_por: number | null;
 }
