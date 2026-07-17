@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useEffect } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, {
@@ -8,7 +10,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import { colors, radius } from "../../constants/design";
+import { radius } from "../../constants/design";
 
 /**
  * ProgressBar — barra horizontal con glow cian.
@@ -52,6 +54,7 @@ export function ProgressBar({
   glow = true,
   breathe = false,
 }: Props) {
+  const { colors } = useTheme();
   const clamped = Math.max(0, Math.min(1, value / max));
   const width = useSharedValue(animated ? 0 : clamped);
   const shadowOpacity = useSharedValue(breathe ? 0.3 : 0.6);

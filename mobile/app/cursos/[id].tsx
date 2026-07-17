@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useEffect, useState, useCallback } from "react";
 import {
   Pressable, ScrollView, Text, View, ActivityIndicator,
@@ -7,7 +9,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle } from "react-native-svg";
 import { DonutChart } from "../../components/ui/DonutChart";
-import { colors, fontFamily, fontSize, spacing } from "../../constants/design";
+import { fontFamily, fontSize, spacing } from "../../constants/design";
 import { fetchMateriaDetalle, PUNTAJE_POR_TIPO, type MateriaDetalle } from "../../services/notasService";
 
 // ─── Datos dummy ──────────────────────────────────────────────────────────────
@@ -94,7 +96,8 @@ function formatFecha(iso: string | null): string {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function MateriaDetalleScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useTheme();
+const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [detalle, setDetalle] = useState<MateriaDetalle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +112,7 @@ export default function MateriaDetalleScreen() {
     } catch {
       const dummy = DUMMY_MATERIAS[Number(id)];
       if (dummy) {
+  const { colors } = useTheme();
         setDetalle(dummy);
       } else {
         setError("No se pudo cargar el detalle.");
@@ -563,6 +567,8 @@ export default function MateriaDetalleScreen() {
 }
 
 function BackArrow() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
@@ -577,6 +583,8 @@ function BackArrow() {
 }
 
 function IconClipboardCheck({ color = colors.cyan, size = 16 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
@@ -587,6 +595,8 @@ function IconClipboardCheck({ color = colors.cyan, size = 16 }: { color?: string
 }
 
 function IconUser({ color = colors.textSecondary, size = 12 }: { color?: string; size?: number }) {
+  const { colors } = useTheme();
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="8" r="3.6" stroke={color} strokeWidth={1.7} />
@@ -596,6 +606,8 @@ function IconUser({ color = colors.textSecondary, size = 12 }: { color?: string;
 }
 
 function ChevronRight() {
+  const { colors } = useTheme();
+
   return (
     <View
       style={{

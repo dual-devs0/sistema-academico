@@ -17,6 +17,8 @@ class EventoBase(BaseModel):
     anio: int | None = None
     semestre: int | None = None
     archivo_pdf: str | None = None
+    hora: str | None = None          # HH:MM — hora del evento
+    ubicacion: str | None = None     # Ej. "Aula 203 — Edif. Principal"
 
 
 class EventoCreate(EventoBase):
@@ -33,11 +35,14 @@ class EventoUpdate(BaseModel):
     descripcion: str | None = None
     anio: int | None = None
     semestre: int | None = None
+    hora: str | None = None
+    ubicacion: str | None = None
 
 
 class EventoOut(EventoBase):
     id: int
     creado_por: int | None = None
+    profesor_nombre: str | None = None  # nombre del profesor asociado a la materia
 
     model_config = {"from_attributes": True}
 

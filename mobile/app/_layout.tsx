@@ -1,3 +1,4 @@
+import { colors } from "../constants/design";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
@@ -19,7 +20,7 @@ import {
 import { AuthProvider, useAuth } from "../hooks/useAuth";
 import { ThemeProvider, useTheme } from "../hooks/useTheme";
 import { SplashAnimated } from "../components/SplashAnimated";
-import { colors } from "../constants/design";
+
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -32,6 +33,8 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
  * hace falta chequear 'loading' acá.
  */
 function AuthGate({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+
   const { status } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -39,6 +42,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const inAuthGroup = segments[0] === "(auth)";
     if (status === "anon" && !inAuthGroup) {
+  const { colors } = useTheme();
       router.replace("/(auth)/login");
     } else if (status === "auth" && inAuthGroup) {
       router.replace("/(tabs)");
@@ -58,10 +62,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
  *   no vuelve a disparar la secuencia.
  */
 function AppGate() {
+  const { colors } = useTheme();
+
   const { status } = useAuth();
   const [animDone, setAnimDone] = useState(false);
 
   if (!animDone || status === "loading") {
+  const { colors } = useTheme();
     return <SplashAnimated onFinish={() => setAnimDone(true)} />;
   }
 
@@ -92,12 +99,15 @@ function AppGate() {
 }
 
 function ThemeStatusBar() {
+  const { colors } = useTheme();
+
   const { effective } = useTheme();
   return <StatusBar style="light" />;
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
+  const { colors } = useTheme();
+const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -109,6 +119,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
+  const { colors } = useTheme();
       // Ocultar el splash nativo apenas las fuentes están listas — a
       // partir de acá la SplashAnimated (JS) toma el control visual.
       SplashScreen.hideAsync().catch(() => {});

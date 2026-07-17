@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { Pressable, Text, View } from "react-native";
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 import Animated, {
@@ -6,7 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { colors, fontFamily } from "../../constants/design";
+import { fontFamily } from "../../constants/design";
 
 type Props = {
   count?: number;
@@ -15,10 +17,13 @@ type Props = {
 };
 
 export function NotificationBell({ count = 0, onPress, size = 28 }: Props) {
-  const shake = useSharedValue(0);
+  const { colors } = useTheme();
+const shake = useSharedValue(0);
   const scale = useSharedValue(1);
 
   function triggerShake() {
+  const { colors } = useTheme();
+
     shake.value = withSequence(
       withTiming(-8, { duration: 60 }),
       withTiming(8, { duration: 60 }),

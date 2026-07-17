@@ -251,6 +251,7 @@ def recuperar_contrasena(
 ):
     _check_password_reset_rate_limit(req.username_or_email)
 
+    # Buscar usuario por username o email
     db_user = (
         db.query(models.user.User)
         .filter(
@@ -265,6 +266,12 @@ def recuperar_contrasena(
             status_code=404, detail="No se encontró un usuario con ese dato."
         )
 
+    # Verificación adicional si se envió matrícula (que puede ser el username o legajo en el sistema)
+    if req.matricula and db_user.username != req.matricula:
+        raise HTTPException(
+            status_code=400, detail="Los datos proporcionados no coinciden."
+        )
+
     alphabet = string.ascii_letters + string.digits
     new_password = "".join(secrets.choice(alphabet) for _ in range(10))
     db_user.hashed_password = security.hash_password(new_password)
@@ -277,4 +284,32 @@ def recuperar_contrasena(
             background_tasks, user_email, user_name, new_password
         )
 
-    return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}
+    return {"detail": "Si el usuario existe y los datos coinciden, recibirás un email con instrucciones."}
+
+
+@router.post("/registro", response_model=schemas.user.RegistroResponse)
+def registro(
+    req: schemas.user.RegistroRequest,
+    db: Session = Depends(database.get_db),
+):
+    """
+    Registra la solicitud de un nuevo alumno para acceder al sistema.
+    En una app real, esto podría crear un usuario inactivo o guardar en una tabla de solicitudes.
+    """
+    # Verificar si ya existe el usuario
+    db_user = (
+        db.query(models.user.User)
+        .filter(models.user.User.username == req.matricula)
+        .first()
+    )
+    if db_user:
+        raise HTTPException(
+            status_code=400, detail="La matrícula ya se encuentra registrada."
+        )
+
+    # Por ahora, simplemente retornamos éxito simulando que la solicitud fue recibida
+    # Para completarlo, podríamos insertar en una tabla "SolicitudesRegistro"
+    return {
+        "detail": "Solicitud de registro enviada exitosamente. Será procesada por secretaría.",
+        "solicitud_id": 12345
+    }

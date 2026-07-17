@@ -3,64 +3,57 @@ import { api } from "./api";
 /**
  * Servicio de Exámenes.
  *
- * ⚠️ Los endpoints de exámenes NO existen todavía en el backend. Este
- * servicio los llama por su nombre tentativo; si devuelven 404 el
- * frontend mostrará estado vacío + banner "próximamente".
- *
- * BACKEND TODO:
- *   GET /examenes/disponibles?turno={turno}
- *   response: list[ExamenDisponibleOut]
- *
- *   GET /examenes/inscriptos
- *   response: list[ExamenInscriptoOut]
- *
- *   POST /examenes/inscripciones
- *   body: { examen_id: number }
- *   response: ExamenInscriptoOut
- *
- *   DELETE /examenes/inscripciones/{inscripcion_id}
- *
- * Los turnos siguen la nomenclatura del backend (feb/may/ago/nov + año).
+ * Consume los endpoints del backend:
+ *   GET  /examenes/disponibles?periodo=may-2026
+ *   GET  /examenes/inscriptos
+ *   POST /examenes/inscripciones  { examen_id }
+ *   DELETE /examenes/inscripciones/{id}
  */
 
-export type Turno = string; // ej "may-2024", "ago-2024"
+export type Turno = string; // ej "may-2026", "ago-2026"
 
-export type EstadoInscripcion = "confirmado" | "pendiente_pago" | "finalizado";
+export type EstadoInscripcion = "inscripto" | "cancelada";
 
 export interface ExamenDisponible {
   id: number;
   materia_id: number;
   materia_nombre: string;
-  fecha: string; // YYYY-MM-DD
-  hora: string; // HH:MM
+  fecha: string;
+  hora_inicio: string | null;
+  hora_fin: string | null;
   aula: string | null;
-  habilitado: boolean;
-  cierre_inscripcion: string; // YYYY-MM-DD
-  turno: Turno;
+  tipo: string;
+  periodo: string;
+  cupos: number | null;
+  cupos_disponibles: number | null;
+  ya_inscripto: boolean;
+  profesor_nombre: string | null;
+  estado: string;
 }
 
 export interface ExamenInscripto {
-  inscripcion_id: number;
+  id: number;
   examen_id: number;
-  materia_id: number;
+  alumno_id: number;
+  estado: string;
+  inscripto_en: string;
   materia_nombre: string;
   fecha: string;
-  hora: string;
+  hora_inicio: string | null;
   aula: string | null;
-  estado: EstadoInscripcion;
   nota: number | null;
 }
 
 // ---------------------------------------------------------------------------
-// Fetchers (tolerantes)
+// Fetchers
 // ---------------------------------------------------------------------------
 
 export async function fetchExamenesDisponibles(
-  turno: Turno,
+  periodo: string,
 ): Promise<ExamenDisponible[]> {
   try {
     const { data } = await api.get<ExamenDisponible[]>("/examenes/disponibles", {
-      params: { turno },
+      params: { periodo },
     });
     return data;
   } catch {
@@ -90,10 +83,24 @@ export async function inscribirseAExamen(
     return {
       ok: false,
       error:
-        anyErr.response?.data?.detail ??
-        (anyErr.response?.status === 404
-          ? "Servicio de exámenes no disponible todavía."
-          : "No se pudo completar la inscripción."),
+        anyErr.response?.data?.detail ?? "No se pudo completar la inscripción.",
+    };
+  }
+}
+
+export async function cancelarInscripcion(
+  inscripcionId: number,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await api.delete(`/examenes/inscripciones/${inscripcionId}`);
+    return { ok: true };
+  } catch (err) {
+    const anyErr = err as {
+      response?: { status?: number; data?: { detail?: string } };
+    };
+    return {
+      ok: false,
+      error: anyErr.response?.data?.detail ?? "No se pudo cancelar la inscripción.",
     };
   }
 }

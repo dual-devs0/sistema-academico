@@ -1,6 +1,8 @@
+import { colors as staticColors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { Image, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { colors, fontFamily } from "../../constants/design";
+import { fontFamily } from "../../constants/design";
 
 /**
  * UserAvatar — avatar reusable para todos los headers + Perfil.
@@ -35,6 +37,8 @@ export function UserAvatar({
   borderWidth = 1.5,
   onPress,
 }: UserAvatarProps) {
+  const { colors } = useTheme();
+  
   const content = fotoUrl ? (
     <Image
       source={{ uri: fotoUrl }}

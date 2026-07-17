@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
@@ -17,7 +19,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { DonutChart } from "../../components/ui/DonutChart";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
-  colors, fontFamily, fontSize, radius, spacing,
+  fontFamily, fontSize, radius, spacing,
 } from "../../constants/design";
 import {
   fetchNotasCompleto,
@@ -55,86 +57,17 @@ function ordinalSem(n: number): string {
   return `${map[n] ?? `${n}.º`} Semestre`;
 }
 
-// ─── Datos dummy ──────────────────────────────────────────────────────────────
-
-const DUMMY_DATA: NotasCompleto = {
-  semestresDisponibles: [1, 2],
-  promedioAnual: 7.8,
-  materias: [
-    {
-      materiaId: 1,
-      nombre: "Programación I",
-      profesor: "Ing. Pérez",
-      anio: 2026,
-      semestre: 1,
-      promedio: 8.5,
-      asistenciaPct: 92,
-      totalClases: 40,
-      presentes: 37,
-      desglose: [
-        { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 88, fecha: "2026-04-15", hora: "17:00", profesor: "Ing. Pérez" },
-        { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 8, puntajeActividad: 100, puntajeLogrado: 80, fecha: "2026-06-10", hora: "17:00", profesor: "Ing. Pérez" },
-        { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 10, puntajeActividad: 50, puntajeLogrado: 48, fecha: "2026-05-20", hora: null, profesor: "Ing. Pérez" },
-        { tipo: "final", label: "Final", peso: 0.3, nota: 7.5, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-      ],
-    },
-    {
-      materiaId: 2, nombre: "Matemática I", profesor: "Lic. González",
-      anio: 2026, semestre: 1, promedio: 6.2, asistenciaPct: 78,
-      totalClases: 40, presentes: 31,
-      desglose: [
-        { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 5, puntajeActividad: 100, puntajeLogrado: 52, fecha: "2026-04-16", hora: "17:00", profesor: "Lic. González" },
-        { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 7, puntajeActividad: 100, puntajeLogrado: 70, fecha: "2026-06-11", hora: "17:00", profesor: "Lic. González" },
-        { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 6, puntajeActividad: 50, puntajeLogrado: 30, fecha: "2026-05-21", hora: null, profesor: "Lic. González" },
-        { tipo: "final", label: "Final", peso: 0.3, nota: 6.5, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-      ],
-    },
-    {
-      materiaId: 3, nombre: "Inglés Técnico", profesor: "Prof. Martínez",
-      anio: 2026, semestre: 1, promedio: 9.0, asistenciaPct: 95,
-      totalClases: 30, presentes: 28,
-      desglose: [
-        { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 92, fecha: "2026-04-14", hora: "15:00", profesor: "Prof. Martínez" },
-        { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 90, fecha: "2026-06-09", hora: "15:00", profesor: "Prof. Martínez" },
-        { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 9, puntajeActividad: 40, puntajeLogrado: 36, fecha: "2026-05-19", hora: null, profesor: "Prof. Martínez" },
-        { tipo: "final", label: "Final", peso: 0.3, nota: 9, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-      ],
-    },
-    {
-      materiaId: 4, nombre: "Base de Datos", profesor: "Ing. López",
-      anio: 2026, semestre: 2, promedio: 7.0, asistenciaPct: 85,
-      totalClases: 36, presentes: 30,
-      desglose: [
-        { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 7, puntajeActividad: 100, puntajeLogrado: 72, fecha: "2026-04-10", hora: "17:00", profesor: "Ing. López" },
-        { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 6, puntajeActividad: 100, puntajeLogrado: 60, fecha: "2026-06-12", hora: "17:00", profesor: "Ing. López" },
-        { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 8, puntajeActividad: 60, puntajeLogrado: 48, fecha: "2026-05-22", hora: null, profesor: "Ing. López" },
-        { tipo: "final", label: "Final", peso: 0.3, nota: 7, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-      ],
-    },
-    {
-      materiaId: 5, nombre: "Álgebra Lineal", profesor: "Lic. Fernández",
-      anio: 2026, semestre: 2, promedio: 5.2, asistenciaPct: 65,
-      totalClases: 40, presentes: 26,
-      desglose: [
-        { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 4, puntajeActividad: 100, puntajeLogrado: 40, fecha: "2026-04-17", hora: "17:00", profesor: "Lic. Fernández" },
-        { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 5, puntajeActividad: 100, puntajeLogrado: 50, fecha: "2026-06-13", hora: "17:00", profesor: "Lic. Fernández" },
-        { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 6, puntajeActividad: 40, puntajeLogrado: 24, fecha: "2026-05-23", hora: null, profesor: "Lic. Fernández" },
-        { tipo: "final", label: "Final", peso: 0.3, nota: null, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-      ],
-    },
-  ],
-};
-
 // ─── Tipo de vista ─────────────────────────────────────────────────────────────
 type Vista = "asistencia" | "calificaciones";
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CursosTab() {
-  const router = useRouter();
-  const [data, setData] = useState<NotasCompleto | null>(DUMMY_DATA);
-  const [user, setUser] = useState<UserInfo | null>({ nombre: "Estudiante UCA", username: "estudiante", id: 0, role: "alumno", email: null, carrera_id: null, es_becado: null, foto_url: null });
-  const [semestre, setSemestre] = useState<number | null>(1);
+  const { colors } = useTheme();
+const router = useRouter();
+  const [data, setData] = useState<NotasCompleto | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [semestre, setSemestre] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,15 +80,14 @@ export default function CursosTab() {
         fetchNotasCompleto(),
         fetchPerfil().catch(() => null),
       ]);
-      if (n.materias.length > 0) {
-        setData(n);
-        if (n.semestresDisponibles.length > 0) {
-          setSemestre(n.semestresDisponibles[n.semestresDisponibles.length - 1]);
-        }
+      setData(n);
+      if (n.semestresDisponibles.length > 0) {
+        setSemestre(n.semestresDisponibles[n.semestresDisponibles.length - 1]);
       }
       if (u) setUser(u);
     } catch {
-      // dummy data ya está en estado
+      setError("No se pudieron cargar los datos de cursos.");
+      setData(null);
     }
   }, []);
 
@@ -313,6 +245,7 @@ function TriggerRow({
   esActual: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -386,6 +319,7 @@ function MateriaCard({
   materia: MateriaCard;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
   const pct = materia.asistenciaPct ?? 0;
   const color = donutColor(pct);
   const logrado = puntajeTotalMateria(materia);
@@ -484,6 +418,7 @@ function SemestreSheet({
   onSelect: (s: number) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
   if (!visible) return null;
 
   const ordenados = [...disponibles].sort((a, b) => b - a);
@@ -763,6 +698,7 @@ function VistaToggle({
   vista: Vista;
   onChange: (v: Vista) => void;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -849,6 +785,7 @@ function AsistenciaGrid({
   onRefresh: () => void;
   onPressMateriaId: (id: number) => void;
 }) {
+  const { colors } = useTheme();
   return (
     <ScrollView
       style={{ flex: 1 }}
@@ -903,6 +840,7 @@ function CalificacionesView({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const { colors } = useTheme();
   const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
@@ -1069,6 +1007,8 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 function EmptyBody({ semestre }: { semestre: number | null }) {
+  const { colors } = useTheme();
+
   return (
     <View style={{ padding: spacing.xl }}>
       <GlassCard contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
@@ -1081,6 +1021,8 @@ function EmptyBody({ semestre }: { semestre: number | null }) {
 }
 
 function LoadingBody() {
+  const { colors } = useTheme();
+
   return (
     <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, marginTop: spacing.md }}>
       <SkeletonLoader height={48} radius={12} />
@@ -1096,6 +1038,7 @@ function LoadingBody() {
 }
 
 function ErrorBody({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { colors } = useTheme();
   return (
     <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg }}>
       <GlassCard variant="accent" contentStyle={{ padding: spacing.lg }}>

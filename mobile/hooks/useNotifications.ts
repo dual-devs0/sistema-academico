@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { api } from "../services/api";
 
 type Notification = {
   id: number;
@@ -11,21 +12,32 @@ type Notification = {
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const subscribedRef = useRef(false);
 
   const unreadCount = notifications.filter((n) => !n.leida).length;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setNotifications([
-        { id: 1, tipo: "examen", mensaje: "Parcial 1 de Física 3 mañana a las 08:00", leida: false, fecha: "2026-07-15" },
-        { id: 2, tipo: "nota", mensaje: "Se cargó tu nota del Parcial 2 de Programación I", leida: false, fecha: "2026-07-14" },
-        { id: 3, tipo: "asistencia", mensaje: "Asistencia registrada en Matemática I", leida: true, fecha: "2026-07-13" },
-      ]);
+      const { data } = await api.get<Notification[]>("/notificaciones");
+      setNotifications(data);
+    } catch {
+      // silencioso — el endpoint puede no existir
+    }
+    setLoading(false);
+  }, []);
+
+  const registerPushToken = useCallback(async (token: string) => {
+    if (subscribedRef.current) return;
+    try {
+      await api.post("/notificaciones/subscribe", {
+        endpoint: token,
+        keys: { p256dh: "", auth: "" },
+      });
+      subscribedRef.current = true;
     } catch {
       // silencioso
     }
-    setLoading(false);
   }, []);
 
   const markAllRead = useCallback(() => {
@@ -38,5 +50,5 @@ export function useNotifications() {
     return () => clearInterval(interval);
   }, [load]);
 
-  return { notifications, unreadCount, loading, markAllRead, reload: load };
+  return { notifications, unreadCount, loading, markAllRead, reload: load, registerPushToken };
 }
