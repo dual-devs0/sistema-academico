@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useState } from "react";
 import { Platform, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
@@ -6,9 +8,11 @@ import { UserAvatar } from "./UserAvatar";
 import { NotificationBell } from "./NotificationBell";
 import { NotificationsSheet } from "./NotificationsSheet";
 import { useNotifications } from "../../hooks/useNotifications";
-import { colors, fontFamily, fontSize, radius, spacing } from "../../constants/design";
+import { fontFamily, fontSize, radius, spacing } from "../../constants/design";
 
 function BackArrow() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
@@ -51,11 +55,13 @@ export function ScreenHeader({
   right,
   style,
 }: Props) {
-  const router = useRouter();
+  const { colors } = useTheme();
+const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { notifications, unreadCount, markAllRead } = useNotifications();
 
   if (right) {
+  const { colors } = useTheme();
     return (
       <View
         style={[

@@ -7,9 +7,10 @@ por comprobante. Nunca debe tumbar el loop del proceso — cualquier
 excepción se loguea y el ciclo sigue.
 """
 
-from __future__ import annotations
-
+import asyncio
 import logging
+
+from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.financiero import Comprobante
@@ -18,22 +19,22 @@ from app.services.facturacion_electronica import procesar_facturacion, MAX_INTEN
 logger = logging.getLogger(__name__)
 
 
-async def ciclo_reintentos() -> int:
-    """Procesa comprobantes pendientes/error con intentos < MAX_INTENTOS.
+def _fetch_pendientes(db: Session) -> list[tuple[int, int]]:
+    pendientes = (
+        db.query(Comprobante)
+        .filter(
+            Comprobante.estado_emision.in_(["pendiente", "error"]),
+            Comprobante.intentos < MAX_INTENTOS,
+        )
+        .all()
+    )
+    return [(c.pago_id, c.id) for c in pendientes]
 
-    Retorna la cantidad de comprobantes procesados en este ciclo.
-    """
+
+async def ciclo_reintentos() -> int:
     db = SessionLocal()
     try:
-        pendientes = (
-            db.query(Comprobante)
-            .filter(
-                Comprobante.estado_emision.in_(["pendiente", "error"]),
-                Comprobante.intentos < MAX_INTENTOS,
-            )
-            .all()
-        )
-        ids = [(c.pago_id, c.id) for c in pendientes]
+        ids = await asyncio.to_thread(_fetch_pendientes, db)
     finally:
         db.close()
 

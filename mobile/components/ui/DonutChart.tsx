@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { useEffect } from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, {
@@ -7,7 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle, G } from "react-native-svg";
-import { colors, fontFamily } from "../../constants/design";
+import { fontFamily } from "../../constants/design";
 
 /**
  * DonutChart — círculo de asistencia SVG.
@@ -55,6 +57,7 @@ export function DonutChart({
   labelSuffix = "%",
   style,
 }: Props) {
+  const { colors } = useTheme();
   const clamped = Math.max(0, Math.min(1, value / max));
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;

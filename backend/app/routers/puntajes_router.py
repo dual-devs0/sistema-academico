@@ -502,4 +502,9 @@ def promedio_puntajes(
         .filter(models.puntaje.Puntaje.user_id == user_id)
         .all()
     )
+    if not puntajes:
+        raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
+    valores = [float(p.valor) for p in puntajes]
+    promedio = round(sum(valores) / len(valores), 2)
+    return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
     

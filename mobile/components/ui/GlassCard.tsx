@@ -1,3 +1,5 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { forwardRef } from "react";
 import {
   Pressable,
@@ -14,7 +16,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
-import { colors, radius } from "../../constants/design";
+import { radius } from "../../constants/design";
 
 /**
  * GlassCard — card con blur + borde translúcido.
@@ -58,6 +60,8 @@ export const GlassCard = forwardRef<View, Props>(function GlassCard(
   },
   ref,
 ) {
+  const { colors } = useTheme();
+
   const borderColor =
     variant === "accent" || variant === "leftAccent"
       ? BORDER_ACCENT
@@ -94,6 +98,7 @@ export const GlassCard = forwardRef<View, Props>(function GlassCard(
   );
 
   if (onPress && !noPress) {
+  const { colors } = useTheme();
     return (
       <Animated.View style={[cardStyle, animatedStyle, style]}>
         <Pressable

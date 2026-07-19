@@ -1,3 +1,4 @@
+import { colors } from "../../constants/design";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,7 +28,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { AxiosError } from "axios";
 import { useAuth } from "../../hooks/useAuth";
-import { recuperarContrasenaRequest } from "../../services/authService";
+import { recuperarContrasenaRequest, registroRequest } from "../../services/authService";
 import { fontFamily, spacing } from "../../constants/design";
 
 // ---------------------------------------------------------------------------
@@ -227,9 +228,17 @@ export default function LoginScreen() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      showToast("Solicitud de registro enviada.");
-    } catch {
-      setErrorMsg("No se pudo completar el registro.");
+      const detail = await registroRequest({
+        documento: regDoc.trim(),
+        matricula: regMatricula.trim()
+      });
+      showToast(detail);
+      setRegDoc("");
+      setRegMatricula("");
+      setTab("login");
+    } catch (err) {
+      const axErr = err as AxiosError<{ detail?: string }>;
+      setErrorMsg(axErr.response?.data?.detail ?? "No se pudo enviar la solicitud de registro.");
     } finally {
       setSubmitting(false);
     }
@@ -239,10 +248,11 @@ export default function LoginScreen() {
     if (!canSubmitForgot) return;
     setFpSending(true);
     try {
-      const detail = await recuperarContrasenaRequest(fpDoc.trim());
+      const detail = await recuperarContrasenaRequest(fpDoc.trim(), fpMatricula.trim());
       showToast(detail);
-    } catch {
-      showToast(`Contactá a secretaría: ${SECRETARIA_EMAIL}`);
+    } catch (err) {
+      const axErr = err as AxiosError<{ detail?: string }>;
+      showToast(axErr.response?.data?.detail ?? `Contactá a secretaría: ${SECRETARIA_EMAIL}`);
     } finally {
       setFpSending(false);
       setFpDoc("");

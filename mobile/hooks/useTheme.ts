@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { darkColors, lightColors } from "../constants/design";
 
 /**
  * Preferencia de tema con persistencia.
@@ -33,6 +34,7 @@ interface ThemeState {
   effective: Effective;
   setPreference: (p: Preference) => Promise<void>;
   toggleDark: () => Promise<void>;
+  colors: typeof darkColors | typeof lightColors;
 }
 
 const ThemeContext = createContext<ThemeState | null>(null);
@@ -74,7 +76,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [effective, setPreference]);
 
   const value = useMemo<ThemeState>(
-    () => ({ preference, effective, setPreference, toggleDark }),
+    () => ({
+      preference,
+      effective,
+      setPreference,
+      toggleDark,
+      colors: effective === "dark" ? darkColors : lightColors,
+    }),
     [preference, effective, setPreference, toggleDark],
   );
 

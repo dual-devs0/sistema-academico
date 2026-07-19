@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
+from app.schemas.users_schemas import AlumnoSimpleOut
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 
@@ -276,3 +277,23 @@ def eliminar_recordatorio(
     db.delete(rec)
     db.commit()
     return {"detail": "Recordatorio eliminado"}
+
+
+@router.get(
+    "/lista-alumnos",
+    response_model=list[AlumnoSimpleOut],
+    summary="Lista básica de alumnos (admin/profesor)",
+)
+def lista_alumnos(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    alumnos = (
+        db.query(models.user.User)
+        .filter(models.user.User.role == "alumno")
+        .order_by(models.user.User.nombre, models.user.User.username)
+        .all()
+    )
+    return alumnos

@@ -1,3 +1,5 @@
+import { colors } from "../constants/design";
+import { useTheme } from "../hooks/useTheme";
 import { useEffect, useRef } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -9,7 +11,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import { colors, fontFamily, fontSize, spacing } from "../constants/design";
+import { fontFamily, fontSize, spacing } from "../constants/design";
 
 /**
  * Splash animada — sustituye el SplashScreen nativo de Expo una vez que
@@ -30,7 +32,8 @@ interface SplashAnimatedProps {
 }
 
 export function SplashAnimated({ onFinish }: SplashAnimatedProps) {
-  const logoScale = useSharedValue(0.8);
+  const { colors } = useTheme();
+const logoScale = useSharedValue(0.8);
   const lineWidth = useSharedValue(0);
   const finishedRef = useRef(false);
 
@@ -46,6 +49,7 @@ export function SplashAnimated({ onFinish }: SplashAnimatedProps) {
 
     const timer = setTimeout(() => {
       if (!finishedRef.current) {
+  const { colors } = useTheme();
         finishedRef.current = true;
         onFinish();
       }
@@ -110,6 +114,8 @@ function Particle({
   style: React.ComponentProps<typeof View>["style"];
   delay: number;
 }) {
+  const { colors } = useTheme();
+
   return (
     <Animated.View
       entering={FadeIn.delay(delay).duration(300)}

@@ -107,6 +107,8 @@ def rechazar_pasantia(pasantia_id: int, db: Session, motivo: str | None = None) 
     if not pasantia:
         raise ValueError("Pasantía no encontrada")
     pasantia.estado = "rechazada"
+    if motivo:
+        pasantia.motivo_rechazo = motivo
     db.flush()
     return pasantia
 

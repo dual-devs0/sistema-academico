@@ -1,3 +1,5 @@
+import { colors } from "../../../constants/design";
+import { useTheme } from "../../../hooks/useTheme";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   ActivityIndicator, Pressable, SectionList, Text, View,
@@ -6,7 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
-import { colors, fontFamily, fontSize, radius, spacing } from "../../../constants/design";
+import { fontFamily, fontSize, radius, spacing } from "../../../constants/design";
 import { fetchAsistenciaDetalle, type AsistenciaRegistro } from "../../../services/notasService";
 
 // ─── Datos dummy ──────────────────────────────────────────────────────────────
@@ -80,6 +82,8 @@ function estadoLabel(estado: string): string {
 }
 
 function parseFecha(iso: string) {
+  const { colors } = useTheme();
+
   const d = new Date(iso + "T00:00:00");
   return {
     dia: d.getDate(),
@@ -92,7 +96,8 @@ function parseFecha(iso: string) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AsistenciaDetalleScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useTheme();
+const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [registros, setRegistros] = useState<AsistenciaRegistro[]>([]);
   const [materiaNombre, setMateriaNombre] = useState("");
@@ -109,6 +114,7 @@ export default function AsistenciaDetalleScreen() {
     } catch {
       const dummy = DUMMY_ASISTENCIA[Number(id)];
       if (dummy) {
+  const { colors } = useTheme();
         setRegistros(dummy.registros);
         setMateriaNombre(dummy.nombre);
       } else {
@@ -418,6 +424,8 @@ export default function AsistenciaDetalleScreen() {
 }
 
 function BackArrow() {
+  const { colors } = useTheme();
+
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
