@@ -11,7 +11,7 @@ GET    /graduacion/procesos/{id}/documentos-cones
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app import database
 from app.dependencias import get_current_user, require_role
@@ -23,16 +23,58 @@ from app.schemas.graduacion import (
     EtapaTesisUpdate,
     EtapaTesisOut,
     VerificacionSolvenciaOut,
+    CandidatosGraduacionPageOut,
 )
 from app.services.graduacion import (
     verificar_condicion_egreso,
     iniciar_proceso,
     asignar_tutor,
     actualizar_etapa,
+    listar_candidatos,
 )
-from app.models.graduacion import ProcesoGraduacion, VerificacionSolvencia
+from app.models.graduacion import ProcesoGraduacion, VerificacionSolvencia, EtapaTesis
 
 router = APIRouter(prefix="/graduacion", tags=["graduacion"])
+
+
+@router.get(
+    "/candidatos",
+    response_model=CandidatosGraduacionPageOut,
+    summary="Admin: lista paginada de alumnos con su condición de egreso",
+)
+def candidatos_graduacion(
+    carrera_id: Optional[int] = None,
+    q: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    items, total = listar_candidatos(
+        db, carrera_id=carrera_id, q=q, skip=skip, limit=limit
+    )
+    return {"items": items, "total": total}
+
+
+@router.get(
+    "/procesos/{id}/etapas",
+    response_model=List[EtapaTesisOut],
+    summary="Listar etapas de tesis de un proceso",
+)
+def listar_etapas(
+    id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    proceso = db.query(ProcesoGraduacion).filter(ProcesoGraduacion.id == id).first()
+    if not proceso:
+        raise HTTPException(status_code=404, detail="Proceso no encontrado")
+    return (
+        db.query(EtapaTesis)
+        .filter(EtapaTesis.proceso_id == id)
+        .order_by(EtapaTesis.id)
+        .all()
+    )
 
 
 @router.get(

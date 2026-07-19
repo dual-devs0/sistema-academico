@@ -278,3 +278,45 @@ def recuperar_contrasena(
         )
 
     return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}
+
+
+@router.post("/registro")
+def solicitar_registro(
+    req: schemas.user.RegistroRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(database.get_db),
+):
+    """Activación de cuenta pre-creada por un admin: el alumno/profesor
+    confirma cédula + matrícula (username) y recibe una contraseña temporal
+    por email. No crea cuentas nuevas — reusa el mismo flujo que
+    recuperar-contrasena."""
+    _check_password_reset_rate_limit(req.matricula)
+
+    db_user = (
+        db.query(models.user.User)
+        .filter(
+            models.user.User.username == req.matricula,
+            models.user.User.cedula == req.documento,
+        )
+        .first()
+    )
+
+    if not db_user:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró una cuenta con esos datos. Contactá a la administración.",
+        )
+
+    alphabet = string.ascii_letters + string.digits
+    new_password = "".join(secrets.choice(alphabet) for _ in range(10))
+    db_user.hashed_password = security.hash_password(new_password)
+    db.commit()
+
+    user_name = db_user.nombre or db_user.username
+    user_email = db_user.email
+    if user_email:
+        send_password_reset_email_bg(
+            background_tasks, user_email, user_name, new_password
+        )
+
+    return {"detail": "Si los datos son correctos, recibirás un email con tus credenciales."}

@@ -7,6 +7,7 @@ class Materia(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, index=True, nullable=False)
+    codigo = Column(String(20), nullable=True)
     carrera_id = Column(Integer, ForeignKey("carreras.id"), nullable=True)
     anio = Column(Integer, default=1)
     semestre = Column(Integer, default=1)
@@ -17,4 +18,5 @@ class Materia(Base):
 
     __table_args__ = (
         UniqueConstraint("nombre", "carrera_id", name="uq_materia_nombre_carrera"),
+        UniqueConstraint("carrera_id", "codigo", name="uq_materia_codigo_carrera"),
     )

@@ -3,31 +3,14 @@ import { getCurrentUser, emitToast } from '../lib/api'
 import { crearSolicitudEquivalencia, getEquivalenciasAlumno,
   type SolicitudEquivalencia } from '../services/equivalenciasService'
 
-const css = `
-  .eq-title { font-size:22px; font-weight:800; margin-bottom:20px; color:var(--text-primary); }
-  .eq-card {
-    background:var(--bg-elevated); border:1px solid var(--border-subtle);
-    border-radius:16px; padding:18px 22px; margin-bottom:12px;
+const badgeEstilo = (estado: string) => {
+  const colores: Record<string, { bg: string; color: string }> = {
+    pendiente: { bg: 'var(--warning-subtle)', color: 'var(--warning)' },
+    resuelta: { bg: 'var(--success-subtle)', color: 'var(--success)' },
+    rechazada: { bg: 'var(--danger-subtle)', color: 'var(--danger)' },
   }
-  .eq-select, .eq-input {
-    padding:8px 12px; border-radius:10px; font-size:13px;
-    background:var(--bg-base); border:1px solid var(--border-subtle);
-    color:var(--text-primary); width:100%; margin-bottom:12px;
-  }
-  .eq-btn {
-    padding:8px 18px; border-radius:10px; font-size:13px; font-weight:700;
-    border:none; cursor:pointer; background:var(--accent-bright); color:#fff;
-  }
-  .eq-btn:disabled { opacity:.5; cursor:not-allowed; }
-  .eq-label { font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:4px; }
-  .eq-badge {
-    padding:4px 12px; border-radius:999px; font-size:11px; font-weight:700;
-    text-transform:uppercase; letter-spacing:.05em;
-  }
-  .eq-badge.pendiente { background:rgba(245,158,11,.15); color:#f59e0b; }
-  .eq-badge.resuelta { background:rgba(16,185,129,.15); color:#10b981; }
-  .eq-badge.rechazada { background:rgba(239,68,68,.15); color:#ef4444; }
-`
+  return colores[estado] ?? colores.pendiente
+}
 
 export default function EquivalenciasAlumno() {
   const [solicitudes, setSolicitudes] = useState<SolicitudEquivalencia[]>([])
@@ -60,41 +43,71 @@ export default function EquivalenciasAlumno() {
 
   return (
     <div>
-      <style>{css}</style>
-      <h2 className="eq-title">Equivalencias</h2>
+      <h1 className="page-title" style={{ marginBottom: 4 }}>🔄 Equivalencias</h1>
+      <p className="page-subtitle" style={{ marginBottom: 20 }}>
+        Solicitá equivalencias o convalidaciones de materias cursadas en otras instituciones.
+      </p>
 
-      <div className="eq-card">
-        <h3 style={{fontWeight:700, marginBottom:12}}>Nueva solicitud</h3>
-        <div className="eq-label">Tipo</div>
-        <select className="eq-select" value={tipo} onChange={e => setTipo(e.target.value)}>
-          <option value="equivalencia">Equivalencia</option>
-          <option value="convalidacion">Convalidación</option>
-        </select>
-        <div className="eq-label">Universidad de origen</div>
-        <input className="eq-input" value={universidad}
-          onChange={e => setUniversidad(e.target.value)} placeholder="Ej: UNIOESTE" />
-        <button className="eq-btn" onClick={solicitar} disabled={loading}>
-          {loading ? 'Enviando...' : 'Solicitar'}
+      {/* Formulario de nueva solicitud */}
+      <div className="card" style={{ maxWidth: 520, marginBottom: 24 }}>
+        <h3 style={{ fontWeight: 700, marginBottom: 16, fontSize: 15 }}><i className="ti ti-plus" style={{ color: 'var(--accent-bright)' }} /> Nueva Solicitud</h3>
+
+        <div style={{ marginBottom: 14 }}>
+          <span className="mono-label" style={{ marginBottom: 6, display: 'block' }}>Tipo</span>
+          <select className="input-uca" value={tipo} onChange={e => setTipo(e.target.value)}>
+            <option value="equivalencia">Equivalencia</option>
+            <option value="convalidacion">Convalidación</option>
+            <option value="homologacion">Homologación</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <span className="mono-label" style={{ marginBottom: 6, display: 'block' }}>Universidad de Origen</span>
+          <input className="input-uca" value={universidad}
+            onChange={e => setUniversidad(e.target.value)} placeholder="Ej: UNIOESTE, UNA, ..." />
+        </div>
+
+        <button type="button" className="btn-primary" onClick={solicitar} disabled={loading}>
+          {loading ? 'Enviando...' : '📤 Solicitar Equivalencia'}
         </button>
       </div>
 
-      <h3 style={{fontWeight:700, margin:'20px 0 12px', fontSize:16}}>Mis solicitudes</h3>
-      {solicitudes.length === 0 && (
-        <div className="eq-card" style={{textAlign:'center', color:'var(--text-secondary)'}}>
-          No tenés solicitudes de equivalencia.
+      {/* Lista de solicitudes */}
+      <h3 style={{ fontWeight: 700, marginBottom: 12, fontSize: 16, color: 'var(--text-primary)' }}>
+        <i className="ti ti-history" style={{ color: 'var(--accent-bright)' }} /> Mis Solicitudes
+      </h3>
+
+      {loading && solicitudes.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-secondary)' }}>Cargando...</div>
+      ) : solicitudes.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          <i className="ti ti-shuffle-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>
+            No tenés solicitudes de equivalencia aún.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {solicitudes.map(s => {
+            const b = badgeEstilo(s.estado)
+            return (
+              <div key={s.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, textTransform: 'capitalize' }}>{s.tipo}</div>
+                  {s.universidad_origen && (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                      <i className="ti ti-building" style={{ marginRight: 4 }} />{s.universidad_origen}
+                    </div>
+                  )}
+                </div>
+                <span className="badge" style={{ background: b.bg, color: b.color }}>
+                  {s.estado === 'resuelta' ? 'Aprobada' : s.estado === 'rechazada' ? 'Rechazada' : 'Pendiente'}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
-      {solicitudes.map(s => (
-        <div key={s.id} className="eq-card">
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <div>
-              <strong>{s.tipo}</strong>
-              {s.universidad_origen && <span style={{fontSize:12, color:'var(--text-secondary)', marginLeft:8}}>{s.universidad_origen}</span>}
-            </div>
-            <span className={`eq-badge ${s.estado}`}>{s.estado}</span>
-          </div>
-        </div>
-      ))}
     </div>
   )
 }

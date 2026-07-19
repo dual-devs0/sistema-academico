@@ -42,7 +42,8 @@ const css = `
     text-transform:uppercase; letter-spacing:.05em;
   }
   .ps-badge.pendiente { background:rgba(245,158,11,.15); color:#f59e0b; }
-  .ps-badge.aprobada { background:rgba(16,185,129,.15); color:#10b981; }
+  .ps-badge.en_curso { background:rgba(59,130,246,.15); color:#3b82f6; }
+  .ps-badge.completada { background:rgba(16,185,129,.15); color:#10b981; }
   .ps-badge.rechazada { background:rgba(239,68,68,.15); color:#ef4444; }
   .ps-btn {
     padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700;
@@ -87,24 +88,25 @@ const css = `
   .ps-detail-value { color:var(--text-primary); text-align:right; }
 `
 
-const TABS = ['pendientes', 'aprobadas', 'rechazadas', 'todas'] as const
+const TABS = ['pendiente', 'en_curso', 'completada', 'rechazada', 'todas'] as const
 type Tab = typeof TABS[number]
 
 const TAB_LABELS: Record<Tab, string> = {
-  pendientes: 'Pendientes',
-  aprobadas: 'Aprobadas',
-  rechazadas: 'Rechazadas',
+  pendiente: 'Pendientes',
+  en_curso: 'En curso',
+  completada: 'Completadas',
+  rechazada: 'Rechazadas',
   todas: 'Todas',
 }
 
 function estadoLabel(e: string) {
-  return e.charAt(0).toUpperCase() + e.slice(1)
+  return (TAB_LABELS as Record<string, string>)[e] ?? e.charAt(0).toUpperCase() + e.slice(1)
 }
 
 export default function PasantiasAdmin() {
   const [pasantias, setPasantias] = useState<PasantiaSolicitud[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('pendientes')
+  const [tab, setTab] = useState<Tab>('pendiente')
   const [selected, setSelected] = useState<PasantiaSolicitud | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [showApprove, setShowApprove] = useState(false)
@@ -232,7 +234,7 @@ export default function PasantiasAdmin() {
               {filtered.map(p => (
                 <tr key={p.id}>
                   <td>#{p.alumno_id}</td>
-                  <td>#{p.empresa_id}</td>
+                  <td>{p.empresa_nombre ?? `#${p.empresa_id}`}</td>
                   <td>{p.fecha_solicitud ? new Date(p.fecha_solicitud).toLocaleDateString('es-PY') : '—'}</td>
                   <td><span className={`ps-badge ${p.estado}`}>{estadoLabel(p.estado)}</span></td>
                   <td>
@@ -265,7 +267,7 @@ export default function PasantiasAdmin() {
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Empresa</span>
-                <span className="ps-detail-value">#{selected.empresa_id}</span>
+                <span className="ps-detail-value">{selected.empresa_nombre ?? `#${selected.empresa_id}`}</span>
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Fecha solicitud</span>
@@ -295,7 +297,7 @@ export default function PasantiasAdmin() {
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Tutor académico</span>
-                <span className="ps-detail-value">{selected.tutor_academico_id ? `#${selected.tutor_academico_id}` : '—'}</span>
+                <span className="ps-detail-value">{selected.tutor_nombre ?? (selected.tutor_academico_id ? `#${selected.tutor_academico_id}` : '—')}</span>
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Estado</span>
@@ -318,7 +320,7 @@ export default function PasantiasAdmin() {
                   <button className="ps-btn danger" onClick={() => openRejectModal(selected)}>Rechazar</button>
                 </>
               )}
-              {selected.estado === 'aprobada' && (
+              {selected.estado === 'en_curso' && (
                 <button
                   className="ps-btn primary"
                   disabled={finalizando === selected.id}

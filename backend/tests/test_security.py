@@ -449,6 +449,28 @@ def test_password_reset_rate_limit(client, seed):
     assert res.status_code == 429
 
 
+# ===================== SOLICITUD DE REGISTRO (activación de cuenta) =====================
+
+
+def test_registro_activa_cuenta_con_documento_y_matricula(client, seed, db):
+    seed["alumno"].cedula = "1234567"
+    db.commit()
+
+    res = client.post(
+        "/auth/registro",
+        json={"documento": "1234567", "matricula": "alumno_test"},
+    )
+    assert res.status_code == 200
+
+
+def test_registro_con_datos_incorrectos_da_404(client, seed):
+    res = client.post(
+        "/auth/registro",
+        json={"documento": "0000000", "matricula": "no_existe"},
+    )
+    assert res.status_code == 404
+
+
 # ===================== AUTH ENDPOINTS =====================
 
 

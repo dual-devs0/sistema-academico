@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { api, decodeToken } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
 
@@ -429,8 +429,7 @@ const cssProg = `
 type ProgramaUnit = { titulo: string; descripcion: string; semana: number }
 
 function ProfesorProgramaView() {
-  const token = sessionStorage.getItem('token')
-  const user  = token ? decodeToken(token) : null
+  const user  = getCurrentUser()
   const uid   = Number(user?.user_id)
 
   const [materias,   setMaterias]   = useState<{ id: number; nombre: string }[]>([])
@@ -595,8 +594,7 @@ function ProfesorProgramaView() {
 }
 
 export default function Programa() {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
+  const user = getCurrentUser()
   const ROL = user?.role || 'alumno'
 
   const [data,       setData]       = useState<MateriaTemario[]>([])

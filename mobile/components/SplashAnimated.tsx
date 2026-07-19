@@ -1,182 +1,199 @@
-import { colors } from "../constants/design";
-import { useTheme } from "../hooks/useTheme";
-import { useEffect, useRef } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef } from "react";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
-  FadeIn,
-  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import { fontFamily, fontSize, spacing } from "../constants/design";
+import { LinearGradient } from "expo-linear-gradient";
+import LottieView from "lottie-react-native";
 
-/**
- * Splash animada — sustituye el SplashScreen nativo de Expo una vez que
- * los assets JS están listos. Secuencia total ~2.2s, dispara `onFinish()`
- * a los 2000ms (después del delay+duration de cada elemento, con margen).
- *
- * Timeline (ms desde el mount):
- *   0    fondo #0a0e17 sólido
- *   200  logo: FadeIn + scale 0.8→1.0, Easing.out(cubic), 600ms
- *   700  "UCA Académico": FadeInDown, 400ms
- *   800  partícula 1: FadeIn
- *   900  partícula 2: FadeIn + "Universidad Católica · Caacupé": FadeIn, 300ms
- *   1000 partícula 3: FadeIn + línea cian: width 0→120, 400ms
- *   2000 onFinish()
- */
+const { width: W, height: H } = Dimensions.get("window");
+
 interface SplashAnimatedProps {
   onFinish: () => void;
 }
 
 export function SplashAnimated({ onFinish }: SplashAnimatedProps) {
-  const { colors } = useTheme();
-const logoScale = useSharedValue(0.8);
-  const lineWidth = useSharedValue(0);
   const finishedRef = useRef(false);
 
+  // Title anims — appear after Lottie plays
+  const titleOpacity = useSharedValue(0);
+  const titleY = useSharedValue(20);
+  const subtitleOpacity = useSharedValue(0);
+  const subtitleY = useSharedValue(16);
+
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: titleOpacity.value,
+    transform: [{ translateY: titleY.value }],
+  }));
+
+  const subtitleStyle = useAnimatedStyle(() => ({
+    opacity: subtitleOpacity.value,
+    transform: [{ translateY: subtitleY.value }],
+  }));
+
+  const handleFinish = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    onFinish();
+  }, [onFinish]);
+
+  // Lottie animation duration is ~3.5s (105 frames @ 30fps)
+  // Total splash timing:
+  //   0-3.5s   Lottie plays (book rising, opening, star, glow)
+  //   3.2s     Title starts fading in (overlapping with end of Lottie)
+  //   3.6s     Subtitle fades in
+  //   4.5s     Call onFinish
   useEffect(() => {
-    logoScale.value = withDelay(
-      200,
-      withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) }),
+    // Start title animations after Lottie is mostly done
+    titleOpacity.value = withDelay(
+      3200,
+      withTiming(1, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
     );
-    lineWidth.value = withDelay(
-      1000,
-      withTiming(120, { duration: 400, easing: Easing.out(Easing.cubic) }),
+    titleY.value = withDelay(
+      3200,
+      withTiming(0, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
     );
 
-    const timer = setTimeout(() => {
-      if (!finishedRef.current) {
-  const { colors } = useTheme();
-        finishedRef.current = true;
-        onFinish();
-      }
-    }, 2000);
+    subtitleOpacity.value = withDelay(
+      3600,
+      withTiming(1, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+    );
+    subtitleY.value = withDelay(
+      3600,
+      withTiming(0, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+    );
 
+    // Overall timeout — safety net in case Lottie callback doesn't fire
+    const timer = setTimeout(() => handleFinish(), 4800);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const logoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: logoScale.value }],
-  }));
-
-  const lineStyle = useAnimatedStyle(() => ({
-    width: lineWidth.value,
-  }));
+  }, [titleOpacity, titleY, subtitleOpacity, subtitleY, handleFinish]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.center}>
-        <View style={styles.logoWrap}>
-          <Animated.View
-            entering={FadeIn.delay(200).duration(600).easing(Easing.out(Easing.cubic))}
-            style={[styles.logoAnimatedWrap, logoStyle]}
-          >
-            <Image
-              source={require("../assets/uc-logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
+      {/* Background gradient */}
+      <LinearGradient
+        colors={["#132852", "#1a3569", "#0d1b33"]}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFill}
+      />
 
-          <Particle style={{ top: -8, left: -8 }} delay={800} />
-          <Particle style={{ top: -8, right: -8 }} delay={900} />
-          <Particle style={{ bottom: -8, left: "50%", marginLeft: -2 }} delay={1000} />
-        </View>
+      {/* Floating background particles with subtle Reanimated drift */}
+      {[...Array(6)].map((_, i) => (
+        <FloatingParticle key={i} index={i} />
+      ))}
 
-        <Animated.Text
-          entering={FadeInDown.delay(700).duration(400).easing(Easing.out(Easing.cubic))}
-          style={styles.title}
-        >
-          UCA Académico
+      {/* Lottie animation — book rising, opening, star, glow */}
+      <View style={styles.lottieWrapper}>
+        <LottieView
+          source={require("../assets/splash-animation.json")}
+          autoPlay
+          loop={false}
+          resizeMode="contain"
+          style={styles.lottie}
+          onAnimationFinish={handleFinish}
+        />
+      </View>
+
+      {/* Title & Subtitle — rendered on top of the Lottie canvas */}
+      <View style={styles.textContainer}>
+        <Animated.Text style={[styles.title, titleStyle]}>
+          Sistema Académico
         </Animated.Text>
-
-        <Animated.Text
-          entering={FadeIn.delay(900).duration(300)}
-          style={styles.subtitle}
-        >
-          Universidad Católica · Caacupé
+        <Animated.Text style={[styles.subtitle, subtitleStyle]}>
+          UCA Caacupé
         </Animated.Text>
-
-        <Animated.View style={[styles.line, lineStyle]} />
       </View>
     </View>
   );
 }
 
-function Particle({
-  style,
-  delay,
-}: {
-  style: React.ComponentProps<typeof View>["style"];
-  delay: number;
-}) {
-  const { colors } = useTheme();
+// ─── Floating Particles ──────────────────────────────────────────────────────
+
+const PARTICLE_POSITIONS: Record<string, string>[] = [
+  { top: "12%", left: "18%" },
+  { top: "20%", right: "22%" },
+  { bottom: "28%", left: "14%" },
+  { top: "55%", right: "12%" },
+  { bottom: "40%", left: "28%" },
+  { bottom: "15%", right: "30%" },
+];
+
+function FloatingParticle({ index }: { index: number }) {
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const op = useSharedValue(0.1);
+
+  useEffect(() => {
+    const delay = index * 600;
+    x.value = withDelay(delay, withTiming(12, { duration: 4000, easing: Easing.inOut(Easing.sin) }));
+    y.value = withDelay(delay, withTiming(-18, { duration: 5000, easing: Easing.inOut(Easing.sin) }));
+    op.value = withDelay(delay, withTiming(0.35, { duration: 2500 }));
+  }, [index, x, y, op]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }, { translateY: y.value }],
+    opacity: op.value,
+  }));
 
   return (
     <Animated.View
-      entering={FadeIn.delay(delay).duration(300)}
-      style={[styles.particle, style]}
+      style={[styles.particle, PARTICLE_POSITIONS[index] as Record<string, string>, style]}
     />
   );
 }
 
-const LOGO_SIZE = 120;
+// ─── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  lottieWrapper: {
+    width: W * 0.7,
+    height: H * 0.55,
     alignItems: "center",
     justifyContent: "center",
   },
-  center: {
+  lottie: {
+    width: "100%",
+    height: "100%",
+  },
+  textContainer: {
+    position: "absolute",
+    bottom: H * 0.16,
     alignItems: "center",
+    gap: 6,
   },
-  logoWrap: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-    marginBottom: spacing.xl,
+  title: {
+    color: "#ffffff",
+    fontSize: 25,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textShadowColor: "rgba(255,255,255,0.12)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 24,
   },
-  logoAnimatedWrap: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-  },
-  logo: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
+  subtitle: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 16,
+    fontWeight: "400",
+    letterSpacing: 2,
+    textShadowColor: "rgba(255,255,255,0.06)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
   },
   particle: {
     position: "absolute",
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.cyan,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontFamily: fontFamily.interBold,
-    fontSize: fontSize.headlineLg,
-  },
-  subtitle: {
-    color: colors.cyan,
-    fontFamily: fontFamily.inter,
-    fontSize: fontSize.caption,
-    letterSpacing: 1,
-    marginTop: spacing.xs,
-  },
-  line: {
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: colors.cyan,
-    marginTop: spacing.lg,
-    shadowColor: colors.cyan,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 4,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.15)",
   },
 });

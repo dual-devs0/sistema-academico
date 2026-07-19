@@ -82,8 +82,6 @@ function estadoLabel(estado: string): string {
 }
 
 function parseFecha(iso: string) {
-  const { colors } = useTheme();
-
   const d = new Date(iso + "T00:00:00");
   return {
     dia: d.getDate(),
@@ -114,7 +112,6 @@ const { id } = useLocalSearchParams<{ id: string }>();
     } catch {
       const dummy = DUMMY_ASISTENCIA[Number(id)];
       if (dummy) {
-  const { colors } = useTheme();
         setRegistros(dummy.registros);
         setMateriaNombre(dummy.nombre);
       } else {

@@ -1,6 +1,6 @@
 import { colors } from "../constants/design";
 import { useTheme } from "../hooks/useTheme";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -11,8 +11,9 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, Easing } from "react-native-reanimated";
 import Svg, { Path, Circle, Polyline, Line } from "react-native-svg";
 import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { GlassCard } from "../components/ui/GlassCard";
@@ -130,6 +131,36 @@ const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  const toastStyle = useMemo(() => ({
+    position: "absolute" as const,
+    left: spacing.xl,
+    right: spacing.xl,
+    bottom: spacing["3xl"],
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: spacing.md,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    elevation: 6,
+  }), [colors]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -159,16 +190,16 @@ const router = useRouter();
     if (!data) return;
     const pendientes = data.cuotas.filter((c) => c.estado === "pendiente" || c.estado === "vencido");
     if (pendientes.length === 0) {
-  const { colors } = useTheme();
-      Alert.alert("Al día", "No tenés cuotas pendientes de pago.");
+      showToast("No tenés cuotas pendientes.");
       return;
     }
     setPaying(true);
     try {
       const url = await iniciarPagoOnline(pendientes.map((c) => c.id));
+      showToast("Redirigiendo al portal de pagos...");
       if (url) await Linking.openURL(url);
     } catch (e: any) {
-      Alert.alert("Error", "No se pudo iniciar el pago. Intentá más tarde.");
+      showToast("No se pudo iniciar el pago. Intentá más tarde.");
     } finally {
       setPaying(false);
     }
@@ -183,6 +214,7 @@ const router = useRouter();
       />
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
         refreshControl={
           <RefreshControl
@@ -206,6 +238,25 @@ const router = useRouter();
           )
         ) : null}
       </ScrollView>
+
+      {toast ? (
+        <Animated.View
+          entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}
+          exiting={FadeOut.duration(250)}
+          style={toastStyle}
+        >
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontFamily: fontFamily.interSemibold,
+              fontSize: 13.5,
+              flex: 1,
+            }}
+          >
+            {toast}
+          </Text>
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -220,9 +271,13 @@ function TabPills({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
     <View
       style={{
         flexDirection: "row",
-        gap: spacing.sm,
-        paddingHorizontal: spacing.xl,
+        marginHorizontal: spacing.xl,
         marginBottom: spacing.lg,
+        backgroundColor: colors.glassBg,
+        borderRadius: radius.pill,
+        padding: 4,
+        borderWidth: 1,
+        borderColor: colors.border,
       }}
     >
       {(["resumen", "facturas"] as const).map((t) => {
@@ -231,28 +286,52 @@ function TabPills({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
           <Pressable
             key={t}
             onPress={() => onChange(t)}
-            style={({ pressed }) => ({
-              flex: 1,
-              paddingVertical: spacing.md,
-              borderRadius: radius.pill,
-              backgroundColor: active ? colors.cyan : colors.glassBg,
-              borderWidth: 1,
-              borderColor: active ? colors.cyan : colors.border,
-              alignItems: "center",
-              opacity: pressed ? 0.85 : 1,
-            })}
+            style={{ flex: 1 }}
           >
-            <Text
-              style={{
-                color: active ? "#0a0e17" : colors.textPrimary,
-                fontFamily: active ? fontFamily.interSemibold : fontFamily.interMedium,
-                fontSize: fontSize.body,
-                letterSpacing: 0.5,
-                textTransform: "capitalize",
-              }}
-            >
-              {t}
-            </Text>
+            {active ? (
+              <LinearGradient
+                colors={["#06b6d4", "#0ea5e9"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  borderRadius: radius.pill,
+                  paddingVertical: spacing.sm,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#0a0e17",
+                    fontFamily: fontFamily.interSemibold,
+                    fontSize: fontSize.caption,
+                    letterSpacing: 0.5,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {t}
+                </Text>
+              </LinearGradient>
+            ) : (
+              <View
+                style={{
+                  borderRadius: radius.pill,
+                  paddingVertical: spacing.sm,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontFamily: fontFamily.interMedium,
+                    fontSize: fontSize.caption,
+                    letterSpacing: 0.5,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {t}
+                </Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
@@ -297,11 +376,11 @@ function ResumenTab({ data, onPagarAhora, paying }: { data: CuentaData; onPagarA
           </Text>
         </GlassCard>
       ) : (
-        <View style={{ gap: spacing.sm }}>
-          {data.cuotas.map((c) => (
-            <CuotaRow key={c.id} cuota={c} />
-          ))}
-        </View>
+          <View style={{ gap: spacing.sm }}>
+            {data.cuotas.map((c) => (
+              <CuotaRow key={c.id} cuota={c} onPress={onPagarAhora} />
+            ))}
+          </View>
       )}
 
       <SectionLabel text="Historial reciente" />
@@ -372,10 +451,9 @@ function SaldoCard({
           lineHeight: fontSize.numericLg + 4,
           marginTop: spacing.sm,
         }}
-        numberOfLines={1}
-        adjustsFontSizeToFit
       >
-        {formatGuaranies(saldo)}
+        <Text style={{ fontFamily: fontFamily.interSemibold, fontSize: fontSize.body }}>{formatGuaranies(saldo).symbol} </Text>
+        {formatGuaranies(saldo).amount}
       </Text>
 
       <View
@@ -399,16 +477,16 @@ function SaldoCard({
           >
             PAGADO
           </Text>
-          <Text
-            style={{
-              color: colors.success,
-              fontFamily: fontFamily.monoBold,
-              fontSize: fontSize.body,
-              marginTop: 2,
-            }}
-          >
-            {formatGuaranies(pagado)}
-          </Text>
+            <Text
+              style={{
+                color: colors.success,
+                fontFamily: fontFamily.monoBold,
+                fontSize: fontSize.body,
+                marginTop: 2,
+              }}
+            >
+              {formatGuaranies(pagado).symbol} {formatGuaranies(pagado).amount}
+            </Text>
         </View>
         <View>
           <Text
@@ -421,49 +499,59 @@ function SaldoCard({
           >
             VENCIDO
           </Text>
-          <Text
-            style={{
-              color: saldoVencido > 0 ? colors.error : colors.textPrimary,
-              fontFamily: fontFamily.monoBold,
-              fontSize: fontSize.body,
-              marginTop: 2,
-            }}
-          >
-            {formatGuaranies(saldoVencido)}
-          </Text>
+            <Text
+              style={{
+                color: saldoVencido > 0 ? colors.error : colors.textPrimary,
+                fontFamily: fontFamily.monoBold,
+                fontSize: fontSize.body,
+                marginTop: 2,
+              }}
+            >
+              {formatGuaranies(saldoVencido).symbol} {formatGuaranies(saldoVencido).amount}
+            </Text>
         </View>
       </View>
 
-      {/* Antes: fondo translúcido rgba(0,180,216,0.15) + borde cian —
-          se veía "apagado". Ahora sólido, igual criterio que
-          "Abrir Escáner" en el dashboard. */}
       <Pressable
         onPress={onPagar}
         disabled={paying}
         style={({ pressed }) => ({
           marginTop: spacing.lg,
-          paddingVertical: spacing.md,
-          borderRadius: radius.md,
-          backgroundColor: colors.cyan,
-          alignItems: "center",
           opacity: pressed || paying ? 0.85 : 1,
+          shadowColor: "#0ea5e9",
+          shadowOffset: { width: 0, height: 10 },
+          shadowRadius: 20,
+          shadowOpacity: 0.45,
+          elevation: 6,
         })}
       >
-        <Text
+        <LinearGradient
+          colors={paying ? ["#2a3744", "#232f3a"] : ["#06b6d4", "#0ea5e9"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={{
-            color: "#0a0e17",
-            fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.body,
+            borderRadius: 999,
+            paddingVertical: spacing.md,
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {paying ? "Procesando..." : "Pagar Ahora"}
-        </Text>
+          <Text
+            style={{
+              color: paying ? colors.textSecondary : "#0a0e17",
+              fontFamily: fontFamily.interSemibold,
+              fontSize: fontSize.body,
+            }}
+          >
+            {paying ? "Procesando..." : "Pagar Ahora"}
+          </Text>
+        </LinearGradient>
       </Pressable>
     </GlassCard>
   );
 }
 
-function CuotaRow({ cuota }: { cuota: CuotaCard }) {
+function CuotaRow({ cuota, onPress }: { cuota: CuotaCard; onPress?: () => void }) {
   const { colors } = useTheme();
 
   const variant =
@@ -479,62 +567,65 @@ function CuotaRow({ cuota }: { cuota: CuotaCard }) {
         ? "PAGADO"
         : "PENDIENTE";
   return (
-    <GlassCard contentStyle={{ padding: spacing.md }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: spacing.md,
-        }}
-      >
+    <Pressable onPress={onPress} disabled={!onPress}>
+      <GlassCard contentStyle={{ padding: spacing.md }}>
         <View
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 10,
-            backgroundColor: "rgba(59,130,246,0.15)",
+            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
+            gap: spacing.md,
           }}
         >
-          <IconReceipt color="#3b82f6" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text
+          <View
             style={{
-              color: colors.textPrimary,
-              fontFamily: fontFamily.interSemibold,
-              fontSize: fontSize.body,
-            }}
-            numberOfLines={1}
-          >
-            {cuota.concepto}
-          </Text>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontFamily: fontFamily.mono,
-              fontSize: fontSize.caption,
-              marginTop: 2,
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              backgroundColor: "rgba(59,130,246,0.15)",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            Vence {cuota.fechaVencimiento}
-          </Text>
+            <IconReceipt color="#3b82f6" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontFamily: fontFamily.interSemibold,
+                fontSize: fontSize.body,
+              }}
+              numberOfLines={1}
+            >
+              {cuota.concepto}
+            </Text>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontFamily: fontFamily.mono,
+                fontSize: fontSize.caption,
+                marginTop: 2,
+              }}
+            >
+              Vence {cuota.fechaVencimiento}
+            </Text>
+          </View>
+          <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontFamily: fontFamily.monoBold,
+                fontSize: fontSize.body,
+              }}
+            >
+              {formatGuaranies(cuota.monto).symbol} {formatGuaranies(cuota.monto).amount}
+            </Text>
+            <CyanBadge label={label} variant={variant} size="sm" />
+          </View>
+          <ChevronRight />
         </View>
-        <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontFamily: fontFamily.monoBold,
-              fontSize: fontSize.body,
-            }}
-          >
-            {formatGuaranies(cuota.monto)}
-          </Text>
-          <CyanBadge label={label} variant={variant} size="sm" />
-        </View>
-      </View>
-    </GlassCard>
+      </GlassCard>
+    </Pressable>
   );
 }
 
@@ -592,7 +683,7 @@ function TransaccionRow({ tx, last }: { tx: Transaccion; last: boolean }) {
           fontSize: fontSize.caption,
         }}
       >
-        {tx.tipo === "pago" ? "-" : "+"} {formatGuaranies(tx.monto)}
+        {tx.tipo === "pago" ? "-" : "+"} {formatGuaranies(tx.monto).symbol} {formatGuaranies(tx.monto).amount}
       </Text>
     </View>
   );
@@ -691,12 +782,12 @@ function FacturaCard({ factura }: { factura: Factura }) {
             fontSize: fontSize.body,
           }}
         >
-          {formatGuaranies(factura.monto)}
+          {formatGuaranies(factura.monto).symbol} {formatGuaranies(factura.monto).amount}
         </Text>
       </View>
       {emitida && factura.urlPdf ? (
         <Pressable
-          onPress={() => { }}
+          onPress={() => factura.urlPdf ? Linking.openURL(factura.urlPdf) : null}
           style={({ pressed }) => ({
             marginTop: spacing.md,
             paddingVertical: spacing.sm,
@@ -720,6 +811,31 @@ function FacturaCard({ factura }: { factura: Factura }) {
         </Pressable>
       ) : null}
     </GlassCard>
+  );
+}
+
+function ChevronRight() {
+  const { colors } = useTheme();
+
+  return (
+    <View
+      style={{
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1, borderColor: colors.border,
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M9 18l6-6-6-6"
+          stroke={colors.cyan}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </View>
   );
 }
 
