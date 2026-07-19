@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -8,7 +8,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import LottieView from "lottie-react-native";
 
 const { width: W, height: H } = Dimensions.get("window");
 
@@ -19,7 +18,6 @@ interface SplashAnimatedProps {
 export function SplashAnimated({ onFinish }: SplashAnimatedProps) {
   const finishedRef = useRef(false);
 
-  // Title anims — appear after Lottie plays
   const titleOpacity = useSharedValue(0);
   const titleY = useSharedValue(20);
   const subtitleOpacity = useSharedValue(0);
@@ -41,60 +39,46 @@ export function SplashAnimated({ onFinish }: SplashAnimatedProps) {
     onFinish();
   }, [onFinish]);
 
-  // Lottie animation duration is ~3.5s (105 frames @ 30fps)
-  // Total splash timing:
-  //   0-3.5s   Lottie plays (book rising, opening, star, glow)
-  //   3.2s     Title starts fading in (overlapping with end of Lottie)
-  //   3.6s     Subtitle fades in
-  //   4.5s     Call onFinish
   useEffect(() => {
-    // Start title animations after Lottie is mostly done
     titleOpacity.value = withDelay(
-      3200,
-      withTiming(1, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+      1200,
+      withTiming(1, { duration: 600, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
     );
     titleY.value = withDelay(
-      3200,
-      withTiming(0, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+      1200,
+      withTiming(0, { duration: 600, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
     );
 
     subtitleOpacity.value = withDelay(
-      3600,
-      withTiming(1, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+      1600,
+      withTiming(1, { duration: 600, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
     );
     subtitleY.value = withDelay(
-      3600,
-      withTiming(0, { duration: 700, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+      1600,
+      withTiming(0, { duration: 600, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
     );
 
-    // Overall timeout — safety net in case Lottie callback doesn't fire
-    const timer = setTimeout(() => handleFinish(), 4800);
+    const timer = setTimeout(() => handleFinish(), 2500);
     return () => clearTimeout(timer);
   }, [titleOpacity, titleY, subtitleOpacity, subtitleY, handleFinish]);
 
   return (
     <View style={styles.container}>
-      {/* Background gradient */}
       <LinearGradient
         colors={["#132852", "#1a3569", "#0d1b33"]}
         locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Floating background particles with subtle Reanimated drift */}
       {[...Array(6)].map((_, i) => (
         <FloatingParticle key={i} index={i} />
       ))}
 
-      {/* Lottie animation — book rising, opening, star, glow */}
-      <View style={styles.lottieWrapper}>
-        <LottieView
-          source={require("../assets/splash-animation.json")}
-          autoPlay
-          loop={false}
+      <View style={styles.logoWrapper}>
+        <Image
+          source={require("../assets/splash-icon.png")}
+          style={styles.logo}
           resizeMode="contain"
-          style={styles.lottie}
-          onAnimationFinish={handleFinish}
         />
       </View>
 
@@ -155,13 +139,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  lottieWrapper: {
-    width: W * 0.7,
-    height: H * 0.55,
+  logoWrapper: {
+    width: W * 0.5,
+    height: H * 0.25,
     alignItems: "center",
     justifyContent: "center",
   },
-  lottie: {
+  logo: {
     width: "100%",
     height: "100%",
   },

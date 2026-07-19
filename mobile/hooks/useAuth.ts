@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { AppState } from "react-native";
 import { configureApi } from "../services/api";
 import {
   loginRequest,
@@ -16,15 +15,6 @@ import {
   refreshRequest,
   type LoginPayload,
 } from "../services/authService";
-
-/**
- * Estado global de autenticación — sesión en memoria ÚNICAMENTE.
- *
- * - `access_token` y `refresh_token` viven solo en refs, nunca se persisten.
- * - Al cerrar la app se pierde todo → siempre pide login al reabrir.
- * - Mientras la app está abierta, el refresh silencioso funciona con el
- *   refresh_token en memoria.
- */
 
 type Status = "loading" | "auth" | "anon";
 
@@ -71,23 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const firstActive = useRef(true);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (next) => {
-      if (firstActive.current) {
-        firstActive.current = false;
-        return;
-      }
-      if (next === "active") {
-        accessRef.current = null;
-        refreshRef.current = null;
-        setStatus("anon");
-      }
-    });
-    return () => sub.remove();
   }, []);
 
   const auth = useMemo<AuthState>(

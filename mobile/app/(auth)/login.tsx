@@ -232,6 +232,7 @@ export default function LoginScreen() {
       setWelcomeName(name);
       setWelcomeCarrera(carrera);
       setLoginSuccess(true);
+      setSubmitting(false);
       welcomeTimer.current = setTimeout(() => confirmAuth(), 2200);
     } catch (err) {
       const axErr = err as AxiosError<{ detail?: string }>;
