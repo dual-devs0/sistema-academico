@@ -30,6 +30,8 @@ def list_apuntes(
     aprobado: Optional[bool] = Query(None),
     tipo_contenido: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -48,7 +50,7 @@ def list_apuntes(
                 models.apunte.Apunte.descripcion.ilike(f"%{q}%"),
             )
         )
-    return query.all()
+    return query.offset(skip).limit(limit).all()
 
 
 @router.get("/{apunte_id}", response_model=schemas.apunte.ApunteOut)

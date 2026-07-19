@@ -11,14 +11,12 @@ class Apunte(Base):
     materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    archivo_url = Column(
-        Text, nullable=True
-    )  # legacy; usar storage_key para archivos nuevos
-    storage_key = Column(Text, nullable=True)  # key en R2, servir con URL firmada
-    tags = Column(Text, nullable=True)  # comma-separated
+    archivo_url = Column(Text, nullable=True)
+    storage_key = Column(Text, nullable=True)
+    tags = Column(Text, nullable=True)
     aprobado = Column(Boolean, default=False)
     tipo_contenido = Column(String(50), default="pdf")
     likes = Column(Integer, default=0)
     descargas = Column(Integer, default=0)
     visibilidad = Column(String(20), default="publico")
-    fecha_subida = Column(DateTime, server_default=func.now())
+    fecha_subida = Column(DateTime(timezone=True), server_default=func.now())

@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import * as SecureStore from "expo-secure-store";
 import { configureApi } from "../services/api";
 import {
   loginRequest,
@@ -17,52 +16,17 @@ import {
   type LoginPayload,
 } from "../services/authService";
 
-/**
- * Estado global de autenticación.
- *
- * - `accessToken` vive solo en memoria (ref, no state — evita re-renders al
- *   rotarlo). Se inyecta en cada request vía interceptor de api.ts.
- * - `refresh_token` se persiste en SecureStore (kSecAttrAccessibleAfterFirstUnlock
- *   en iOS; EncryptedSharedPreferences en Android).
- * - Al bootear la app, si hay refresh guardado se intenta canjear por access
- *   nuevo. Si falla → sesión anónima.
- */
-
 type Status = "loading" | "auth" | "anon";
-
-const REFRESH_KEY = "uca.refresh_token";
 
 interface AuthState {
   status: Status;
   login: (payload: LoginPayload) => Promise<void>;
   logout: () => Promise<void>;
+  setTokens: (access: string, refresh?: string) => void;
+  confirmAuth: () => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
-
-async function secureDelete(key: string): Promise<void> {
-  try {
-    await SecureStore.deleteItemAsync(key);
-  } catch {
-    // silenciar — SecureStore lanza si la clave no existe en algunas versiones
-  }
-}
-
-async function secureSet(key: string, value: string): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(key, value);
-  } catch {
-    // silenciar — no bloquear login por falla del keychain
-  }
-}
-
-async function secureGet(key: string): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(key);
-  } catch {
-    return null;
-  }
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
@@ -78,52 +42,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessRef.current = token;
       },
       refresh: async () => {
-        const stored = refreshRef.current;
-        const res = await refreshRequest(stored);
+        const res = await refreshRequest(refreshRef.current);
         accessRef.current = res.access_token;
         if (res.refresh_token) {
           refreshRef.current = res.refresh_token;
-          await secureSet(REFRESH_KEY, res.refresh_token);
         }
         return res.access_token;
       },
       onAuthFailed: () => {
         accessRef.current = null;
         refreshRef.current = null;
-        void secureDelete(REFRESH_KEY);
         if (mounted) setStatus("anon");
       },
     });
 
-    (async () => {
-      const stored = await secureGet(REFRESH_KEY);
-      if (!stored) {
-        if (mounted) setStatus("anon");
-        return;
-      }
-      refreshRef.current = stored;
-      try {
-        const res = await refreshRequest(stored);
-        accessRef.current = res.access_token;
-        if (res.refresh_token) {
-          refreshRef.current = res.refresh_token;
-          await secureSet(REFRESH_KEY, res.refresh_token);
-        }
-        if (mounted) setStatus("auth");
-      } catch {
-        accessRef.current = null;
-        refreshRef.current = null;
-        await secureDelete(REFRESH_KEY);
-        if (mounted) setStatus("anon");
-      }
-    })();
+    if (mounted) setStatus("anon");
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const value = useMemo<AuthState>(
+  const auth = useMemo<AuthState>(
     () => ({
       status,
       login: async (payload) => {
@@ -131,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessRef.current = res.access_token;
         if (res.refresh_token) {
           refreshRef.current = res.refresh_token;
-          await secureSet(REFRESH_KEY, res.refresh_token);
         }
         setStatus("auth");
       },
@@ -139,18 +78,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await logoutRequest();
         } catch {
-          // sesión ya inválida en server — seguimos limpiando local
+          // sesión ya inválida en server
         }
         accessRef.current = null;
         refreshRef.current = null;
-        await secureDelete(REFRESH_KEY);
         setStatus("anon");
+      },
+      setTokens: (access, refresh) => {
+        accessRef.current = access;
+        if (refresh) refreshRef.current = refresh;
+      },
+      confirmAuth: () => {
+        setStatus("auth");
       },
     }),
     [status],
   );
 
-  return createElement(AuthContext.Provider, { value }, children);
+  return createElement(AuthContext.Provider, { value: auth }, children);
 }
 
 export function useAuth(): AuthState {

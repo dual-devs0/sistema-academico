@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -17,9 +18,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import Animated, {
   FadeIn,
   FadeOut,
+  Easing,
   Layout,
-  SlideInLeft,
-  SlideInRight,
   ZoomIn,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,7 +28,8 @@ import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { AxiosError } from "axios";
 import { useAuth } from "../../hooks/useAuth";
-import { recuperarContrasenaRequest, registroRequest } from "../../services/authService";
+import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
+import { fetchPerfil } from "../../services/dashboardService";
 import { fontFamily, spacing } from "../../constants/design";
 
 // ---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ type BioType = "Face ID" | "Huella digital" | "Biométrico";
 const TITLE = "PORTAL ACADÉMICO";
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { setTokens, confirmAuth } = useAuth();
 
   const [screen, setScreen] = useState<Screen>("main");
   const [tab, setTab] = useState<Tab>("login");
@@ -174,12 +175,15 @@ export default function LoginScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const [bioType, setBioType] = useState<BioType>("Biométrico");
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+  const [welcomeCarrera, setWelcomeCarrera] = useState<string | null>(null);
 
   const [fpDoc, setFpDoc] = useState("");
   const [fpMatricula, setFpMatricula] = useState("");
   const [fpSending, setFpSending] = useState(false);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const welcomeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const passwordRef = useRef<TextInput>(null);
 
   function showToast(msg: string) {
@@ -188,7 +192,10 @@ export default function LoginScreen() {
     toastTimer.current = setTimeout(() => setToast(null), 3500);
   }
 
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    if (welcomeTimer.current) clearTimeout(welcomeTimer.current);
+  }, []);
 
   useEffect(() => {
     LocalAuthentication.supportedAuthenticationTypesAsync().then((types) => {
@@ -210,15 +217,26 @@ export default function LoginScreen() {
     setErrorMsg(null);
     try {
       const trimmed = username.trim();
-      await login({ username: trimmed, password });
+      const res = await loginRequest({ username: trimmed, password });
+      setTokens(res.access_token, res.refresh_token);
       try {
         await SecureStore.setItemAsync(SAVED_CREDENTIALS_KEY, JSON.stringify({ username: trimmed, password }));
       } catch { /* silent */ }
+      let name = trimmed;
+      let carrera: string | null = null;
+      try {
+        const profile = await fetchPerfil();
+        if (profile.nombre) name = profile.nombre;
+        carrera = profile.carrera_nombre;
+      } catch { /* usa fallback */ }
+      setWelcomeName(name);
+      setWelcomeCarrera(carrera);
       setLoginSuccess(true);
+      setSubmitting(false);
+      welcomeTimer.current = setTimeout(() => confirmAuth(), 2200);
     } catch (err) {
       const axErr = err as AxiosError<{ detail?: string }>;
       setErrorMsg(axErr.response?.data?.detail ?? "No se pudo iniciar sesión. Verificá los datos.");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -287,8 +305,19 @@ export default function LoginScreen() {
       setSubmitting(true);
       setErrorMsg(null);
       try {
-        await login(creds);
+        const res = await loginRequest(creds);
+        setTokens(res.access_token, res.refresh_token);
+        let name = creds.username;
+        let carrera: string | null = null;
+        try {
+          const profile = await fetchPerfil();
+          if (profile.nombre) name = profile.nombre;
+          carrera = profile.carrera_nombre;
+        } catch { /* usa fallback */ }
+        setWelcomeName(name);
+        setWelcomeCarrera(carrera);
         setLoginSuccess(true);
+        welcomeTimer.current = setTimeout(() => confirmAuth(), 2200);
       }
       catch { showToast("No se pudo iniciar sesión con las credenciales guardadas"); }
       finally { setSubmitting(false); }
@@ -359,7 +388,7 @@ export default function LoginScreen() {
                 {tab === "login" ? (
                   <Animated.View
                     key="login-form"
-                    entering={SlideInLeft.duration(220)}
+                    entering={FadeIn.duration(200)}
                     exiting={FadeOut.duration(150)}
                     style={{ gap: spacing.md }}
                   >
@@ -428,7 +457,7 @@ export default function LoginScreen() {
                 ) : (
                   <Animated.View
                     key="register-form"
-                    entering={SlideInRight.duration(220)}
+                    entering={FadeIn.duration(200)}
                     exiting={FadeOut.duration(150)}
                     style={{ gap: spacing.md }}
                   >
@@ -580,8 +609,8 @@ export default function LoginScreen() {
 
       {toast ? (
         <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(200)}
+          entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}
+          exiting={FadeOut.duration(250)}
           style={{
             position: "absolute",
             left: spacing.xl,
@@ -604,27 +633,105 @@ export default function LoginScreen() {
         </Animated.View>
       ) : null}
 
-      {loginSuccess ? (
-        <Animated.View
-          entering={FadeIn.duration(250)}
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: P.navy,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: spacing.md,
-          }}
-        >
-          <Animated.View entering={ZoomIn.duration(350).springify()}>
-            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: "rgba(56,189,248,0.15)", alignItems: "center", justifyContent: "center" }}>
-              <CheckIcon />
-            </View>
-          </Animated.View>
-          <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 20 }}>¡Bienvenido!</Text>
+      {loginSuccess ? <WelcomeOverlay name={welcomeName} carrera={welcomeCarrera} /> : null}
+    </WaveBackground>
+  );
+}
+
+const welcomeOverlayStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: P.navy,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    zIndex: 999,
+  },
+  iconCircle: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: "rgba(56,189,248,0.08)",
+    borderWidth: 2,
+    borderColor: "rgba(56,189,248,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+function WelcomeOverlay({ name, carrera }: { name: string; carrera: string | null }) {
+  return (
+    <Animated.View
+      entering={FadeIn.duration(300)}
+      style={welcomeOverlayStyles.overlay}
+    >
+      <Animated.View entering={ZoomIn.duration(500).springify().damping(15)}>
+        <View style={welcomeOverlayStyles.iconCircle}>
+          <CapIcon fill={P.accent} size={48} />
+        </View>
+      </Animated.View>
+
+      <View style={{ height: 8 }} />
+
+      <Animated.View entering={FadeIn.duration(400).delay(300)}>
+        <Text style={{
+          color: P.accent,
+          fontFamily: fontFamily.interSemibold,
+          fontSize: 13,
+          letterSpacing: 2,
+        }}>
+          BIENVENIDO
+        </Text>
+      </Animated.View>
+
+      <Animated.View entering={FadeIn.duration(500).delay(500)}>
+        <Text style={{
+          color: P.white,
+          fontFamily: fontFamily.interBold,
+          fontSize: 28,
+          textAlign: "center",
+          paddingHorizontal: 40,
+          lineHeight: 34,
+        }}>
+          {name}
+        </Text>
+      </Animated.View>
+
+      {carrera ? (
+        <Animated.View entering={FadeIn.duration(400).delay(700)}>
+          <Text style={{
+            color: P.mutedText,
+            fontFamily: fontFamily.inter,
+            fontSize: 15,
+            textAlign: "center",
+            paddingHorizontal: 40,
+          }}>
+            {carrera}
+          </Text>
         </Animated.View>
       ) : null}
-    </WaveBackground>
+
+      <View style={{ position: "absolute", bottom: 80, flexDirection: "row", gap: 10 }}>
+        <EnteringDot delay={0} />
+        <EnteringDot delay={200} />
+        <EnteringDot delay={400} />
+      </View>
+    </Animated.View>
+  );
+}
+
+function EnteringDot({ delay }: { delay: number }) {
+  return (
+    <Animated.View
+      entering={FadeIn.duration(300).delay(delay + 900)}
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: P.accent,
+      }}
+    />
   );
 }
 

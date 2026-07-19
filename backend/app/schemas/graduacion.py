@@ -61,6 +61,28 @@ class EtapaTesisOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CandidatoGraduacionOut(BaseModel):
+    alumno_id: int
+    nombre: str
+    username: str
+    carrera_id: Optional[int]
+    carrera_nombre: Optional[str]
+    creditos_aprobados: int
+    creditos_totales: int
+    ppa_actual: Optional[float]
+    ppa_minimo: float
+    pasantia_completada: bool
+    tesina_estado: Optional[str] = None
+    proceso_id: Optional[int] = None
+    proceso_estado: Optional[str] = None
+    estado_candidato: str  # 'elegible' | 'pendiente' | 'verificado'
+
+
+class CandidatosGraduacionPageOut(BaseModel):
+    items: list[CandidatoGraduacionOut]
+    total: int
+
+
 class VerificacionSolvenciaOut(BaseModel):
     id: int
     proceso_id: int

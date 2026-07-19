@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { decodeToken, emitToast } from '../lib/api'
+import { getCurrentUser, emitToast } from '../lib/api'
 import {
   getCatalogoBecas,
   postularBeca,
@@ -14,8 +14,7 @@ import {
 type Tab = 'catalogo' | 'postulaciones' | 'activas'
 
 export default function BecasAlumno() {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
+  const user = getCurrentUser()
   const userId = Number(user?.user_id ?? 0)
 
   const [tab, setTab] = useState<Tab>('catalogo')
@@ -50,18 +49,9 @@ export default function BecasAlumno() {
 
   return (
     <div>
-      <style>{`
-        .bc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; }
-        .bc-card { background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:14px; padding:18px 20px; }
-        .bc-card:hover { border-color:var(--accent-hover); }
-        .bc-icon { font-size:24px; }
-        .bc-muted { color:var(--text-muted); font-size:11.5px; }
-        .bc-tag { display:inline-block; background:var(--accent-muted); color:var(--accent-bright); font-family:var(--font-mono); font-size:9.5px; font-weight:700; border-radius:999px; padding:3px 10px; }
-      `}</style>
-
       <h1 className="page-title" style={{ marginBottom: 4 }}>Becas y Ayudas</h1>
       <p className="page-subtitle" style={{ marginBottom: 20 }}>
-        Postulate a becas disponibles y gestiona tus beneficios
+        Postulate a becas disponibles y gestioná tus beneficios
       </p>
 
       <div className="line-tabs" style={{ marginBottom: 20 }}>
@@ -97,23 +87,23 @@ export default function BecasAlumno() {
               </p>
             </div>
           ) : (
-            <div className="bc-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14 }}>
               {catalogoFiltrado.map(beca => {
                 const yaActiva = becasActivas.some(a => a.beca_nombre === beca.nombre)
                 const sinCupos = beca.cupos_disponibles !== null && beca.cupos_disponibles <= 0
                 return (
-                  <div key={beca.id} className="bc-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div key={beca.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 15 }}>{beca.nombre}</div>
-                        <span className="bc-tag">{beca.fuente.nombre}</span>
+                        <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>{beca.fuente.nombre}</span>
                       </div>
-                      <span className="bc-icon">{beca.fuente.es_externa ? '🏦' : '🎓'}</span>
+                      <span style={{ fontSize: 24 }}>{beca.fuente.es_externa ? '🏦' : '🎓'}</span>
                     </div>
                     {beca.requisitos && (
-                      <p className="bc-muted" style={{ marginBottom: 8 }}>{beca.requisitos}</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>{beca.requisitos}</p>
                     )}
-                    <div style={{ display: 'flex', gap: 16, marginBottom: 14, fontSize: 12.5 }}>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 12.5 }}>
                       <div>
                         <span className="mono-label">Descuento</span>
                         <div style={{ fontWeight: 700 }}>{beca.porcentaje_descuento}%</div>
@@ -158,28 +148,15 @@ function MisPostulacionesTab({ userId }: { userId: number }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!userId) return
-    getBecasActivas(userId).then(activas => {
-      const fuenteIds = [...new Set(activas.map(a => a.id))]
-      Promise.all(fuenteIds.map(id =>
-        getCatalogoBecas().then(cat => cat.filter(b => b.id === id))
-      )).then(() => {
-        getCatalogoBecas().then(catalogo => {
-          const todas: Postulacion[] = []
-          Promise.all(catalogo.map(b =>
-            fetch(`/api/becas/postulaciones?fuente_id=${b.fuente_id}`, {
-              headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
-            }).then(r => r.ok ? r.json() : [])
-              .then((posts: Postulacion[]) => posts.filter((p: Postulacion) => p.alumno_id === userId))
-              .then(posts => todas.push(...posts))
-          )).then(() => {
-            todas.sort((a, b) => new Date(b.fecha_postulacion).getTime() - new Date(a.fecha_postulacion).getTime())
-            setPostulaciones(todas)
-            setLoading(false)
-          })
-        })
+    if (!userId) { setLoading(false); return }
+    // Usamos el nuevo endpoint backend /becas/mis-postulaciones que
+    // devuelve las postulaciones del alumno autenticado directamente
+    api.get<Postulacion[]>('/becas/mis-postulaciones')
+      .then((data) => {
+        setPostulaciones(data)
       })
-    }).catch(() => setLoading(false))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [userId])
 
   if (loading) return <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Cargando...</p>
@@ -205,14 +182,13 @@ function MisPostulacionesTab({ userId }: { userId: number }) {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className={`badge ${p.estado === 'aprobada' ? '' : p.estado === 'rechazada' ? '' : ''}`}
-              style={{
-                background: p.estado === 'aprobada' ? 'rgba(16,185,129,0.12)' : p.estado === 'rechazada' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)',
-                color: p.estado === 'aprobada' ? '#10b981' : p.estado === 'rechazada' ? '#ef4444' : '#eab308',
-              }}>
+            <span className="badge" style={{
+              background: p.estado === 'aprobada' ? 'var(--success-subtle)' : p.estado === 'rechazada' ? 'var(--danger-subtle)' : 'var(--warning-subtle)',
+              color: p.estado === 'aprobada' ? 'var(--success)' : p.estado === 'rechazada' ? 'var(--danger)' : 'var(--warning)',
+            }}>
               {p.estado === 'aprobada' ? 'Aprobada' : p.estado === 'rechazada' ? 'Rechazada' : 'Pendiente'}
             </span>
-            {p.motivo_rechazo && <span className="mono-label" style={{ fontSize: 9, maxWidth: 160 }}>{p.motivo_rechazo}</span>}
+            {p.motivo_rechazo && <span className="mono-label" style={{ fontSize: 12, maxWidth: 160 }}>{p.motivo_rechazo}</span>}
           </div>
         </div>
       ))}
@@ -256,7 +232,10 @@ function MisBecasTab({ userId }: { userId: number }) {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div className="badge" style={{ background: b.estado_renovacion === 'vigente' ? 'rgba(16,185,129,0.12)' : 'rgba(234,179,8,0.12)', color: b.estado_renovacion === 'vigente' ? '#10b981' : '#eab308' }}>
+            <div className="badge" style={{
+              background: b.estado_renovacion === 'vigente' ? 'var(--success-subtle)' : 'var(--warning-subtle)',
+              color: b.estado_renovacion === 'vigente' ? 'var(--success)' : 'var(--warning)',
+            }}>
               {b.estado_renovacion === 'vigente' ? 'Vigente' : b.estado_renovacion}
             </div>
             <div style={{ marginTop: 4, fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 16, color: 'var(--accent-bright)' }}>

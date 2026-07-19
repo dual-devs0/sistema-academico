@@ -4,6 +4,63 @@ Formato cronológico inverso (nuevo arriba).
 
 ---
 
+## 2026-07-17 — UI polish + seguridad + navegación
+
+### Tab bar sync (UI thread)
+- `"worklet"` directive agregada a `onPageScroll` en `(tabs)/_layout.tsx` — `@expo/ui/community/pager-view` lo ejecuta síncrono en UI thread vía `onPageScrollSync`, eliminando latencia del bridge JNI/JS thread
+- Pill sincronizado vía `scrollProgressSV` (SharedValue) + `useAnimatedStyle` — mismo thread UI
+- Icono + label sincronizados vía `nearestIdxSV` + `useAnimatedReaction` + `useAnimatedStyle` en `TabItem` — doble capa de icono (activo + overlay inactivo)
+- `scrollProgress.value = null` removido de `onTabChange` → el pill ya no hace "salto+retroceso" durante animación programática de setPage
+- `hooks/TabNavigationContext.ts` creado: `useTabNavigation()` para cambiar de tab desde cualquier screen
+- `Ver agenda` en Dashboard ahora usa `switchTab("horario")` en vez de `router.push`
+
+### Gestos y dismiss
+- `cursos.tsx` SemestreSheet: `inset: 0` reemplazado por `top/right/bottom/left: 0` (compat RN <0.80)
+- SemestreSheet: `PanResponder` + `RNAnimated.Value` para swipe-down-to-dismiss con barra horizontal gesteable
+- NotificationsSheet rediseñado como panel flotante en esquina superior derecha, `FadeIn.duration(200)` sin spring/bounce
+- NotificationsSheet: overflow corregido, transparencia fija, `onNotificationPress` callback
+
+### Perfil — cards personalizadas
+- `StatCard` reemplazado por `PromedioCard` (barra cyan, ruler 0–10, número grande JetBrains Mono)
+- `RegularidadCard` con dot pulsante animado (Reanimated), status Activa/Riesgo con colores semánticos
+
+### Scanner — limpieza visual
+- Círculos cyan glow eliminados del overlay de QR
+
+### Dashboard — saludo por hora
+- `greetingForNow()` se actualiza cada 60s vía `forceUpdate` + `setInterval`
+
+### Auth — sesión solo en memoria
+- `useAuth.ts`: rewrite completo — eliminada toda persistencia en `SecureStore`
+- `access_token` y `refresh_token` viven solo en `useRef`, nunca se escriben a disco
+- Al cerrar la app → status "anon" → login requerido en cada apertura
+- Refresh silencioso funciona intra-sesión (refresh_token en memoria)
+
+### Seguridad — re-login al reabrir desde background
+- `useAuth.ts`: `AppState.addEventListener("change")` — cuando la app vuelve a foreground, borra tokens y fuerza status "anon"
+- `firstActive` ref evita que se dispare en el mount inicial (solo en resumes reales)
+- `BackHandler` en `app/_layout.tsx`: `BackExitGuard` con `BackHandler.exitApp()` desde la raíz del Stack
+
+### Navegación — back inteligente desde tabs
+- `utils/currentTab.ts`: módulo global con `activeTabIndex` + `goToFirstTab` callback
+- `(tabs)/_layout.tsx`: registra `goToFirstTab` → `pagerRef.current?.setPage(0)`; llama `setActiveTabIndex(index)` en cada `onPageSelected`
+- `BackExitGuard` modificado: si `activeTabIndex > 0`, llama `goToFirstTab()` (vuelve al dashboard) en vez de salir; si ya está en tab 0 → `exitApp()`
+- Flujo correcto: Perfil → Back → Dashboard → Back → sale de la app
+
+### Login — formulario + bienvenida profesional
+- `SlideInLeft` / `SlideInRight` reemplazados por `FadeIn` en ambos formularios — eliminado glitch visual donde el form aparecía "a la mitad" compitiendo con el fade del Stack
+- `useAuth.setTokens()` + `confirmAuth()`: nuevas funciones que separan almacenamiento de tokens del cambio de status
+- `handleLogin` mejorado: llama `loginRequest()` directo → `setTokens()` → `fetchPerfil()` (nombre real + carrera) → muestra `WelcomeOverlay` → `confirmAuth()` tras 2.2s
+- `handleBiometricPress`: mismo flujo de welcome
+- `WelcomeOverlay`: CapIcon con spring scale, "BIENVENIDO" en accent, nombre del alumno grande bold blanco, carrera en muted, 3 dots animados al pie
+- Cleanup: `welcomeTimer` ref con `clearTimeout` en unmount
+
+### Estado
+- `tsc --noEmit`: 0 errores ✅
+- Sin cambios en backend
+
+---
+
 ## 2026-07-16 — Auditoría completa + integración backend real
 
 ### Auditoría realizada

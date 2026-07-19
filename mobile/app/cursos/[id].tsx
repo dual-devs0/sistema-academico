@@ -112,7 +112,6 @@ const { id } = useLocalSearchParams<{ id: string }>();
     } catch {
       const dummy = DUMMY_MATERIAS[Number(id)];
       if (dummy) {
-  const { colors } = useTheme();
         setDetalle(dummy);
       } else {
         setError("No se pudo cargar el detalle.");
@@ -200,6 +199,7 @@ const { id } = useLocalSearchParams<{ id: string }>();
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: spacing.xl,
           paddingBottom: spacing["3xl"],

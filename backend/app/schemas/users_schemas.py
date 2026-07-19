@@ -44,6 +44,11 @@ class RecuperarRequest(BaseModel):
     matricula: str | None = None  # verificación adicional opcional
 
 
+class RegistroRequest(BaseModel):
+    documento: str
+    matricula: str
+
+
 class UserOut(BaseModel):
     id: int
     username: str
@@ -67,29 +72,10 @@ class UserListOut(BaseModel):
     total: int
 
 
-class RegistroRequest(BaseModel):
-    """Solicitud de registro de nuevo alumno."""
-    documento: str = Field(..., min_length=5, max_length=20)
-    matricula: str = Field(..., min_length=3, max_length=30)
-    documento_extranjero: str | None = None
-    pais_documento: str | None = None
+class AlumnoSimpleOut(BaseModel):
+    id: int
+    nombre: str
+    username: str
+    role: str
 
-
-class RegistroResponse(BaseModel):
-    detail: str
-    solicitud_id: int | None = None
-
-
-class StudentSummary(BaseModel):
-    """Resumen académico completo del alumno para el Dashboard."""
-    creditos_aprobados: int
-    creditos_pendientes: int
-    creditos_totales: int
-    promedio_general: float | None
-    asistencia_promedio: float | None
-    avance_porcentaje: float
-    estado_financiero: str        # "al_dia" | "pendiente" | "vencido"
-    regularidad_activa: bool
-    materias_cursando: int
-    carrera_nombre: str | None
-    semestre_actual: int | None
+    model_config = {"from_attributes": True}

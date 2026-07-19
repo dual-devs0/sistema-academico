@@ -105,6 +105,8 @@ def list_eventos(
     semestre: Optional[int] = Query(None),
     desde: Optional[str] = Query(None),
     hasta: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -148,7 +150,12 @@ def list_eventos(
         else:
             query = query.filter(models.evento.EventoCalendario.materia_id.is_(None))
 
-    return query.order_by(models.evento.EventoCalendario.fecha).all()
+    return (
+        query.order_by(models.evento.EventoCalendario.fecha)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get("/{evento_id}", response_model=schemas.evento.EventoOut)

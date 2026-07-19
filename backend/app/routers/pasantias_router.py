@@ -51,6 +51,29 @@ def listar_empresas(
     return empresas
 
 
+@router.get(
+    "/solicitudes",
+    response_model=list[PasantiaOut],
+    summary="Admin: todas las pasantías (filtro opcional ?estado=) · Alumno: propias",
+)
+def listar_solicitudes(
+    estado: Optional[str] = None,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.pasantia import Pasantia
+
+    q = db.query(Pasantia)
+    if current_user.role == "admin":
+        if estado:
+            q = q.filter(Pasantia.estado == estado)
+    elif current_user.role == "alumno":
+        q = q.filter(Pasantia.alumno_id == current_user.user_id)
+    else:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    return q.order_by(Pasantia.fecha_inicio.desc()).all()
+
+
 @router.post(
     "/empresas",
     response_model=EmpresaReceptoraOut,
@@ -158,7 +181,7 @@ def subir_informe_endpoint(
     try:
         storage_key = None
         if archivo:
-            storage_key = subir_archivo(archivo, carpeta="informes_pasantia")
+            storage_key = subir_archivo(archivo.file.read(), archivo.filename or "informe.pdf", "informes_pasantia")
         informe = subir_informe(id, tipo=tipo, storage_key=storage_key, db=db)
         db.commit()
         db.refresh(informe)

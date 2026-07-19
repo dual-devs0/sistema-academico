@@ -7,8 +7,8 @@ class Inscripcion(Base):
     __tablename__ = "inscripciones"
 
     id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"))
-    oferta_materia_id = Column(Integer, ForeignKey("ofertas_materia.id"))
+    alumno_id = Column(Integer, ForeignKey("users.id"), index=True)
+    oferta_materia_id = Column(Integer, ForeignKey("ofertas_materia.id"), index=True)
 
     alumno = relationship("User")
     oferta = relationship("OfertaMateria")

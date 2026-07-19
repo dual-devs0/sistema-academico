@@ -185,6 +185,27 @@ def listar_postulaciones(
     return q.order_by(PostulacionBeca.fecha_postulacion.desc()).all()
 
 
+@router.get(
+    "/mis-postulaciones",
+    response_model=List[PostulacionOut],
+    summary="Postulaciones del alumno actual",
+)
+def mis_postulaciones(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role(["alumno"])),
+):
+    """
+    Retorna todas las postulaciones del alumno autenticado,
+    sin necesidad de filtrar por fuente_id.
+    """
+    return (
+        db.query(PostulacionBeca)
+        .filter(PostulacionBeca.alumno_id == current_user.user_id)
+        .order_by(PostulacionBeca.fecha_postulacion.desc())
+        .all()
+    )
+
+
 @router.put(
     "/postulaciones/{postulacion_id}/revisar",
     response_model=PostulacionOut,

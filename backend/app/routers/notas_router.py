@@ -8,7 +8,7 @@ Endpoints:
 La app mobile consume estos endpoints desde `notasService.ts`.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app import database, models
 from app.dependencias import get_current_user

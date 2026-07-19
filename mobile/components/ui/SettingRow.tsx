@@ -37,7 +37,8 @@ export function SettingRow({
   right,
   disabled,
 }: Props) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
 const inner = (
     <View
       style={{
@@ -98,9 +99,9 @@ const inner = (
           value={toggled}
           onValueChange={onToggle}
           disabled={disabled}
-          trackColor={{ true: colors.cyan, false: "rgba(255,255,255,0.15)" }}
-          thumbColor="#0a0e17"
-          ios_backgroundColor="rgba(255,255,255,0.15)"
+          trackColor={{ true: colors.cyan, false: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)" }}
+          thumbColor={isDark ? "#0a0e17" : "#ffffff"}
+          ios_backgroundColor={isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)"}
         />
       ) : variant === "chevron" ? (
         <Text style={{ color: colors.textSecondary, fontSize: fontSize.headline }}>›</Text>
@@ -111,7 +112,6 @@ const inner = (
   );
 
   if (variant === "chevron" && onPress) {
-  const { colors } = useTheme();
     return (
       <Pressable onPress={onPress} disabled={disabled}>
         {inner}

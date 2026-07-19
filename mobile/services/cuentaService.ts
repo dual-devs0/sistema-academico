@@ -202,6 +202,6 @@ export async function iniciarPagoOnline(cuotaIds: number[]): Promise<string> {
 // Formatter
 // ---------------------------------------------------------------------------
 
-export function formatGuaranies(n: number): string {
-  return `₲ ${Math.round(n).toLocaleString("es-PY")}`;
+export function formatGuaranies(n: number): { symbol: string; amount: string } {
+  return { symbol: "Gs.", amount: Math.round(n).toLocaleString("es-PY") };
 }

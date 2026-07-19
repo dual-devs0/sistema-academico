@@ -61,7 +61,6 @@ const router = useRouter();
   const { notifications, unreadCount, markAllRead } = useNotifications();
 
   if (right) {
-  const { colors } = useTheme();
     return (
       <View
         style={[

@@ -60,7 +60,7 @@ export const GlassCard = forwardRef<View, Props>(function GlassCard(
   },
   ref,
 ) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
 
   const borderColor =
     variant === "accent" || variant === "leftAccent"
@@ -85,7 +85,7 @@ export const GlassCard = forwardRef<View, Props>(function GlassCard(
   const content = (
     <BlurView
       intensity={blurIntensity}
-      tint="dark"
+      tint={effective === "dark" ? "dark" : "light"}
       style={[StyleSheet.absoluteFill, { borderRadius: radius.glass }]}
     />
   );

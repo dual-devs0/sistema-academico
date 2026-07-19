@@ -112,6 +112,8 @@ async def procesar_facturacion(pago_id: int, comprobante_id: int) -> None:
         comprobante.intentos += 1
 
         try:
+            if not pago.cuota:
+                raise ValueError(f"Pago {pago.id} no tiene cuota asociada")
             alumno = pago.cuota.alumno
             concepto_nombre = pago.cuota.concepto.nombre
             resultado = await emitir_factura(pago, alumno, concepto_nombre)

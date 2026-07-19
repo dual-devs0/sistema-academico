@@ -324,6 +324,7 @@ class TestRendicionExcel:
         db.commit()
         excel_bytes = export_rendicion_excel(9999, None, db)
         assert isinstance(excel_bytes, bytes)
+        assert excel_bytes[:4] == b"PK\x03\x04", "Debe ser un XLSX válido aunque esté vacío"
 
 
 class TestComprobantes:
