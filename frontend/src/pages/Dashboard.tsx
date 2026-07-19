@@ -59,6 +59,11 @@ const css = `
   }
   .tl-dot.live { background:var(--accent-muted); border-color:var(--accent); color:var(--accent-bright); }
   .tl-line { position:absolute; left:12px; top:36px; bottom:-12px; width:2px; background:var(--border-subtle); }
+  .dash-access-card {
+    cursor:pointer; text-align:left; display:flex; align-items:center; gap:14px;
+    padding:16px 18px; border:1px solid var(--border-subtle); transition:border-color .15s;
+  }
+  .dash-access-card:hover { border-color:var(--accent-hover); }
   @media(max-width:1024px){ .dash-grid { grid-template-columns:1fr; } .dash-kpis { grid-template-columns:repeat(2,1fr); } }
   @media(max-width:560px){ .dash-kpis { grid-template-columns:1fr 1fr; gap:10px; } .greet-banner{ padding:16px 18px; } .greet-icon{ display:none; } }
 `
@@ -213,6 +218,46 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos 
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Cards de acceso rápido: Graduación y Equivalencias */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, marginTop: 20 }}>
+        <button type="button" onClick={() => navigate('/mi-graduacion')}
+          className="card dash-access-card">
+          <span style={{ fontSize: 28 }}>🎓</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Mi Graduación</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Verificá tu condición de egreso</div>
+          </div>
+          <i className="ti ti-chevron-right" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+        </button>
+        <button type="button" onClick={() => navigate('/mis-equivalencias')}
+          className="card dash-access-card">
+          <span style={{ fontSize: 28 }}>🔄</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Equivalencias</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Solicitud de convalidación de materias</div>
+          </div>
+          <i className="ti ti-chevron-right" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+        </button>
+        <button type="button" onClick={() => navigate('/mis-pasantias')}
+          className="card dash-access-card">
+          <span style={{ fontSize: 28 }}>💼</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Pasantías</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Gestioná tus prácticas profesionales</div>
+          </div>
+          <i className="ti ti-chevron-right" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+        </button>
+        <button type="button" onClick={() => navigate('/tramites')}
+          className="card dash-access-card">
+          <span style={{ fontSize: 28 }}>📋</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Trámites</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Solicitudes y gestiones académicas</div>
+          </div>
+          <i className="ti ti-chevron-right" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+        </button>
       </div>
 
       <button className="fab" onClick={() => emitHelp()} aria-label="Centro de Ayuda">

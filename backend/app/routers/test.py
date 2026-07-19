@@ -13,6 +13,6 @@ def test_endpoint():
 def test_auth(current_user=Depends(get_current_user)):
     return {
         "msg": "Autenticación OK",
-        "user": current_user["username"],
-        "role": current_user["role"],
+        "user": current_user.username,
+        "role": current_user.role,
     }

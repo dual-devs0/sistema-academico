@@ -26,7 +26,6 @@ from app.models import (  # noqa: F401
     puntaje as puntaje_model,
     apunte,
     evento_calendario,
-    temario,
     horario,
 )
 from app.security import hash_password
@@ -97,7 +96,6 @@ def pg_engine():
         "inscripciones",
         "eventos_calendario",
         "programas",
-        "temarios",
         "horarios",
         "pensum_materias",
         "ofertas_materia",

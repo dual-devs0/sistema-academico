@@ -13,7 +13,7 @@ class ForoHilo(Base):
     creado_por = Column(Integer, ForeignKey("users.id"), nullable=False)
     fijado = Column(Boolean, default=False)
     cerrado = Column(Boolean, default=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class ForoMensaje(Base):
@@ -23,4 +23,4 @@ class ForoMensaje(Base):
     hilo_id = Column(Integer, ForeignKey("foro_hilos.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     contenido = Column(Text, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

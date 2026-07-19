@@ -40,10 +40,13 @@ export interface AvanceMateriaOut {
   pensum_materia_id: number
   materia_id: number
   materia_nombre: string
+  materia_codigo: string | null
   semestre: number
   creditos: number
-  estado: 'aprobada' | 'cursando' | 'pendiente' | 'bloqueada'
+  estado: 'aprobada' | 'cursando' | 'reprobada' | 'pendiente' | 'bloqueada'
+  nota: number | null
   pendientes: PendienteOut[]
+  prerequisitos: PendienteOut[]
 }
 
 export interface CreditosAlumnoOut {

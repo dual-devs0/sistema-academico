@@ -25,10 +25,10 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Accent por rol — default alumno */
-  --accent:         #00b4d8;
-  --accent-bright:  #22d3ee;
-  --accent-muted:   rgba(0, 180, 216, 0.12);
-  --accent-hover:   rgba(0, 180, 216, 0.22);
+  --accent:         #0ea5e9;
+  --accent-bright:  #38bdf8;
+  --accent-muted:   rgba(14, 165, 233, 0.12);
+  --accent-hover:   rgba(14, 165, 233, 0.22);
   --accent-subtle:  var(--accent-muted);
 
   /* Status */
@@ -49,9 +49,9 @@
   --radius-lg: 18px;
 }
 
-[data-role="alumno"]   { --accent: #00b4d8; --accent-bright:#22d3ee; --accent-muted: rgba(0,180,216,0.12);  --accent-hover: rgba(0,180,216,0.22); }
-[data-role="profesor"] { --accent: #8b5cf6; --accent-bright:#a78bfa; --accent-muted: rgba(139,92,246,0.14); --accent-hover: rgba(139,92,246,0.24); }
-[data-role="admin"]    { --accent: #2563eb; --accent-bright:#60a5fa; --accent-muted: rgba(37,99,235,0.14);  --accent-hover: rgba(37,99,235,0.24); }
+[data-role="alumno"]   { --accent: #0ea5e9; --accent-bright:#38bdf8; --accent-muted: rgba(14,165,233,0.12); --accent-hover: rgba(14,165,233,0.22); }
+[data-role="profesor"] { --accent: #fb923c; --accent-bright:#fdba74; --accent-muted: rgba(251,146,60,0.14); --accent-hover: rgba(251,146,60,0.24); }
+[data-role="admin"]    { --accent: #34d399; --accent-bright:#6ee7b7; --accent-muted: rgba(52,211,153,0.14); --accent-hover: rgba(52,211,153,0.24); }
 
 /* ── Componentes base ─────────────────────────────────────────── */
 .card {

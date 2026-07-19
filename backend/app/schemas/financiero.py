@@ -267,3 +267,35 @@ class RendicionRow(BaseModel):
     porcentaje_descuento: Decimal
     monto_becado: Decimal  # sum(monto_descuento) en cuotas del período
     periodo: str
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PAGOS ONLINE (gateway stub)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class PagoOnlineInitRequest(BaseModel):
+    cuota_id: int
+
+
+class PagoOnlineInitResponse(BaseModel):
+    pago_id: int
+    transaction_id: str
+    redirect_url: str
+    monto: Decimal
+
+
+class PagoOnlineConfirmRequest(BaseModel):
+    transaction_id: str
+    estado: str = "confirmado"  # | "rechazado"
+
+
+class PagoOnlineOut(BaseModel):
+    id: int
+    cuota_id: int
+    monto: Decimal
+    transaction_id: Optional[str]
+    estado: str
+    creado_en: Optional[datetime]
+
+    model_config = {"from_attributes": True}

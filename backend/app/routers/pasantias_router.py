@@ -30,10 +30,48 @@ from app.services.pasantia import (
     actualizar_horas,
     subir_informe,
     finalizar_pasantia,
+    rechazar_pasantia,
 )
 from app.services.storage import subir_archivo
 
 router = APIRouter(prefix="/pasantias", tags=["pasantias"])
+
+
+@router.get(
+    "/empresas",
+    response_model=list[EmpresaReceptoraOut],
+    summary="Listar empresas receptoras activas",
+)
+def listar_empresas(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.pasantia import EmpresaReceptora
+    empresas = db.query(EmpresaReceptora).filter(EmpresaReceptora.convenio_activo).all()
+    return empresas
+
+
+@router.get(
+    "/solicitudes",
+    response_model=list[PasantiaOut],
+    summary="Admin: todas las pasantías (filtro opcional ?estado=) · Alumno: propias",
+)
+def listar_solicitudes(
+    estado: Optional[str] = None,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.pasantia import Pasantia
+
+    q = db.query(Pasantia)
+    if current_user.role == "admin":
+        if estado:
+            q = q.filter(Pasantia.estado == estado)
+    elif current_user.role == "alumno":
+        q = q.filter(Pasantia.alumno_id == current_user.user_id)
+    else:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    return q.order_by(Pasantia.fecha_inicio.desc()).all()
 
 
 @router.post(
@@ -74,7 +112,7 @@ def crear_solicitud_endpoint(
 ):
     try:
         pasantia = crear_solicitud_pasantia(
-            alumno_id=current_user["user_id"],
+            alumno_id=current_user.user_id,
             empresa_id=data.empresa_id,
             fecha_inicio=data.fecha_inicio,
             horas_requeridas=data.horas_requeridas,
@@ -97,7 +135,7 @@ def aprobar_pasantia_endpoint(
     id: int,
     tutor_id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
         pasantia = aprobar_pasantia(id, tutor_id=tutor_id, db=db)
@@ -116,7 +154,7 @@ def actualizar_horas_endpoint(
     id: int,
     data: PasantiaHorasUpdate,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
         pasantia = actualizar_horas(id, horas_completadas=data.horas_completadas, db=db)
@@ -138,12 +176,12 @@ def subir_informe_endpoint(
     tipo: str = Form(...),
     archivo: Optional[UploadFile] = File(None),
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor", "alumno"])),
 ):
     try:
         storage_key = None
         if archivo:
-            storage_key = subir_archivo(archivo, carpeta="informes_pasantia")
+            storage_key = subir_archivo(archivo.file.read(), archivo.filename or "informe.pdf", "informes_pasantia")
         informe = subir_informe(id, tipo=tipo, storage_key=storage_key, db=db)
         db.commit()
         db.refresh(informe)
@@ -153,11 +191,28 @@ def subir_informe_endpoint(
         raise HTTPException(status_code=422, detail=str(e))
 
 
+@router.put("/{id}/rechazar", response_model=PasantiaOut, summary="Rechazar pasantía")
+def rechazar_pasantia_endpoint(
+    id: int,
+    motivo: str | None = None,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    try:
+        pasantia = rechazar_pasantia(id, db=db, motivo=motivo)
+        db.commit()
+        db.refresh(pasantia)
+        return pasantia
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @router.put("/{id}/finalizar", response_model=PasantiaOut, summary="Finalizar pasantía")
 def finalizar_pasantia_endpoint(
     id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
         pasantia = finalizar_pasantia(id, db=db)

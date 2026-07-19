@@ -31,6 +31,37 @@ export interface EtapaTesis {
   observaciones: string | null
 }
 
+export interface CandidatoGraduacion {
+  alumno_id: number
+  nombre: string
+  username: string
+  carrera_id: number | null
+  carrera_nombre: string | null
+  creditos_aprobados: number
+  creditos_totales: number
+  ppa_actual: number | null
+  ppa_minimo: number
+  pasantia_completada: boolean
+  tesina_estado: string | null
+  proceso_id: number | null
+  proceso_estado: string | null
+  estado_candidato: 'elegible' | 'pendiente' | 'verificado'
+}
+
+export interface CandidatosGraduacionPage {
+  items: CandidatoGraduacion[]
+  total: number
+}
+
+export const getCandidatos = (params: { carrera_id?: number; q?: string; skip?: number; limit?: number }) => {
+  const usp = new URLSearchParams()
+  if (params.carrera_id) usp.set('carrera_id', String(params.carrera_id))
+  if (params.q) usp.set('q', params.q)
+  usp.set('skip', String(params.skip ?? 0))
+  usp.set('limit', String(params.limit ?? 20))
+  return api.get<CandidatosGraduacionPage>(`/graduacion/candidatos?${usp}`)
+}
+
 export const getCondicionEgreso = (alumnoId: number) =>
   api.get<CondicionEgreso>(`/graduacion/alumno/${alumnoId}/condicion`)
 
@@ -43,5 +74,16 @@ export const asignarTutor = (procesoId: number, tutor_id: number) =>
 export const actualizarEtapa = (procesoId: number, etapaId: number, estado: string, observaciones?: string) =>
   api.put<EtapaTesis>(`/graduacion/procesos/${procesoId}/etapas/${etapaId}`, { estado, observaciones })
 
+export const getEtapasProceso = (procesoId: number) =>
+  api.get<EtapaTesis[]>(`/graduacion/procesos/${procesoId}/etapas`)
+
+export interface VerificacionSolvencia {
+  id: number
+  proceso_id: number
+  solvencia_financiera: boolean
+  solvencia_biblioteca: boolean
+  fecha_verificacion: string
+}
+
 export const getSolvencia = (procesoId: number) =>
-  api.get<{id:number;concepto:string;estado:string;observacion:string|null}[]>(`/graduacion/procesos/${procesoId}/solvencia`)
+  api.get<VerificacionSolvencia[]>(`/graduacion/procesos/${procesoId}/solvencia`)

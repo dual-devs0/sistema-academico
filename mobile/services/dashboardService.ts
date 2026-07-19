@@ -3,19 +3,22 @@ import { api } from "./api";
 /**
  * Servicio de Dashboard móvil.
  *
- * El backend NO tiene un endpoint agregado `/alumno/dashboard`, así que
- * este servicio compone los datos desde varios endpoints existentes:
+ * AHORA usa el endpoint agregado `/alumno/dashboard` que compone toda
+ * la información del dashboard en UNA sola llamada:
+ * - perfil del usuario
+ * - resumen académico (notas, asistencia)
+ * - próximos eventos
+ * - saldo de cuenta
+ * - regularidad activa
  *
- * - GET /alumno/mi-perfil        → info del usuario logueado
- * - GET /alumno/mi-resumen       → cantidad de materias, promedio general,
- *                                  notas, asistencia por materia
- * - GET /eventos/?desde&hasta    → próximos eventos (parciales, entregas)
- * - GET /finanzas/alumno/{id}/cuotas → cuotas (para saldo pendiente / vencido)
+ * Antes hacía 4 requests paralelos (fetchPerfil, fetchResumen,
+ * fetchEventosProximos, fetchCuotas). El backend consolidó todo en
+ * un solo endpoint para reducir latencia.
  *
- * `fetchDashboard()` dispara los 4 en paralelo y devuelve un DTO plano
- * listo para la vista. Si alguno falla (ej. finanzas retorna 403 para un
- * alumno sin cuotas cargadas), el campo respectivo queda `null` — la
- * pantalla debe tolerar ausencias parciales.
+ * Los fetchers individuales (fetchPerfil, fetchResumen, etc.) se
+ * conservan exportados para ser reusados desde otras pantallas que
+ * necesiten solo una parte de los datos sin el payload completo del
+ * dashboard.
  */
 
 export interface UserInfo {
@@ -25,7 +28,11 @@ export interface UserInfo {
   nombre: string | null;
   email: string | null;
   carrera_id: number | null;
-  es_becado: boolean | null;
+  carrera_nombre: string | null;
+  semestre: number | null;
+  es_becado: boolean;
+  fuente_beca?: string | null;
+  legajo?: string;
   foto_url: string | null;
 }
 
@@ -55,6 +62,20 @@ export interface MiResumen {
   promedio_general: number | null;
   notas: MateriaNota[];
   asistencia: MateriaAsistencia[];
+}
+
+export interface StudentSummary {
+  creditos_aprobados: number;
+  creditos_pendientes: number;
+  creditos_totales: number;
+  promedio_general: number | null;
+  asistencia_promedio: number | null;
+  avance_porcentaje: number;
+  estado_financiero: string;
+  regularidad_activa: boolean;
+  materias_cursando: number;
+  carrera_nombre: string | null;
+  semestre_actual: number | null;
 }
 
 export type TipoEvento =
@@ -103,6 +124,7 @@ export interface CuotaOut {
 export interface DashboardData {
   user: UserInfo | null;
   resumen: MiResumen | null;
+  summary: StudentSummary | null;
   proximoEvento: EventoOut | null;
   eventosCercanos: EventoOut[];
   cuentaSaldoPendiente: number;
@@ -143,6 +165,11 @@ export async function fetchResumen(): Promise<MiResumen> {
   return data;
 }
 
+export async function fetchStudentSummary(): Promise<StudentSummary> {
+  const { data } = await api.get<StudentSummary>("/alumno/summary");
+  return data;
+}
+
 export async function fetchEventosProximos(dias = 30): Promise<EventoOut[]> {
   const hoy = new Date();
   const hasta = new Date(hoy);
@@ -163,29 +190,57 @@ export async function fetchCuotas(alumnoId: number): Promise<CuotaOut[]> {
 // ---------------------------------------------------------------------------
 
 export async function fetchDashboard(): Promise<DashboardData> {
-  // El perfil es requerido (necesitamos user.id para /finanzas).
+  // Un solo request al endpoint agregado /alumno/dashboard
+  const { data } = await api.get<{
+    user: UserInfo | null;
+    resumen: MiResumen | null;
+    proximoEvento: EventoOut | null;
+    eventosCercanos: EventoOut[];
+    cuentaSaldoPendiente: number;
+    cuentaSaldoVencido: number;
+    cuentaPagado: number;
+    cuentaHayCuotas: boolean;
+    regularidadActiva: boolean;
+  }>("/alumno/dashboard");
+
+  return {
+    user: data.user,
+    resumen: data.resumen,
+    summary: null,
+    proximoEvento: data.proximoEvento,
+    eventosCercanos: data.eventosCercanos,
+    cuentaSaldoPendiente: data.cuentaSaldoPendiente,
+    cuentaSaldoVencido: data.cuentaSaldoVencido,
+    cuentaPagado: data.cuentaPagado,
+    cuentaHayCuotas: data.cuentaHayCuotas,
+    regularidadActiva: data.regularidadActiva,
+  };
+}
+
+/**
+ * Deprecated — alternativa que compone 4 requests manualmente.
+ * Se mantiene por compatibilidad pero fetchDashboard() ahora usa
+ * el endpoint agregado del backend.
+ */
+export async function fetchDashboardLegacy(): Promise<DashboardData> {
   const perfil = await fetchPerfil().catch(() => null);
   const alumnoId = perfil?.id ?? null;
 
-  // Resto en paralelo. Cualquier fallo → null / vacío.
-  const [resumen, eventos, cuotas] = await Promise.all([
+  const [resumen, summary, eventos, cuotas] = await Promise.all([
     fetchResumen().catch(() => null),
+    fetchStudentSummary().catch(() => null),
     fetchEventosProximos(30).catch<EventoOut[]>(() => []),
     alumnoId
       ? fetchCuotas(alumnoId).catch<CuotaOut[]>(() => [])
       : Promise.resolve<CuotaOut[]>([]),
   ]);
 
-  // Próximo evento = el de fecha más cercana entre los eventos "importantes"
-  // (parciales, finales, entregas). Feriados y asuetos se muestran en el
-  // calendario pero no como "próximo evento".
   const eventosRelevantes = eventos
     .filter((e) => e.tipo === "parcial" || e.tipo === "final" || e.tipo === "entrega")
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
   const proximoEvento = eventosRelevantes[0] ?? eventos[0] ?? null;
 
-  // Cuenta: sumar por estado.
   let cuentaSaldoPendiente = 0;
   let cuentaSaldoVencido = 0;
   let cuentaPagado = 0;
@@ -196,17 +251,12 @@ export async function fetchDashboard(): Promise<DashboardData> {
     else if (c.estado === "pendiente") cuentaSaldoPendiente += monto;
   }
 
-  // Regularidad activa: asistencia promedio ≥ 70% en TODAS las materias.
-  // Definición conservadora — el backend no expone este flag hoy.
-  const asistencias = resumen?.asistencia ?? [];
-  const regularidadActiva =
-    asistencias.length === 0
-      ? true
-      : asistencias.every((a) => (a.porcentaje ?? 100) >= 70);
+  const regularidadActiva = summary ? summary.regularidad_activa : true;
 
   return {
     user: perfil,
     resumen,
+    summary,
     proximoEvento,
     eventosCercanos: eventos,
     cuentaSaldoPendiente,

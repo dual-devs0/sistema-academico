@@ -57,14 +57,17 @@ export default function ExpedienteAdmin() {
 
   function cargarDatosAlumno() {
     if (!alumno) return
+    setLoading(true)
+    // Usamos el filtro alumno_id del backend para traer solo las inscripciones de este alumno
     Promise.all([
-      api.get<Inscripcion[]>('/inscripciones/'),
+      api.get<Inscripcion[]>(`/inscripciones/?alumno_id=${alumno.id}`),
       alumno.carrera_id ? api.get<Materia[]>(`/materias/?carrera_id=${alumno.carrera_id}`) : Promise.resolve([] as Materia[]),
       obtenerExpediente(alumno.id),
       obtenerRegularidad(alumno.id),
     ])
-      .then(([todasInscripciones, materias, exp, reg]) => {
-        setInscripciones(todasInscripciones.filter(i => i.alumno_id === alumno.id))
+      .then(([inscs, materias, exp, reg]) => {
+        // Ya vienen filtradas por alumno_id desde el backend
+        setInscripciones(inscs)
         setMateriasMap(new Map(materias.map(m => [m.id, m.nombre])))
         setExpediente(exp)
         setRegularidad(reg)
@@ -81,7 +84,7 @@ export default function ExpedienteAdmin() {
       await cerrarMateria(alumno.id, Number(ofertaSeleccionada))
       emitToast('Materia cerrada en el expediente')
       setOfertaSeleccionada('')
-      setLoading(true); cargarDatosAlumno()
+      cargarDatosAlumno()
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al cerrar materia', 'error')
     } finally { setCerrando(false) }
