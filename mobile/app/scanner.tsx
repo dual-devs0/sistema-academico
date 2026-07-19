@@ -55,10 +55,10 @@ import {
  */
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const FRAME_SIZE = Math.min(SCREEN_W * 0.68, 300);
-const FRAME_TOP = SCREEN_H * 0.16;
-const CORNER = 24;
-const CORNER_STROKE = 3;
+const FRAME_SIZE = Math.min(SCREEN_W * 0.7, 320);
+const FRAME_TOP = SCREEN_H * 0.15;
+const CORNER = 28;
+const CORNER_STROKE = 3.5;
 
 type Phase = "camera" | "confirming" | "confirmed";
 
@@ -91,7 +91,6 @@ const router = useRouter();
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
-  const { colors } = useTheme();
       requestPermission();
     }
   }, [permission, requestPermission]);
@@ -165,13 +164,12 @@ const router = useRouter();
         onBarcodeScanned={phase === "camera" ? handleBarcodeScanned : undefined}
       />
 
-      {/* Máscara oscura + ventana clara vía View overlays (workaround por
-          la falta de un mask nativo simple en RN) */}
+      {/* Máscara oscura + ventana clara */}
       <View pointerEvents="none" style={{ ...StyleSheetAbs.fill }}>
         <View
           style={{
             ...StyleSheetAbs.fill,
-            backgroundColor: "rgba(0,0,0,0.5)",
+            backgroundColor: "rgba(0,0,0,0.55)",
           }}
         />
         <View
@@ -186,7 +184,6 @@ const router = useRouter();
             overflow: "hidden",
           }}
         >
-          {/* Recorte transparente + esquinas + línea de scan */}
           <CameraView
             style={StyleSheetAbs.fill}
             facing="back"
@@ -253,17 +250,20 @@ const router = useRouter();
             Posicioná el código QR dentro del marco
           </Text>
           {phase === "confirming" ? (
+            <PulsingText text="Verificando…" />
+          ) : (
             <Text
               style={{
-                color: colors.cyan,
-                fontFamily: fontFamily.mono,
-                fontSize: fontSize.caption,
+                color: colors.textSecondary,
+                fontFamily: fontFamily.inter,
+                fontSize: fontSize.label,
                 marginTop: spacing.xs,
+                textAlign: "center",
               }}
             >
-              Verificando…
+              La cámara detectará automáticamente el código
             </Text>
-          ) : null}
+          )}
         </View>
 
         {timedOut ? (
@@ -425,32 +425,31 @@ function ScanCorners() {
   const c = colors.cyan;
   const w = CORNER_STROKE;
   return (
-    <Svg
-      style={{ ...StyleSheetAbs.fill }}
-      width={s}
-      height={s}
-      pointerEvents="none"
-    >
-      <Path d={`M 0 ${p} L 0 0 L ${p} 0`} stroke={c} strokeWidth={w} fill="none" />
-      <Path
-        d={`M ${s - p} 0 L ${s} 0 L ${s} ${p}`}
-        stroke={c}
-        strokeWidth={w}
-        fill="none"
-      />
-      <Path
-        d={`M ${s} ${s - p} L ${s} ${s} L ${s - p} ${s}`}
-        stroke={c}
-        strokeWidth={w}
-        fill="none"
-      />
-      <Path
-        d={`M ${p} ${s} L 0 ${s} L 0 ${s - p}`}
-        stroke={c}
-        strokeWidth={w}
-        fill="none"
-      />
-    </Svg>
+    <>
+      {/* Glow detrás de las esquinas */}
+      <Svg
+        style={{ ...StyleSheetAbs.fill, opacity: 0.5 }}
+        width={s}
+        height={s}
+        pointerEvents="none"
+      >
+        <Path d={`M 0 ${p} L 0 0 L ${p} 0`} stroke={c} strokeWidth={w + 4} fill="none" />
+        <Path d={`M ${s - p} 0 L ${s} 0 L ${s} ${p}`} stroke={c} strokeWidth={w + 4} fill="none" />
+        <Path d={`M ${s} ${s - p} L ${s} ${s} L ${s - p} ${s}`} stroke={c} strokeWidth={w + 4} fill="none" />
+        <Path d={`M ${p} ${s} L 0 ${s} L 0 ${s - p}`} stroke={c} strokeWidth={w + 4} fill="none" />
+      </Svg>
+      <Svg
+        style={{ ...StyleSheetAbs.fill }}
+        width={s}
+        height={s}
+        pointerEvents="none"
+      >
+        <Path d={`M 0 ${p} L 0 0 L ${p} 0`} stroke={c} strokeWidth={w} fill="none" />
+        <Path d={`M ${s - p} 0 L ${s} 0 L ${s} ${p}`} stroke={c} strokeWidth={w} fill="none" />
+        <Path d={`M ${s} ${s - p} L ${s} ${s} L ${s - p} ${s}`} stroke={c} strokeWidth={w} fill="none" />
+        <Path d={`M ${p} ${s} L 0 ${s} L 0 ${s - p}`} stroke={c} strokeWidth={w} fill="none" />
+      </Svg>
+    </>
   );
 }
 
@@ -478,27 +477,62 @@ function ScanLine() {
   }));
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        {
-          position: "absolute",
-          left: 8,
-          right: 8,
-          top: 0,
-          height: 2,
-          backgroundColor: colors.cyan,
-          opacity: 0.7,
-          borderRadius: 2,
-          shadowColor: colors.cyan,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.7,
-          shadowRadius: 8,
-          elevation: 6,
-        },
-        style,
-      ]}
-    />
+    <>
+      {/* Gradiente simulado con múltiples líneas de opacidad decreciente */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            left: 4,
+            right: 4,
+            top: -6,
+            height: 14,
+            opacity: 0.15,
+          },
+          style,
+        ]}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.cyan, borderRadius: 7 }} />
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            left: 4,
+            right: 4,
+            top: -3,
+            height: 8,
+            opacity: 0.3,
+          },
+          style,
+        ]}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.cyan, borderRadius: 4 }} />
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            left: 6,
+            right: 6,
+            top: 0,
+            height: 2,
+            backgroundColor: colors.cyan,
+            opacity: 0.85,
+            borderRadius: 2,
+            shadowColor: colors.cyan,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: 10,
+            elevation: 8,
+          },
+          style,
+        ]}
+      />
+    </>
   );
 }
 
@@ -515,9 +549,9 @@ function MateriaHoyRow({ materia }: { materia: MateriaHoy }) {
         flexDirection: "row",
         alignItems: "center",
         gap: spacing.md,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        backgroundColor: "rgba(0,0,0,0.4)",
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        backgroundColor: colors.glassBg,
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: colors.border,
@@ -525,19 +559,19 @@ function MateriaHoyRow({ materia }: { materia: MateriaHoy }) {
     >
       <View
         style={{
-          width: 8,
-          height: 8,
-          borderRadius: 4,
+          width: 10,
+          height: 10,
+          borderRadius: 5,
           backgroundColor:
             materia.estado === "ok" ? colors.success : colors.error,
         }}
       />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, gap: 2 }}>
         <Text
           style={{
             color: colors.textPrimary,
             fontFamily: fontFamily.interSemibold,
-            fontSize: fontSize.caption,
+            fontSize: fontSize.label,
           }}
           numberOfLines={1}
         >
@@ -556,7 +590,7 @@ function MateriaHoyRow({ materia }: { materia: MateriaHoy }) {
       </View>
       <DonutChart
         value={materia.asistenciaPct}
-        size={36}
+        size={34}
         strokeWidth={3}
         showLabel={false}
         thresholdColor
@@ -579,43 +613,76 @@ function ConfirmedScreen({
   onOpenReport: () => void;
 }) {
   const { colors } = useTheme();
+  const floatY = useSharedValue(0);
+
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withTiming(-8, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [floatY]);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
+  const total = data.presentes + data.ausentes;
+  const pct = total > 0 ? (data.presentes / total) * 100 : 0;
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
       <View style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: spacing.xl }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, padding: spacing.xl }}>
+          {/* Glow background */}
+          <View
+            style={{
+              position: "absolute",
+              top: SCREEN_H * 0.06,
+              alignSelf: "center",
+              width: 200,
+              height: 200,
+              borderRadius: 100,
+              backgroundColor: colors.cyanGlow,
+              opacity: 0.25,
+            }}
+          />
+
           <Animated.View
             entering={ZoomIn.duration(320).easing(Easing.out(Easing.cubic))}
             style={{ alignItems: "center", marginTop: spacing["3xl"] }}
           >
-            <View
-              style={{
-                width: 96,
-                height: 96,
-                borderRadius: 48,
-                backgroundColor: colors.cyanDim,
-                borderWidth: 2,
-                borderColor: colors.cyan,
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: spacing.xl,
-                shadowColor: colors.cyan,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.6,
-                shadowRadius: 20,
-                elevation: 10,
-              }}
-            >
-              <Text
+            <Animated.View style={floatStyle}>
+              <View
                 style={{
-                  color: colors.cyan,
-                  fontFamily: fontFamily.interBold,
-                  fontSize: 44,
-                  lineHeight: 46,
+                  width: 96,
+                  height: 96,
+                  borderRadius: 48,
+                  backgroundColor: colors.cyanDim,
+                  borderWidth: 2,
+                  borderColor: colors.cyan,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: spacing.xl,
+                  shadowColor: colors.cyan,
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.6,
+                  shadowRadius: 24,
+                  elevation: 12,
                 }}
               >
-                ✓
-              </Text>
-            </View>
+                <Text
+                  style={{
+                    color: colors.cyan,
+                    fontFamily: fontFamily.interBold,
+                    fontSize: 44,
+                    lineHeight: 46,
+                  }}
+                >
+                  ✓
+                </Text>
+              </View>
+            </Animated.View>
             <Text
               style={{
                 color: colors.textPrimary,
@@ -685,18 +752,9 @@ function ConfirmedScreen({
 
           <Animated.View
             entering={FadeInDown.delay(200).duration(320)}
-            style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}
+            style={{ marginTop: spacing.lg }}
           >
-            <GlassCard style={{ flex: 1 }} contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
-              <Text
-                style={{
-                  color: colors.success,
-                  fontFamily: fontFamily.monoBold,
-                  fontSize: fontSize.numeric,
-                }}
-              >
-                {data.presentes}
-              </Text>
+            <GlassCard contentStyle={{ padding: spacing.lg }}>
               <Text
                 style={{
                   color: colors.textSecondary,
@@ -704,32 +762,56 @@ function ConfirmedScreen({
                   fontSize: fontSize.caption,
                   letterSpacing: 1.5,
                   textTransform: "uppercase",
+                  marginBottom: spacing.md,
                 }}
               >
-                Presentes
+                Progreso del ciclo
               </Text>
-            </GlassCard>
-            <GlassCard style={{ flex: 1 }} contentStyle={{ padding: spacing.lg, alignItems: "center" }}>
-              <Text
+              {/* Barra de progreso */}
+              <View
                 style={{
-                  color: colors.error,
-                  fontFamily: fontFamily.monoBold,
-                  fontSize: fontSize.numeric,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.border,
+                  overflow: "hidden",
                 }}
               >
-                {data.ausentes}
-              </Text>
-              <Text
+                <Animated.View
+                  entering={FadeIn.delay(300).duration(600)}
+                  style={{
+                    width: `${pct}%`,
+                    height: "100%",
+                    backgroundColor: colors.cyan,
+                    borderRadius: 3,
+                  }}
+                />
+              </View>
+              <View
                 style={{
-                  color: colors.textSecondary,
-                  fontFamily: fontFamily.interMedium,
-                  fontSize: fontSize.caption,
-                  letterSpacing: 1.5,
-                  textTransform: "uppercase",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginTop: spacing.sm,
                 }}
               >
-                Ausentes
-              </Text>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontFamily: fontFamily.mono,
+                    fontSize: fontSize.caption,
+                  }}
+                >
+                  {data.presentes} presentes
+                </Text>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontFamily: fontFamily.mono,
+                    fontSize: fontSize.caption,
+                  }}
+                >
+                  {data.ausentes} ausentes
+                </Text>
+              </View>
             </GlassCard>
           </Animated.View>
 
@@ -756,7 +838,7 @@ function ConfirmedScreen({
                   fontSize: fontSize.body,
                 }}
               >
-                Ver Reporte
+                Ver Reporte Detallado
               </Text>
             </Pressable>
             <Pressable
@@ -914,6 +996,41 @@ const MESES = [
 function formatToday(): string {
   const d = new Date();
   return `${DIAS[d.getDay()]} · ${String(d.getDate()).padStart(2, "0")} ${MESES[d.getMonth()]}`;
+}
+
+// ---------------------------------------------------------------------------
+// Pulsing text (Verificando…)
+// ---------------------------------------------------------------------------
+
+function PulsingText({ text }: { text: string }) {
+  const { colors } = useTheme();
+  const opacity = useSharedValue(0.4);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [opacity]);
+
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.Text
+      style={[
+        style,
+        {
+          color: colors.cyan,
+          fontFamily: fontFamily.mono,
+          fontSize: fontSize.caption,
+          marginTop: spacing.xs,
+        },
+      ]}
+    >
+      {text}
+    </Animated.Text>
+  );
 }
 
 function mapErrorMessage(res: QrVerifyResult): string {

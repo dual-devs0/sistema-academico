@@ -4,12 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   RefreshControl,
-  ScrollView,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { useTabBarScroll } from "../../hooks/useHideOnScroll";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { CyanBadge } from "../../components/ui/CyanBadge";
@@ -31,6 +31,7 @@ import {
   type EventoOut,
   type TipoEvento,
 } from "../../services/calendarioService";
+import Svg, { Path, Circle, Rect, Line, Polyline } from "react-native-svg";
 import { api } from "../../services/api";
 
 const TODAY = new Date();
@@ -55,14 +56,21 @@ const TIPO_COLOR: Record<TipoEvento, string> = {
   asueto:    "#22c55e",
 };
 
-const TIPO_EMOJI: Record<TipoEvento, string> = {
-  parcial:   "📝",
-  final:     "🎓",
-  entrega:   "📦",
-  actividad: "📌",
-  feriado:   "🏖️",
-  asueto:    "🏖️",
-};
+function TipoIcon({ tipo, color, size = 16 }: { tipo: TipoEvento; color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      {tipo === "parcial" || tipo === "final" ? (
+        <Rect x="3" y="2" width="14" height="16" rx="2" stroke={color} strokeWidth={1.5} />
+      ) : tipo === "entrega" ? (
+        <Polyline points="4,10 10,16 16,10" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      ) : tipo === "actividad" ? (
+        <Circle cx="10" cy="10" r="7" stroke={color} strokeWidth={1.5} />
+      ) : (
+        <Path d="M4 10h12" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+      )}
+    </Svg>
+  );
+}
 
 function cuatrimestre(mes: number): string {
   if (mes <= 4)  return "Primer Cuatrimestre";
@@ -82,6 +90,7 @@ function formatHora(hora: string | null | undefined): { time: string; period: st
 
 export default function HorarioScreen() {
   const { colors } = useTheme();
+  const { scrollHandler, contentBottomPadding } = useTabBarScroll();
 const [cursor, setCursor] = useState({ anio: TODAY.getFullYear(), mes: TODAY.getMonth() + 1 });
   const [selectedIso, setSelectedIso] = useState<string>(toIso(TODAY));
   const [allEventos, setAllEventos] = useState<EventoOut[]>([]);
@@ -148,8 +157,11 @@ const [cursor, setCursor] = useState({ anio: TODAY.getFullYear(), mes: TODAY.get
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <ScreenHeader title="Calendario" hideAvatar />
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingBottom: contentBottomPadding }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.cyan} />
         }
@@ -179,7 +191,7 @@ const [cursor, setCursor] = useState({ anio: TODAY.getFullYear(), mes: TODAY.get
             </View>
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -401,20 +413,64 @@ function SelectedDaySection({ selectedIso, eventos }: {
         style={{
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "flex-start",
+          gap: spacing.md,
           marginBottom: spacing.md,
         }}
       >
-        <Text
+        <View
           style={{
-            color: colors.textPrimary,
-            fontFamily: fontFamily.interBold,
-            fontSize: 17,
+            width: 48, height: 56,
+            borderRadius: 12,
+            backgroundColor: colors.cyan + "18",
+            borderWidth: 1,
+            borderColor: colors.cyan + "30",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {formatDiaLargo(selectedIso)}
-        </Text>
-
+          <Text
+            style={{
+              color: colors.cyan,
+              fontFamily: fontFamily.interBold,
+              fontSize: 18,
+              lineHeight: 20,
+            }}
+          >
+            {new Date(selectedIso + "T12:00:00").getDate()}
+          </Text>
+          <Text
+            style={{
+              color: colors.cyan,
+              fontFamily: fontFamily.interSemibold,
+              fontSize: 9,
+              letterSpacing: 1,
+              marginTop: -1,
+            }}
+          >
+            {MESES[new Date(selectedIso + "T12:00:00").getMonth()].slice(0, 3).toUpperCase()}
+          </Text>
+        </View>
+        <View>
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontFamily: fontFamily.interBold,
+              fontSize: 17,
+            }}
+          >
+            {formatDiaLargo(selectedIso)}
+          </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.inter,
+              fontSize: 11,
+              marginTop: 2,
+            }}
+          >
+            {eventos.length} evento{eventos.length !== 1 ? "s" : ""}
+          </Text>
+        </View>
       </View>
 
       {eventos.length === 0 ? (
@@ -430,7 +486,12 @@ function SelectedDaySection({ selectedIso, eventos }: {
               gap: spacing.md,
             }}
           >
-            <Text style={{ fontSize: 36 }}>📅</Text>
+            <Svg width={36} height={36} viewBox="0 0 24 24" fill="none">
+              <Rect x="3" y="4" width="18" height="18" rx="2" stroke={colors.textSecondary} strokeWidth={1.5} />
+              <Line x1="3" y1="9" x2="21" y2="9" stroke={colors.textSecondary} strokeWidth={1.5} />
+              <Line x1="8" y1="2" x2="8" y2="6" stroke={colors.textSecondary} strokeWidth={1.5} strokeLinecap="round" />
+              <Line x1="16" y1="2" x2="16" y2="6" stroke={colors.textSecondary} strokeWidth={1.5} strokeLinecap="round" />
+            </Svg>
             <Text
               style={{
                 color: colors.textSecondary,
@@ -466,7 +527,7 @@ function EventoDiaCard({ evento }: { evento: EventoOut }) {
 
   const hora = formatHora(evento.hora ?? null);
   const accentColor = TIPO_COLOR[evento.tipo];
-  const esUrgente = evento.tipo === "entrega" || evento.tipo === "final";
+  const esTypeUrgente = evento.tipo === "entrega" || evento.tipo === "final";
 
   return (
     <View
@@ -531,20 +592,23 @@ function EventoDiaCard({ evento }: { evento: EventoOut }) {
       </View>
 
       <View style={{ flex: 1, padding: spacing.md, gap: 4 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <TipoIcon tipo={evento.tipo} color={accentColor} size={14} />
           <Text
             style={{
               color: accentColor,
               fontFamily: fontFamily.interSemibold,
               fontSize: 10,
               letterSpacing: 1.5,
+              textTransform: "uppercase",
             }}
           >
             {TIPO_LABEL[evento.tipo]}
           </Text>
-          {esUrgente && (
+          {esTypeUrgente && (
             <View
               style={{
+                marginLeft: "auto",
                 width: 20, height: 20, borderRadius: 10,
                 backgroundColor: accentColor + "30",
                 borderWidth: 1,
@@ -574,7 +638,10 @@ function EventoDiaCard({ evento }: { evento: EventoOut }) {
 
         {evento.ubicacion && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-            <Text style={{ fontSize: 10 }}>📍</Text>
+            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+              <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={colors.textSecondary} strokeWidth={1.5} />
+              <Circle cx="12" cy="9" r="2.5" stroke={colors.textSecondary} strokeWidth={1.5} />
+            </Svg>
             <Text
               style={{
                 color: colors.textSecondary,
@@ -667,7 +734,12 @@ function UpcomingSection({ eventos, showAll, onToggleShowAll }: {
       {filtrados.length === 0 ? (
         <View style={{ paddingHorizontal: spacing.xl }}>
           <View style={{ alignItems: "center", gap: spacing.sm }}>
-            <Text style={{ fontSize: 36, marginBottom: spacing.sm }}>📅</Text>
+            <Svg width={36} height={36} viewBox="0 0 24 24" fill="none">
+              <Rect x="3" y="4" width="18" height="18" rx="2" stroke={colors.textSecondary} strokeWidth={1.5} />
+              <Line x1="3" y1="9" x2="21" y2="9" stroke={colors.textSecondary} strokeWidth={1.5} />
+              <Line x1="8" y1="2" x2="8" y2="6" stroke={colors.textSecondary} strokeWidth={1.5} strokeLinecap="round" />
+              <Line x1="16" y1="2" x2="16" y2="6" stroke={colors.textSecondary} strokeWidth={1.5} strokeLinecap="round" />
+            </Svg>
             <Text style={{ color: colors.textSecondary, fontFamily: fontFamily.inter, fontSize: fontSize.caption, textAlign: "center" }}>
               No hay eventos importantes en los próximos 30 días.
             </Text>
@@ -682,7 +754,7 @@ function UpcomingSection({ eventos, showAll, onToggleShowAll }: {
           ))}
         </View>
       ) : (
-        <ScrollView
+        <Animated.ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.sm }}
@@ -692,7 +764,7 @@ function UpcomingSection({ eventos, showAll, onToggleShowAll }: {
               <UpcomingCard evento={e} />
             </Animated.View>
           ))}
-        </ScrollView>
+      </Animated.ScrollView>
       )}
     </View>
   );
@@ -703,7 +775,6 @@ function UpcomingCardFull({ evento }: { evento: EventoOut }) {
 
   const { day, month } = formatDayMonthShort(evento.fecha);
   const accentColor = TIPO_COLOR[evento.tipo];
-  const emoji = TIPO_EMOJI[evento.tipo];
 
   return (
     <View
@@ -716,15 +787,15 @@ function UpcomingCardFull({ evento }: { evento: EventoOut }) {
         overflow: "hidden",
       }}
     >
-      <View style={{ width: 3, backgroundColor: accentColor + "90" }} />
+      <View style={{ width: 3, backgroundColor: accentColor }} />
       <View
         style={{
-          width: 48, alignItems: "center", justifyContent: "center",
+          width: 56, alignItems: "center", justifyContent: "center",
           backgroundColor: accentColor + "10",
           borderRightWidth: 1, borderRightColor: colors.border,
         }}
       >
-        <Text style={{ fontSize: 20 }}>{emoji}</Text>
+        <TipoIcon tipo={evento.tipo} color={accentColor} size={24} />
       </View>
       <View style={{ flex: 1, padding: spacing.md, gap: 3 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -733,6 +804,7 @@ function UpcomingCardFull({ evento }: { evento: EventoOut }) {
               color: accentColor,
               fontFamily: fontFamily.interSemibold,
               fontSize: 10, letterSpacing: 1.5,
+              textTransform: "uppercase",
             }}
           >
             {TIPO_LABEL[evento.tipo]}
@@ -741,7 +813,7 @@ function UpcomingCardFull({ evento }: { evento: EventoOut }) {
             style={{
               color: colors.textSecondary,
               fontFamily: fontFamily.inter,
-              fontSize: 10,
+              fontSize: 11,
             }}
           >
             {day} {month}
@@ -768,12 +840,11 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
 
   const { day, month } = formatDayMonthShort(evento.fecha);
   const accentColor = TIPO_COLOR[evento.tipo];
-  const emoji = TIPO_EMOJI[evento.tipo];
 
   return (
     <View
       style={{
-        width: 160,
+        width: 170,
         backgroundColor: colors.glassBg,
         borderWidth: 1,
         borderColor: colors.border,
@@ -781,30 +852,30 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
         overflow: "hidden",
       }}
     >
-      <View style={{ height: 3, backgroundColor: accentColor + "90" }} />
+      <View style={{ height: 3, backgroundColor: accentColor }} />
 
-      <View style={{ padding: spacing.md, gap: spacing.sm }}>
+      <View style={{ padding: spacing.md, gap: spacing.md }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View
             style={{
-              width: 38, height: 38,
-              borderRadius: 10,
-              backgroundColor: accentColor + "20",
+              width: 48, height: 48,
+              borderRadius: 12,
+              backgroundColor: accentColor + "18",
               borderWidth: 1,
-              borderColor: accentColor + "40",
+              borderColor: accentColor + "30",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Text style={{ fontSize: 18 }}>{emoji}</Text>
+            <TipoIcon tipo={evento.tipo} color={accentColor} size={22} />
           </View>
 
           <View
             style={{
               backgroundColor: colors.cyan + "18",
-              borderRadius: 8,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
+              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
               alignItems: "center",
             }}
           >
@@ -812,8 +883,8 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
               style={{
                 color: colors.cyan,
                 fontFamily: fontFamily.interBold,
-                fontSize: 14,
-                lineHeight: 16,
+                fontSize: 16,
+                lineHeight: 18,
               }}
             >
               {day}
@@ -826,7 +897,7 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
                 letterSpacing: 1,
               }}
             >
-              {month}
+              {month.toUpperCase()}
             </Text>
           </View>
         </View>
@@ -837,6 +908,7 @@ function UpcomingCard({ evento }: { evento: EventoOut }) {
             fontFamily: fontFamily.interSemibold,
             fontSize: 10,
             letterSpacing: 1.5,
+            textTransform: "uppercase",
           }}
         >
           {TIPO_LABEL[evento.tipo]}

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
@@ -131,7 +132,8 @@ def inscribir(
                 detail=f"Solapamiento de horario: {', '.join(conflictos)}",
             )
     except ImportError:
-        pass  # horarios module not yet available
+        import logging
+        logging.getLogger(__name__).warning("horarios_router no disponible — saltando verificación de solapamiento")
     nueva = models.inscripcion.Inscripcion(
         alumno_id=alumno_id,
         oferta_materia_id=oferta.id,
@@ -174,13 +176,18 @@ def alumnos_por_materia(
         .filter(models.inscripcion.Inscripcion.oferta_materia_id == oferta.id)
         .all()
     )
+    if not inscripciones:
+        return []
+    alumno_ids = [i.alumno_id for i in inscripciones]
+    alumnos_map = {
+        u.id: u
+        for u in db.query(models.user.User)
+        .filter(models.user.User.id.in_(alumno_ids))
+        .all()
+    }
     result = []
     for i in inscripciones:
-        alumno = (
-            db.query(models.user.User)
-            .filter(models.user.User.id == i.alumno_id)
-            .first()
-        )
+        alumno = alumnos_map.get(i.alumno_id)
         if alumno:
             result.append(
                 {
@@ -196,7 +203,9 @@ def alumnos_por_materia(
 
 @router.get("/")
 def list_inscripciones(
-    db: Session = Depends(database.get_db), current_user=Depends(get_current_user)
+    alumno_id: Optional[int] = Query(None, description="Filtrar por alumno (admin/profesor)"),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
 ):
     if current_user.role == "alumno":
         rows = (
@@ -205,5 +214,8 @@ def list_inscripciones(
             .all()
         )
     else:
-        rows = db.query(models.inscripcion.Inscripcion).all()
+        q = db.query(models.inscripcion.Inscripcion)
+        if alumno_id:
+            q = q.filter(models.inscripcion.Inscripcion.alumno_id == alumno_id)
+        rows = q.all()
     return [_to_out(db, i) for i in rows]

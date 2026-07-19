@@ -41,7 +41,11 @@ class RefreshRequest(BaseModel):
 
 class RecuperarRequest(BaseModel):
     username_or_email: str
-    matricula: str | None = None  # verificación adicional opcional
+
+
+class RegistroRequest(BaseModel):
+    documento: str
+    matricula: str
 
 
 class UserOut(BaseModel):
@@ -51,10 +55,6 @@ class UserOut(BaseModel):
     nombre: str | None = None
     email: str | None = None
     carrera_id: int | None = None
-    carrera_nombre: str | None = None   # nombre de la carrera (join)
-    semestre: int | None = None          # semestre actual de la carrera
-    legajo: str | None = None            # legajo real del alumno (= username para esta institución)
-    fuente_beca: str | None = None       # fuente de la beca si es becado
     es_becado: bool | None = None
     foto_url: str | None = None
     created_at: datetime | None = None
@@ -67,29 +67,10 @@ class UserListOut(BaseModel):
     total: int
 
 
-class RegistroRequest(BaseModel):
-    """Solicitud de registro de nuevo alumno."""
-    documento: str = Field(..., min_length=5, max_length=20)
-    matricula: str = Field(..., min_length=3, max_length=30)
-    documento_extranjero: str | None = None
-    pais_documento: str | None = None
+class AlumnoSimpleOut(BaseModel):
+    id: int
+    nombre: str
+    username: str
+    role: str
 
-
-class RegistroResponse(BaseModel):
-    detail: str
-    solicitud_id: int | None = None
-
-
-class StudentSummary(BaseModel):
-    """Resumen académico completo del alumno para el Dashboard."""
-    creditos_aprobados: int
-    creditos_pendientes: int
-    creditos_totales: int
-    promedio_general: float | None
-    asistencia_promedio: float | None
-    avance_porcentaje: float
-    estado_financiero: str        # "al_dia" | "pendiente" | "vencido"
-    regularidad_activa: bool
-    materias_cursando: int
-    carrera_nombre: str | None
-    semestre_actual: int | None
+    model_config = {"from_attributes": True}

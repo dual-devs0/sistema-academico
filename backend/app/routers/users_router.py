@@ -13,6 +13,7 @@ from typing import Optional
 from app import models, schemas, database
 from app.security import hash_password
 from app.dependencias import get_current_user
+from app.models.refresh_token import RefreshToken
 from app.services.storage import subir_archivo, obtener_url_firmada
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -52,6 +53,8 @@ def get_me(
     )
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.foto_url:
+        user.foto_url = obtener_url_firmada(user.foto_url)
     return user
 
 
@@ -166,6 +169,9 @@ def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     # Delete related records first
+    db.query(RefreshToken).filter(
+        RefreshToken.usuario_id == user_id
+    ).delete()
     db.query(models.asistencia.Asistencia).filter(
         models.asistencia.Asistencia.user_id == user_id
     ).delete()

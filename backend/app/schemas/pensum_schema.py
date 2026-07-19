@@ -13,6 +13,7 @@ class PensumMateriaOut(BaseModel):
     carrera_id: int
     materia_id: int
     materia_nombre: str | None = None
+    materia_codigo: str | None = None
     semestre: int
     creditos: int
     es_electiva: bool
@@ -45,10 +46,13 @@ class AvanceMateriaOut(BaseModel):
     pensum_materia_id: int
     materia_id: int
     materia_nombre: str
+    materia_codigo: str | None = None
     semestre: int
     creditos: int
     estado: str
+    nota: float | None = None
     pendientes: list[PendienteOut] = []
+    prerequisitos: list[PendienteOut] = []
 
 
 class CreditosAlumnoOut(BaseModel):

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   RefreshControl,
-  ScrollView,
   Text,
   View,
   ViewStyle,
@@ -12,6 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useTabBarScroll } from "../../hooks/useHideOnScroll";
+import { useTabNavigation } from "../../hooks/TabNavigationContext";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { StatCard } from "../../components/ui/StatCard";
@@ -117,11 +118,19 @@ const staggerDelay = (index: number, step = 35) => Math.min(index * step, MAX_ST
 
 export default function DashboardScreen() {
   const { colors } = useTheme();
-const router = useRouter();
+  const router = useRouter();
+  const { scrollHandler, contentBottomPadding } = useTabBarScroll();
+  const switchTab = useTabNavigation();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => forceUpdate((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -176,8 +185,11 @@ const router = useRouter();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingBottom: contentBottomPadding }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -239,10 +251,10 @@ const router = useRouter();
             onOpenCuenta={() => router.push("/cuenta")}
             onOpenExamenes={() => router.push("/examenes")}
             onOpenScanner={() => router.push("/scanner")}
-            onOpenAgenda={() => router.push("/(tabs)/horario")}
+            onOpenAgenda={() => switchTab("horario")}
           />
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }

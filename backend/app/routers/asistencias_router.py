@@ -311,23 +311,30 @@ def cargar_asistencia_lote(
     actualizados = 0
     ausentes_user_ids = []
 
-    for reg in lote.registros:
-        alumno = (
-            db.query(models.user.User)
-            .filter(models.user.User.id == reg.user_id)
-            .first()
+    # batch pre-fetch: 2 queries fijas en vez de 2 × N
+    lote_user_ids = [r.user_id for r in lote.registros]
+    users_map = {
+        u.id: u
+        for u in db.query(models.user.User)
+        .filter(models.user.User.id.in_(lote_user_ids))
+        .all()
+    }
+    existentes_map = {
+        a.user_id: a
+        for a in db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.user_id.in_(lote_user_ids),
+            models.asistencia.Asistencia.oferta_materia_id == oferta_id,
+            models.asistencia.Asistencia.fecha == lote.fecha,
         )
+        .all()
+    }
+
+    for reg in lote.registros:
+        alumno = users_map.get(reg.user_id)
         es_becado = alumno.es_becado if alumno else False
 
-        existing = (
-            db.query(models.asistencia.Asistencia)
-            .filter(
-                models.asistencia.Asistencia.user_id == reg.user_id,
-                models.asistencia.Asistencia.oferta_materia_id == oferta_id,
-                models.asistencia.Asistencia.fecha == lote.fecha,
-            )
-            .first()
-        )
+        existing = existentes_map.get(reg.user_id)
         if existing:
             existing.presente = reg.presente
             existing.es_becado = es_becado
@@ -390,25 +397,30 @@ def alumnos_asistencia(
         alumnos = alumnos.filter(models.user.User.es_becado == becado)
     alumnos = alumnos.all()
 
+    from sqlalchemy import func, case as sa_case
+
+    alumno_ids_list = [a.id for a in alumnos]
+    # GROUP BY: 1 query total en vez de 2 × N
+    conteos_raw = (
+        db.query(
+            models.asistencia.Asistencia.user_id,
+            func.count().label("total"),
+            func.sum(
+                sa_case((models.asistencia.Asistencia.presente == True, 1), else_=0)
+            ).label("presentes"),
+        )
+        .filter(
+            models.asistencia.Asistencia.user_id.in_(alumno_ids_list),
+            models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
+        )
+        .group_by(models.asistencia.Asistencia.user_id)
+        .all()
+    )
+    conteos = {row.user_id: (row.total, int(row.presentes or 0)) for row in conteos_raw}
+
     result = []
     for a in alumnos:
-        total = (
-            db.query(models.asistencia.Asistencia)
-            .filter(
-                models.asistencia.Asistencia.user_id == a.id,
-                models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
-            )
-            .count()
-        )
-        presentes = (
-            db.query(models.asistencia.Asistencia)
-            .filter(
-                models.asistencia.Asistencia.user_id == a.id,
-                models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
-                models.asistencia.Asistencia.presente,
-            )
-            .count()
-        )
+        total, presentes = conteos.get(a.id, (0, 0))
         pct = round((presentes / total) * 100, 1) if total > 0 else 0.0
         result.append(
             schemas.asistencia.AlumnoAsistenciaOut(
@@ -710,17 +722,20 @@ def profesor_alumnos(
     )
 
     fecha_date = date.fromisoformat(fecha) if fecha else date.today()
+    # batch: 1 query en vez de 1 × N
+    asis_map = {
+        a_row.user_id: a_row
+        for a_row in db.query(models.asistencia.Asistencia)
+        .filter(
+            models.asistencia.Asistencia.user_id.in_([a.id for a in alumnos]),
+            models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
+            models.asistencia.Asistencia.fecha == fecha_date,
+        )
+        .all()
+    }
     result = []
     for a in alumnos:
-        asistencia = (
-            db.query(models.asistencia.Asistencia)
-            .filter(
-                models.asistencia.Asistencia.user_id == a.id,
-                models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
-                models.asistencia.Asistencia.fecha == fecha_date,
-            )
-            .first()
-        )
+        asistencia = asis_map.get(a.id)
         result.append(
             schemas.asistencia.ProfesorAlumnoOut(
                 id=a.id,

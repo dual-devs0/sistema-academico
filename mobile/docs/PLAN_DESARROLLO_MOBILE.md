@@ -106,17 +106,46 @@ nuevo token al resolver. Si el refresh falla → cola completa se rechaza,
 URL para `/auth/login` y `/auth/refresh` evita recursión. Ver
 `services/api.ts:57-134`.
 
-### Refresh token en SecureStore
-Access token vive solo en memoria (ref en `useAuth`, no state — no
-re-renders al rotarlo). Refresh persiste en `expo-secure-store` (keychain
-iOS con `kSecAttrAccessibleAfterFirstUnlock` / EncryptedSharedPreferences
-Android). Al bootear se intenta canjear por access nuevo.
+### Sesión en memoria — sin persistencia en disco
+**A partir de 2026-07-17:** `useAuth` eliminó toda persistencia en
+`SecureStore`. Ambos tokens (`access_token` y `refresh_token`) viven
+exclusivamente en `useRef` — nunca se escriben a disco. Al cerrar la app
+se pierde todo → siempre pide login al reabrir.
+- En frío: `configureApi` + `setStatus("anon")` → `AuthGate` redirige a login.
+- En background→foreground: `AppState.addEventListener("change")` limpia
+  los refs y fuerza `status = "anon"` → re-login obligatorio.
+- `firstActive` ref evita el disparo en el mount inicial.
+
+### Refresh token rota cada sesión
+Al hacer login, `handleLogin()` en `login.tsx` llama `loginRequest()`
+directo, guarda tokens vía `setTokens()`, y `confirmAuth()` se dispara
+tras 2.2s (tiempo de la animación `WelcomeOverlay`). Así la pantalla de
+bienvenida se muestra completa antes de que `AuthGate` redirija a tabs.
 
 ### Backend acepta refresh por body **o** cookie
 El endpoint `/auth/refresh` fue modificado para leer `refresh_token` del
 body además del cookie. Precedencia: body > cookie. Móvil manda body
 (cookies HTTP-only no persisten confiablemente en apps nativas entre
 reinicios); web sigue usando la cookie. Ver `../backend/app/routers/auth_router.py:94`.
+
+### Tab bar custom con indicator sincronizado al swipe
+El tab bar usa `scrollProgressSV` (SharedValue) actualizado directamente
+desde `onPageScroll` del `PagerView` (@expo/ui/community/pager-view) con
+directiva `"worklet"` — corre en UI thread sin pasar por JS bridge. El
+pill interpolado con `useAnimatedStyle` sigue la posición en tiempo real.
+Iconos y labels se sincronizan vía `nearestIdxSV` + `useAnimatedReaction`.
+
+`TabNavigationContext` expone `switchTab(key)` para que cualquier
+screen interna pueda cambiar de tab programáticamente (ej. "Ver agenda"
+en Dashboard → `switchTab("horario")`).
+
+### Back inteligente con primer tab
+`BackExitGuard` en `app/_layout.tsx` intercepta `hardwareBackPress`.
+Si `activeTabIndex > 0` (usuario no está en dashboard), llama
+`goToFirstTab()` → `pagerRef.current?.setPage(0)` y vuelve al inicio.
+Si ya está en tab 0 → `BackHandler.exitApp()`.
+`activeTabIndex` se actualiza globalmente desde cada `onPageSelected` en
+el layout de tabs (`utils/currentTab.ts`).
 
 ### expo-blur en vez de @react-native-community/blur
 El paquete de la comunidad está deprecado para managed Expo. `expo-blur`

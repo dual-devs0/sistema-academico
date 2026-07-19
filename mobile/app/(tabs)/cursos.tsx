@@ -1,10 +1,11 @@
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated as RNAnimated,
+  PanResponder,
   Pressable,
   RefreshControl,
-  ScrollView,
   Text,
   View,
   Modal,
@@ -12,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Animated, { FadeInDown, FadeIn, SlideInDown } from "react-native-reanimated";
+import { useTabBarScroll } from "../../hooks/useHideOnScroll";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
@@ -245,7 +247,8 @@ function TriggerRow({
   esActual: boolean;
   onPress: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
   return (
     <View
       style={{
@@ -255,20 +258,20 @@ function TriggerRow({
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: "#1e2128",
+        borderBottomColor: colors.border,
         marginTop: spacing.sm,
       }}
     >
       <Text
         style={{
-          color: "#13D6FF",
+          color: colors.cyan,
           fontFamily: fontFamily.interMedium,
           fontSize: 13,
         }}
         numberOfLines={1}
       >
         Visualizando:{" "}
-        <Text style={{ color: "#e2e4ec", fontFamily: fontFamily.interSemibold }}>
+        <Text style={{ color: colors.textPrimary, fontFamily: fontFamily.interSemibold }}>
           {semestre != null ? `${ordinalSem(semestre)}` : "—"}
           {esActual ? " (Actual)" : ""}
         </Text>
@@ -280,9 +283,9 @@ function TriggerRow({
           flexDirection: "row",
           alignItems: "center",
           gap: 7,
-          backgroundColor: "#13151c",
+          backgroundColor: isDark ? "#13151c" : colors.glassBg,
           borderWidth: 1,
-          borderColor: pressed ? "#13D6FF44" : "#2a2d35",
+          borderColor: pressed ? colors.cyan + "44" : colors.border,
           borderRadius: 10,
           paddingHorizontal: 12,
           paddingVertical: 7,
@@ -290,13 +293,13 @@ function TriggerRow({
         })}
       >
         <View style={{ gap: 2.5 }}>
-          <View style={{ width: 14, height: 1.5, borderRadius: 1, backgroundColor: "#8ab4be" }} />
-          <View style={{ width: 10, height: 1.5, borderRadius: 1, backgroundColor: "#8ab4be" }} />
-          <View style={{ width: 14, height: 1.5, borderRadius: 1, backgroundColor: "#8ab4be" }} />
+          <View style={{ width: 14, height: 1.5, borderRadius: 1, backgroundColor: colors.textSecondary }} />
+          <View style={{ width: 10, height: 1.5, borderRadius: 1, backgroundColor: colors.textSecondary }} />
+          <View style={{ width: 14, height: 1.5, borderRadius: 1, backgroundColor: colors.textSecondary }} />
         </View>
         <Text
           style={{
-            color: "#13D6FF",
+            color: colors.cyan,
             fontFamily: fontFamily.monoMedium,
             fontSize: 11,
             fontWeight: "600",
@@ -418,7 +421,38 @@ function SemestreSheet({
   onSelect: (s: number) => void;
   onClose: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
+
+  const swipeYRef = useRef<RNAnimated.Value | null>(null);
+  if (swipeYRef.current === null) swipeYRef.current = new RNAnimated.Value(0);
+  const swipeY = swipeYRef.current;
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8,
+        onPanResponderMove: (_, gs) => {
+          if (gs.dy > 0) swipeY.setValue(gs.dy);
+        },
+        onPanResponderRelease: (_, gs) => {
+          if (gs.dy > 100 || gs.vy > 0.5) {
+            RNAnimated.timing(swipeY, {
+              toValue: 400,
+              duration: 220,
+              useNativeDriver: true,
+            }).start(onClose);
+          } else {
+            RNAnimated.spring(swipeY, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    [onClose, swipeY],
+  );
+
   if (!visible) return null;
 
   const ordenados = [...disponibles].sort((a, b) => b - a);
@@ -439,251 +473,250 @@ function SemestreSheet({
     >
       <Animated.View
         entering={FadeIn.duration(200)}
-        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" }}
+        style={{ flex: 1, backgroundColor: isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}
       >
-        <Pressable style={{ position: "absolute", inset: 0 }} onPress={onClose} />
+        <Pressable style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }} onPress={onClose} />
 
-        <Animated.View
-          entering={SlideInDown.duration(280)}
-          style={{
-            backgroundColor: "#13151c",
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            borderTopWidth: 1,
-            borderColor: "#23262f",
-            paddingBottom: 20,
-          }}
+        <RNAnimated.View
+          style={{ transform: [{ translateY: swipeY }] }}
         >
-          <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}>
-            <View style={{ width: 34, height: 4, borderRadius: 2, backgroundColor: "#2a2d35" }} />
-          </View>
-
-          <View
+          <Animated.View
+            entering={SlideInDown.duration(280)}
             style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              paddingHorizontal: 20,
-              paddingTop: 14,
-              paddingBottom: 12,
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              borderTopWidth: 1,
+              borderColor: colors.border,
+              paddingBottom: 20,
             }}
           >
-            <View>
-              <Text
-                style={{
-                  color: "#5a6070",
-                  fontFamily: fontFamily.interMedium,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  marginBottom: 3,
-                }}
-              >
-                PERÍODO ACADÉMICO
-              </Text>
-              <Text
-                style={{
-                  color: "#e2e4ec",
-                  fontFamily: fontFamily.interSemibold,
-                  fontSize: 17,
-                }}
-              >
-                Seleccionar semestre
-              </Text>
+            <View {...panResponder.panHandlers} style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}>
+              <View style={{ width: 34, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
             </View>
 
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => ({
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                backgroundColor: "#1e2128",
-                borderWidth: 1,
-                borderColor: "#2a2d35",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                marginTop: 2,
-                opacity: pressed ? 0.75 : 1,
-              })}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                paddingHorizontal: 20,
+                paddingTop: 14,
+                paddingBottom: 12,
+              }}
             >
-              <Text style={{ color: "#5a6070", fontSize: 13 }}>✕</Text>
-            </Pressable>
-          </View>
+              <View>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontFamily: fontFamily.interMedium,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    marginBottom: 3,
+                  }}
+                >
+                  PERÍODO ACADÉMICO
+                </Text>
+                <Text
+                  style={{
+                    color: colors.textPrimary,
+                    fontFamily: fontFamily.interSemibold,
+                    fontSize: 17,
+                  }}
+                >
+                  Seleccionar semestre
+                </Text>
+              </View>
 
-          <View style={{ height: 1, backgroundColor: "#1e2128", marginHorizontal: 20 }} />
+              <Pressable
+                onPress={onClose}
+                style={({ pressed }) => ({
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: isDark ? "#1e2128" : colors.glassBg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  marginTop: 2,
+                  opacity: pressed ? 0.75 : 1,
+                })}
+              >
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>✕</Text>
+              </Pressable>
+            </View>
 
-          <ScrollView
-            style={{ maxHeight: 340 }}
-            contentContainerStyle={{ paddingVertical: 6, paddingBottom: 20 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {ordenados.map((s, i) => {
-              const estado = estadoSem(s);
-              const isSelected = s === selected;
-              const info = promediosPorSemestre?.get(s);
-              const anio = info?.anio;
-              const promedio = info?.promedio;
+            <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 20 }} />
 
-              const chipBg =
-                estado === "actual" ? "#13D6FF" : estado === "aprobado" ? "#0e2a1a" : "#1a1d26";
-              const chipTextColor =
-                estado === "actual" ? "#0a0e17" : estado === "aprobado" ? "#22c55e" : "#3a4050";
-              const chipBorderColor = estado === "aprobado" ? "#22c55e33" : "#23262f";
+            <Animated.ScrollView
+              style={{ maxHeight: 340 }}
+              contentContainerStyle={{ paddingVertical: 6, paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {ordenados.map((s, i) => {
+                const estado = estadoSem(s);
+                const isSelected = s === selected;
+                const info = promediosPorSemestre?.get(s);
+                const anio = info?.anio;
+                const promedio = info?.promedio;
 
-              const subColor =
-                estado === "actual" ? "#00D1FF" : estado === "aprobado" ? "#22c55e" : "#5a6070";
-              const subText =
-                estado === "actual"
-                  ? `En curso · ${anio ?? new Date().getFullYear()}`
-                  : estado === "aprobado" && promedio != null
-                    ? `Promedio: ${promedio.toFixed(1)} · ${anio ?? ""}`
-                    : anio
-                      ? `${anio}`
-                      : "Próximo";
+                const chipBg =
+                  estado === "actual" ? "#13D6FF" : estado === "aprobado" ? "#0e2a1a" : "#1a1d26";
+                const chipTextColor =
+                  estado === "actual" ? "#0a0e17" : estado === "aprobado" ? "#22c55e" : "#3a4050";
+                const chipBorderColor = estado === "aprobado" ? "#22c55e33" : "#23262f";
 
-              const badgeLabel =
-                estado === "actual" ? "ACTUAL" : estado === "aprobado" ? "APROBADO" : "FUTURO";
-              const badgeBg =
-                estado === "actual"
-                  ? "rgba(19,214,255,0.10)"
-                  : estado === "aprobado"
-                    ? "rgba(34,197,94,0.09)"
-                    : "#1a1d26";
-              const badgeBorder =
-                estado === "actual"
-                  ? "rgba(19,214,255,0.2)"
-                  : estado === "aprobado"
-                    ? "rgba(34,197,94,0.16)"
-                    : "#23262f";
-              const badgeTextColor =
-                estado === "actual" ? "#13D6FF" : estado === "aprobado" ? "#22c55e" : "#3a4050";
+                const subColor =
+                  estado === "actual" ? colors.cyan : estado === "aprobado" ? "#22c55e" : colors.textSecondary;
+                const subText =
+                  estado === "actual"
+                    ? `En curso · ${anio ?? new Date().getFullYear()}`
+                    : estado === "aprobado" && promedio != null
+                      ? `Promedio: ${promedio.toFixed(1)} · ${anio ?? ""}`
+                      : anio
+                        ? `${anio}`
+                        : "Próximo";
 
-              return (
-                <Animated.View key={s} entering={FadeInDown.delay(i * 45).duration(220)}>
-                  <Pressable
-                    onPress={() => onSelect(s)}
-                    style={({ pressed }) => ({
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 20,
-                      paddingVertical: 12,
-                      gap: 12,
-                      backgroundColor:
-                        estado === "actual"
-                          ? pressed
-                            ? "#13202a"
-                            : "#0e1e26"
-                          : pressed
-                            ? "#13202a"
-                            : "transparent",
-                    })}
-                  >
-                    {/* num-chip — 34x34, flexShrink:0 para que nunca se
-                        deforme */}
-                    <View
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 10,
+                const badgeLabel =
+                  estado === "actual" ? "ACTUAL" : estado === "aprobado" ? "APROBADO" : "FUTURO";
+                const badgeBg =
+                  estado === "actual"
+                    ? "rgba(19,214,255,0.10)"
+                    : estado === "aprobado"
+                      ? "rgba(34,197,94,0.09)"
+                      : isDark ? "#1a1d26" : colors.glassBg;
+                const badgeBorder =
+                  estado === "actual"
+                    ? "rgba(19,214,255,0.2)"
+                    : estado === "aprobado"
+                      ? "rgba(34,197,94,0.16)"
+                      : colors.border;
+                const badgeTextColor =
+                  estado === "actual" ? "#13D6FF" : estado === "aprobado" ? "#22c55e" : colors.textSecondary;
+
+                return (
+                  <Animated.View key={s} entering={FadeInDown.delay(i * 45).duration(220)}>
+                    <Pressable
+                      onPress={() => onSelect(s)}
+                      style={({ pressed }) => ({
+                        flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: chipBg,
-                        borderWidth: estado !== "actual" ? 1 : 0,
-                        borderColor: chipBorderColor,
-                        flexShrink: 0,
-                      }}
+                        paddingHorizontal: 20,
+                        paddingVertical: 12,
+                        gap: 12,
+                        backgroundColor:
+                          estado === "actual"
+                            ? pressed
+                              ? isDark ? "#13202a" : colors.glassBg
+                              : isDark ? "#0e1e26" : "transparent"
+                            : pressed
+                              ? isDark ? "#13202a" : colors.glassBg
+                              : "transparent",
+                      })}
                     >
-                      <Text
+                      <View
                         style={{
-                          fontFamily: fontFamily.interBold,
-                          fontSize: 13,
-                          color: chipTextColor,
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: chipBg,
+                          borderWidth: estado !== "actual" ? 1 : 0,
+                          borderColor: chipBorderColor,
+                          flexShrink: 0,
                         }}
                       >
-                        {s}
-                      </Text>
-                    </View>
-
-                    {/* sem-info — único elemento flexible de la fila */}
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Text
                           style={{
-                            color: "#e2e4ec",
-                            fontFamily: fontFamily.interSemibold,
+                            fontFamily: fontFamily.interBold,
                             fontSize: 13,
+                            color: chipTextColor,
                           }}
-                          numberOfLines={1}
                         >
-                          {ordinalSem(s)}
+                          {s}
                         </Text>
-                        {/* badge — inline junto al nombre */}
-                        <View
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 10,
-                            backgroundColor: badgeBg,
-                            borderWidth: 1,
-                            borderColor: badgeBorder,
-                            flexShrink: 0,
-                          }}
-                        >
+                      </View>
+
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                           <Text
                             style={{
-                              fontSize: 9,
-                              fontFamily: fontFamily.interBold,
-                              letterSpacing: 0.9,
-                              color: badgeTextColor,
+                              color: colors.textPrimary,
+                              fontFamily: fontFamily.interSemibold,
+                              fontSize: 13,
                             }}
                             numberOfLines={1}
                           >
-                            {badgeLabel}
+                            {ordinalSem(s)}
                           </Text>
-                        </View>
-                        {/* check — inline junto al badge, solo si está seleccionado */}
-                        {isSelected && (
                           <View
                             style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: 9,
-                              backgroundColor: "#13D6FF",
-                              alignItems: "center",
-                              justifyContent: "center",
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 10,
+                              backgroundColor: badgeBg,
+                              borderWidth: 1,
+                              borderColor: badgeBorder,
                               flexShrink: 0,
                             }}
                           >
-                            <Svg width={10} height={8} viewBox="0 0 10 8" fill="none">
-                              <Path
-                                d="M1 4L3.5 6.5L9 1"
-                                stroke="#0a0e17"
-                                strokeWidth={1.8}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </Svg>
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontFamily: fontFamily.interBold,
+                                letterSpacing: 0.9,
+                                color: badgeTextColor,
+                              }}
+                              numberOfLines={1}
+                            >
+                              {badgeLabel}
+                            </Text>
                           </View>
-                        )}
+                          {isSelected && (
+                            <View
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                backgroundColor: colors.cyan,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Svg width={10} height={8} viewBox="0 0 10 8" fill="none">
+                                <Path
+                                  d="M1 4L3.5 6.5L9 1"
+                                  stroke={isDark ? "#0a0e17" : "#0a0e17"}
+                                  strokeWidth={1.8}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </Svg>
+                            </View>
+                          )}
+                        </View>
+                        <Text
+                          style={{ fontSize: 11, fontFamily: fontFamily.inter, color: subColor }}
+                          numberOfLines={1}
+                        >
+                          {subText}
+                        </Text>
                       </View>
-                      <Text
-                        style={{ fontSize: 11, fontFamily: fontFamily.inter, color: subColor }}
-                        numberOfLines={1}
-                      >
-                        {subText}
-                      </Text>
-                    </View>
-                  </Pressable>
+                    </Pressable>
 
-                  {i < ordenados.length - 1 && (
-                    <View style={{ height: 1, backgroundColor: "#1a1d24", marginLeft: 66 }} />
-                  )}
-                </Animated.View>
-              );
-            })}
-          </ScrollView>
-        </Animated.View>
+                    {i < ordenados.length - 1 && (
+                      <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 66 }} />
+                    )}
+                  </Animated.View>
+                );
+              })}
+            </Animated.ScrollView>
+          </Animated.View>
+        </RNAnimated.View>
       </Animated.View>
     </Modal>
   );
@@ -786,13 +819,17 @@ function AsistenciaGrid({
   onPressMateriaId: (id: number) => void;
 }) {
   const { colors } = useTheme();
+  const { scrollHandler, contentBottomPadding } = useTabBarScroll();
   return (
-    <ScrollView
+    <Animated.ScrollView
+      showsVerticalScrollIndicator={false}
       style={{ flex: 1 }}
+      onScroll={scrollHandler}
+      scrollEventThrottle={16}
       contentContainerStyle={{
         paddingHorizontal: spacing.md,
-        paddingBottom: spacing["3xl"],
         gap: spacing.sm,
+        paddingBottom: contentBottomPadding,
       }}
       refreshControl={
         <RefreshControl
@@ -823,7 +860,7 @@ function AsistenciaGrid({
           </View>
         ))
       )}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
@@ -841,15 +878,19 @@ function CalificacionesView({
   onRefresh: () => void;
 }) {
   const { colors } = useTheme();
+  const { scrollHandler, contentBottomPadding } = useTabBarScroll();
   const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
-    <ScrollView
+    <Animated.ScrollView
+      showsVerticalScrollIndicator={false}
       style={{ flex: 1 }}
+      onScroll={scrollHandler}
+      scrollEventThrottle={16}
       contentContainerStyle={{
         paddingHorizontal: spacing.xl,
-        paddingBottom: spacing["3xl"],
         gap: spacing.sm,
+        paddingBottom: contentBottomPadding,
       }}
       refreshControl={
         <RefreshControl
@@ -994,7 +1035,7 @@ function CalificacionesView({
           );
         })
       )}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 

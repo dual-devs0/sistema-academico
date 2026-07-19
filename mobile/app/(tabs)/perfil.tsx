@@ -5,17 +5,28 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
+  StyleProp,
   Text,
   View,
+  ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  cancelAnimation,
+} from "react-native-reanimated";
+import { useTabBarScroll } from "../../hooks/useHideOnScroll";
 import Svg, { Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { UserAvatar } from "../../components/ui/UserAvatar";
-import { StatCard } from "../../components/ui/StatCard";
 import { SettingRow } from "../../components/ui/SettingRow";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
@@ -42,6 +53,7 @@ import {
  */
 export default function PerfilScreen() {
   const { colors } = useTheme();
+  const { scrollHandler, contentBottomPadding } = useTabBarScroll();
 const { logout } = useAuth();
   const theme = useTheme();
   const biometry = useBiometry();
@@ -90,8 +102,6 @@ const { logout } = useAuth();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function showToast(msg: string) {
-  const { colors } = useTheme();
-
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
@@ -101,7 +111,6 @@ const { logout } = useAuth();
 
   const handleBiometryToggle = async (v: boolean) => {
     if (!biometry.available) {
-  const { colors } = useTheme();
       showToast("Biometría no disponible en este dispositivo");
       return;
     }
@@ -117,8 +126,11 @@ const { logout } = useAuth();
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <ScreenHeader title="Perfil" hideAvatar />
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingBottom: contentBottomPadding }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -147,21 +159,13 @@ const { logout } = useAuth();
                 gap: spacing.md,
               }}
             >
-              <StatCard
-                label="PROMEDIO"
-                value={promedio != null ? promedio.toFixed(2) : "—"}
-                footer={
-                  resumen?.cantidad_materias
-                    ? `${resumen.cantidad_materias} materias`
-                    : "sin datos"
-                }
+              <PromedioCard
+                promedio={promedio}
+                materiasCount={resumen?.cantidad_materias}
                 style={{ flex: 1 }}
               />
-              <StatCard
-                label="REGULARIDAD"
-                value={regularidadActiva ? "● Activa" : "● Riesgo"}
-                valueColor={regularidadActiva ? colors.success : colors.warning}
-                footer={regularidadActiva ? "asistencia OK" : "revisar asistencia"}
+              <RegularidadCard
+                activa={regularidadActiva}
                 style={{ flex: 1 }}
               />
             </View>
@@ -246,28 +250,28 @@ const { logout } = useAuth();
                   opacity: pressed ? 0.8 : 1,
                 })}
               >
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: "rgba(239,68,68,0.2)",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <LogoutIcon />
-                </View>
-                <Text
-                  style={{
-                    color: "#fca5a5",
-                    fontFamily: fontFamily.interSemibold,
-                    fontSize: fontSize.body,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Cerrar Sesión
-                </Text>
+              <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: "rgba(239,68,68,0.15)",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <LogoutIcon />
+                  </View>
+                  <Text
+                    style={{
+                      color: colors.error,
+                      fontFamily: fontFamily.interSemibold,
+                      fontSize: fontSize.body,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    Cerrar Sesión
+                  </Text>
               </Pressable>
             </View>
 
@@ -278,14 +282,14 @@ const { logout } = useAuth();
             />
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <FaqModal visible={faqOpen} onClose={() => setFaqOpen(false)} />
       <TermsModal visible={termsOpen} onClose={() => setTermsOpen(false)} />
 
       {toast ? (
         <Animated.View
-          entering={FadeInDown.duration(200)}
+          entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}
           style={{
             position: "absolute",
             left: spacing.xl,
@@ -442,6 +446,192 @@ function IdentitySection({
         ) : null}
       </View>
     </Animated.View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PromedioCard — moderna, sin rastro "IA"                          
+// ---------------------------------------------------------------------------
+
+function PromedioCard({
+  promedio,
+  materiasCount,
+  style,
+}: {
+  promedio: number | null | undefined;
+  materiasCount?: number;
+  style?: ViewStyle;
+}) {
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
+  const val = promedio != null ? promedio.toFixed(2) : "—";
+  const pct = promedio != null ? Math.min(promedio / 10, 1) : 0;
+
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: isDark ? "#11151c" : colors.surface,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: isDark ? "rgba(255,255,255,0.06)" : colors.border,
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    >
+      {/* Barra superior gradiente */}
+      <View style={{ height: 3, backgroundColor: colors.cyan }} />
+      <View style={{ padding: spacing.md, gap: spacing.sm }}>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontFamily: fontFamily.interMedium,
+            fontSize: 12,
+            letterSpacing: 1.5,
+          }}
+        >
+          PROMEDIO
+        </Text>
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontFamily: fontFamily.monoBold,
+            fontSize: 28,
+            lineHeight: 30,
+            letterSpacing: -1,
+          }}
+        >
+          {val}
+        </Text>
+        {/* Ruler 0–10 */}
+        <View
+          style={{
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: isDark ? "#1f2430" : "#e2e8f0",
+            marginTop: 2,
+            overflow: "hidden",
+          }}
+        >
+          <View
+            style={{
+              width: `${pct * 100}%`,
+              height: "100%",
+              backgroundColor: colors.cyan,
+              borderRadius: 2,
+            }}
+          />
+        </View>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontFamily: fontFamily.inter,
+            fontSize: 12,
+          }}
+        >
+          {materiasCount != null ? `${materiasCount} materias` : "—"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RegularidadCard — status con pulso visual                          
+// ---------------------------------------------------------------------------
+
+function RegularidadCard({
+  activa,
+  style,
+}: {
+  activa: boolean;
+  style?: ViewStyle;
+}) {
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
+  const dotGlow = useSharedValue(1);
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: dotGlow.value,
+  }));
+
+  useEffect(() => {
+    if (activa) {
+      dotGlow.value = withRepeat(
+        withTiming(0.35, { duration: 1600, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      );
+    } else {
+      dotGlow.value = withTiming(1);
+    }
+    return () => cancelAnimation(dotGlow);
+  }, [activa, dotGlow]);
+
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: isDark ? "#11151c" : colors.surface,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: isDark ? "rgba(255,255,255,0.06)" : colors.border,
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    >
+      {/* Barra superior */}
+      <View
+        style={{
+          height: 3,
+          backgroundColor: activa ? "#22c55e" : "#f59e0b",
+        }}
+      />
+      <View style={{ padding: spacing.md, gap: spacing.sm }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Animated.View
+            style={[
+              {
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: activa ? "#22c55e" : "#f59e0b",
+              },
+              dotStyle,
+            ]}
+          />
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontFamily: fontFamily.interMedium,
+              fontSize: 12,
+              letterSpacing: 1.5,
+            }}
+          >
+            REGULARIDAD
+          </Text>
+        </View>
+        <Text
+          style={{
+            color: activa ? "#22c55e" : "#f59e0b",
+            fontFamily: fontFamily.interSemibold,
+            fontSize: 15,
+          }}
+        >
+          {activa ? "Activa" : "En riesgo"}
+        </Text>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontFamily: fontFamily.inter,
+            fontSize: 12,
+          }}
+        >
+          {activa ? "Asistencia al día" : "Revisar asistencia"}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -768,11 +958,12 @@ function SupportModal({
   title: string;
   children: React.ReactNode;
 }) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
-        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }}
+        style={{ flex: 1, backgroundColor: isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)" }}
         onPress={onClose}
       >
         <Pressable
@@ -815,7 +1006,7 @@ function SupportModal({
                 width: 32,
                 height: 32,
                 borderRadius: 16,
-                backgroundColor: "rgba(255,255,255,0.06)",
+                backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
                 alignItems: "center",
                 justifyContent: "center",
               }}
@@ -823,13 +1014,13 @@ function SupportModal({
               <Text style={{ color: colors.textSecondary, fontSize: 18 }}>✕</Text>
             </Pressable>
           </View>
-          <ScrollView
+          <Animated.ScrollView
             style={{ padding: spacing.xl }}
             contentContainerStyle={{ paddingBottom: spacing["3xl"] }}
             showsVerticalScrollIndicator={false}
           >
             {children}
-          </ScrollView>
+          </Animated.ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -863,21 +1054,21 @@ function LogoutIcon() {
     <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Path
         d="M15 3H19a2 2 0 012 2v14a2 2 0 01-2 2h-4"
-        stroke="#fca5a5"
+        stroke={colors.error}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <Path
         d="M10 17l5-5-5-5"
-        stroke="#fca5a5"
+        stroke={colors.error}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <Path
         d="M15 12H3"
-        stroke="#fca5a5"
+        stroke={colors.error}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -899,11 +1090,12 @@ function LogoutConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable
-        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: spacing.xl }}
+        style={{ flex: 1, backgroundColor: isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", padding: spacing.xl }}
         onPress={onClose}
       >
         <Pressable
@@ -912,12 +1104,12 @@ function LogoutConfirmModal({
             width: "100%",
             backgroundColor: colors.surface,
             borderWidth: 1,
-            borderColor: "rgba(239,68,68,0.25)",
+            borderColor: colors.logoutBorder,
             borderRadius: radius.lg,
             padding: spacing["2xl"],
             alignItems: "center",
             gap: spacing.lg,
-            shadowColor: "#ef4444",
+            shadowColor: colors.error,
             shadowOffset: { width: 0, height: 8 },
             shadowRadius: 24,
             shadowOpacity: 0.15,
@@ -929,7 +1121,7 @@ function LogoutConfirmModal({
               width: 56,
               height: 56,
               borderRadius: 28,
-              backgroundColor: "rgba(239,68,68,0.15)",
+              backgroundColor: "rgba(239,68,68,0.12)",
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -991,10 +1183,10 @@ function LogoutConfirmModal({
                 flex: 1,
                 paddingVertical: spacing.md,
                 borderRadius: radius.pill,
-                backgroundColor: "#dc2626",
+                backgroundColor: colors.error,
                 alignItems: "center",
                 opacity: pressed ? 0.8 : 1,
-                shadowColor: "#ef4444",
+                shadowColor: colors.error,
                 shadowOffset: { width: 0, height: 4 },
                 shadowRadius: 12,
                 shadowOpacity: 0.4,
@@ -1003,7 +1195,7 @@ function LogoutConfirmModal({
             >
               <Text
                 style={{
-                  color: "#fff",
+                  color: colors.background,
                   fontFamily: fontFamily.interBold,
                   fontSize: fontSize.body,
                 }}

@@ -84,6 +84,48 @@ class TestSolicitudes:
         assert r.status_code == 403
 
 
+class TestListarSolicitudes:
+    def test_alumno_ve_solo_las_propias(self, client, tokens):
+        emp_r = _crear_empresa(client, tokens["admin"])
+        _solicitar(client, tokens["alumno"], emp_r.json()["id"])
+        r = client.get(
+            "/pasantias/solicitudes",
+            headers={"Authorization": f"Bearer {tokens['alumno']}"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) >= 1
+        assert all("alumno_id" in p for p in data)
+
+    def test_admin_ve_todas_con_empresa_nombre(self, client, tokens):
+        emp_r = _crear_empresa(client, tokens["admin"], nombre="Empresa Listar SA")
+        _solicitar(client, tokens["alumno"], emp_r.json()["id"])
+        r = client.get(
+            "/pasantias/solicitudes",
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert any(p["empresa_nombre"] == "Empresa Listar SA" for p in data)
+
+    def test_admin_filtra_por_estado(self, client, tokens):
+        emp_r = _crear_empresa(client, tokens["admin"], nombre="Empresa Filtro SA")
+        _solicitar(client, tokens["alumno"], emp_r.json()["id"])
+        r = client.get(
+            "/pasantias/solicitudes?estado=pendiente",
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        )
+        assert r.status_code == 200
+        assert all(p["estado"] == "pendiente" for p in r.json())
+
+    def test_profesor_no_autorizado_403(self, client, tokens):
+        r = client.get(
+            "/pasantias/solicitudes",
+            headers={"Authorization": f"Bearer {tokens['profesor']}"},
+        )
+        assert r.status_code == 403
+
+
 @pytest.fixture()
 def aprobar_setup(client, tokens):
     emp_r = _crear_empresa(client, tokens["admin"])

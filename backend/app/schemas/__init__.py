@@ -39,4 +39,5 @@ __all__ = [
     "pasantia",
     "graduacion",
     "equivalencia",
+    "examen",
 ]

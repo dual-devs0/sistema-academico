@@ -33,6 +33,10 @@ const css = `
   .tr-estado-badge.rechazada { background:rgba(239,68,68,.15); color:#ef4444; }
   .tr-empty { text-align:center; padding:32px; color:var(--text-secondary); font-size:14px; }
   .tr-motivo { font-size:12px; color:#ef4444; margin-top:6px; }
+  .tr-skeleton { border-radius:16px; height:64px; margin-bottom:12px; background:linear-gradient(90deg,var(--bg-elevated) 25%,var(--bg-hover) 50%,var(--bg-elevated) 75%); background-size:200% 100%; animation:tr-shimmer 1.4s infinite; }
+  @keyframes tr-shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+  .tr-empty-icon { font-size:32px; margin-bottom:10px; opacity:.6; }
+  .tr-empty-title { font-weight:700; color:var(--text-primary); margin-bottom:4px; }
 `
 
 function estadoLabel(estado: string) {
@@ -47,12 +51,14 @@ function VistaAlumno() {
   const [tipos, setTipos] = useState<TipoTramite[]>([])
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [solicitando, setSolicitando] = useState<number | null>(null)
 
   const cargar = () => {
+    setLoadError(false)
     Promise.all([getTiposTramite(), getMisSolicitudes()])
       .then(([t, s]) => { setTipos(t); setSolicitudes(s) })
-      .catch(() => emitToast('Error cargando trámites', 'error'))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }
 
@@ -80,7 +86,28 @@ function VistaAlumno() {
     }
   }
 
-  if (loading) return <div className="tr-empty">Cargando…</div>
+  if (loading) {
+    return (
+      <div className="tr-section">
+        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>
+          Trámites disponibles
+        </h3>
+        {[0, 1, 2, 3].map(i => <div key={i} className="tr-skeleton" />)}
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="tr-section">
+        <div className="tr-empty">
+          <div className="tr-empty-icon">📄</div>
+          <div className="tr-empty-title">Trámites próximamente disponibles</div>
+          <div>Estamos preparando el catálogo de solicitudes académicas.</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -88,7 +115,13 @@ function VistaAlumno() {
         <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>
           Trámites disponibles
         </h3>
-        {tipos.map(t => (
+        {tipos.length === 0 ? (
+          <div className="tr-empty">
+            <div className="tr-empty-icon">📄</div>
+            <div className="tr-empty-title">Trámites próximamente disponibles</div>
+            <div>Estamos preparando el catálogo de solicitudes académicas.</div>
+          </div>
+        ) : tipos.map(t => (
           <div key={t.id} className="tr-card tr-tipo-row">
             <div>
               <div className="tr-tipo-nombre">{t.nombre}</div>

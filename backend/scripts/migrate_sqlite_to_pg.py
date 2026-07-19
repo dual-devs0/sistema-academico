@@ -108,7 +108,8 @@ def migrate():
 
     pg_engine = create_engine(PG_URL)
 
-    with pg_engine.begin() as pg_conn:
+    try:
+        with pg_engine.begin() as pg_conn:
         pg_insp = inspect(pg_engine)
         existing_tables = pg_insp.get_table_names()
 
@@ -170,10 +171,11 @@ def migrate():
                         f'COALESCE(MAX(id), 1)) FROM "{table}"'
                     )
                 )
-            except Exception:
-                pass  # tabla sin sequence serial
+            except Exception as exc:
+                print(f"  AVISO: no se pudo resetear sequence para {table}: {exc}")
 
-    sqlite_conn.close()
+    finally:
+        sqlite_conn.close()
     print("\nMigración completada.")
 
 

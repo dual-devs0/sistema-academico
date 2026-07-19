@@ -53,12 +53,12 @@ class TestResolverMateria:
 
     def test_listar_equivalencias_alumno(self, client, tokens):
         _crear_solicitud(client, tokens["alumno"])
+        current_user_id = tokens.get("alumno_id", 1)
         r = client.get(
-            "/equivalencias/alumno/1",  # alumno_id genérico
+            f"/equivalencias/alumno/{current_user_id}",
             headers={"Authorization": f"Bearer {tokens['admin']}"},
         )
-        # Si no hay alumno con id 1, rta vacía — no falla
-        assert r.status_code in (200, 422)
+        assert r.status_code == 200
 
     def test_examen_suficiencia_admin(self, client, tokens):
         r = client.post(
@@ -66,8 +66,7 @@ class TestResolverMateria:
             json={"materia_id": 1, "fecha": "2026-09-15"},
             headers={"Authorization": f"Bearer {tokens['admin']}"},
         )
-        # materia_id=1 puede no existir, solo validamos que llegue al router
-        assert r.status_code in (200, 422)
+        assert r.status_code in (200, 201, 422), f"Expected 200/201/422, got {r.status_code}: {r.text}"
 
     def test_resolver_sin_token_rechazado(self, client):
         r = client.put(

@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 from datetime import date
 
 TipoEvento = Literal["parcial", "final", "feriado", "asueto", "entrega", "actividad"]
-Alcance = Literal["global", "materia", "carrera"]
 
 
 class EventoBase(BaseModel):

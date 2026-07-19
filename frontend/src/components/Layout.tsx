@@ -122,8 +122,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    window.addEventListener('uca:help', () => setHelpOpen(true))
-    return () => window.removeEventListener('uca:help', () => setHelpOpen(true))
+    const onHelp = () => setHelpOpen(true)
+    window.addEventListener('uca:help', onHelp)
+    return () => window.removeEventListener('uca:help', onHelp)
   }, [])
 
   useEffect(() => {

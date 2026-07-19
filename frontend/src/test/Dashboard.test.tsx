@@ -49,7 +49,11 @@ describe('Dashboard', () => {
     // El sidebar debe renderizar 17 items
     await waitFor(() => {
       const sideItems = document.querySelectorAll('button.side-item')
+<<<<<<< HEAD
       expect(sideItems.length).toBe(17)
+=======
+      expect(sideItems.length).toBe(18)
+>>>>>>> origin/sistema-academico-v2
     })
   })
 

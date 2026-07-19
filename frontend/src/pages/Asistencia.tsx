@@ -15,75 +15,16 @@ interface AlumnoAsist {
 }
 
 const css = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  .as-root { padding: 28px 36px 60px; min-height: 100%; background: var(--bg-base); font-family: 'Inter', system-ui, sans-serif; color: var(--text-primary); }
-  .as-header { margin-bottom: 28px; }
-  .as-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-  .as-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
-
-  /* Alumno: layout de 2 columnas en desktop */
-  .alumno-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-  .alumno-layout-single { display: flex; flex-direction: column; gap: 20px; max-width: 560px; }
-
-  .as-scan-btn {
-    width: 220px; height: 220px; border-radius: 50%; border: 2px dashed #2a3040;
-    background: var(--bg-input); display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; cursor: pointer; transition: all 0.2s; margin: 0 auto;
-  }
-  .as-scan-btn:hover { border-color: var(--accent); background: var(--accent-muted); }
-  .as-scan-btn:active { transform: scale(0.97); }
-  .as-scan-icon { width: 48px; height: 48px; color: var(--accent); }
-  .as-scan-label { font-size: 15px; font-weight: 600; color: var(--text-primary); }
-  .as-scan-sub { font-size: 12px; color: var(--text-muted); text-align: center; max-width: 200px; }
-
-  .as-hist { margin-top: 40px; }
-  .as-hist-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 14px; }
-  .as-hist-grid { display: flex; flex-direction: column; gap: 8px; }
-  .as-hist-item {
-    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    background: var(--bg-input); border: 1px solid #2a3040; border-radius: 10px;
-  }
-  .as-hist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .as-hist-info { flex: 1; min-width: 0; }
-  .as-hist-mat { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-  .as-hist-fec { font-size: 11px; color: var(--text-muted); }
-
-  .bread { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 13px; }
-  .bread-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-family: inherit; font-size: 13px; padding: 0; }
-  .bread-btn:hover { color: var(--text-primary); }
-  .bread-sep { color: #2a3040; }
-  .bread-cur { color: var(--text-primary); font-weight: 600; }
-
-  .grid-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-  .sel-card {
-    background: var(--bg-input); border: 1px solid #2a3040; border-radius: 12px;
-    padding: 18px; cursor: pointer; transition: all 0.15s;
-  }
-  .sel-card:hover { border-color: var(--accent); background: var(--accent-muted); }
-  .sel-card:active { transform: scale(0.98); }
-  .sel-card-nom { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-  .sel-card-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
-
-  .as-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .as-toolbar-left { display: flex; align-items: center; gap: 12px; }
-  .as-toolbar-right { display: flex; align-items: center; gap: 8px; }
+  @keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
   .as-btn {
-    height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid #2a3040;
+    height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border-subtle);
     background: var(--bg-input); color: var(--text-primary); font-size: 12px; font-weight: 500;
     cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px;
     transition: all 0.15s;
   }
   .as-btn:hover { border-color: var(--accent); }
-  .as-btn-primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+  .as-btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   .as-btn-primary:hover { opacity: 0.88; }
-
-  .as-table-wrap { overflow-x: auto; border: 1px solid #2a3040; border-radius: 12px; }
-  .as-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .as-table th { text-align: left; padding: 12px 16px; background: var(--bg-input); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #2a3040; }
-  .as-table td { padding: 10px 16px; border-bottom: 1px solid var(--bg-hover); color: #cbd5e1; }
-  .as-table tr:last-child td { border-bottom: none; }
-  .as-table tr:hover td { background: var(--bg-input); }
-
   .as-badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
@@ -91,65 +32,6 @@ const css = `
   .as-badge-presente { background: #34d39915; color: #34d399; }
   .as-badge-ausente  { background: #2a3040; color: var(--text-muted); }
   .as-badge-becado   { background: #fbbf2415; color: #fbbf24; }
-
-  .as-toggle {
-    width: 36px; height: 24px; border-radius: 12px; border: none; cursor: pointer;
-    position: relative; transition: all 0.2s;
-  }
-  .as-toggle::after {
-    content: ''; position: absolute; top: 3px; left: 3px;
-    width: 18px; height: 18px; border-radius: 50%; background: #fff;
-    transition: all 0.2s;
-  }
-  .as-toggle.on  { background: #34d399; }
-  .as-toggle.on::after  { left: 15px; }
-  .as-toggle.off { background: #2a3040; }
-  .as-toggle.off::after { left: 3px; }
-
-  .as-empty {
-    text-align: center; padding: 40px 20px; color: var(--text-muted);
-  }
-  .as-empty-icon { width: 40px; height: 40px; margin: 0 auto 12px; opacity: 0.3; }
-
-  /* Alumno — instrucciones QR */
-  .qr-instruc-card {
-    background: var(--bg-input); border: 1px solid #2a3040; border-radius: 16px;
-    padding: 28px 24px; max-width: 480px; margin: 0 auto;
-  }
-  .qr-instruc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-  .qr-instruc-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .qr-instruc-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
-  .qr-instruc-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .qr-steps { display: flex; flex-direction: column; gap: 12px; }
-  .qr-step { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--bg-surface); border: 1px solid var(--bg-hover); border-radius: 10px; }
-  .qr-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-muted); border: 1px solid var(--accent-hover); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
-  .qr-step-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
-  .qr-step-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-  .qr-tip { display: flex; align-items: flex-start; gap: 8px; margin-top: 20px; padding: 12px 14px; background: #f59e0b08; border: 1px solid #f59e0b20; border-radius: 8px; font-size: 12px; color: #f59e0b; line-height: 1.5; }
-  .qr-tip svg { flex-shrink: 0; margin-top: 1px; }
-
-  /* Historial mejorado */
-  .as-hist-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; flex-shrink: 0; }
-  .as-hist-badge.presente { background: #34d39915; color: #34d399; }
-  .as-hist-badge.ausente { background: #ef444415; color: #ef4444; }
-  .as-hist-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-input); border: 1px solid #2a3040; border-radius: 10px; }
-  .as-hist-left { flex: 1; min-width: 0; }
-  .as-hist-mat { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .as-hist-fec { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-  @media(max-width:900px){
-    .alumno-layout { grid-template-columns: 1fr; }
-  }
-  @media(max-width:768px){
-    .as-root { padding: 16px 16px 80px; }
-    .grid-2 { grid-template-columns: 1fr; }
-    .qr-instruc-card { padding: 20px 16px; }
-    .as-toolbar { flex-direction: column; align-items: flex-start; }
-    .as-toolbar-right { width: 100%; justify-content: flex-end; }
-    .as-table { font-size: 12px; }
-    .as-table th, .as-table td { padding: 10px 12px; }
-    .alumno-layout { grid-template-columns: 1fr; gap: 16px; }
-  }
 `
 
 export default function Asistencia() {
@@ -169,12 +51,9 @@ export default function Asistencia() {
 type MateriaAsistRow = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
 type SesionRow = { materia_id: number; materia_nombre: string; fecha: string; presente: boolean }
 
+/* Alumno: estilos mínimos que no están en design-tokens */
 const cssAlumno = `
-  .aa-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
   .aa-alerta { background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius); padding:14px 16px; }
-  .aa-grid { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
-  .aa-mat-row { padding:12px 0; border-bottom:1px solid var(--border-subtle); }
-  .aa-mat-row:last-child { border-bottom:none; }
   .aa-fab-qr {
     position:fixed; bottom:26px; right:26px; z-index:60;
     display:flex; align-items:center; gap:8px;
@@ -183,8 +62,7 @@ const cssAlumno = `
     cursor:pointer; box-shadow:0 10px 30px var(--accent-hover); transition:transform .15s;
   }
   .aa-fab-qr:hover { transform:scale(1.05); }
-  @media(max-width:1024px){ .aa-grid { grid-template-columns:1fr; } }
-  @media(max-width:768px){ .aa-kpis { grid-template-columns:1fr 1fr; } .aa-fab-qr { bottom:80px; } }
+  @media(max-width:768px){ .aa-fab-qr { bottom:80px; } }
 `
 
 interface AsistenciaApiRow {
@@ -241,8 +119,11 @@ function AlumnoView() {
             {carreraNombre || 'Visualiza tu registro de asistencia por materia y semestre.'} Mantén un seguimiento preciso para cumplir con los requisitos académicos.
           </p>
         </div>
-        <span className="badge" style={{ background: promedioTotal >= LIMITE ? 'var(--success-subtle)' : 'var(--danger-subtle)', color: promedioTotal >= LIMITE ? 'var(--success)' : 'var(--danger)' }}>
-          <i className="ti ti-shield-check" /> Estado: {promedioTotal >= LIMITE ? 'Alumno Regular' : 'En Riesgo'}
+        <span className="badge" style={{
+          background: totalClases === 0 ? 'var(--bg-elevated)' : promedioTotal >= LIMITE ? 'var(--success-subtle)' : 'var(--danger-subtle)',
+          color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? 'var(--success)' : 'var(--danger)',
+        }}>
+          <i className="ti ti-shield-check" /> Estado: {totalClases === 0 ? 'Sin datos aún' : promedioTotal >= LIMITE ? 'Alumno Regular' : 'En Riesgo'}
         </span>
       </div>
 
@@ -251,15 +132,15 @@ function AlumnoView() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="aa-kpis">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
             <div className="kpi-card">
               <div className="mono-label" style={{ marginBottom: 8 }}>Promedio Total</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="kpi-value" style={{ fontSize: 26, color: promedioTotal >= LIMITE ? 'var(--accent-bright)' : 'var(--danger)' }}>{promedioTotal}%</span>
+                <span className="kpi-value" style={{ fontSize: 26, color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? 'var(--accent-bright)' : 'var(--danger)' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</span>
                 <i className="ti ti-trending-up" style={{ color: 'var(--success)', fontSize: 15 }} />
               </div>
               <div className="progress-track" style={{ marginTop: 8 }}>
-                <div className="progress-fill" style={{ width: `${promedioTotal}%`, background: promedioTotal >= LIMITE ? undefined : 'var(--danger)' }} />
+                <div className="progress-fill" style={{ width: `${promedioTotal}%`, background: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? undefined : 'var(--danger)' }} />
               </div>
             </div>
             <div className="kpi-card">
@@ -290,7 +171,7 @@ function AlumnoView() {
             )}
           </div>
 
-          <div className="aa-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 18, alignItems: 'start' }}>
             <div>
               {/* Cumplimiento por materia */}
               <div className="card" style={{ marginBottom: 16 }}>
@@ -300,7 +181,7 @@ function AlumnoView() {
                 ) : porMateria.map(m => {
                   const ok = m.porcentaje >= LIMITE
                   return (
-                    <div key={m.materia_id} className="aa-mat-row">
+                    <div key={m.materia_id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.materia_nombre}</span>
                         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13, color: ok ? 'var(--accent-bright)' : 'var(--danger)' }}>{m.porcentaje}%</span>
@@ -519,11 +400,11 @@ function ProfesorView() {
   return (
     <>
       <style>{css}</style>
-      <div className="as-root">
-        <div className="as-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ padding: '28px 36px 60px' }}>
+        <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div className="as-title" style={{ fontSize: 24, fontWeight: 800 }}>Control de Asistencia</div>
-            <div className="as-sub">
+            <div className="page-title" style={{ fontSize: 24, fontWeight: 800 }}>Control de Asistencia</div>
+            <div className="page-subtitle">
               {selMat
                 ? <>Materia: <span style={{ color: 'var(--accent-bright)', fontWeight: 700 }}>{selMat.nombre}</span></>
                 : 'Gestioná la asistencia de tus cursos por carrera y materia'}
@@ -538,40 +419,40 @@ function ProfesorView() {
         </div>
 
         {/* Breadcrumb */}
-        <div className="bread">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 13 }}>
           {view !== 'carreras' && (
-            <button className="bread-btn" onClick={() => { setView('carreras'); setSelCarr(null); setSelMat(null) }}>
+            <button type="button" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'} onClick={() => { setView('carreras'); setSelCarr(null); setSelMat(null) }}>
               Carreras
             </button>
           )}
-          {selCarr && view !== 'carreras' && <span className="bread-sep">/</span>}
+          {selCarr && view !== 'carreras' && <span style={{ color: 'var(--border-subtle)' }}>/</span>}
           {selCarr && view !== 'carreras' && (
             view === 'materias'
-              ? <span className="bread-cur">{selCarr.nombre}</span>
-              : <button className="bread-btn" onClick={() => { setView('materias'); setSelMat(null) }}>{selCarr.nombre}</button>
+              ? <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{selCarr.nombre}</span>
+              : <button type="button" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'} onClick={() => { setView('materias'); setSelMat(null) }}>{selCarr.nombre}</button>
           )}
-          {selMat && view === 'alumnos' && <span className="bread-sep">/</span>}
-          {selMat && view === 'alumnos' && <span className="bread-cur">{selMat.nombre}</span>}
+          {selMat && view === 'alumnos' && <span style={{ color: 'var(--border-subtle)' }}>/</span>}
+          {selMat && view === 'alumnos' && <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{selMat.nombre}</span>}
         </div>
 
         {view === 'carreras' && (
-          loading ? <div className="as-empty">Cargando carreras…</div>
-          : carreras.length === 0 ? <div className="as-empty"><div className="as-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No tenés carreras asignadas</div>
-          : <div className="grid-2">{carreras.map(c => (
-              <div key={c.id} className="sel-card" onClick={() => selectCarrera(c)}>
-                <div className="sel-card-nom">{c.nombre}</div>
-                <div className="sel-card-sub">Carrera</div>
+          loading ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>Cargando carreras…</div>
+          : carreras.length === 0 ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}><div style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.3 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No tenés carreras asignadas</div>
+          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>{carreras.map(c => (
+              <div key={c.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 18, cursor: 'pointer', transition: 'border-color 0.15s, background-color 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-muted)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-input)' }} onClick={() => selectCarrera(c)}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{c.nombre}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Carrera</div>
               </div>
             ))}</div>
         )}
 
         {view === 'materias' && (
-          loading ? <div className="as-empty">Cargando materias…</div>
-          : materias.length === 0 ? <div className="as-empty"><div className="as-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No hay materias en esta carrera</div>
-          : <div className="grid-2">{materias.map(m => (
-              <div key={m.id} className="sel-card" onClick={() => selectMateria(m)}>
-                <div className="sel-card-nom">{m.nombre}</div>
-                <div className="sel-card-sub">{m.codigo}</div>
+          loading ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>Cargando materias…</div>
+          : materias.length === 0 ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}><div style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.3 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No hay materias en esta carrera</div>
+          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>{materias.map(m => (
+              <div key={m.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 18, cursor: 'pointer', transition: 'border-color 0.15s, background-color 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-muted)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-input)' }} onClick={() => selectMateria(m)}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{m.nombre}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{m.codigo}</div>
               </div>
             ))}</div>
         )}
@@ -579,7 +460,7 @@ function ProfesorView() {
         {view === 'alumnos' && (
           <>
             {/* Grid: QR en tiempo real + KPIs/Historial */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) 1.2fr', gap: 16, marginBottom: 18 }} className="as-rt-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) 1.2fr', gap: 16, marginBottom: 18 }} >
               <style>{`@media(max-width:900px){ .as-rt-grid { grid-template-columns:1fr !important; } }`}</style>
 
               {/* Panel REGISTRO EN TIEMPO REAL */}
@@ -702,13 +583,13 @@ function ProfesorView() {
                 </div>
               </div>
             </div>
-            <div className="as-toolbar">
-              <div className="as-toolbar-left">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <input type="date" value={fecha} onChange={e => cambiarFecha(e.target.value)}
                   style={{ height: 34, padding: '0 12px', borderRadius: 8, border: '1px solid #2a3040', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit' }} />
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fechaLabel}</span>
               </div>
-              <div className="as-toolbar-right">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{presentes}/{total} presentes</span>
                 {/* QR timer badge — visible without modal */}
                 {qrActive && (
@@ -733,9 +614,9 @@ function ProfesorView() {
               </div>
             </div>
 
-            {loading ? <div className="as-empty">Cargando alumnos…</div>
-            : alumnos.length === 0 ? <div className="as-empty"><div className="as-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>No hay alumnos inscriptos en esta materia</div>
-            : <div className="as-table-wrap"><table className="as-table">
+            {loading ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>Cargando alumnos…</div>
+            : alumnos.length === 0 ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}><div style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.3 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>No hay alumnos inscriptos en esta materia</div>
+            : <div style={{ overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 12 }}><table className="table-uca">
               <thead><tr>
                 <th>N°</th>
                 <th>Alumno</th>
@@ -902,10 +783,10 @@ function AdminView() {
   return (
     <>
       <style>{css}</style>
-      <div className="as-root">
-        <div className="as-header">
-          <div className="as-title">Asistencia — Resumen institucional</div>
-          <div className="as-sub">Estadísticas de asistencia por materia en todo el sistema</div>
+      <div style={{ padding: '28px 36px 60px' }}>
+        <div style={{ marginBottom: 28 }}>
+          <div className="page-title">Asistencia — Resumen institucional</div>
+          <div className="page-subtitle">Estadísticas de asistencia por materia en todo el sistema</div>
         </div>
 
         {/* KPI cards */}
@@ -938,10 +819,10 @@ function AdminView() {
         </div>
 
         {loading ? (
-          <div className="as-empty">Cargando datos de asistencia…</div>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>Cargando datos de asistencia…</div>
         ) : filtradas.length === 0 ? (
-          <div className="as-empty">
-            <div className="as-empty-icon">
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+            <div style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.3 }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
@@ -949,8 +830,8 @@ function AdminView() {
             No se encontraron materias
           </div>
         ) : (
-          <div className="as-table-wrap">
-            <table className="as-table">
+          <div style={{ overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
+            <table className="table-uca">
               <thead>
                 <tr>
                   <th>Materia</th>

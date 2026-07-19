@@ -87,7 +87,7 @@ def resolver_materia(
                         db.query(Materia)
                         .filter(Materia.id == materia_destino_id)
                         .first()
-                        .carrera_id
+                        .carrera_id if db.query(Materia).filter(Materia.id == materia_destino_id).first() else None
                     ),
                 )
                 .first()

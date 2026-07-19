@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { api, decodeToken, emitToast, emitAvatarUpdated } from '../lib/api'
+import { api, getCurrentUser, getAccessToken, emitToast, emitAvatarUpdated } from '../lib/api'
 import { getBecasActivas, type BecaActiva } from '../services/finanzasService'
 
 type Tab = 'info' | 'seguridad' | 'preferencias'
@@ -83,13 +83,13 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
     setSubiendoFoto(true)
     try {
       const form = new FormData()
-      form.append('file', file)
-      const token = sessionStorage.getItem('token')
+      form.append('foto', file)
+      const token = getAccessToken()
       const res = await fetch('/api/users/me/foto', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Error al subir la foto')
       const data = await res.json()
-      setFotoUrl(data.foto_url)
-      emitAvatarUpdated(data.foto_url)
+      setFotoUrl(data.url)
+      emitAvatarUpdated(data.url)
       emitToast('Foto de perfil actualizada')
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al subir la foto', 'error')
@@ -306,13 +306,13 @@ function PerfilProfesor({ userId }: { userId: number }) {
     setSubiendoFoto(true)
     try {
       const form = new FormData()
-      form.append('file', file)
-      const token = sessionStorage.getItem('token')
+      form.append('foto', file)
+      const token = getAccessToken()
       const res = await fetch('/api/users/me/foto', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Error al subir la foto')
       const data = await res.json()
-      setFotoUrl(data.foto_url)
-      emitAvatarUpdated(data.foto_url)
+      setFotoUrl(data.url)
+      emitAvatarUpdated(data.url)
       emitToast('Foto de perfil actualizada')
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al subir la foto', 'error')
@@ -446,9 +446,8 @@ function PerfilProfesor({ userId }: { userId: number }) {
 /* ═══ Router por rol ════════════════════════════════════════════ */
 
 export default function Perfil() {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
-  const role = user?.role ?? 'alumno'
+  const user = getCurrentUser()
+  const role = (user?.role ?? 'alumno').toLowerCase().trim()
   const userId = Number(user?.user_id ?? 0)
 
   return (

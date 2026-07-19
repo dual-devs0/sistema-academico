@@ -1,9 +1,20 @@
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
-import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { useMemo } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  Dimensions,
+} from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import Svg, { Path, Circle, Line, Polyline, Rect } from "react-native-svg";
 import { fontFamily, fontSize, radius, spacing } from "../../constants/design";
+
+const { width: SCREEN_W } = Dimensions.get("window");
+const PANEL_W = Math.min(SCREEN_W - 24, 340);
 
 type Notification = {
   id: number;
@@ -15,43 +26,35 @@ type Notification = {
 
 // ─── SVG Iconos para notificaciones ───────────────────────────────────────────
 
-function IconPencil({ color = "#fbbf24", size = 20 }: { color?: string; size?: number }) {
-  const { colors } = useTheme();
-
+function IconPencil({ color = "#fbbf24" }: { color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-function IconChartLine({ color = "#3b82f6", size = 20 }: { color?: string; size?: number }) {
-  const { colors } = useTheme();
-
+function IconChartLine({ color = "#3b82f6" }: { color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
       <Line x1="1" y1="22" x2="23" y2="22" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
     </Svg>
   );
 }
 
-function IconCheckCircle({ color = "#22c55e", size = 20 }: { color?: string; size?: number }) {
-  const { colors } = useTheme();
-
+function IconCheckCircle({ color = "#22c55e" }: { color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
       <Path d="M8 12l3 3 5-5" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-function IconAlert({ color = "#f43f5e", size = 20 }: { color?: string; size?: number }) {
-  const { colors } = useTheme();
-
+function IconAlert({ color = "#f43f5e" }: { color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Path d="M12 2L1 21h22L12 2z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
       <Line x1="12" y1="9" x2="12" y2="13" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
       <Circle cx="12" cy="17" r="1" fill={color} />
@@ -59,22 +62,18 @@ function IconAlert({ color = "#f43f5e", size = 20 }: { color?: string; size?: nu
   );
 }
 
-function IconBell({ color = "#06b6d4", size = 20 }: { color?: string; size?: number }) {
-  const { colors } = useTheme();
-
+function IconBell({ color = "#06b6d4" }: { color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M13.7 20a2 2 0 01-3.4 0" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path d="M13.73 20a2 2 0 01-3.46 0" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
     </Svg>
   );
 }
 
-function IconCalendarStar({ color = "#8b5cf6", size = 20 }: { color?: string; size?: number }) {
-  const { colors } = useTheme();
-
+function IconCalendarStar({ color = "#8b5cf6" }: { color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth={1.8} />
       <Line x1="3" y1="10" x2="21" y2="10" stroke={color} strokeWidth={1.8} />
       <Path d="M12 12l1.5 3 3.5.5-2.5 2.5.5 3.5L12 19l-3 1.5.5-3.5L7 15.5l3.5-.5L12 12z" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -100,41 +99,12 @@ function formatRelativa(fecha: string): string {
   return `Hace ${diff} días`;
 }
 
-function BellIcon() {
-  const { colors } = useTheme();
-
-  return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"
-        stroke={colors.textPrimary}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M13.73 21a2 2 0 01-3.46 0"
-        stroke={colors.textPrimary}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 function CheckIcon() {
   const { colors } = useTheme();
 
   return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M5 13l4 4L19 7"
-        stroke={colors.cyan}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 13l4 4L19 7" stroke={colors.cyan} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -144,16 +114,32 @@ export function NotificationsSheet({
   notifications,
   onClose,
   onMarkAllRead,
+  onNotificationPress,
 }: {
   visible: boolean;
   notifications: Notification[];
   onClose: () => void;
   onMarkAllRead: () => void;
+  onNotificationPress?: (n: Notification) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+  const isDark = effective === "dark";
   const unread = notifications.filter((n) => !n.leida).length;
 
-  if (!visible) return null;
+  const panelStyle = useMemo(() => ({
+    width: PANEL_W,
+    backgroundColor: isDark ? "#13161e" : colors.surfaceElevated,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: isDark ? "rgba(255,255,255,0.08)" : colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 32,
+    shadowOpacity: 0.4,
+    elevation: 20,
+    maxHeight: "70%" as const,
+    overflow: "hidden" as const,
+  }), [isDark, colors]);
 
   return (
     <Modal
@@ -164,238 +150,158 @@ export function NotificationsSheet({
       onRequestClose={onClose}
     >
       <Animated.View
-        entering={FadeIn.duration(180)}
+        entering={FadeIn.duration(150)}
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.65)",
-          justifyContent: "flex-end",
+          backgroundColor: "rgba(0,0,0,0.35)",
         }}
       >
         <Pressable
-          style={{ position: "absolute", inset: 0 }}
+          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
           onPress={onClose}
         />
 
-        <Animated.View
-          entering={FadeInDown.duration(280).springify().damping(20).stiffness(180)}
-          style={{
-            backgroundColor: colors.surfaceElevated,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-            borderTopWidth: Platform.OS === "ios" ? 0 : 1,
-            borderColor: colors.border,
-            maxHeight: "80%",
-            ...Platform.select({
-              ios: {
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: -4 },
-                shadowRadius: 24,
-                shadowOpacity: 0.3,
-              },
-            }),
-          }}
-        >
-          <View style={{ alignItems: "center", paddingTop: spacing.sm }}>
+        <View style={{ flex: 1, paddingTop: spacing.xl + 52, paddingRight: spacing.sm, alignItems: "flex-end" }}>
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={panelStyle}
+          >
+            {/* Header */}
             <View
               style={{
-                width: 40,
-                height: 5,
-                borderRadius: 3,
-                backgroundColor: colors.border,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderBottomWidth: 1,
+                borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : colors.border,
               }}
-            />
-          </View>
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: spacing.xl,
-              paddingTop: spacing.md,
-              paddingBottom: spacing.sm,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-              <View
+            >
+              <Text
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: radius.pill,
-                  backgroundColor: colors.glassBg,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  alignItems: "center",
-                  justifyContent: "center",
+                  color: colors.textPrimary,
+                  fontFamily: fontFamily.interBold,
+                  fontSize: 15,
                 }}
               >
-                <BellIcon />
-              </View>
-              <View>
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontFamily: fontFamily.interBold,
-                    fontSize: 20,
-                  }}
-                >
-                  Notificaciones
-                </Text>
+                Notificaciones
+              </Text>
+              <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                 {unread > 0 && (
-                  <Text
-                    style={{
-                      color: colors.textSecondary,
-                      fontFamily: fontFamily.inter,
-                      fontSize: 12,
-                      marginTop: 1,
-                    }}
+                  <Pressable
+                    onPress={() => { onMarkAllRead(); onClose(); }}
+                    style={({ pressed }) => ({
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 3,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: radius.pill,
+                      backgroundColor: colors.cyan + "18",
+                      borderWidth: 1,
+                      borderColor: colors.cyan + "30",
+                      opacity: pressed ? 0.7 : 1,
+                    })}
                   >
-                    {unread} sin leer
-                  </Text>
+                    <CheckIcon />
+                    <Text style={{ color: colors.cyan, fontFamily: fontFamily.interSemibold, fontSize: 10 }}>
+                      Leídas
+                    </Text>
+                  </Pressable>
                 )}
-              </View>
-            </View>
-
-            <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
-              {unread > 0 && (
                 <Pressable
-                  onPress={onMarkAllRead}
+                  onPress={onClose}
+                  hitSlop={8}
                   style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 4,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: radius.pill,
-                    backgroundColor: colors.cyan + "18",
-                    borderWidth: 1,
-                    borderColor: colors.cyan + "30",
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <CheckIcon />
-                  <Text
-                    style={{
-                      color: colors.cyan,
-                      fontFamily: fontFamily.interSemibold,
-                      fontSize: 12,
-                    }}
-                  >
-                    Leídas
-                  </Text>
-                </Pressable>
-              )}
-
-              <Pressable
-                onPress={onClose}
-                hitSlop={12}
-                style={({ pressed }) => ({
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: colors.glassBg,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={{ height: 1, backgroundColor: colors.border }} />
-
-          <ScrollView
-            contentContainerStyle={{
-              paddingVertical: spacing.sm,
-              paddingBottom: Platform.OS === "ios" ? 40 : spacing["3xl"],
-              paddingHorizontal: spacing.md,
-              gap: spacing.sm,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            {notifications.length === 0 ? (
-              <View style={{ padding: 40, alignItems: "center", gap: spacing.sm }}>
-                <View
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 32,
-                    backgroundColor: colors.glassBg,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: isDark ? "#1e2128" : colors.glassBg,
                     borderWidth: 1,
                     borderColor: colors.border,
                     alignItems: "center",
                     justifyContent: "center",
-                  }}
+                    opacity: pressed ? 0.7 : 1,
+                  })}
                 >
-                  <BellIcon />
-                </View>
-                <Text
-                  style={{
-                    color: colors.textSecondary,
-                    fontFamily: fontFamily.interMedium,
-                    fontSize: 14,
-                    textAlign: "center",
-                    marginTop: spacing.xs,
-                  }}
-                >
-                  Sin notificaciones
-                </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>✕</Text>
+                </Pressable>
               </View>
-            ) : (
-              notifications.map((n, i) => {
-                const cfg = TIPO_CONFIG[n.tipo] ?? TIPO_CONFIG.aviso;
-                return (
-                  <Animated.View
-                    key={n.id}
-                    entering={FadeInDown.delay(i * 40).duration(200)}
+            </View>
+
+            {/* Lista */}
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: spacing.xs }}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              {notifications.length === 0 ? (
+                <View style={{ padding: 32, alignItems: "center", gap: spacing.sm }}>
+                  <View
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 24,
+                      backgroundColor: isDark ? "#1a1d26" : colors.glassBg,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                   >
-                    <View
-                      style={{
-                        backgroundColor: n.leida
-                          ? "transparent"
-                          : colors.glassBg,
-                        borderRadius: radius.md,
-                        borderWidth: 1,
-                        borderColor: n.leida
-                          ? "transparent"
-                          : cfg.color + "20",
-                        overflow: "hidden",
-                      }}
+                    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                      <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      <Path d="M13.73 21a2 2 0 01-3.46 0" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                    </Svg>
+                  </View>
+                  <Text style={{ color: colors.textSecondary, fontFamily: fontFamily.interMedium, fontSize: 13 }}>
+                    Sin notificaciones
+                  </Text>
+                </View>
+              ) : (
+                notifications.map((n, i) => {
+                  const cfg = TIPO_CONFIG[n.tipo] ?? TIPO_CONFIG.aviso;
+                  return (
+                    <Animated.View
+                      key={n.id}
+                      entering={FadeIn.delay(i * 30).duration(180)}
                     >
                       <Pressable
+                        onPress={() => onNotificationPress?.(n)}
                         style={({ pressed }) => ({
                           flexDirection: "row",
                           alignItems: "flex-start",
                           paddingHorizontal: spacing.md,
-                          paddingVertical: spacing.md,
+                          paddingVertical: spacing.sm,
                           gap: spacing.sm,
-                          opacity: pressed ? 0.75 : 1,
+                          backgroundColor: pressed
+                            ? isDark ? "rgba(255,255,255,0.04)" : colors.glassBg
+                            : "transparent",
+                          borderBottomWidth: i < notifications.length - 1 ? 1 : 0,
+                          borderBottomColor: isDark ? "rgba(255,255,255,0.04)" : colors.border + "60",
                         })}
                       >
                         <View style={{ paddingTop: 2, position: "relative" }}>
                           {!n.leida && (
                             <View
                               style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
+                                width: 7,
+                                height: 7,
+                                borderRadius: 3.5,
                                 backgroundColor: cfg.color,
                                 position: "absolute",
-                                top: -2,
-                                left: -10,
+                                top: -1,
+                                left: -8,
                                 zIndex: 1,
                               }}
                             />
                           )}
                           <View
                             style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 10,
+                              width: 34,
+                              height: 34,
+                              borderRadius: 9,
                               backgroundColor: cfg.bg,
                               borderWidth: 1,
                               borderColor: cfg.color + "30",
@@ -407,14 +313,14 @@ export function NotificationsSheet({
                           </View>
                         </View>
 
-                        <View style={{ flex: 1, gap: 4 }}>
+                        <View style={{ flex: 1, gap: 2 }}>
                           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                             <Text
                               style={{
                                 color: cfg.color,
                                 fontFamily: fontFamily.interSemibold,
-                                fontSize: 10,
-                                letterSpacing: 1,
+                                fontSize: 9,
+                                letterSpacing: 0.8,
                                 textTransform: "uppercase",
                               }}
                             >
@@ -424,7 +330,7 @@ export function NotificationsSheet({
                               style={{
                                 color: colors.textSecondary,
                                 fontFamily: fontFamily.inter,
-                                fontSize: 10,
+                                fontSize: 12,
                               }}
                             >
                               {formatRelativa(n.fecha)}
@@ -434,21 +340,22 @@ export function NotificationsSheet({
                             style={{
                               color: n.leida ? colors.textSecondary : colors.textPrimary,
                               fontFamily: n.leida ? fontFamily.inter : fontFamily.interMedium,
-                              fontSize: 13,
-                              lineHeight: 18,
+                              fontSize: 12,
+                              lineHeight: 16,
                             }}
+                            numberOfLines={3}
                           >
                             {n.mensaje}
                           </Text>
                         </View>
                       </Pressable>
-                    </View>
-                  </Animated.View>
-                );
-              })
-            )}
-          </ScrollView>
-        </Animated.View>
+                    </Animated.View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </Animated.View>
+        </View>
       </Animated.View>
     </Modal>
   );
