@@ -251,7 +251,6 @@ def recuperar_contrasena(
 ):
     _check_password_reset_rate_limit(req.username_or_email)
 
-    # Buscar usuario por username o email
     db_user = (
         db.query(models.user.User)
         .filter(
@@ -264,12 +263,6 @@ def recuperar_contrasena(
     if not db_user:
         raise HTTPException(
             status_code=404, detail="No se encontró un usuario con ese dato."
-        )
-
-    # Verificación adicional si se envió matrícula (que puede ser el username o legajo en el sistema)
-    if req.matricula and db_user.username != req.matricula:
-        raise HTTPException(
-            status_code=400, detail="Los datos proporcionados no coinciden."
         )
 
     alphabet = string.ascii_letters + string.digits

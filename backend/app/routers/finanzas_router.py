@@ -136,11 +136,13 @@ def generar_cuotas(
 
 
 @router.get(
-    "/alumno/me/cuotas",
+    "/alumno/{alumno_id}/cuotas",
     response_model=List[CuotaOut],
-    summary="Listar cuotas del alumno logueado",
+    summary="Cuotas de un alumno",
 )
-def listar_mis_cuotas(
+def cuotas_alumno(
+    alumno_id: int,
+    estado: Optional[str] = None,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -148,77 +150,14 @@ def listar_mis_cuotas(
     if current_user.role == "alumno" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
-
-@router.get(
-    "/alumno/{alumno_id}/cuotas",
-    response_model=List[CuotaOut],
-    summary="Listar cuotas de un alumno (admin)",
-)
-def listar_cuotas_alumno(
-    alumno_id: int,
-    db: Session = Depends(database.get_db),
-    current_user=Depends(require_role("admin")),
-):
-    cuotas = (
-        db.query(Cuota)
-        .filter(Cuota.alumno_id == alumno_id)
-        .order_by(Cuota.fecha_vencimiento.asc())
-        .all()
-    )
+    q = db.query(Cuota).filter(Cuota.alumno_id == alumno_id)
+    if estado:
+        q = q.filter(Cuota.estado == estado)
+    cuotas = q.order_by(Cuota.fecha_vencimiento.asc()).all()
     return [cuota_to_out(c) for c in cuotas]
 
 
 # ── Pagos ─────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/pagos/online/iniciar",
-    response_model=PagoOnlineInitResponse,
-    summary="Iniciar pago online (simulado)",
-)
-def iniciar_pago_online(
-    data: PagoOnlineInitRequest,
-    db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
-):
-    """
-    Simula la creación de una intención de pago.
-    En producción, aquí se llamaría a la API de Bancard o similar
-    para obtener un process_id o token de pago.
-    """
-    # Verificar que las cuotas existan y sean del usuario
-    cuotas = db.query(Cuota).filter(
-        Cuota.id.in_(data.cuota_ids),
-        Cuota.alumno_id == current_user.user_id,
-        Cuota.estado != "pagado"
-    ).all()
-    
-    if len(cuotas) != len(data.cuota_ids):
-        raise HTTPException(
-            status_code=400, detail="Algunas cuotas no son válidas o ya están pagadas."
-        )
-
-    monto_total = sum(c.monto_a_pagar for c in cuotas)
-    
-    # Crear registro de intento de pago
-    intento = PagoOnline(
-        usuario_id=current_user.user_id,
-        cuotas_ids=data.cuota_ids,
-        monto=monto_total,
-        estado="pendiente",
-        transaction_id=f"PAY-{uuid4().hex[:8].upper()}"
-    )
-    db.add(intento)
-    db.commit()
-    db.refresh(intento)
-
-    # Devolvemos una URL de checkout simulada
-    return PagoOnlineInitResponse(
-        gateway_url=f"https://sandbox.bancard.com.py/checkout/test_{intento.transaction_id}",
-        transaction_id=intento.transaction_id,
-        monto=monto_total,
-        pago_id=intento.id
-    )
 
 
 @router.post(
