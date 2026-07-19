@@ -13,7 +13,7 @@ def create_programa(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     new_programa = models.programa.Programa(
         materia_id=programa.materia_id,
@@ -60,7 +60,7 @@ def update_programa(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.programa.Programa)
@@ -84,7 +84,7 @@ def delete_programa(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.programa.Programa)
@@ -106,7 +106,7 @@ def bulk_save_programa(
     current_user=Depends(get_current_user),
 ):
     """Replace all programa items for a materia."""
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     materia = (
         db.query(models.materia.Materia)

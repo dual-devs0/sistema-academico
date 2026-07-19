@@ -40,6 +40,12 @@ postgres_data/
 *.sqlite
 *.sqlite3
 
+# Skills globales de Claude
+skills/
+
+# Windows NUL device artifact
+backend/app/routers/nul
+
 # Sesiones de Claude / IDE local
 .claude/
 

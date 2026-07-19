@@ -1,180 +1,140 @@
-import { Tabs, useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { colors, fontFamily, fontSize, spacing, tabBar } from "../../constants/design";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View } from "react-native";
+import { useRouter } from "expo-router";
+import Animated, { useSharedValue } from "react-native-reanimated";
+import PagerView from "@expo/ui/community/pager-view";
+import type {
+  PagerViewRef,
+  PagerViewOnPageSelectedEvent,
+  PagerViewOnPageScrollEvent,
+} from "@expo/ui/community/pager-view";
+import { BottomTabBar, QrFab } from "../../components/ui/BottomTabBar";
+import { useTheme } from "../../hooks/useTheme";
+import {
+  useHideOnScroll,
+  TabBarScrollContext,
+} from "../../hooks/useHideOnScroll";
+import { TabNavigationContext } from "../../hooks/TabNavigationContext";
+import type { TabKey } from "../../hooks/TabNavigationContext";
+import { setActiveTabIndex, registerGoToFirstTab } from "../../utils/currentTab";
+import DashboardScreen from "./index";
+import CursosTab from "./cursos";
+import HorarioScreen from "./horario";
+import PerfilScreen from "./perfil";
 
-/**
- * Tab bar custom con botón QR central elevado.
- * - 4 tabs reales de expo-router: index, notas, horario, perfil.
- * - Un 5.º "botón" central que no es tab: abre /scanner como modal.
- * - El QR button sube tabBar.qrButtonLift px sobre el tab bar.
- */
+const SCREENS: { key: TabKey; component: React.ComponentType }[] = [
+  { key: "index",   component: DashboardScreen },
+  { key: "cursos",  component: CursosTab },
+  { key: "horario", component: HorarioScreen },
+  { key: "perfil",  component: PerfilScreen },
+];
+
 export default function TabsLayout() {
-  return (
-    <Tabs
-      tabBar={(props) => <UcaTabBar {...props} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}
-    >
-      <Tabs.Screen name="index" options={{ title: "Inicio" }} />
-      <Tabs.Screen name="notas" options={{ title: "Notas" }} />
-      <Tabs.Screen name="horario" options={{ title: "Horario" }} />
-      <Tabs.Screen name="perfil" options={{ title: "Perfil" }} />
-    </Tabs>
-  );
-}
-
-type TabDef = {
-  routeName: "index" | "notas" | "horario" | "perfil";
-  label: string;
-  glyph: string;
-};
-
-const LEFT_TABS: TabDef[] = [
-  { routeName: "index", label: "Inicio", glyph: "◉" },
-  { routeName: "notas", label: "Notas", glyph: "≡" },
-];
-
-const RIGHT_TABS: TabDef[] = [
-  { routeName: "horario", label: "Horario", glyph: "▦" },
-  { routeName: "perfil", label: "Perfil", glyph: "◍" },
-];
-
-function UcaTabBar({ state, navigation }: BottomTabBarProps) {
+  const { colors } = useTheme();
   const router = useRouter();
-  const currentRouteName = state.routes[state.index]?.name;
+  const insets = useSafeAreaInsets();
+  const { scrollHandler, barStyle, setBarHeight, resetBar } = useHideOnScroll();
+  const contentBottomPadding = 120 + insets.bottom;
 
-  function goto(routeName: string, isFocused: boolean) {
-    const event = navigation.emit({
-      type: "tabPress",
-      target: routeName,
-      canPreventDefault: true,
-    });
-    if (!isFocused && !event.defaultPrevented) {
-      navigation.navigate(routeName);
-    }
-  }
+  const [activeTab, setActiveTab] = useState<TabKey>("index");
+  const pagerRef = useRef<PagerViewRef>(null);
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
-  return (
-    <SafeAreaView
-      edges={["bottom"]}
-      style={{
-        backgroundColor: colors.background,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-end",
-          height: tabBar.height,
-          paddingHorizontal: spacing.sm,
-        }}
-      >
-        {LEFT_TABS.map((t) => (
-          <TabItem
-            key={t.routeName}
-            def={t}
-            focused={currentRouteName === t.routeName}
-            onPress={() => goto(t.routeName, currentRouteName === t.routeName)}
-          />
-        ))}
+  const scrollProgress = useSharedValue<number | null>(null);
 
-        <QrCenterButton onPress={() => router.push("/scanner")} />
-
-        {RIGHT_TABS.map((t) => (
-          <TabItem
-            key={t.routeName}
-            def={t}
-            focused={currentRouteName === t.routeName}
-            onPress={() => goto(t.routeName, currentRouteName === t.routeName)}
-          />
-        ))}
+  const screens = useMemo(
+    () => SCREENS.map(({ key, component: Component }) => (
+      <View key={key} style={{ flex: 1 }}>
+        <Component />
       </View>
-    </SafeAreaView>
+    )),
+    [],
   );
-}
 
-function TabItem({
-  def,
-  focused,
-  onPress,
-}: {
-  def: TabDef;
-  focused: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: spacing.sm,
-        gap: 2,
-      }}
-    >
-      <Text
-        style={{
-          color: focused ? colors.cyan : colors.textSecondary,
-          fontSize: fontSize.headline,
-        }}
-      >
-        {def.glyph}
-      </Text>
-      <Text
-        style={{
-          color: focused ? colors.cyan : colors.textSecondary,
-          fontFamily: focused ? fontFamily.interSemibold : fontFamily.inter,
-          fontSize: fontSize.caption,
-        }}
-      >
-        {def.label}
-      </Text>
-    </Pressable>
+  const onPageScroll = useCallback(
+    (e: PagerViewOnPageScrollEvent) => {
+      "worklet";
+      scrollProgress.value = e.nativeEvent.position + e.nativeEvent.offset;
+    },
+    [],
   );
-}
 
-function QrCenterButton({ onPress }: { onPress: () => void }) {
+  const onPageSelected = useCallback(
+    (e: PagerViewOnPageSelectedEvent) => {
+      scrollProgress.value = null;
+      const index = e.nativeEvent.position;
+      const tab = SCREENS[index]?.key;
+      if (tab && tab !== activeTabRef.current) {
+        activeTabRef.current = tab;
+      setActiveTab(tab);
+      setActiveTabIndex(index);
+      resetBar();
+      }
+    },
+    [resetBar],
+  );
+
+  const onTabChange = useCallback(
+    (tab: TabKey) => {
+      const index = SCREENS.findIndex((s) => s.key === tab);
+      if (index >= 0) {
+        pagerRef.current?.setPage(index);
+        if (tab !== activeTabRef.current) {
+          activeTabRef.current = tab;
+          setActiveTab(tab);
+          resetBar();
+        }
+      }
+    },
+    [resetBar],
+  );
+
+  useEffect(() => {
+    registerGoToFirstTab(() => pagerRef.current?.setPage(0));
+    return () => registerGoToFirstTab(null);
+  }, []);
+
+  const scrollContextValue = useMemo(
+    () => ({ scrollHandler, contentBottomPadding }),
+    [scrollHandler, contentBottomPadding],
+  );
+
   return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "flex-end",
-      }}
-      pointerEvents="box-none"
-    >
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => ({
-          width: tabBar.qrButtonSize,
-          height: tabBar.qrButtonSize,
-          borderRadius: tabBar.qrButtonSize / 2,
-          backgroundColor: colors.cyan,
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: tabBar.qrButtonLift,
-          shadowColor: colors.cyan,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: pressed ? 0.4 : 0.6,
-          shadowRadius: 16,
-          elevation: 10,
-          transform: [{ scale: pressed ? 0.96 : 1 }],
-        })}
-      >
-        <Text
-          style={{
-            color: "#0a0e17",
-            fontFamily: fontFamily.interBold,
-            fontSize: fontSize.headlineLg,
-          }}
+    <TabNavigationContext.Provider value={onTabChange}>
+    <TabBarScrollContext.Provider value={scrollContextValue}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <PagerView
+          ref={pagerRef}
+          style={{ flex: 1 }}
+          initialPage={0}
+          onPageScroll={onPageScroll}
+          onPageSelected={onPageSelected}
         >
-          ▣
-        </Text>
-      </Pressable>
-    </View>
+          {screens}
+        </PagerView>
+
+        <Animated.View
+          style={[
+            { position: "absolute", left: 0, right: 0, bottom: 0 },
+            barStyle,
+            { zIndex: 100 },
+          ]}
+          pointerEvents="box-none"
+        >
+          <QrFab onPress={() => router.push("/scanner")} />
+          <BottomTabBar
+            active={activeTab}
+            scrollProgressSV={scrollProgress}
+            onHeightChange={setBarHeight}
+            onChange={onTabChange}
+          />
+        </Animated.View>
+      </View>
+    </TabBarScrollContext.Provider>
+    </TabNavigationContext.Provider>
   );
 }

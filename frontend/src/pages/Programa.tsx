@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { api, decodeToken } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
 
@@ -429,8 +429,7 @@ const cssProg = `
 type ProgramaUnit = { titulo: string; descripcion: string; semana: number }
 
 function ProfesorProgramaView() {
-  const token = sessionStorage.getItem('token')
-  const user  = token ? decodeToken(token) : null
+  const user  = getCurrentUser()
   const uid   = Number(user?.user_id)
 
   const [materias,   setMaterias]   = useState<{ id: number; nombre: string }[]>([])
@@ -595,8 +594,7 @@ function ProfesorProgramaView() {
 }
 
 export default function Programa() {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
+  const user = getCurrentUser()
   const ROL = user?.role || 'alumno'
 
   const [data,       setData]       = useState<MateriaTemario[]>([])
@@ -680,6 +678,13 @@ export default function Programa() {
     showToast('Clase guardada correctamente')
     setClaseOpen(null)
   }
+
+  const temario = data.find(t => t.materia === activa)
+  const totalClases = data.reduce((s, t) => s + t.clases.length, 0)
+  const totalComp = data.reduce((s, t) => s + t.clases.filter(c => c.completada).length, 0)
+  const progresoGlob = totalClases ? Math.round((totalComp / totalClases) * 100) : 0
+  const completadas = temario?.clases.filter(c => c.completada).length ?? 0
+  const progreso = temario?.clases.length ? Math.round((completadas / temario.clases.length) * 100) : 0
 
   if (cargando) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg-base)', color:'var(--text-muted)', fontFamily:'Inter,system-ui,sans-serif', flexDirection:'column', gap:12 }}>

@@ -43,6 +43,11 @@ class RecuperarRequest(BaseModel):
     username_or_email: str
 
 
+class RegistroRequest(BaseModel):
+    documento: str
+    matricula: str
+
+
 class UserOut(BaseModel):
     id: int
     username: str
@@ -60,3 +65,12 @@ class UserOut(BaseModel):
 class UserListOut(BaseModel):
     items: list[UserOut]
     total: int
+
+
+class AlumnoSimpleOut(BaseModel):
+    id: int
+    nombre: str
+    username: str
+    role: str
+
+    model_config = {"from_attributes": True}

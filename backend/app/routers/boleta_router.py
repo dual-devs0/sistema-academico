@@ -343,8 +343,8 @@ def get_boleta(
     current_user=Depends(get_current_user),
 ):
     if (
-        current_user["role"] not in ("admin", "profesor")
-        and current_user["user_id"] != user_id
+        current_user.role not in ("admin", "profesor")
+        and current_user.user_id != user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
 

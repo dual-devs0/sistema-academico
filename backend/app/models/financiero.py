@@ -235,3 +235,43 @@ class AuditoriaOverrideMora(Base):
 
     alumno = relationship("User", foreign_keys=[alumno_id])
     admin = relationship("User", foreign_keys=[admin_id])
+
+
+class PagoOnline(Base):
+    """Pago iniciado por gateway online (Bancard stub)."""
+
+    __tablename__ = "pagos_online"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cuota_id = Column(Integer, ForeignKey("cuotas.id"), nullable=False)
+    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    monto = Column(Numeric(12, 2), nullable=False)
+    transaction_id = Column(String(100), unique=True, nullable=True)
+    estado = Column(String(20), nullable=False, default="pendiente")
+    gateway_url = Column(String(500), nullable=True)
+    gateway_response = Column(JSON, nullable=True)
+    creado_en = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    confirmado_en = Column(DateTime(timezone=True), nullable=True)
+
+    cuota = relationship("Cuota")
+    alumno = relationship("User", foreign_keys=[alumno_id])
+
+
+class SuscripcionPush(Base):
+    """Suscripción Web Push para notificaciones."""
+
+    __tablename__ = "suscripciones_push"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    endpoint = Column(String(500), nullable=False)
+    p256dh = Column(String(200), nullable=False)
+    auth = Column(String(200), nullable=False)
+    user_agent = Column(String(300), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    user = relationship("User")

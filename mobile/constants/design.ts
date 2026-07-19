@@ -4,7 +4,7 @@
  * Consumir SIEMPRE desde aquí en componentes (colores literales fuera de Tailwind).
  */
 
-export const colors = {
+export const darkColors = {
   background: "#0a0e17",
   surface: "#111827",
   surfaceElevated: "#1a2235",
@@ -23,17 +23,47 @@ export const colors = {
   textSecondary: "#9ca3af",
   textAccent: "#00b4d8",
 
-  logoutBg: "rgba(127,29,29,0.5)",
-  logoutBorder: "rgba(239,68,68,0.3)",
+  logoutBg: "rgba(127,29,29,0.6)",
+  logoutBorder: "rgba(239,68,68,0.4)",
 
   overlayLogin: "rgba(10,14,23,0.75)",
   glassBg: "rgba(17,24,39,0.8)",
 } as const;
 
+export const lightColors = {
+  background: "#f8fafc",
+  surface: "#ffffff",
+  surfaceElevated: "#f1f5f9",
+  border: "rgba(0,0,0,0.08)",
+  borderAccent: "#0077b6",
+
+  cyan: "#00b4d8",
+  cyanDim: "rgba(0,180,216,0.15)",
+  cyanGlow: "rgba(0,180,216,0.25)",
+
+  success: "#16a34a",
+  warning: "#d97706",
+  error: "#dc2626",
+
+  textPrimary: "#0f172a",
+  textSecondary: "#64748b",
+  textAccent: "#0077b6",
+
+  logoutBg: "rgba(254,226,226,0.6)",
+  logoutBorder: "rgba(248,113,113,0.4)",
+
+  overlayLogin: "rgba(255,255,255,0.75)",
+  glassBg: "rgba(255,255,255,0.8)",
+} as const;
+
+// Legacy export if something is missed by refactor script
+export const colors = darkColors;
+
 export const radius = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 24,
   glass: 16,
   pill: 999,
   qrButton: 32,
@@ -116,10 +146,12 @@ export const shadow = {
 } as const;
 
 export const tabBar = {
-  height: 68,
-  qrButtonSize: 64,
-  qrButtonLift: 12,
+  height: 60,
+  barBg: "#0f172a",
+  active: "#06b6d4",
+  inactive: "#6b7280",
+  qrButtonSize: 56,
 } as const;
 
-export type ColorToken = keyof typeof colors;
+export type ColorToken = keyof typeof darkColors;
 export type FontSizeToken = keyof typeof fontSize;

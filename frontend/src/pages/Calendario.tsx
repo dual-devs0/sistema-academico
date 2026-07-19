@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { api, emitToast, decodeToken } from '../lib/api'
+import { api, emitToast, getCurrentUser } from '../lib/api'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -58,7 +58,7 @@ export default function Calendario() {
   const [saving, setSaving] = useState(false)
   const [cargandoPdf, setCargandoPdf] = useState(false)
   const pdfInputRef = useRef<HTMLInputElement>(null)
-  const role = decodeToken(sessionStorage.getItem('token') || '')?.role
+  const role = getCurrentUser()?.role
 
   function onPdfSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

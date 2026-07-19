@@ -54,13 +54,17 @@ const tipoCfg: Record<string,{color:string;bg:string;label:string}> = {
   materias:   { color:YELLOW, bg:'#f59e0b15', label:'Materias'   },
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 function buildReportePdfHtml(tipo: string, carrerasData: CarreraStats[], res: Resumen): string {
   const r   = reportes.find(x=>x.tipo===tipo)!
   const cfg = tipoCfg[tipo]
   const fecha = new Date().toLocaleDateString('es-PY',{day:'2-digit',month:'long',year:'numeric'})
 
   const filas = carrerasData.map(c=>`<tr>
-    <td style="font-weight:600;color:#1e293b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.carrera}</td>
+    <td style="font-weight:600;color:#1e293b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(c.carrera)}</td>
     <td style="text-align:center;color:#64748b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.total_alumnos}</td>
     <td style="text-align:center;font-weight:700;color:#16a34a;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.asistencia_pct}%</td>
     <td style="text-align:center;font-weight:700;color:#0284c7;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.aprobados_pct}%</td>

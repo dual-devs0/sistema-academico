@@ -16,9 +16,9 @@ class Puntaje(Base):
     __tablename__ = "puntajes"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     oferta_materia_id = Column(
-        Integer, ForeignKey("ofertas_materia.id"), nullable=False
+        Integer, ForeignKey("ofertas_materia.id"), nullable=False, index=True
     )
     tipo = Column(String(20), nullable=False)  # parcial1, parcial2, practico, final
     valor = Column(Numeric(5, 2), nullable=False)

@@ -1,11 +1,13 @@
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.pensum import (
     validar_correlatividades,
-    _tiene_nota_aprobatoria,
-    _tiene_inscripcion,
+    promedio_y_estado_intento,
+    _calcular_estado_cached,
+    _tiene_nota_aprobatoria_cached,
 )
 
 router = APIRouter(prefix="/pensum", tags=["pensum"])
@@ -20,7 +22,7 @@ def agregar_materia_a_malla(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     carrera = (
         db.query(models.carrera.Carrera)
@@ -77,7 +79,7 @@ def quitar_materia_de_malla(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     pm = (
         db.query(models.pensum_materia.PensumMateria)
@@ -122,7 +124,7 @@ def crear_correlatividad(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     if data.materia_id == data.prerrequisito_id:
         raise HTTPException(
@@ -157,7 +159,7 @@ def eliminar_correlatividad(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
     corr = (
         db.query(models.correlatividad.Correlatividad)
@@ -192,19 +194,23 @@ def obtener_malla_carrera(
         .order_by(models.pensum_materia.PensumMateria.semestre)
         .all()
     )
+    materia_ids = [pm.materia_id for pm in filas]
+    materias_map = {
+        m.id: m
+        for m in db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id.in_(materia_ids))
+        .all()
+    }
     result = []
     for pm in filas:
-        materia = (
-            db.query(models.materia.Materia)
-            .filter(models.materia.Materia.id == pm.materia_id)
-            .first()
-        )
+        materia = materias_map.get(pm.materia_id)
         result.append(
             schemas.pensum.PensumMateriaOut(
                 id=pm.id,
                 carrera_id=pm.carrera_id,
                 materia_id=pm.materia_id,
                 materia_nombre=materia.nombre if materia else None,
+                materia_codigo=materia.codigo if materia else None,
                 semestre=pm.semestre,
                 creditos=pm.creditos,
                 es_electiva=pm.es_electiva,
@@ -213,16 +219,46 @@ def obtener_malla_carrera(
     return result
 
 
+def _prerequisitos_de(db: Session, materia_id: int) -> list[dict]:
+    """Lista completa de prerrequisitos de una materia (independiente de si
+    ya están cumplidos), para mostrar 'Requiere: X' en la card."""
+    prereqs = (
+        db.query(models.correlatividad.Correlatividad)
+        .filter(models.correlatividad.Correlatividad.materia_id == materia_id)
+        .all()
+    )
+    resultado = []
+    for pr in prereqs:
+        materia_prerreq = (
+            db.query(models.materia.Materia)
+            .filter(models.materia.Materia.id == pr.prerrequisito_id)
+            .first()
+        )
+        resultado.append(
+            {
+                "materia_id": pr.prerrequisito_id,
+                "materia_nombre": materia_prerreq.nombre if materia_prerreq else "—",
+                "tipo": pr.tipo,
+            }
+        )
+    return resultado
+
+
 def _calcular_estado_materia(
     db: Session, alumno_id: int, materia_id: int
-) -> tuple[str, list[dict]]:
-    if _tiene_nota_aprobatoria(db, alumno_id, materia_id):
-        return "aprobada", []
-    if _tiene_inscripcion(db, alumno_id, materia_id):
-        return "cursando", []
+) -> tuple[str, list[dict], float | None]:
+    promedio, inscripto_en_activa, reprobado = promedio_y_estado_intento(
+        db, alumno_id, materia_id
+    )
+    if promedio is not None and promedio >= 6:
+        return "aprobada", [], promedio
+    if inscripto_en_activa:
+        return "cursando", [], promedio
+    if reprobado:
+        return "reprobada", [], promedio
     resultado = validar_correlatividades(alumno_id, materia_id, db)
     if resultado["valido"]:
-        return "pendiente", []
+        return "pendiente", [], promedio
     pendientes = []
     for p in resultado["pendientes"]:
         materia_prerreq = (
@@ -237,7 +273,7 @@ def _calcular_estado_materia(
                 "tipo": p["tipo"],
             }
         )
-    return "bloqueada", pendientes
+    return "bloqueada", pendientes, promedio
 
 
 @router.get(
@@ -248,7 +284,7 @@ def avance_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
     if not alumno:
@@ -262,24 +298,113 @@ def avance_alumno(
         .order_by(models.pensum_materia.PensumMateria.semestre)
         .all()
     )
+
+    # --- batch pre-fetch: 7 queries fijas independientemente del tamaño de malla ---
+    materia_ids = [pm.materia_id for pm in filas]
+    pensum_ids = [pm.id for pm in filas]
+
+    # 1. Materias
+    materias_map = {
+        m.id: m
+        for m in db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id.in_(materia_ids))
+        .all()
+    }
+
+    # 2. Correlatividades
+    correlatividades_por_materia: dict = defaultdict(list)
+    for c in (
+        db.query(models.correlatividad.Correlatividad)
+        .filter(models.correlatividad.Correlatividad.materia_id.in_(materia_ids))
+        .all()
+    ):
+        correlatividades_por_materia[c.materia_id].append(c)
+
+    # 3. OfertaMateria
+    ofertas = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(models.oferta_materia.OfertaMateria.materia_id.in_(materia_ids))
+        .all()
+    )
+    ofertas_por_materia: dict = defaultdict(list)
+    for o in ofertas:
+        ofertas_por_materia[o.materia_id].append(o)
+    activa_por_oferta_id = {o.id: bool(o.activa) for o in ofertas}
+
+    # 4. Inscripciones del alumno
+    todos_oferta_ids = [o.id for o in ofertas]
+    inscriptas_oferta_ids: set = {
+        i.oferta_materia_id
+        for i in db.query(models.inscripcion.Inscripcion.oferta_materia_id)
+        .filter(
+            models.inscripcion.Inscripcion.alumno_id == alumno_id,
+            models.inscripcion.Inscripcion.oferta_materia_id.in_(todos_oferta_ids),
+        )
+        .all()
+    }
+
+    # 5. Puntajes del alumno
+    puntajes_por_oferta: dict = defaultdict(dict)
+    for p in (
+        db.query(models.puntaje.Puntaje)
+        .filter(
+            models.puntaje.Puntaje.user_id == alumno_id,
+            models.puntaje.Puntaje.oferta_materia_id.in_(todos_oferta_ids),
+        )
+        .all()
+    ):
+        puntajes_por_oferta[p.oferta_materia_id][p.tipo] = float(p.valor)
+
+    # 6. AvanceAlumnoPensum existente
+    avance_map = {
+        a.pensum_materia_id: a
+        for a in db.query(models.avance_alumno_pensum.AvanceAlumnoPensum)
+        .filter(
+            models.avance_alumno_pensum.AvanceAlumnoPensum.alumno_id == alumno_id,
+            models.avance_alumno_pensum.AvanceAlumnoPensum.pensum_materia_id.in_(
+                pensum_ids
+            ),
+        )
+        .all()
+    }
+
+    # 7. Nombres de prereqs
+    prereq_ids = {
+        c.prerrequisito_id
+        for corrs in correlatividades_por_materia.values()
+        for c in corrs
+    }
+    prereq_nombres = {
+        m.id: m.nombre
+        for m in db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id.in_(prereq_ids))
+        .all()
+    } if prereq_ids else {}
+    # ---------------------------------------------------------------------------------
+
     result = []
     for pm in filas:
-        materia = (
-            db.query(models.materia.Materia)
-            .filter(models.materia.Materia.id == pm.materia_id)
-            .first()
+        materia = materias_map.get(pm.materia_id)
+        estado, pendientes, nota = _calcular_estado_cached(
+            pm.materia_id,
+            ofertas_por_materia,
+            inscriptas_oferta_ids,
+            puntajes_por_oferta,
+            activa_por_oferta_id,
+            correlatividades_por_materia,
+            prereq_nombres,
         )
-        estado, pendientes = _calcular_estado_materia(db, alumno_id, pm.materia_id)
+        # prerequisitos completos (todos, no solo pendientes)
+        prerequisitos = [
+            {
+                "materia_id": c.prerrequisito_id,
+                "materia_nombre": prereq_nombres.get(c.prerrequisito_id, "—"),
+                "tipo": c.tipo,
+            }
+            for c in correlatividades_por_materia.get(pm.materia_id, [])
+        ]
 
-        avance = (
-            db.query(models.avance_alumno_pensum.AvanceAlumnoPensum)
-            .filter(
-                models.avance_alumno_pensum.AvanceAlumnoPensum.alumno_id == alumno_id,
-                models.avance_alumno_pensum.AvanceAlumnoPensum.pensum_materia_id
-                == pm.id,
-            )
-            .first()
-        )
+        avance = avance_map.get(pm.id)
         if avance:
             avance.estado = estado
         else:
@@ -296,10 +421,13 @@ def avance_alumno(
                 pensum_materia_id=pm.id,
                 materia_id=pm.materia_id,
                 materia_nombre=materia.nombre if materia else "—",
+                materia_codigo=materia.codigo if materia else None,
                 semestre=pm.semestre,
                 creditos=pm.creditos,
                 estado=estado,
+                nota=round(nota, 2) if nota is not None else None,
                 pendientes=pendientes,
+                prerequisitos=prerequisitos,
             )
         )
     db.commit()
@@ -314,7 +442,7 @@ def creditos_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
     if not alumno:
@@ -334,9 +462,32 @@ def creditos_alumno(
         .filter(models.pensum_materia.PensumMateria.carrera_id == alumno.carrera_id)
         .all()
     )
+    materia_ids = [pm.materia_id for pm in filas]
+    ofertas_cred = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(models.oferta_materia.OfertaMateria.materia_id.in_(materia_ids))
+        .all()
+    )
+    ofertas_por_materia_cred: dict = defaultdict(list)
+    for o in ofertas_cred:
+        ofertas_por_materia_cred[o.materia_id].append(o)
+    oferta_ids_cred = [o.id for o in ofertas_cred]
+    puntajes_por_oferta_cred: dict = defaultdict(dict)
+    for p in (
+        db.query(models.puntaje.Puntaje)
+        .filter(
+            models.puntaje.Puntaje.user_id == alumno_id,
+            models.puntaje.Puntaje.oferta_materia_id.in_(oferta_ids_cred),
+        )
+        .all()
+    ):
+        puntajes_por_oferta_cred[p.oferta_materia_id][p.tipo] = float(p.valor)
+
     acumulados = 0
     for pm in filas:
-        if _tiene_nota_aprobatoria(db, alumno_id, pm.materia_id):
+        if _tiene_nota_aprobatoria_cached(
+            pm.materia_id, ofertas_por_materia_cred, puntajes_por_oferta_cred
+        ):
             acumulados += pm.creditos
 
     return schemas.pensum.CreditosAlumnoOut(

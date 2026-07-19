@@ -62,17 +62,17 @@ def create_puntaje(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     # Verify profesor teaches this materia (unless admin)
-    if current_user["role"] == "profesor":
+    if current_user.role == "profesor":
         materia = (
             db.query(models.materia.Materia)
             .filter(models.materia.Materia.id == puntaje.materia_id)
@@ -80,7 +80,7 @@ def create_puntaje(
         )
         if not materia:
             raise HTTPException(status_code=404, detail="Materia no encontrada")
-        if not es_profesor_de_materia(db, puntaje.materia_id, current_user["user_id"]):
+        if not es_profesor_de_materia(db, puntaje.materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -144,12 +144,14 @@ def list_puntajes(
     user_id: Optional[int] = Query(None),
     materia_id: Optional[int] = Query(None),
     tipo: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
     query = db.query(models.puntaje.Puntaje)
-    if current_user["role"] == "alumno":
-        query = query.filter(models.puntaje.Puntaje.user_id == current_user["user_id"])
+    if current_user.role == "alumno":
+        query = query.filter(models.puntaje.Puntaje.user_id == current_user.user_id)
     else:
         if user_id is not None:
             query = query.filter(models.puntaje.Puntaje.user_id == user_id)
@@ -158,6 +160,7 @@ def list_puntajes(
         query = query.filter(models.puntaje.Puntaje.oferta_materia_id == oferta_id)
     if tipo is not None:
         query = query.filter(models.puntaje.Puntaje.tipo == tipo)
+    query = query.order_by(models.puntaje.Puntaje.id).offset(skip).limit(limit)
     return query.all()
 
 
@@ -169,11 +172,11 @@ def update_puntaje(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
@@ -186,8 +189,8 @@ def update_puntaje(
     if not existing:
         raise HTTPException(status_code=404, detail="Puntaje no encontrado")
     # Verify profesor owns this materia
-    if current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, existing.materia_id, current_user["user_id"]):
+    if current_user.role == "profesor":
+        if not es_profesor_de_materia(db, existing.materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -236,7 +239,7 @@ def delete_puntaje(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.puntaje.Puntaje)
@@ -246,8 +249,8 @@ def delete_puntaje(
     if not existing:
         raise HTTPException(status_code=404, detail="Puntaje no encontrado")
     # Verify profesor owns this materia
-    if current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, existing.materia_id, current_user["user_id"]):
+    if current_user.role == "profesor":
+        if not es_profesor_de_materia(db, existing.materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -265,11 +268,11 @@ def puntajes_por_materia(
     current_user=Depends(get_current_user),
 ):
     """Notas de todos los alumnos de una materia."""
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     # Verify profesor owns this materia
-    if current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, materia_id, current_user["user_id"]):
+    if current_user.role == "profesor":
+        if not es_profesor_de_materia(db, materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -308,7 +311,7 @@ def promedio_final_alumno(
     current_user=Depends(get_current_user),
 ):
     """Promedio ponderado final de un alumno. Si materia_id es None, por cada materia."""  # noqa: E501
-    if current_user["role"] == "alumno" and current_user["user_id"] != user_id:
+    if current_user.role == "alumno" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     query = db.query(models.puntaje.Puntaje).filter(
@@ -342,11 +345,11 @@ def exportar_materia(
     current_user=Depends(get_current_user),
 ):
     """Datos de una materia para exportar (notas + asistencia)."""
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     # Verify profesor owns this materia
-    if current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, materia_id, current_user["user_id"]):
+    if current_user.role == "profesor":
+        if not es_profesor_de_materia(db, materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -421,11 +424,11 @@ def estadisticas_materia(
     current_user=Depends(get_current_user),
 ):
     """Promedio del grupo, distribuci\u00f3n de notas, aprobados/riesgo."""
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     # Verify profesor owns this materia
-    if current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, materia_id, current_user["user_id"]):
+    if current_user.role == "profesor":
+        if not es_profesor_de_materia(db, materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -492,7 +495,7 @@ def promedio_puntajes(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+    if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     puntajes = (
         db.query(models.puntaje.Puntaje)
@@ -500,6 +503,8 @@ def promedio_puntajes(
         .all()
     )
     if not puntajes:
-        return {"promedio": 0}
-    total = sum(float(p.valor) for p in puntajes)
-    return {"promedio": round(total / len(puntajes), 2)}
+        raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
+    valores = [float(p.valor) for p in puntajes]
+    promedio = round(sum(valores) / len(valores), 2)
+    return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
+    

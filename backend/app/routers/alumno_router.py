@@ -1,8 +1,10 @@
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.security import hash_password
+from app.services.storage import obtener_url_firmada
 
 router = APIRouter(prefix="/alumno", tags=["alumno"])
 
@@ -14,11 +16,13 @@ def mi_perfil(
 ):
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.foto_url:
+        user.foto_url = obtener_url_firmada(user.foto_url)
     return user
 
 
@@ -30,7 +34,7 @@ def actualizar_mi_perfil(
 ):
     user = (
         db.query(models.user.User)
-        .filter(models.user.User.id == current_user["user_id"])
+        .filter(models.user.User.id == current_user.user_id)
         .first()
     )
     if not user:
@@ -62,7 +66,7 @@ def mis_materias(
 ):
     inscripciones = (
         db.query(models.inscripcion.Inscripcion)
-        .filter(models.inscripcion.Inscripcion.alumno_id == current_user["user_id"])
+        .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
         .all()
     )
     materia_ids = [i.oferta.materia_id for i in inscripciones]
@@ -107,7 +111,7 @@ def mis_notas(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     puntajes = (
         db.query(models.puntaje.Puntaje)
         .filter(models.puntaje.Puntaje.user_id == user_id)
@@ -153,7 +157,7 @@ def mi_asistencia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     asistencias = (
         db.query(models.asistencia.Asistencia)
         .filter(models.asistencia.Asistencia.user_id == user_id)
@@ -188,12 +192,185 @@ def mi_asistencia(
     return result
 
 
+@router.get("/dashboard")
+def dashboard(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Endpoint agregado para el dashboard móvil.
+
+    Retorna en UNA sola llamada todo lo que la pantalla principal necesita:
+    - perfil del usuario (user)
+    - resumen académico (resumen)
+    - próximo evento / eventos cercanos (proximoEvento, eventosCercanos)
+    - saldo de cuenta (cuentaSaldoPendiente, etc.)
+    - regularidad activa (regularidadActiva)
+
+    Esto reemplaza los 4 requests paralelos que hacía antes el mobile.
+    """
+    user_id = current_user.user_id
+
+    # Perfil
+    user = (
+        db.query(models.user.User)
+        .filter(models.user.User.id == user_id)
+        .first()
+    )
+
+    # Resumen
+    notas_data = mis_notas(db, current_user) or []
+    asistencias_data = mi_asistencia(db, current_user) or []
+    promedios = [n.get("promedio") for n in notas_data if n.get("promedio") is not None]
+    prom_general = round(sum(promedios) / len(promedios), 2) if promedios else None
+
+    resumen = {
+        "alumno": {
+            "id": user.id,
+            "nombre": user.nombre,
+            "username": user.username,
+            "email": user.email,
+            "es_becado": user.es_becado,
+        }
+        if user
+        else None,
+        "cantidad_materias": len(notas_data),
+        "promedio_general": prom_general,
+        "notas": notas_data,
+        "asistencia": asistencias_data,
+    }
+
+    # Eventos próximos (30 días)
+    hoy = date.today()
+    hasta = hoy + timedelta(days=30)
+    eventos = (
+        db.query(models.evento_calendario.EventoCalendario)
+        .filter(
+            models.evento_calendario.EventoCalendario.fecha >= hoy,
+            models.evento_calendario.EventoCalendario.fecha <= hasta,
+        )
+        .order_by(models.evento_calendario.EventoCalendario.fecha.asc())
+        .all()
+    )
+    eventos_cercanos = [
+        {
+            "id": e.id,
+            "titulo": e.titulo,
+            "tipo": e.tipo,
+            "fecha": e.fecha.isoformat() if e.fecha else None,
+            "fecha_fin": e.fecha_fin.isoformat() if e.fecha_fin else None,
+            "materia_id": e.materia_id,
+            "carrera_id": e.carrera_id,
+            "descripcion": e.descripcion,
+            "anio": e.anio,
+            "semestre": e.semestre,
+            "archivo_pdf": e.archivo_pdf,
+            "creado_por": e.creado_por,
+        }
+        for e in eventos
+    ]
+
+    # Próximo evento relevante (parcial, final, entrega)
+    relevantes = [e for e in eventos if e.tipo in ("parcial", "final", "entrega")]
+    proximo = relevantes[0] if relevantes else (eventos[0] if eventos else None)
+    proximo_evento = None
+    if proximo:
+        proximo_evento = {
+            "id": proximo.id,
+            "titulo": proximo.titulo,
+            "tipo": proximo.tipo,
+            "fecha": proximo.fecha.isoformat() if proximo.fecha else None,
+            "fecha_fin": proximo.fecha_fin.isoformat() if proximo.fecha_fin else None,
+            "materia_id": proximo.materia_id,
+            "carrera_id": proximo.carrera_id,
+            "descripcion": proximo.descripcion,
+            "anio": proximo.anio,
+            "semestre": proximo.semestre,
+            "archivo_pdf": proximo.archivo_pdf,
+            "creado_por": proximo.creado_por,
+        }
+
+    # Cuenta: saldos de cuotas
+    cuenta_saldo_pendiente = 0.0
+    cuenta_saldo_vencido = 0.0
+    cuenta_pagado = 0.0
+    cuenta_hay_cuotas = False
+
+    try:
+        cuotas = (
+            db.query(models.financiero.Cuota)
+            .filter(models.financiero.Cuota.alumno_id == user_id)
+            .all()
+        )
+        if cuotas:
+            cuenta_hay_cuotas = True
+            for c in cuotas:
+                monto = float(c.monto_a_pagar) if c.monto_a_pagar else 0
+                if c.estado == "pagada":
+                    cuenta_pagado += monto
+                elif c.estado == "vencido":
+                    cuenta_saldo_vencido += monto
+                elif c.estado == "pendiente":
+                    cuenta_saldo_pendiente += monto
+    except Exception:
+        pass  # Si no hay tabla o modelo, ignorar silenciosamente
+
+    # Regularidad activa: asistencia promedio >= 70%
+    asistencias_lista = asistencias_data or []
+    if asistencias_lista:
+        regularidad = all(
+            (a.get("porcentaje") or 100) >= 70 for a in asistencias_lista
+        )
+    else:
+        regularidad = True
+
+    # Perfil del usuario en formato UserInfo
+    user_out = None
+    if user:
+        user_out = {
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
+            "nombre": user.nombre,
+            "email": user.email,
+            "carrera_id": user.carrera_id,
+            "es_becado": user.es_becado,
+            "foto_url": obtener_url_firmada(user.foto_url) if user.foto_url else None,
+        }
+        # Intentar obtener nombre de carrera y semestre
+        if user.carrera_id:
+            carrera = (
+                db.query(models.carrera.Carrera)
+                .filter(models.carrera.Carrera.id == user.carrera_id)
+                .first()
+            )
+            if carrera:
+                user_out["carrera_nombre"] = carrera.nombre
+            else:
+                user_out["carrera_nombre"] = None
+        else:
+            user_out["carrera_nombre"] = None
+        user_out["semestre"] = None  # backend no expone semestre actual hoy
+
+    return {
+        "user": user_out,
+        "resumen": resumen,
+        "proximoEvento": proximo_evento,
+        "eventosCercanos": eventos_cercanos,
+        "cuentaSaldoPendiente": cuenta_saldo_pendiente,
+        "cuentaSaldoVencido": cuenta_saldo_vencido,
+        "cuentaPagado": cuenta_pagado,
+        "cuentaHayCuotas": cuenta_hay_cuotas,
+        "regularidadActiva": regularidad,
+    }
+
+
 @router.get("/mi-resumen")
 def mi_resumen(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     notas = mis_notas(db, current_user) or []
     asistencia = mi_asistencia(db, current_user) or []
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()

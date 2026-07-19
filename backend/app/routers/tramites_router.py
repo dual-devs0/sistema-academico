@@ -48,7 +48,7 @@ def crear_solicitud_endpoint(
     current_user=Depends(require_role("alumno")),
 ):
     try:
-        solicitud = crear_solicitud(current_user["user_id"], data.tipo_tramite_id, db)
+        solicitud = crear_solicitud(current_user.user_id, data.tipo_tramite_id, db)
         db.commit()
         db.refresh(solicitud)
         return solicitud
@@ -68,11 +68,11 @@ def listar_mis_solicitudes(
     current_user=Depends(get_current_user),
 ):
     q = db.query(Solicitud)
-    if current_user["role"] == "admin":
+    if current_user.role == "admin":
         if estado:
             q = q.filter(Solicitud.estado == estado)
-    elif current_user["role"] == "alumno":
-        q = q.filter(Solicitud.alumno_id == current_user["user_id"])
+    elif current_user.role == "alumno":
+        q = q.filter(Solicitud.alumno_id == current_user.user_id)
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
     return q.order_by(Solicitud.fecha_solicitud.desc()).all()
@@ -113,7 +113,7 @@ async def resolver_solicitud(
 
     solicitud.estado = estado
     solicitud.motivo_rechazo = motivo_rechazo if estado == "rechazada" else None
-    solicitud.resuelto_por = current_user["user_id"]
+    solicitud.resuelto_por = current_user.user_id
     solicitud.fecha_resolucion = datetime.now(timezone.utc)
     db.commit()
     db.refresh(solicitud)
@@ -134,8 +134,8 @@ def descargar_resultado(
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
     if (
-        current_user["role"] != "admin"
-        and current_user["user_id"] != solicitud.alumno_id
+        current_user.role != "admin"
+        and current_user.user_id != solicitud.alumno_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
 

@@ -30,7 +30,10 @@ from app.models import (  # noqa: F401, E402
     puntaje,
     apunte,
     evento_calendario,
-    temario,
+    programa,
+    foro,
+    horario,
+    refresh_token,
     recordatorio_docente,
     pensum_materia,
     correlatividad,
@@ -38,6 +41,12 @@ from app.models import (  # noqa: F401, E402
     expediente_materia,
     expediente_semestre,
     regularidad_alumno,
+    financiero,
+    pasantia,
+    graduacion,
+    equivalencia,
+    examen,
+    tramites,
 )
 
 target_metadata = Base.metadata

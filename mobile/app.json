@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#0a0e17",
+      "backgroundColor": "#1a3569",
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain"
     },
@@ -24,7 +24,7 @@
     "android": {
       "package": "py.edu.uca.movil",
       "adaptiveIcon": {
-        "backgroundColor": "#0a0e17",
+        "backgroundColor": "#1a3569",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -59,7 +59,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0a0e17",
+          "backgroundColor": "#1a3569",
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain"
         }
@@ -67,9 +67,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "apiBase": "http://localhost:8000"
     }
   }
 }

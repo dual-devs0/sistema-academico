@@ -4,7 +4,7 @@ Schemas Pydantic — Fase 5A: Solicitudes y trámites.
 
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 
@@ -37,5 +37,5 @@ class SolicitudOut(BaseModel):
 
 
 class SolicitudResolverRequest(BaseModel):
-    estado: str  # 'resuelta' | 'rechazada'
+    estado: Literal["resuelta", "rechazada"]
     motivo_rechazo: Optional[str] = None

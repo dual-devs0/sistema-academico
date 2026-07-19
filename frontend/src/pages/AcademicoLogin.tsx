@@ -74,9 +74,9 @@ export default function AcademicoLogin() {
 
   const semestreActual = `Semestre ${new Date().getMonth() < 6 ? 1 : 2} · ${new Date().getFullYear()}`
 
-  const accentColor  = rol === 'profesor' ? '#8b5cf6' : '#00b4d8'
-  const accentGlow   = rol === 'profesor' ? '#8b5cf620' : '#00b4d820'
-  const accentBright = rol === 'profesor' ? '#c4b5fd' : '#48cae4'
+  const accentColor  = rol === 'profesor' ? '#fb923c' : '#0ea5e9'
+  const accentGlow   = rol === 'profesor' ? '#fb923c20' : '#0ea5e920'
+  const accentBright = rol === 'profesor' ? '#fdba74' : '#38bdf8'
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setError('')

@@ -22,6 +22,8 @@ from . import financiero
 from . import pasantia
 from . import graduacion
 from . import equivalencia
+from . import examen
+from . import tramites
 
 __all__ = [
     "user",
@@ -48,4 +50,7 @@ __all__ = [
     "pasantia",
     "graduacion",
     "equivalencia",
+    "examen",
+    "tramites",
 ]
+

@@ -1,6 +1,8 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { GlassCard } from "./GlassCard";
-import { colors, fontFamily, fontSize, spacing } from "../../constants/design";
+import { fontFamily, fontSize, spacing } from "../../constants/design";
 
 /**
  * StatCard — card KPI para grids 2x2 del dashboard y perfil.
@@ -51,7 +53,8 @@ export function StatCard({
   onPress,
   style,
 }: Props) {
-  return (
+  const { colors } = useTheme();
+return (
     <GlassCard
       onPress={onPress}
       contentStyle={{ padding: spacing.lg }}
@@ -84,6 +87,9 @@ export function StatCard({
             fontFamily: fontFamily.monoBold,
             fontSize: fontSize.numeric,
             lineHeight: fontSize.numeric + 2,
+            textShadowColor: valueColor ?? colors.cyan,
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 8,
           }}
           numberOfLines={1}
           adjustsFontSizeToFit

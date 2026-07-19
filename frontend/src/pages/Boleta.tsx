@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, decodeToken, emitToast } from '../lib/api'
+import { api, getCurrentUser, getAccessToken, emitToast } from '../lib/api'
 
 type NotaRow = {
   materia_id: number; materia_nombre: string
@@ -37,31 +37,50 @@ function notaColor(n: number | null): string {
 
 const iconos = ['ti-cpu', 'ti-database', 'ti-shield-lock', 'ti-topology-star-3', 'ti-book-2', 'ti-flask']
 
+function periodosRecientes(n = 4): string[] {
+  const out: string[] = []
+  let y = new Date().getFullYear()
+  let s = new Date().getMonth() < 6 ? 1 : 2
+  for (let i = 0; i < n; i++) {
+    out.push(`${s === 1 ? 'Otoño' : 'Primavera'} ${y}`)
+    s--
+    if (s === 0) { s = 2; y-- }
+  }
+  return out
+}
+
 export default function Boleta() {
-  const user = decodeToken(sessionStorage.getItem('token') || '')
+  const user = getCurrentUser()
   const esAlumno = user?.role === 'alumno'
   const [resumen, setResumen] = useState<Resumen | null>(null)
   const [alumnos, setAlumnos] = useState<AlumnoOpt[]>([])
   const [selId, setSelId] = useState<number | null>(esAlumno ? Number(user?.user_id) : null)
   const [loading, setLoading] = useState(esAlumno)
   const [descargando, setDescargando] = useState(false)
+  const periodos = periodosRecientes()
+  const [periodo, setPeriodo] = useState(periodos[0])
 
   useEffect(() => {
     if (!esAlumno) {
-      api.get<AlumnoOpt[]>('/users/').then(us => setAlumnos(us.filter(u => u.role === 'alumno'))).catch(() => {})
+      api.get<AlumnoOpt[]>('/profesor/lista-alumnos').then(setAlumnos).catch(e => {
+        console.error('Error al cargar alumnos:', e)
+        emitToast('Error al cargar lista de alumnos', 'error')
+      })
     }
   }, [esAlumno])
 
   useEffect(() => {
     if (!selId) return
     if (esAlumno) {
-      api.get<Resumen>('/alumno/mi-resumen').then(setResumen).catch(() => {}).finally(() => setLoading(false))
+      api.get<Resumen>('/alumno/mi-resumen').then(setResumen).catch(e => {
+        console.error('Error al cargar resumen:', e)
+        emitToast('Error al cargar tu boleta', 'error')
+      }).finally(() => setLoading(false))
     } else {
-      // admin/profesor: armar resumen desde puntajes
       Promise.all([
         api.get<{id:number;nombre:string}[]>('/materias/'),
         api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${selId}`),
-        api.get<AlumnoOpt[]>('/users/'),
+        api.get<AlumnoOpt[]>('/profesor/lista-alumnos'),
       ]).then(([mats, pts, us]) => {
         const al = us.find(u => u.id === selId)
         const notas: NotaRow[] = mats.map((m: {id:number;nombre:string}) => {
@@ -80,7 +99,10 @@ export default function Boleta() {
           promedio_general: proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : null,
           notas,
         })
-      }).catch(() => {}).finally(() => setLoading(false))
+      }).catch(e => {
+        console.error('Error al cargar datos de boleta:', e)
+        emitToast('Error al cargar datos de la boleta', 'error')
+      }).finally(() => setLoading(false))
     }
   }, [selId, esAlumno])
 
@@ -88,7 +110,7 @@ export default function Boleta() {
     if (!selId) return
     setDescargando(true)
     try {
-      const token = sessionStorage.getItem('token')
+      const token = getAccessToken()
       const res = await fetch(`/api/boleta/${selId}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error('No se pudo generar la boleta')
       const blob = await res.blob()
@@ -114,9 +136,9 @@ export default function Boleta() {
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 className="page-title" style={{ fontSize: 27 }}>Boleta de Calificaciones</h1>
+          <h1 className="page-title" style={{ fontSize: 27 }}>{esAlumno ? 'Mi Boleta' : 'Boleta de Calificaciones'}</h1>
           <p className="page-subtitle">
-            Semestre {new Date().getMonth() < 6 ? 'Otoño' : 'Primavera'} {new Date().getFullYear()}
+            {esAlumno ? `— ${periodo}` : `Semestre ${new Date().getMonth() < 6 ? 'Otoño' : 'Primavera'} ${new Date().getFullYear()}`}
             {resumen?.alumno.nombre ? <> • <span style={{ color: 'var(--accent-bright)' }}>{resumen.alumno.nombre}</span></> : null}
           </p>
         </div>
@@ -125,10 +147,19 @@ export default function Boleta() {
         </button>
       </div>
 
+      {esAlumno && (
+        <div style={{ maxWidth: 260, marginBottom: 20 }}>
+          <div className="mono-label" style={{ marginBottom: 6 }}>Período</div>
+          <select className="input-uca" value={periodo} onChange={e => setPeriodo(e.target.value)}>
+            {periodos.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      )}
+
       {!esAlumno && (
         <div style={{ maxWidth: 380, marginBottom: 20 }}>
           <div className="mono-label" style={{ marginBottom: 6 }}>Alumno</div>
-          <select className="input-uca" value={selId ?? ''} onChange={e => { const id = Number(e.target.value) || null; setSelId(id); if (id) setLoading(true) }}>
+          <select aria-label="Alumno" className="input-uca" value={selId ?? ''} onChange={e => { const id = Number(e.target.value) || null; setSelId(id); if (id) setLoading(true) }}>
             <option value="">Seleccioná un alumno…</option>
             {alumnos.map(a => <option key={a.id} value={a.id}>{a.nombre || a.username}</option>)}
           </select>

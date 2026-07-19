@@ -139,3 +139,67 @@ class TestProcesosEndpoint:
             headers={"Authorization": f"Bearer {tokens['admin']}"},
         )
         assert r.status_code == 404
+
+    def test_etapas_endpoint(self, client, tokens, db, seed):
+        _avanzar_alumno(db, seed, creditos=100)
+        seed["carrera"].creditos_totales = 100
+        db.commit()
+        proceso_id = client.post(
+            "/graduacion/procesos",
+            json={"alumno_id": seed["alumno"].id},
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        ).json()["id"]
+
+        r = client.get(
+            f"/graduacion/procesos/{proceso_id}/etapas",
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        )
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_etapas_endpoint_proceso_inexistente_404(self, client, tokens):
+        r = client.get(
+            "/graduacion/procesos/9999/etapas",
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        )
+        assert r.status_code == 404
+
+
+class TestCandidatos:
+    def test_admin_lista_candidatos(self, client, tokens, db, seed):
+        _avanzar_alumno(db, seed, creditos=100)
+        seed["carrera"].creditos_totales = 100
+        db.commit()
+
+        r = client.get(
+            "/graduacion/candidatos",
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert "items" in data and "total" in data
+        fila = next(
+            (c for c in data["items"] if c["alumno_id"] == seed["alumno"].id), None
+        )
+        assert fila is not None
+        assert fila["estado_candidato"] == "elegible"
+        assert fila["creditos_aprobados"] == 100
+
+    def test_no_admin_403(self, client, tokens):
+        r = client.get(
+            "/graduacion/candidatos",
+            headers={"Authorization": f"Bearer {tokens['alumno']}"},
+        )
+        assert r.status_code == 403
+
+    def test_filtro_busqueda(self, client, tokens, seed):
+        r = client.get(
+            f"/graduacion/candidatos?q={seed['alumno'].username}",
+            headers={"Authorization": f"Bearer {tokens['admin']}"},
+        )
+        assert r.status_code == 200
+        assert all(
+            seed["alumno"].username.lower() in c["username"].lower()
+            or seed["alumno"].username.lower() in (c["nombre"] or "").lower()
+            for c in r.json()["items"]
+        )

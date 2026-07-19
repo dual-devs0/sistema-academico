@@ -43,7 +43,7 @@ def crear_solicitud_endpoint(
 ):
     try:
         solicitud = crear_solicitud(
-            alumno_id=current_user["user_id"],
+            alumno_id=current_user.user_id,
             tipo=data.tipo,
             universidad_origen=data.universidad_origen,
             db=db,
@@ -84,6 +84,44 @@ def resolver_materia_endpoint(
         raise HTTPException(status_code=422, detail=str(e))
 
 
+@router.put(
+    "/{solicitud_id}/resolver",
+    response_model=EquivalenciaMateriaOut,
+    summary="Admin resuelve la primera materia pendiente de una solicitud",
+)
+def resolver_solicitud_endpoint(
+    solicitud_id: int,
+    data: EquivalenciaMateriaResolver,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    from app.models.equivalencia import EquivalenciaMateria
+    eq = (
+        db.query(EquivalenciaMateria)
+        .filter(
+            EquivalenciaMateria.solicitud_id == solicitud_id,
+            EquivalenciaMateria.resolucion.is_(None),
+        )
+        .first()
+    )
+    if not eq:
+        raise HTTPException(status_code=404, detail="No hay materias pendientes en esta solicitud")
+    try:
+        result = resolver_materia(
+            solicitud_id=solicitud_id,
+            materia_eq_id=eq.id,
+            resolucion=data.resolucion,
+            materia_destino_id=data.materia_destino_id,
+            db=db,
+        )
+        db.commit()
+        db.refresh(result)
+        return result
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @router.post(
     "/examenes-suficiencia",
     response_model=ExamenSuficienciaOut,
@@ -94,9 +132,13 @@ def crear_examen_endpoint(
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role("admin")),
 ):
+    from app.models.users import User
+    alumno = db.query(User).filter(User.id == data.alumno_id, User.role == "alumno").first()
+    if not alumno:
+        raise HTTPException(status_code=422, detail="El alumno_id proporcionado no existe o no es un alumno")
     try:
         examen = crear_examen_suficiencia(
-            alumno_id=current_user["user_id"],
+            alumno_id=data.alumno_id,
             materia_id=data.materia_id,
             fecha=data.fecha,
             db=db,
