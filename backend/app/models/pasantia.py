@@ -56,6 +56,14 @@ class Pasantia(Base):
     empresa = relationship("EmpresaReceptora", back_populates="pasantias")
     informes = relationship("InformePasantia", back_populates="pasantia")
 
+    @property
+    def empresa_nombre(self) -> str | None:
+        return self.empresa.nombre if self.empresa else None
+
+    @property
+    def tutor_nombre(self) -> str | None:
+        return self.tutor_academico.nombre if self.tutor_academico else None
+
 
 class InformePasantia(Base):
     __tablename__ = "informes_pasantia"

@@ -23,6 +23,9 @@ from . import tramites_router as tramites
 from . import pasantias_router as pasantias
 from . import graduacion_router as graduacion
 from . import equivalencias_router as equivalencias
+from . import examenes_router as examenes
+from . import notificaciones_router as notificaciones
+from . import notas_router as notas
 
 __all__ = [
     "users",
@@ -49,4 +52,7 @@ __all__ = [
     "pasantias",
     "graduacion",
     "equivalencias",
+    "examenes",
+    "notificaciones",
+    "notas",
 ]

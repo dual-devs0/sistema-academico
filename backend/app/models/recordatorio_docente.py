@@ -9,6 +9,6 @@ class RecordatorioDocente(Base):
     profesor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    fecha = Column(DateTime, nullable=False)
+    fecha = Column(DateTime(timezone=True), nullable=False)
     materia_id = Column(Integer, ForeignKey("materias.id"), nullable=True)
     completado = Column(Boolean, default=False)

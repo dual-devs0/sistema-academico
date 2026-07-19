@@ -17,7 +17,7 @@ def crear_hilo(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor", "alumno"):
+    if current_user.role not in ("admin", "profesor", "alumno"):
         raise HTTPException(status_code=403, detail="No autorizado")
     materia = (
         db.query(models.materia.Materia)
@@ -27,7 +27,7 @@ def crear_hilo(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
     # Check that user is enrolled in or teaches this materia (unless admin)
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         ofertas_ids = [
             o.id
             for o in db.query(models.oferta_materia.OfertaMateria.id)
@@ -37,7 +37,7 @@ def crear_hilo(
         insc = (
             db.query(models.inscripcion.Inscripcion)
             .filter(
-                models.inscripcion.Inscripcion.alumno_id == current_user["user_id"],
+                models.inscripcion.Inscripcion.alumno_id == current_user.user_id,
                 models.inscripcion.Inscripcion.oferta_materia_id.in_(ofertas_ids),
             )
             .first()
@@ -46,8 +46,8 @@ def crear_hilo(
             raise HTTPException(
                 status_code=403, detail="No estas inscripto en esta materia"
             )
-    elif current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, hilo.materia_id, current_user["user_id"]):
+    elif current_user.role == "profesor":
+        if not es_profesor_de_materia(db, hilo.materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor de esta materia"
             )
@@ -55,7 +55,7 @@ def crear_hilo(
         materia_id=hilo.materia_id,
         titulo=hilo.titulo,
         descripcion=hilo.descripcion,
-        creado_por=current_user["user_id"],
+        creado_por=current_user.user_id,
     )
     db.add(nuevo)
     db.commit()
@@ -191,7 +191,7 @@ def actualizar_hilo(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     hilo = (
         db.query(models.foro.ForoHilo)
@@ -200,8 +200,8 @@ def actualizar_hilo(
     )
     if not hilo:
         raise HTTPException(status_code=404, detail="Hilo no encontrado")
-    if current_user["role"] == "profesor" and not es_profesor_de_materia(
-        db, hilo.materia_id, current_user["user_id"]
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, hilo.materia_id, current_user.user_id
     ):
         raise HTTPException(
             status_code=403, detail="No sos el profesor de esta materia"
@@ -219,7 +219,7 @@ def eliminar_hilo(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     hilo = (
         db.query(models.foro.ForoHilo)
@@ -228,8 +228,8 @@ def eliminar_hilo(
     )
     if not hilo:
         raise HTTPException(status_code=404, detail="Hilo no encontrado")
-    if current_user["role"] == "profesor" and not es_profesor_de_materia(
-        db, hilo.materia_id, current_user["user_id"]
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, hilo.materia_id, current_user.user_id
     ):
         raise HTTPException(
             status_code=403, detail="No sos el profesor de esta materia"
@@ -264,7 +264,7 @@ def crear_mensaje(
         .filter(models.materia.Materia.id == hilo.materia_id)
         .first()
     )
-    if current_user["role"] == "alumno":
+    if current_user.role == "alumno":
         ofertas_ids = [
             o.id
             for o in db.query(models.oferta_materia.OfertaMateria.id)
@@ -274,7 +274,7 @@ def crear_mensaje(
         insc = (
             db.query(models.inscripcion.Inscripcion)
             .filter(
-                models.inscripcion.Inscripcion.alumno_id == current_user["user_id"],
+                models.inscripcion.Inscripcion.alumno_id == current_user.user_id,
                 models.inscripcion.Inscripcion.oferta_materia_id.in_(ofertas_ids),
             )
             .first()
@@ -283,15 +283,15 @@ def crear_mensaje(
             raise HTTPException(
                 status_code=403, detail="No estas inscripto en esta materia"
             )
-    elif current_user["role"] == "profesor" and materia:
-        if not es_profesor_de_materia(db, hilo.materia_id, current_user["user_id"]):
+    elif current_user.role == "profesor" and materia:
+        if not es_profesor_de_materia(db, hilo.materia_id, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor de esta materia"
             )
 
     nuevo = models.foro.ForoMensaje(
         hilo_id=hilo_id,
-        user_id=current_user["user_id"],
+        user_id=current_user.user_id,
         contenido=msg.contenido,
     )
     db.add(nuevo)
@@ -325,7 +325,7 @@ def editar_mensaje(
     )
     if not msg:
         raise HTTPException(status_code=404, detail="Mensaje no encontrado")
-    if current_user["user_id"] != msg.user_id:
+    if current_user.user_id != msg.user_id:
         raise HTTPException(
             status_code=403, detail="Solo podés editar tus propios mensajes"
         )
@@ -370,8 +370,8 @@ def eliminar_mensaje(
     if not msg:
         raise HTTPException(status_code=404, detail="Mensaje no encontrado")
     if (
-        current_user["role"] not in ("admin",)
-        and current_user["user_id"] != msg.user_id
+        current_user.role not in ("admin",)
+        and current_user.user_id != msg.user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(msg)

@@ -69,3 +69,51 @@ class PorcentajeGlobalOut(BaseModel):
     total_clases: int
     presentes: int
     porcentaje: float
+
+
+# ─── Módulo QR asistencia ────────────────────────────────────────────────────
+
+
+class QrVerifyRequest(BaseModel):
+    """Token JWT firmado por el profesor que abre el registro de asistencia."""
+
+    qr_token: str
+
+
+class QrVerifyResponse(BaseModel):
+    """Confirmación de registro de asistencia del alumno + conteo en vivo."""
+
+    materia_nombre: str
+    fecha: date
+    hora_registro: str  # HH:MM
+    presentes: int
+    ausentes: int
+
+
+class QrGenerateResponse(BaseModel):
+    """Datos para mostrar el QR al profesor."""
+
+    qr_base64: str
+    token: str
+    scan_url: str
+    expira_en: int
+
+
+class ProfesorAlumnoOut(BaseModel):
+    """Alumno con su estado de asistencia para una fecha dada."""
+
+    id: int
+    nombre: str
+    documento: str
+    asistencia_id: int | None = None
+    presente: bool | None = None
+    es_becado: bool = False
+    motivo: str | None = None
+
+
+class ProfesorAlumnosResponse(BaseModel):
+    """Respuesta del endpoint de alumnos por materia+fecha."""
+
+    fecha: str
+    materia: str
+    alumnos: list[ProfesorAlumnoOut]

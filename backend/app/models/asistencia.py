@@ -15,9 +15,9 @@ class Asistencia(Base):
     __tablename__ = "asistencias"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     oferta_materia_id = Column(
-        Integer, ForeignKey("ofertas_materia.id"), nullable=False
+        Integer, ForeignKey("ofertas_materia.id"), nullable=False, index=True
     )
     fecha = Column(Date, nullable=False)
     presente = Column(Boolean, nullable=False, default=True)

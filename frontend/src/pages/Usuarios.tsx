@@ -7,7 +7,7 @@ type Usuario = { id: number; username: string; role: string; nombre: string; ema
 
 const rolCfg: Record<string, { color: string; bg: string; label: string }> = {
   alumno:   { color: 'var(--accent-bright)', bg: 'var(--accent-muted)', label: 'ALUMNO' },
-  profesor: { color: '#a78bfa', bg: 'rgba(139,92,246,0.14)', label: 'PROFESOR' },
+  profesor: { color: '#fdba74', bg: 'rgba(251,146,60,0.14)', label: 'PROFESOR' },
   admin:    { color: '#fbbf24', bg: 'rgba(245,158,11,0.14)', label: 'ADMIN' },
 }
 
@@ -28,7 +28,6 @@ export default function Usuarios() {
   const [filtroRol, setFiltroRol] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [busquedaDebounced, setBusquedaDebounced] = useState('')
-  const [checks, setChecks] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<Usuario | 'nuevo' | null>(null)
   const [confirmDel, setConfirmDel] = useState<number | null>(null)
@@ -82,7 +81,7 @@ export default function Usuarios() {
     {
       header: 'Rol',
       render: u => {
-        const cfg = rolCfg[u.role] ?? rolCfg.alumno
+        const cfg = rolCfg[u.role?.toLowerCase().trim()] ?? rolCfg.alumno
         return <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
       },
     },
@@ -173,14 +172,6 @@ export default function Usuarios() {
     URL.revokeObjectURL(a.href)
   }
 
-  function toggleCheck(id: number) {
-    setChecks(prev => {
-      const n = new Set(prev)
-      if (n.has(id)) n.delete(id); else n.add(id)
-      return n
-    })
-  }
-
   return (
     <>
       <style>{css}</style>
@@ -232,18 +223,7 @@ export default function Usuarios() {
         loading={loading}
         onPageChange={setPage}
         getRowKey={u => u.id}
-        selectable
-        selectedIds={checks}
-        onToggleSelect={id => toggleCheck(id as number)}
         emptyMessage="Sin usuarios que coincidan con el filtro."
-        headerExtra={checks.size > 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 800 }}>{checks.size} Usuarios seleccionados</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--danger)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              <i className="ti ti-ban" /> Bloqueo Masivo
-            </button>
-          </div>
-        ) : undefined}
       />
 
       {/* Panel inferior */}
@@ -262,7 +242,6 @@ export default function Usuarios() {
           <div className="aud-row"><span><i className="ti ti-shield-check" style={{ color: 'var(--success)', marginRight: 7 }} />Inicios de sesión hoy</span><b style={{ fontFamily: 'var(--font-mono)' }}>2,482</b></div>
           <div className="aud-row"><span><i className="ti ti-alert-triangle" style={{ color: 'var(--danger)', marginRight: 7 }} />Bloqueos automáticos</span><b style={{ fontFamily: 'var(--font-mono)' }}>3</b></div>
           <div className="aud-row"><span><i className="ti ti-key" style={{ color: 'var(--warning)', marginRight: 7 }} />Password resets</span><b style={{ fontFamily: 'var(--font-mono)' }}>14</b></div>
-          <button className="btn-ghost" style={{ width: '100%', marginTop: 8 }}>Ver Reporte Completo</button>
         </div>
       </div>
 

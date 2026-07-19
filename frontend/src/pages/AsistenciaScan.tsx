@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
 
 type Estado = 'idle' | 'verificando' | 'exito' | 'duplicado' | 'expirado' | 'no_autorizado' | 'error'
 type ResultData = { materia: string; fecha: string; alumno: string }
@@ -50,7 +50,8 @@ export default function AsistenciaScan() {
   const [camara, setCamara] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const nombre = sessionStorage.getItem('user_nombre') || 'Alumno'
+  const user = getCurrentUser()
+  const nombre = user?.username || 'Alumno'
 
   useEffect(() => {
     api.get<MateriaAsist[]>('/alumno/mi-asistencia').then(setMaterias).catch(() => {})
@@ -58,13 +59,12 @@ export default function AsistenciaScan() {
 
   useEffect(() => {
     if (!token) return
-    const authToken = sessionStorage.getItem('token')
-    const userRol = sessionStorage.getItem('user_rol')
-    if (!authToken) {
+    const currentUser = getCurrentUser()
+    if (!currentUser) {
       navigate(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)
       return
     }
-    const prom = userRol !== 'alumno'
+    const prom = currentUser.role !== 'alumno'
       ? Promise.reject(new Error('no_autorizado'))
       : api.post<ResultData>('/asistencias/scan', { token })
     prom

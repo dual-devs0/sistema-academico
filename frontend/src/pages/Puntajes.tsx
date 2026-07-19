@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { api, decodeToken, emitToast } from '../lib/api'
+import { api, getCurrentUser, emitToast } from '../lib/api'
 
 /* ═══ Compartido ════════════════════════════════════════════════ */
 
@@ -614,8 +614,7 @@ function AdminView() {
 /* ═══ Router por rol ════════════════════════════════════════════ */
 
 export default function Puntajes() {
-  const token = sessionStorage.getItem('token')
-  const currentUser = token ? decodeToken(token) : null
+  const currentUser = getCurrentUser()
 
   return (
     <>

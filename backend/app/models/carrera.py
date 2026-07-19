@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -10,3 +11,4 @@ class Carrera(Base):
     duracion_semestres = Column(Integer, nullable=True)
     creditos_totales = Column(Integer, nullable=True)
     max_cuotas_mora = Column(Integer, nullable=False, default=1)
+    users = relationship("User", back_populates="carrera")

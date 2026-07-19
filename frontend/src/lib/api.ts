@@ -5,10 +5,12 @@ const BASE = '/api'
 // ---------------------------------------------------------------------------
 let _accessToken: string | null = null
 let _currentUser: UserInfo | null = null
+let _csrfToken: string | null = null
 
 export function setAccessToken(token: string | null): void {
   _accessToken = token
   _currentUser = token ? decodeToken(token) : null
+  if (!token) _csrfToken = null
   // Mantener indicador de sesión activa para que RutaProtegida sepa intentar refresh
   if (token) {
     sessionStorage.setItem('session_active', '1')
@@ -19,6 +21,16 @@ export function setAccessToken(token: string | null): void {
 
 export function getAccessToken(): string | null {
   return _accessToken
+}
+
+// csrf_token viene en el body de /auth/login y /auth/refresh (doble-submit
+// contra la cookie httpOnly csrf_token). Se reenvía como header en el
+// próximo /auth/refresh — protege esa ruta contra CSRF vía cookie auto-enviada.
+function _captureCsrfToken(data: unknown): void {
+  if (data && typeof data === 'object' && 'csrf_token' in (data as Record<string, unknown>)) {
+    const t = (data as Record<string, unknown>).csrf_token
+    if (typeof t === 'string') _csrfToken = t
+  }
 }
 
 export function getCurrentUser(): UserInfo | null {
@@ -55,10 +67,12 @@ async function tryRefresh(): Promise<boolean> {
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
+        headers: _csrfToken ? { 'X-CSRF-Token': _csrfToken } : {},
       })
       if (!res.ok) return false
       const data = await res.json()
       setAccessToken(data.access_token)
+      _captureCsrfToken(data)
       return true
     } catch {
       return false
@@ -104,7 +118,9 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || 'Error de conexión')
   }
-  return res.json()
+  const data = await res.json()
+  _captureCsrfToken(data)
+  return data
 }
 
 export const api = {

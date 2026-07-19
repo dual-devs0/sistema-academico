@@ -39,7 +39,9 @@ class PasantiaOut(BaseModel):
     id: int
     alumno_id: int
     empresa_id: int
+    empresa_nombre: Optional[str] = None
     tutor_academico_id: Optional[int]
+    tutor_nombre: Optional[str] = None
     fecha_inicio: date
     fecha_fin: Optional[date]
     horas_requeridas: int

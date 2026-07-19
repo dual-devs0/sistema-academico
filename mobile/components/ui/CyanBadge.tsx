@@ -1,5 +1,7 @@
+import { colors } from "../../constants/design";
+import { useTheme } from "../../hooks/useTheme";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { colors, fontFamily, fontSize, radius, spacing } from "../../constants/design";
+import { fontFamily, fontSize, radius, spacing } from "../../constants/design";
 
 /**
  * CyanBadge — pill/chip para estados y etiquetas.
@@ -52,7 +54,8 @@ export function CyanBadge({
   glyph,
   style,
 }: Props) {
-  const v = VARIANT_STYLE[variant];
+  const { colors } = useTheme();
+const v = VARIANT_STYLE[variant];
   const paddingV = size === "sm" ? 4 : 6;
   const paddingH = size === "sm" ? spacing.sm : spacing.md;
   const fs = size === "sm" ? fontSize.caption : fontSize.label;

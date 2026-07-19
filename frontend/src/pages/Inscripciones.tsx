@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, decodeToken, emitToast } from '../lib/api'
+import { api, getCurrentUser, emitToast } from '../lib/api'
 
 type Materia = { id: number; nombre: string; profesor_nombre?: string | null; creditos?: number | null; cupos?: number | null; horario?: string | null; secciones?: number | null; inscritos?: number | null }
 type Inscripcion = { id: number; alumno_id: number; materia_id: number }
@@ -48,10 +48,13 @@ function AlumnoView({ userId }: { userId: number }) {
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      api.get<Materia[]>('/materias/').catch(() => [] as Materia[]),
-      api.get<Inscripcion[]>('/inscripciones/').catch(() => [] as Inscripcion[]),
-    ]).then(([mats, ins]) => {
+    api.get<{ carrera_id: number | null }>('/users/me').then(me => {
+      const carreraQuery = me.carrera_id ? `?carrera_id=${me.carrera_id}` : ''
+      return Promise.all([
+        api.get<Materia[]>(`/materias/${carreraQuery}`).catch(() => [] as Materia[]),
+        api.get<Inscripcion[]>('/inscripciones/').catch(() => [] as Inscripcion[]),
+      ])
+    }).then(([mats, ins]) => {
       setMaterias(mats)
       setInscriptas(ins.filter(i => i.alumno_id === userId))
     }).finally(() => setLoading(false))
@@ -403,8 +406,7 @@ function AdminView() {
 /* ═══ Router por rol ════════════════════════════════════════════ */
 
 export default function Inscripciones() {
-  const token = sessionStorage.getItem('token')
-  const user = token ? decodeToken(token) : null
+  const user = getCurrentUser()
 
   return (
     <>

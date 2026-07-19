@@ -12,7 +12,6 @@ from app.models.puntaje import Puntaje  # noqa: E402
 from app.models.asistencia import Asistencia  # noqa: E402
 from app.models.evento_calendario import EventoCalendario  # noqa: E402
 from app.models.apunte import Apunte  # noqa: E402
-from app.models.temario import Temario  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
@@ -565,120 +564,6 @@ for ap in apuntes_data:
             )
         )
 print(f"  + Apuntes: {len(apuntes_data)} cargados")
-
-# ─────────────────────────────────────────
-# 9. TEMARIOS
-# ─────────────────────────────────────────
-temarios_data = [
-    (
-        "Analisis Matematico I",
-        1,
-        "Limites y Continuidad",
-        "Numeros reales, funciones basicas, limites y continuidad.",
-    ),
-    (
-        "Analisis Matematico I",
-        2,
-        "Derivadas",
-        "Definicion, reglas de derivacion, regla de la cadena y aplicaciones.",
-    ),
-    (
-        "Analisis Matematico I",
-        3,
-        "Aplicaciones de la Derivada",
-        "Maximos y minimos, regla de L'Hopital, optimizacion.",
-    ),
-    (
-        "Analisis Matematico I",
-        4,
-        "Integrales",
-        "Integral indefinida, integral definida, Teorema Fundamental del Calculo.",
-    ),
-    (
-        "Programacion I",
-        1,
-        "Fundamentos de Python",
-        "Variables, tipos de datos, operadores y entradas/salidas.",
-    ),
-    (
-        "Programacion I",
-        2,
-        "Estructuras de Control",
-        "Condicionales (if/elif/else), bucles (for, while) y control de flujo.",
-    ),
-    (
-        "Programacion I",
-        3,
-        "Funciones y Modulos",
-        "Definicion de funciones, parametros, retorno y modulos estandar.",
-    ),
-    (
-        "Programacion I",
-        4,
-        "Colecciones",
-        "Listas, tuplas, diccionarios y conjuntos. Operaciones fundamentales.",
-    ),
-    (
-        "Fisica I",
-        1,
-        "Cinematica",
-        "Movimiento rectilineo uniforme y uniformemente acelerado.",
-    ),
-    (
-        "Fisica I",
-        2,
-        "Dinamica",
-        "Leyes de Newton. Plano inclinado, poleas y rozamiento.",
-    ),
-    (
-        "Fisica I",
-        3,
-        "Trabajo y Energia",
-        "Trabajo, energia cinetica, energia potencial y conservacion.",
-    ),
-    (
-        "Matematica Discreta",
-        1,
-        "Logica Proposicional",
-        "Tablas de verdad, conectivos logicos, equivalencias.",
-    ),
-    (
-        "Matematica Discreta",
-        2,
-        "Teoria de Conjuntos",
-        "Operaciones con conjuntos, diagramas de Venn, cardinalidad.",
-    ),
-    (
-        "Historia y Filosofia",
-        1,
-        "Filosofia Antigua",
-        "Socrates, Platon, Aristoteles y el pensamiento griego.",
-    ),
-    (
-        "Historia y Filosofia",
-        2,
-        "Filosofia Moderna",
-        "Descartes, Kant y el racionalismo/empirismo.",
-    ),
-]
-for mat_nombre, semana, titulo, desc in temarios_data:
-    existe = (
-        db.query(Temario)
-        .filter(
-            Temario.materia_id == materias_map[mat_nombre].id, Temario.semana == semana
-        )
-        .first()
-    )
-    if not existe:
-        db.add(
-            Temario(
-                materia_id=materias_map[mat_nombre].id,
-                semana=semana,
-                titulo=titulo,
-                descripcion=desc,
-            )
-        )
-print(f"  + Temarios: {len(temarios_data)} semanas cargadas")
 
 # ─────────────────────────────────────────
 # GUARDAR TODO

@@ -254,12 +254,6 @@ def crear_solicitud(alumno_id: int, tipo_tramite_id: int, db: Session) -> Solici
     if not tipo:
         raise ValueError(f"Tipo de trámite {tipo_tramite_id} no existe")
 
-    solicitud = Solicitud(
-        alumno_id=alumno_id, tipo_tramite_id=tipo_tramite_id, estado="pendiente"
-    )
-    db.add(solicitud)
-    db.flush()
-
     generador = _GENERADORES_AUTO.get(tipo.nombre)
     if not tipo.requiere_aprobacion and generador:
         alumno = db.query(User).filter(User.id == alumno_id).first()
@@ -271,12 +265,25 @@ def crear_solicitud(alumno_id: int, tipo_tramite_id: int, db: Session) -> Solici
                 f"({regularidad['estado']}"
                 f"{' — ' + regularidad['motivo'] if regularidad['motivo'] else ''})"
             )
+
+    if not tipo.requiere_aprobacion and generador:
+        solicitud = Solicitud(
+            alumno_id=alumno_id, tipo_tramite_id=tipo_tramite_id, estado="pendiente"
+        )
+        db.add(solicitud)
+        db.flush()
+
         pdf_bytes = generador(alumno, db)
         key = subir_archivo(pdf_bytes, f"{tipo.nombre}.pdf", prefix="tramite")
         solicitud.estado = "resuelta"
         solicitud.storage_key_resultado = key
         solicitud.fecha_resolucion = datetime.now(timezone.utc)
         solicitud.resuelto_por = None
+    else:
+        solicitud = Solicitud(
+            alumno_id=alumno_id, tipo_tramite_id=tipo_tramite_id, estado="pendiente"
+        )
+        db.add(solicitud)
+        db.flush()
 
-    db.flush()
     return solicitud

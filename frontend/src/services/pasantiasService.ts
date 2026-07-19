@@ -14,12 +14,14 @@ export interface Pasantia {
   id: number
   alumno_id: number
   empresa_id: number
+  empresa_nombre: string | null
   tutor_academico_id: number | null
+  tutor_nombre: string | null
   fecha_inicio: string
   fecha_fin: string | null
   horas_requeridas: number
   horas_completadas: number
-  estado: string
+  estado: 'pendiente' | 'en_curso' | 'completada' | 'rechazada'
 }
 
 export interface InformePasantia {
@@ -31,6 +33,9 @@ export interface InformePasantia {
 }
 
 export const getEmpresas = () => api.get<EmpresaReceptora[]>('/pasantias/empresas')
+
+export const getMisPasantias = (estado?: string) =>
+  api.get<Pasantia[]>(`/pasantias/solicitudes${estado ? `?estado=${estado}` : ''}`)
 
 export const crearEmpresa = (data: Partial<EmpresaReceptora>) =>
   api.post<EmpresaReceptora>('/pasantias/empresas', data)
@@ -52,7 +57,7 @@ export const actualizarHoras = (id: number, horas_completadas: number) =>
   api.put<Pasantia>(`/pasantias/${id}/horas`, { horas_completadas })
 
 export const finalizarPasantia = (id: number) =>
-  api.put<Pasantia>(`/pasantias/${id}/finalizar`)
+  api.put<Pasantia>(`/pasantias/${id}/finalizar`, {})
 
 export const subirInforme = async (id: number, tipo: string, archivo?: File) => {
   const form = new FormData()

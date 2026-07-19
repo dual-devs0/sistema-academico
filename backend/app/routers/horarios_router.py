@@ -77,7 +77,7 @@ def create_horario(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(
             status_code=403,
             detail="Solo administradores y profesores pueden crear horarios",
@@ -89,8 +89,8 @@ def create_horario(
     )
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
-    if current_user["role"] == "profesor" and not es_profesor_de_materia(
-        db, horario.materia_id, current_user["user_id"]
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, horario.materia_id, current_user.user_id
     ):
         raise HTTPException(
             status_code=403, detail="No sos el profesor de esta materia"
@@ -207,7 +207,7 @@ def delete_horario(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user["role"] not in ("admin", "profesor"):
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
     horario = (
         db.query(models.horario.Horario)
@@ -216,8 +216,8 @@ def delete_horario(
     )
     if not horario:
         raise HTTPException(status_code=404, detail="Horario no encontrado")
-    if current_user["role"] == "profesor":
-        if not es_profesor_de_materia(db, horario.materia_id, current_user["user_id"]):
+    if current_user.role == "profesor":
+        if not es_profesor_de_materia(db, horario.materia_id, current_user.user_id):
             raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(horario)
     db.commit()
@@ -231,12 +231,12 @@ def verificar_solapamiento(
     current_user=Depends(get_current_user),
 ):
     """Verifica si el alumno actual tiene solapamiento de horario al inscribirse en una materia."""  # noqa: E501
-    if current_user["role"] != "alumno":
+    if current_user.role != "alumno":
         raise HTTPException(
             status_code=403, detail="Solo alumnos pueden verificar solapamiento"
         )
     conflictos = verificar_solapamiento_inscripcion(
-        db, current_user["user_id"], materia_id
+        db, current_user.user_id, materia_id
     )
     return {
         "tiene_conflicto": len(conflictos) > 0,

@@ -209,6 +209,65 @@ def test_avance_alumno_estados(client, seed, tokens, db):
     assert pendientes[0]["tipo"] == "aprobada"
 
 
+def test_avance_alumno_nota_y_reprobada(client, seed, tokens, db):
+    aprobada, oferta_aprobada = _materia_con_oferta(db, seed, "Avance Nota Aprobada")
+    db.add(
+        PensumMateria(
+            carrera_id=seed["carrera"].id,
+            materia_id=aprobada.id,
+            semestre=1,
+            creditos=5,
+        )
+    )
+    db.add(
+        Puntaje(
+            user_id=seed["alumno"].id,
+            oferta_materia_id=oferta_aprobada.id,
+            tipo="final",
+            valor=9.0,
+        )
+    )
+
+    reprobada = Materia(nombre="Avance Reprobada", carrera_id=seed["carrera"].id)
+    db.add(reprobada)
+    db.flush()
+    oferta_cerrada = OfertaMateria(
+        materia_id=reprobada.id,
+        profesor_id=seed["profesor"].id,
+        periodo="2025-1",
+        activa=False,
+    )
+    db.add(oferta_cerrada)
+    db.flush()
+    db.add(
+        PensumMateria(
+            carrera_id=seed["carrera"].id,
+            materia_id=reprobada.id,
+            semestre=1,
+            creditos=4,
+        )
+    )
+    db.add(
+        Puntaje(
+            user_id=seed["alumno"].id,
+            oferta_materia_id=oferta_cerrada.id,
+            tipo="final",
+            valor=3.0,
+        )
+    )
+    db.commit()
+
+    res = client.get(
+        f"/pensum/alumno/{seed['alumno'].id}/avance", headers=auth(tokens["alumno"])
+    )
+    assert res.status_code == 200
+    por_materia = {a["materia_id"]: a for a in res.json()}
+    assert por_materia[aprobada.id]["estado"] == "aprobada"
+    assert por_materia[aprobada.id]["nota"] == 9.0
+    assert por_materia[reprobada.id]["estado"] == "reprobada"
+    assert por_materia[reprobada.id]["nota"] == 3.0
+
+
 def test_avance_alumno_no_autorizado_403(client, seed, tokens):
     res = client.get(
         f"/pensum/alumno/{seed['alumno'].id}/avance", headers=auth(tokens["alumno2"])
