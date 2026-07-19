@@ -98,6 +98,7 @@ export const GlassCard = forwardRef<View, Props>(function GlassCard(
   );
 
   if (onPress && !noPress) {
+  const { colors } = useTheme();
     return (
       <Animated.View style={[cardStyle, animatedStyle, style]}>
         <Pressable

@@ -393,3 +393,58 @@ def mi_resumen(
         "notas": notas,
         "asistencia": asistencia,
     }
+
+
+@router.get("/summary", response_model=schemas.user.StudentSummary)
+def student_summary(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Resumen académico y financiero para el Dashboard."""
+    user = db.query(models.user.User).filter(models.user.User.id == current_user.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    carrera_nombre = None
+    if user.carrera_id:
+        carrera = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id == user.carrera_id).first()
+        if carrera:
+            carrera_nombre = carrera.nombre
+
+    # Promedio
+    notas = mis_notas(db, current_user) or []
+    promedios = [n.get("promedio") for n in notas if n.get("promedio") is not None]
+    prom_general = round(sum(promedios) / len(promedios), 2) if promedios else None
+
+    # Asistencia
+    asistencia = mi_asistencia(db, current_user) or []
+    porcentajes_asistencia = [a.get("porcentaje") for a in asistencia if a.get("porcentaje") is not None]
+    asistencia_prom = round(sum(porcentajes_asistencia) / len(porcentajes_asistencia), 2) if porcentajes_asistencia else None
+    
+    regularidad_activa = True
+    if porcentajes_asistencia and any(p < 70 for p in porcentajes_asistencia):
+        regularidad_activa = False
+
+    # Financiero dummy check for now (we'll assume all good if no debts found, or just 'al_dia')
+    # In a full implementation, this would check finanzas service
+    estado_financiero = "al_dia"
+
+    # Créditos (dummy for now, but dynamic from backend)
+    creditos_totales = 240
+    creditos_aprobados = 120
+    creditos_pendientes = creditos_totales - creditos_aprobados
+    avance_pct = round((creditos_aprobados / creditos_totales) * 100, 1) if creditos_totales > 0 else 0
+
+    return {
+        "creditos_aprobados": creditos_aprobados,
+        "creditos_pendientes": creditos_pendientes,
+        "creditos_totales": creditos_totales,
+        "promedio_general": prom_general,
+        "asistencia_promedio": asistencia_prom,
+        "avance_porcentaje": avance_pct,
+        "estado_financiero": estado_financiero,
+        "regularidad_activa": regularidad_activa,
+        "materias_cursando": len(notas),
+        "carrera_nombre": carrera_nombre,
+        "semestre_actual": 5,
+    }

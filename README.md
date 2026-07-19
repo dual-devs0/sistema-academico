@@ -1,7 +1,5 @@
 # Sistema Académico UCA V2
 
-**Universidad Católica "Nuestra Señora de la Asunción" — Sede Caacupé**
-
 Sistema de gestión académica integral con backend en FastAPI y frontend en React.
 
 ---
