@@ -344,21 +344,12 @@ def exportar_materia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    """Datos de una materia para exportar (notas + asistencia)."""
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    # Verify profesor owns this materia
-    if current_user.role == "profesor":
-        if not es_profesor_de_materia(db, materia_id, current_user.user_id):
-            raise HTTPException(
-                status_code=403, detail="No sos el profesor titular de esta materia"
-            )
+    if current_user.role == "profesor" and not es_profesor_de_materia(db, materia_id, current_user.user_id):
+        raise HTTPException(status_code=403, detail="No sos el profesor titular de esta materia")
 
-    materia = (
-        db.query(models.materia.Materia)
-        .filter(models.materia.Materia.id == materia_id)
-        .first()
-    )
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
 
@@ -366,55 +357,36 @@ def exportar_materia(
     alumno_map: dict[int, dict] = {}
     for p, nombre, username in rows:
         if p.user_id not in alumno_map:
-            alumno_map[p.user_id] = {
-                "nombre": nombre,
-                "username": username,
-                "parcial1": None,
-                "parcial2": None,
-                "practico": None,
-                "final": None,
-            }
+            alumno_map[p.user_id] = {"nombre": nombre, "username": username,
+                                     "parcial1": None, "parcial2": None, "practico": None, "final": None}
         alumno_map[p.user_id][p.tipo] = float(p.valor)
 
     asistencia_oferta_id = _oferta_activa_id(db, materia_id)
+    uids = list(alumno_map.keys())
+
+    # Batch attendance counts (single query)
+    from sqlalchemy import func, case
+    A = models.asistencia.Asistencia
+    asist_rows = (
+        db.query(
+            A.user_id,
+            func.count(A.id).label("total"),
+            func.sum(case((A.presente, 1), else_=0)).label("pres"),
+        )
+        .filter(A.user_id.in_(uids), A.oferta_materia_id == asistencia_oferta_id)
+        .group_by(A.user_id)
+        .all()
+    )
+    asist_map = {r.user_id: (r.total, r.pres) for r in asist_rows}
+
     alumnos_out = []
     for uid, data in alumno_map.items():
         prom = _calcular_promedio_final(data)
-        total_asist = (
-            db.query(models.asistencia.Asistencia)
-            .filter(
-                models.asistencia.Asistencia.user_id == uid,
-                models.asistencia.Asistencia.oferta_materia_id == asistencia_oferta_id,
-            )
-            .count()
-        )
-        presentes = (
-            db.query(models.asistencia.Asistencia)
-            .filter(
-                models.asistencia.Asistencia.user_id == uid,
-                models.asistencia.Asistencia.oferta_materia_id == asistencia_oferta_id,
-                models.asistencia.Asistencia.presente,
-            )
-            .count()
-        )
-        asist_pct = (
-            round((presentes / total_asist) * 100, 1) if total_asist > 0 else None
-        )
+        tot, pres = asist_map.get(uid, (0, 0))
+        asist_pct = round((pres / tot) * 100, 1) if tot > 0 else None
+        alumnos_out.append(schemas.puntaje.AlumnoExportRow(user_id=uid, **data, promedio=prom, asistencia_pct=asist_pct))
 
-        alumnos_out.append(
-            schemas.puntaje.AlumnoExportRow(
-                user_id=uid,
-                **data,
-                promedio=prom,
-                asistencia_pct=asist_pct,
-            )
-        )
-
-    return schemas.puntaje.ExportacionMateriaOut(
-        materia_id=materia_id,
-        materia_nombre=materia.nombre,
-        alumnos=alumnos_out,
-    )
+    return schemas.puntaje.ExportacionMateriaOut(materia_id=materia_id, materia_nombre=materia.nombre, alumnos=alumnos_out)
 
 
 @router.get("/materia/{materia_id}/estadisticas")
@@ -423,65 +395,51 @@ def estadisticas_materia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    """Promedio del grupo, distribuci\u00f3n de notas, aprobados/riesgo."""
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    # Verify profesor owns this materia
-    if current_user.role == "profesor":
-        if not es_profesor_de_materia(db, materia_id, current_user.user_id):
-            raise HTTPException(
-                status_code=403, detail="No sos el profesor titular de esta materia"
-            )
+    if current_user.role == "profesor" and not es_profesor_de_materia(db, materia_id, current_user.user_id):
+        raise HTTPException(status_code=403, detail="No sos el profesor titular de esta materia")
 
+    from sqlalchemy import func as f
+    P = models.puntaje.Puntaje
     oferta_id = _oferta_activa_id(db, materia_id)
-    puntajes = (
-        db.query(models.puntaje.Puntaje)
-        .filter(models.puntaje.Puntaje.oferta_materia_id == oferta_id)
-        .all()
-        if oferta_id
-        else []
-    )
-    if not puntajes:
-        return {
-            "materia_id": materia_id,
-            "total_alumnos": 0,
-            "promedio_grupo": 0,
-            "distribucion": {},
-            "aprobados": 0,
-            "en_riesgo": 0,
-        }
+    if not oferta_id:
+        return {"materia_id": materia_id, "total_alumnos": 0, "promedio_grupo": 0,
+                "distribucion": {}, "aprobados": 0, "en_riesgo": 0}
 
-    valores = [float(p.valor) for p in puntajes]
-    promedio = round(sum(valores) / len(valores), 2)
+    # Single query: per-student average
+    agg = (
+        db.query(P.user_id, f.avg(P.valor).label("prom"), f.count(P.id).label("cnt"))
+        .filter(P.oferta_materia_id == oferta_id)
+        .group_by(P.user_id)
+        .all()
+    )
+    if not agg:
+        return {"materia_id": materia_id, "total_alumnos": 0, "promedio_grupo": 0,
+                "distribucion": {}, "aprobados": 0, "en_riesgo": 0}
+
+    promedios = [float(r.prom) for r in agg]
+    total_alumnos = len(agg)
+    total_notas = sum(r.cnt for r in agg)
 
     distribucion = {
-        "0-3": sum(1 for v in valores if v < 3),
-        "3-5": sum(1 for v in valores if 3 <= v < 5),
-        "5-6": sum(1 for v in valores if 5 <= v < 6),
-        "6-7": sum(1 for v in valores if 6 <= v < 7),
-        "7-9": sum(1 for v in valores if 7 <= v < 9),
-        "9-10": sum(1 for v in valores if 9 <= v <= 10),
+        "0-3": sum(1 for v in promedios if v < 3),
+        "3-5": sum(1 for v in promedios if 3 <= v < 5),
+        "5-6": sum(1 for v in promedios if 5 <= v < 6),
+        "6-7": sum(1 for v in promedios if 6 <= v < 7),
+        "7-9": sum(1 for v in promedios if 7 <= v < 9),
+        "9-10": sum(1 for v in promedios if 9 <= v <= 10),
     }
-
-    alumnos_unicos = set(p.user_id for p in puntajes)
-    aprobados = 0
-    en_riesgo = 0
-    for uid in alumnos_unicos:
-        pts = [float(p.valor) for p in puntajes if p.user_id == uid]
-        if pts:
-            avg = sum(pts) / len(pts)
-            if avg >= 6:
-                aprobados += 1
-            else:
-                en_riesgo += 1
+    aprobados = sum(1 for v in promedios if v >= 6)
+    en_riesgo = total_alumnos - aprobados
 
     return {
         "materia_id": materia_id,
-        "total_alumnos": len(alumnos_unicos),
-        "total_notas": len(puntajes),
-        "promedio_grupo": promedio,
-        "nota_maxima": round(max(valores), 2),
-        "nota_minima": round(min(valores), 2),
+        "total_alumnos": total_alumnos,
+        "total_notas": total_notas,
+        "promedio_grupo": round(sum(promedios) / total_alumnos, 2) if total_alumnos else 0,
+        "nota_maxima": round(max(promedios), 2) if promedios else 0,
+        "nota_minima": round(min(promedios), 2) if promedios else 0,
         "distribucion": distribucion,
         "aprobados": aprobados,
         "en_riesgo": en_riesgo,

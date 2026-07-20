@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.security import hash_password
@@ -64,45 +64,35 @@ def mis_materias(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    uid = current_user.user_id
     inscripciones = (
         db.query(models.inscripcion.Inscripcion)
-        .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
+        .options(
+            joinedload(models.inscripcion.Inscripcion.oferta)
+            .joinedload(models.oferta_materia.OfertaMateria.materia),
+            joinedload(models.inscripcion.Inscripcion.oferta)
+            .joinedload(models.oferta_materia.OfertaMateria.profesor),
+        )
+        .filter(models.inscripcion.Inscripcion.alumno_id == uid)
         .all()
     )
-    materia_ids = [i.oferta.materia_id for i in inscripciones]
-    if not materia_ids:
-        return []
-    materias = (
-        db.query(models.materia.Materia)
-        .filter(models.materia.Materia.id.in_(materia_ids))
-        .all()
-    )
+    seen = set()
     result = []
-    for m in materias:
-        oferta = (
-            db.query(models.oferta_materia.OfertaMateria)
-            .filter(
-                models.oferta_materia.OfertaMateria.materia_id == m.id,
-                models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
-            )
-            .first()
-        )
-        profesor = (
-            db.query(models.user.User)
-            .filter(models.user.User.id == oferta.profesor_id)
-            .first()
-            if oferta
-            else None
-        )
-        result.append(
-            {
-                "id": m.id,
-                "nombre": m.nombre,
-                "profesor": profesor.nombre if profesor else None,
-                "anio": m.anio,
-                "semestre": m.semestre,
-            }
-        )
+    for ins in inscripciones:
+        oferta = ins.oferta
+        if not oferta or not oferta.activa:
+            continue
+        m = oferta.materia
+        if not m or m.id in seen:
+            continue
+        seen.add(m.id)
+        result.append({
+            "id": m.id,
+            "nombre": m.nombre,
+            "profesor": oferta.profesor.nombre if oferta.profesor else None,
+            "anio": m.anio,
+            "semestre": m.semestre,
+        })
     return result
 
 
