@@ -168,19 +168,17 @@ def desinscribir(
 @router.get("/materia/{materia_id}")
 def alumnos_por_materia(
     materia_id: int,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
     oferta = _oferta_activa_o_404(db, materia_id)
-    q = db.query(models.inscripcion.Inscripcion).filter(
-        models.inscripcion.Inscripcion.oferta_materia_id == oferta.id
+    inscripciones = (
+        db.query(models.inscripcion.Inscripcion)
+        .filter(models.inscripcion.Inscripcion.oferta_materia_id == oferta.id)
+        .all()
     )
-    total = q.count()
-    inscripciones = q.offset(skip).limit(limit).all()
     if not inscripciones:
-        return {"total": 0, "items": []}
+        return []
     alumno_ids = [i.alumno_id for i in inscripciones]
     alumnos_map = {
         u.id: u
@@ -201,14 +199,12 @@ def alumnos_por_materia(
                     "email": alumno.email or alumno.username,
                 }
             )
-    return {"total": total, "skip": skip, "limit": limit, "items": result}
+    return result
 
 
 @router.get("/")
 def list_inscripciones(
     alumno_id: Optional[int] = Query(None, description="Filtrar por alumno (admin/profesor)"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -219,6 +215,5 @@ def list_inscripciones(
         q = q.filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
     elif alumno_id:
         q = q.filter(models.inscripcion.Inscripcion.alumno_id == alumno_id)
-    total = q.count()
-    rows = q.offset(skip).limit(limit).all()
-    return {"total": total, "skip": skip, "limit": limit, "items": [_to_out(i) for i in rows]}
+    rows = q.all()
+    return [_to_out(i) for i in rows]

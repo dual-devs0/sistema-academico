@@ -21,11 +21,12 @@ def _parsear_pdf_con_gemini(
 ) -> list[dict]:
     """Env\u00eda PDF a Gemini y devuelve lista de eventos parseados."""
     try:
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
     except ImportError:
         raise HTTPException(
             status_code=500,
-            detail="google-generativeai no instalado. pip install google-generativeai",
+            detail="google-genai no instalado. pip install google-genai",
         )
 
     if not GEMINI_API_KEY:
@@ -33,8 +34,7 @@ def _parsear_pdf_con_gemini(
             status_code=500, detail="GEMINI_API_KEY no configurada en .env"
         )
 
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""
 Eres un asistente que extrae eventos de calendarios acad\u00e9micos en PDF.
@@ -51,8 +51,11 @@ Devuelve SOLO un JSON array con objetos con los campos:
 No incluyas markdown ni texto adicional, solo el JSON array.
 """
 
-    pdf_data = {"mime_type": "application/pdf", "data": pdf_bytes}
-    response = model.generate_content([prompt, pdf_data])
+    pdf_blob = types.Blob(mime_type="application/pdf", data=pdf_bytes)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[prompt, pdf_blob],
+    )
     text = response.text.strip()
 
     text = re.sub(r"^```(?:json)?\s*", "", text)
