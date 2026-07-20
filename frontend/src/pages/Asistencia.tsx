@@ -745,31 +745,9 @@ function AdminView() {
   const [search, setSearch]   = useState('')
 
   useEffect(() => {
-    Promise.all([
-      api.get<{ id: number; nombre: string }[]>('/materias/'),
-      api.get<{ materia_id: number; presente: boolean | null }[]>('/asistencias/'),
-    ]).then(([mats, asists]) => {
-      const byMat: Record<number, { total: number; presentes: number }> = {}
-      asists.forEach(a => {
-        if (!byMat[a.materia_id]) byMat[a.materia_id] = { total: 0, presentes: 0 }
-        byMat[a.materia_id].total++
-        if (a.presente === true) byMat[a.materia_id].presentes++
-      })
-      const result: ResumenRow[] = mats.map(m => {
-        const c = byMat[m.id] ?? { total: 0, presentes: 0 }
-        const pct = c.total > 0 ? Math.round((c.presentes / c.total) * 100) : 0
-        return {
-          materia_id: m.id,
-          materia: m.nombre,
-          total: c.total,
-          presentes: c.presentes,
-          ausentes: c.total - c.presentes,
-          pct,
-        }
-      }).sort((a, b) => b.total - a.total)
-      setRows(result)
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    api.get<ResumenRow[]>('/reportes/asistencia-por-materia')
+      .then(d => { setRows(d.sort((a, b) => b.total - a.total)); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const filtradas = search.trim()
