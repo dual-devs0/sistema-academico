@@ -6,7 +6,7 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
-from app.routers.puntajes_router import PESOS, _calcular_promedio_final
+from app.services.puntajes_utils import PESOS, calcular_promedio_final
 
 router = APIRouter(prefix="/reportes", tags=["reportes"])
 
@@ -475,7 +475,7 @@ def exportar_trayecto_academico_rue_es(
             continue
 
         notas = {p.tipo: float(p.valor) for p in punt_map.get((alumno.id, oferta.id), []) if p.tipo in PESOS}
-        promedio = _calcular_promedio_final({k: notas.get(k) for k in PESOS})
+        promedio = calcular_promedio_final({k: notas.get(k) for k in PESOS})
         if promedio is None:
             estado = "CURSANDO"
         elif promedio >= 6:

@@ -21,12 +21,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    # SQLite via create_all() ya tiene la columna; solo aplica en PostgreSQL
-    if bind.dialect.name == "postgresql":
+    # Always add the column - SQLite via create_all() already has it but Alembic can add it idempotently
+    # Check if column exists first to avoid errors on SQLite
+    insp = sa.inspect(bind)
+    cols = [c['name'] for c in insp.get_columns('users')]
+    if 'foto_url' not in cols:
         op.add_column("users", sa.Column("foto_url", sa.String(), nullable=True))
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
+    insp = sa.inspect(bind)
+    cols = [c['name'] for c in insp.get_columns('users')]
+    if 'foto_url' in cols:
         op.drop_column("users", "foto_url")

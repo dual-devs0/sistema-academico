@@ -4,71 +4,9 @@ from typing import Optional
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.autorizacion import es_profesor_de_materia
+from app.services.pensum import verificar_solapamiento_inscripcion
 
 router = APIRouter(prefix="/horarios", tags=["horarios"])
-
-
-def verificar_solapamiento_inscripcion(
-    db: Session, alumno_id: int, materia_id_nueva: int
-) -> list[str]:
-    """
-    Verifica si el horario de la materia nueva se superpone
-    con materias ya cursadas por el alumno.
-    Retorna lista de descripciones de conflictos.
-    """
-    conflictos = []
-    horario_nuevo = (
-        db.query(models.horario.Horario)
-        .filter(models.horario.Horario.materia_id == materia_id_nueva)
-        .all()
-    )
-    if not horario_nuevo:
-        return []
-
-    inscripciones = (
-        db.query(models.inscripcion.Inscripcion)
-        .filter(
-            models.inscripcion.Inscripcion.alumno_id == alumno_id,
-        )
-        .all()
-    )
-    materia_ids_existentes = [
-        i.oferta.materia_id
-        for i in inscripciones
-        if i.oferta.materia_id != materia_id_nueva
-    ]
-
-    for h_nuevo in horario_nuevo:
-        horarios_exist = (
-            db.query(models.horario.Horario)
-            .filter(
-                models.horario.Horario.materia_id.in_(materia_ids_existentes),
-                models.horario.Horario.dia_semana == h_nuevo.dia_semana,
-            )
-            .all()
-        )
-        for h_exist in horarios_exist:
-            if (
-                h_nuevo.hora_inicio < h_exist.hora_fin
-                and h_nuevo.hora_fin > h_exist.hora_inicio
-            ):
-                materia_exist = (
-                    db.query(models.materia.Materia)
-                    .filter(models.materia.Materia.id == h_exist.materia_id)
-                    .first()
-                )
-                conflictos.append(
-                    f"'{materia_exist.nombre if materia_exist else '?'}' el día "
-                    f"{_dia_nombre(h_exist.dia_semana)} "
-                    f"de {h_exist.hora_inicio} a {h_exist.hora_fin}"
-                )
-
-    return conflictos
-
-
-def _dia_nombre(d: int) -> str:
-    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    return dias[d] if 0 <= d <= 6 else "?"
 
 
 @router.post("/", response_model=schemas.horario.HorarioOut)

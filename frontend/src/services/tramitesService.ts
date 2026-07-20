@@ -1,7 +1,7 @@
 /**
  * tramitesService.ts — Fase 5A: Solicitudes y trámites
  */
-import { api, getAccessToken } from '../lib/api'
+import { api } from '../lib/api'
 
 export interface TipoTramite {
   id: number
@@ -35,7 +35,7 @@ export const getMisSolicitudes = (estado?: string) =>
 export const getDescargaUrl = (solicitudId: number) =>
   api.get<{ download_url: string }>(`/tramites/solicitudes/${solicitudId}/descargar`)
 
-export const resolverSolicitud = async (
+export const resolverSolicitud = (
   solicitudId: number,
   estado: 'resuelta' | 'rechazada',
   motivo_rechazo?: string,
@@ -46,11 +46,5 @@ export const resolverSolicitud = async (
   if (motivo_rechazo) form.append('motivo_rechazo', motivo_rechazo)
   if (archivo) form.append('archivo', archivo)
 
-  const token = getAccessToken()
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/tramites/solicitudes/${solicitudId}/resolver`,
-    { method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: form },
-  )
-  if (!res.ok) throw new Error('Error al resolver solicitud')
-  return res.json()
+  return api.upload<Solicitud>(`/tramites/solicitudes/${solicitudId}/resolver`, form)
 }

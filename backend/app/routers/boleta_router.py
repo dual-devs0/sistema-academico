@@ -22,11 +22,11 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 from app import models, database
 from app.dependencias import get_current_user
+from app.services.puntajes_utils import PESOS, calcular_promedio_final
 
 router = APIRouter(prefix="/boleta", tags=["boleta"])
 
 TIPOS = ["parcial1", "parcial2", "practico", "final"]
-PESOS_BOLETA = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
 HEADERS = ["Materia", "Parcial 1", "Parcial 2", "T.P.", "Final", "Promedio"]
 
 
@@ -167,20 +167,7 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
             "practico": row["practico"],
             "final": row["final"],
         }
-        existentes = {k: v for k, v in scores.items() if v is not None}
-        if existentes:
-            peso_total = sum(PESOS_BOLETA[k] for k in existentes)
-            prom = (
-                round(
-                    sum(PESOS_BOLETA[k] * v for k, v in existentes.items())
-                    / peso_total,
-                    2,
-                )
-                if peso_total > 0
-                else None
-            )
-        else:
-            prom = None
+        prom = calcular_promedio_final(scores)
         if prom is not None:
             promedios_generales.append(prom)
 

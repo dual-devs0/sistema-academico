@@ -123,6 +123,72 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
   return data
 }
 
+async function requestBlob(path: string, options?: RequestInit, isRetry = false): Promise<Blob> {
+  const token = getAccessToken()
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+  })
+
+  if (res.status === 401 && !isRetry) {
+    const refreshed = await tryRefresh()
+    if (refreshed) {
+      return requestBlob(path, options, true)
+    }
+    const role = _currentUser?.role
+    setAccessToken(null)
+    emitToast('Tu sesión ha expirado. Iniciá sesión nuevamente.', 'warning')
+    setTimeout(() => {
+      window.location.href = role === 'admin' ? '/admin' : '/login'
+    }, 1500)
+    throw new Error('Sesión expirada')
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Error de conexión')
+  }
+  return res.blob()
+}
+
+async function requestFormData<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
+  const token = getAccessToken()
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  })
+
+  if (res.status === 401 && !isRetry) {
+    const refreshed = await tryRefresh()
+    if (refreshed) {
+      return requestFormData<T>(path, formData, true)
+    }
+    const role = _currentUser?.role
+    setAccessToken(null)
+    emitToast('Tu sesión ha expirado. Iniciá sesión nuevamente.', 'warning')
+    setTimeout(() => {
+      window.location.href = role === 'admin' ? '/admin' : '/login'
+    }, 1500)
+    throw new Error('Sesión expirada')
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Error de conexión')
+  }
+  const data = await res.json()
+  _captureCsrfToken(data)
+  return data
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
@@ -133,6 +199,15 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: <T>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, formData: FormData) => requestFormData<T>(path, formData),
+  download: (path: string, filename?: string) => requestBlob(path).then(blob => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || 'download'
+    a.click()
+    URL.revokeObjectURL(url)
+  }),
 }
 
 // ---------------------------------------------------------------------------
