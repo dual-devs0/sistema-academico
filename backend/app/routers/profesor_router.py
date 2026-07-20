@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
@@ -21,75 +22,70 @@ def mi_historico(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    """Cátedras dictadas por el profesor, agrupadas por período (más reciente primero)."""  # noqa: E501
     _requiere_profesor(current_user)
 
+    uid = current_user.user_id
+    O = models.oferta_materia.OfertaMateria
+    M = models.materia.Materia
+    C = models.carrera.Carrera
+    I = models.inscripcion.Inscripcion
+    P = models.puntaje.Puntaje
+
     ofertas = (
-        db.query(models.oferta_materia.OfertaMateria)
-        .filter(
-            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id
-        )
-        .order_by(models.oferta_materia.OfertaMateria.periodo.desc())
+        db.query(O)
+        .options(joinedload(O.materia).joinedload(M.carrera))
+        .filter(O.profesor_id == uid)
+        .order_by(O.periodo.desc())
+        .all()
+    )
+    if not ofertas:
+        return []
+
+    oferta_ids = [o.id for o in ofertas]
+    materia_ids = [o.materia_id for o in ofertas]
+
+    # Student count per oferta (single query)
+    alumno_counts = dict(
+        db.query(I.oferta_materia_id, func.count(I.id))
+        .filter(I.oferta_materia_id.in_(oferta_ids))
+        .group_by(I.oferta_materia_id)
         .all()
     )
 
+    # Avg puntaje + pass rate per oferta (single query per student)
+    punt_agg = {}
+    for ofid in oferta_ids:
+        rows = db.query(P.user_id, func.avg(P.valor).label("prom")).filter(
+            P.oferta_materia_id == ofid
+        ).group_by(P.user_id).all()
+        if rows:
+            vals = [r.prom for r in rows]
+            prom = round(sum(vals) / len(vals), 2) if vals else None
+            aprob = sum(1 for r in rows if r.prom >= 6)
+            total = len(rows)
+            pct_aprob = round((aprob / total) * 100, 1) if total > 0 else 0.0
+        else:
+            prom = None
+            pct_aprob = None
+        punt_agg[ofid] = (prom, pct_aprob)
+
     periodos: dict[str, list] = {}
     for oferta in ofertas:
-        materia = (
-            db.query(models.materia.Materia)
-            .filter(models.materia.Materia.id == oferta.materia_id)
-            .first()
-        )
+        materia = oferta.materia
         if not materia:
             continue
-        carrera_nombre = None
-        if materia.carrera_id:
-            carrera = (
-                db.query(models.carrera.Carrera)
-                .filter(models.carrera.Carrera.id == materia.carrera_id)
-                .first()
-            )
-            carrera_nombre = carrera.nombre if carrera else None
-
-        cantidad_alumnos = (
-            db.query(models.inscripcion.Inscripcion)
-            .filter(models.inscripcion.Inscripcion.oferta_materia_id == oferta.id)
-            .count()
-        )
-
-        puntajes = (
-            db.query(models.puntaje.Puntaje)
-            .filter(models.puntaje.Puntaje.oferta_materia_id == oferta.id)
-            .all()
-        )
-        if puntajes:
-            valores = [float(p.valor) for p in puntajes]
-            promedio_grupo = round(sum(valores) / len(valores), 2)
-            alumnos_con_nota = set(p.user_id for p in puntajes)
-            aprobados = 0
-            for uid in alumnos_con_nota:
-                pts = [float(p.valor) for p in puntajes if p.user_id == uid]
-                if sum(pts) / len(pts) >= 6:
-                    aprobados += 1
-            porcentaje_aprobacion = round((aprobados / len(alumnos_con_nota)) * 100, 1)
-        else:
-            promedio_grupo = None
-            porcentaje_aprobacion = None
-
+        prom, pct = punt_agg.get(oferta.id, (None, None))
         cat = {
             "materia_id": materia.id,
             "materia_nombre": materia.nombre,
-            "carrera_nombre": carrera_nombre,
-            "cantidad_alumnos": cantidad_alumnos,
-            "promedio_grupo": promedio_grupo,
-            "porcentaje_aprobacion": porcentaje_aprobacion,
+            "carrera_nombre": materia.carrera.nombre if materia.carrera else None,
+            "cantidad_alumnos": alumno_counts.get(oferta.id, 0),
+            "promedio_grupo": prom,
+            "porcentaje_aprobacion": pct,
         }
         periodos.setdefault(oferta.periodo, []).append(cat)
 
-    return [
-        {"periodo": periodo, "catedras": catedras}
-        for periodo, catedras in periodos.items()
-    ]
+    return [{"periodo": p, "catedras": c} for p, c in periodos.items()]
 
 
 @router.get("/mi-agenda")
@@ -281,19 +277,25 @@ def eliminar_recordatorio(
 
 @router.get(
     "/lista-alumnos",
-    response_model=list[AlumnoSimpleOut],
-    summary="Lista básica de alumnos (admin/profesor)",
+    summary="Lista básica de alumnos (admin/profesor) con paginación",
 )
 def lista_alumnos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    alumnos = (
+    q = (
         db.query(models.user.User)
         .filter(models.user.User.role == "alumno")
         .order_by(models.user.User.nombre, models.user.User.username)
-        .all()
     )
-    return alumnos
+    total = q.count()
+    alumnos = q.offset(skip).limit(limit).all()
+    items = [
+        {"id": a.id, "nombre": a.nombre or a.username, "username": a.username, "cedula": a.cedula or ""}
+        for a in alumnos
+    ]
+    return {"total": total, "skip": skip, "limit": limit, "items": items}

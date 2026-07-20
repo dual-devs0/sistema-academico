@@ -4,12 +4,17 @@ import {
   PieChart, Pie, Cell, Legend,
   LineChart, Line,
 } from 'recharts'
-import { api, getCurrentUser } from '../lib/api'
-import { obtenerEstadisticasMateria, type EstadisticasMateria } from '../services/estadisticasService'
+import { api } from '../lib/api'
 
-interface Puntaje   { id: number; user_id: number; materia_id: number; tipo: string; valor: number }
-interface Materia   { id: number; nombre: string; profesor_id: number | null; carrera_id: number | null; anio: number | null; semestre: number | null }
-interface Asistencia{ id: number; user_id: number; materia_id: number; fecha: string; presente: boolean }
+interface DashboardData {
+  kpis: { promedio_general: number; aprobacion_pct: number; asistencia_pct: number; alumnos_activos: number }
+  materias: {
+    materia_id: number; materia_nombre: string; total_alumnos: number; total_notas: number
+    promedio_grupo: number; distribucion: Record<string, number>; aprobados: number; en_riesgo: number
+  }[]
+  asistencia_por_materia: { materia_id: number; materia_nombre: string; asistencia_pct: number }[]
+  alertas: { user_id: number; nombre: string; inasistencia_pct: number; promedio: number | null }[]
+}
 
 const CYAN   = 'var(--accent)'
 const GREEN  = '#22c55e'
@@ -84,12 +89,9 @@ function SkeletonChart({ h = 200 }: { h?: number }) {
 }
 
 export default function Estadisticas() {
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState<string | null>(null)
-  const [puntajes,     setPuntajes]     = useState<Puntaje[]>([])
-  const [materias,     setMaterias]     = useState<Materia[]>([])
-  const [asistencias,  setAsistencias]  = useState<Asistencia[]>([])
-  const [estadisticas, setEstadisticas] = useState<EstadisticasMateria[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<DashboardData | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -97,22 +99,9 @@ export default function Estadisticas() {
       setLoading(true)
       setError(null)
       try {
-        const user = getCurrentUser()
-        const materiasUrl = user?.role === 'profesor' ? `/materias/?profesor_id=${user.user_id}` : '/materias/'
-        const [materiasRes, asistenciasRes, puntajesRes] = await Promise.all([
-          api.get<Materia[]>(materiasUrl),
-          api.get<Asistencia[]>('/asistencias/'),
-          api.get<Puntaje[]>('/puntajes/'),
-        ])
-        const statsList = await Promise.all(
-          materiasRes.map(m => obtenerEstadisticasMateria(m.id).catch(() => null))
-        )
-        const stats = statsList.filter((s): s is EstadisticasMateria => s !== null)
+        const res = await api.get<DashboardData>('/reportes/dashboard')
         if (cancelled) return
-        setMaterias(materiasRes)
-        setAsistencias(asistenciasRes)
-        setPuntajes(puntajesRes)
-        setEstadisticas(stats)
+        setData(res)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar estadísticas')
       } finally {
@@ -123,47 +112,20 @@ export default function Estadisticas() {
     return () => { cancelled = true }
   }, [])
 
-  const sinDatos = !loading && !error && estadisticas.every(e => (e.total_notas ?? 0) === 0)
+  const dashboard = data
+  const sinDatos = !loading && !error && dashboard?.materias.every(m => (m.total_notas ?? 0) === 0)
 
-  // KPI computations — agregados desde /puntajes/materia/{id}/estadisticas por materia
-  const kpis = useMemo(() => {
-    if (!estadisticas.length) return { promedio: 0, aprobacion: 0, alumnos: 0 }
-    const totalNotas = estadisticas.reduce((a, e) => a + (e.total_notas ?? 0), 0)
-    const sumaPonderada = estadisticas.reduce((a, e) => a + e.promedio_grupo * (e.total_notas ?? 0), 0)
-    const aprobados = estadisticas.reduce((a, e) => a + e.aprobados, 0)
-    const enRiesgo  = estadisticas.reduce((a, e) => a + e.en_riesgo, 0)
-    return {
-      promedio:   totalNotas > 0 ? Math.round(sumaPonderada / totalNotas * 10) / 10 : 0,
-      aprobacion: (aprobados + enRiesgo) > 0 ? Math.round(aprobados / (aprobados + enRiesgo) * 100) : 0,
-      // Suma de total_alumnos por materia: el endpoint no expone user_id individual,
-      // así que un alumno inscripto en más de una materia se cuenta más de una vez.
-      // Aproximación conocida y aceptada — no hay forma de deduplicar sin cambiar el endpoint.
-      alumnos: estadisticas.reduce((a, e) => a + e.total_alumnos, 0),
-    }
-  }, [estadisticas])
+  const kpis = dashboard?.kpis ?? { promedio_general: 0, aprobacion_pct: 0, asistencia_pct: 0, alumnos_activos: 0 }
 
-  const asistenciaPct = useMemo(() => {
-    if (!asistencias.length) return 0
-    return Math.round(asistencias.filter(a => a.presente).length / asistencias.length * 100)
-  }, [asistencias])
+  const barData = (dashboard?.materias ?? [])
+    .filter(m => (m.total_notas ?? 0) > 0)
+    .map(m => ({ name: truncate(m.materia_nombre), promedio: m.promedio_grupo }))
 
-  // BarChart: promedio por materia — directo del endpoint de estadísticas, sin recalcular
-  const barData = useMemo(() => {
-    const matMap: Record<number, string> = {}
-    for (const m of materias) matMap[m.id] = m.nombre
-    return estadisticas
-      .filter(e => (e.total_notas ?? 0) > 0)
-      .map(e => ({
-        name:     truncate(matMap[e.materia_id] ?? `Mat.${e.materia_id}`),
-        promedio: e.promedio_grupo,
-      }))
-  }, [estadisticas, materias])
-
-  // PieChart: distribución de notas — suma de distribucion de cada materia
   const pieData = useMemo(() => {
+    if (!dashboard) return []
     const b = { excelente: 0, bueno: 0, regular: 0, riesgo: 0 }
-    for (const e of estadisticas) {
-      const d = e.distribucion
+    for (const m of dashboard.materias) {
+      const d = m.distribucion
       b.excelente += d['9-10'] ?? 0
       b.bueno     += d['7-9']  ?? 0
       b.regular   += d['6-7']  ?? 0
@@ -175,51 +137,38 @@ export default function Estadisticas() {
       { name: 'Regular (≥6)',   value: b.regular,   color: YELLOW },
       { name: 'En riesgo (<6)', value: b.riesgo,    color: RED    },
     ].filter(d => d.value > 0)
-  }, [estadisticas])
+  }, [dashboard])
 
-  // LineChart: asistencia % por materia
-  const lineData = useMemo(() => {
-    const counts: Record<number, { total: number; pres: number }> = {}
-    for (const a of asistencias) {
-      if (!counts[a.materia_id]) counts[a.materia_id] = { total: 0, pres: 0 }
-      counts[a.materia_id].total++
-      if (a.presente) counts[a.materia_id].pres++
-    }
-    const matMap: Record<number, string> = {}
-    for (const m of materias) matMap[m.id] = m.nombre
-    return Object.entries(counts).map(([mid, c]) => ({
-      name:       truncate(matMap[Number(mid)] ?? `Mat.${mid}`),
-      asistencia: Math.round(c.pres / c.total * 100),
-    }))
-  }, [asistencias, materias])
+  const lineData = (dashboard?.asistencia_por_materia ?? [])
+    .map(m => ({ name: truncate(m.materia_nombre), asistencia: m.asistencia_pct }))
 
   const kpiCards = [
     {
       label: 'Promedio general',
-      value: loading ? '—' : String(kpis.promedio),
+      value: loading ? '—' : String(kpis.promedio_general),
       color: CYAN,
       bg:    'var(--accent-muted)',
-      bar:   Math.min(kpis.promedio / 10 * 100, 100),
+      bar:   Math.min(kpis.promedio_general / 10 * 100, 100),
       icon: <svg viewBox="0 0 24 24" fill="none" stroke={CYAN} strokeWidth="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>,
     },
     {
       label: 'Aprobación',
-      value: loading ? '—' : `${kpis.aprobacion}%`,
+      value: loading ? '—' : `${kpis.aprobacion_pct}%`,
       color: GREEN,
       bg:    '#22c55e15',
-      bar:   kpis.aprobacion,
+      bar:   kpis.aprobacion_pct,
       icon: <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2">
         <polyline points="20 6 9 17 4 12"/>
       </svg>,
     },
     {
       label: 'Asistencia',
-      value: loading ? '—' : `${asistenciaPct}%`,
+      value: loading ? '—' : `${kpis.asistencia_pct}%`,
       color: YELLOW,
       bg:    '#f59e0b15',
-      bar:   asistenciaPct,
+      bar:   kpis.asistencia_pct,
       icon: <svg viewBox="0 0 24 24" fill="none" stroke={YELLOW} strokeWidth="2">
         <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
         <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -227,7 +176,7 @@ export default function Estadisticas() {
     },
     {
       label: 'Alumnos activos',
-      value: loading ? '—' : String(kpis.alumnos),
+      value: loading ? '—' : String(kpis.alumnos_activos),
       color: '#a855f7',
       bg:    '#a855f715',
       bar:   100,
@@ -259,22 +208,22 @@ export default function Estadisticas() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, padding: '14px 24px 0' }}>
           <div className="kpi-card">
             <div className="mono-label" style={{ marginBottom: 6 }}>Tasa de Deserción</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.max(0, Math.round((100 - asistenciaPct) / 5))}%`}</span>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.max(0, Math.round((100 - kpis.asistencia_pct) / 5))}%`}</span>
             <div style={{ fontSize: 10.5, color: 'var(--danger)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↑ vs semestre anterior</div>
           </div>
           <div className="kpi-card">
             <div className="mono-label" style={{ marginBottom: 6 }}>Uso del Sistema</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${asistenciaPct}%`}</span>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${kpis.asistencia_pct}%`}</span>
             <div style={{ fontSize: 10.5, color: 'var(--success)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↗ usuarios activos</div>
           </div>
           <div className="kpi-card">
             <div className="mono-label" style={{ marginBottom: 6 }}>Rendimiento Académico</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${kpis.promedio}/10`}</span>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${kpis.promedio_general}/10`}</span>
             <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>— Estable</div>
           </div>
           <div className="kpi-card">
             <div className="mono-label" style={{ marginBottom: 6 }}>Retención Estudiantil</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.min(100, kpis.aprobacion + 8)}%`}</span>
+            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.min(100, kpis.aprobacion_pct + 8)}%`}</span>
             <div style={{ fontSize: 10.5, color: 'var(--success)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↗ En meta proyectada</div>
           </div>
         </div>
@@ -439,43 +388,24 @@ export default function Estadisticas() {
                   <tr><th>Estudiante</th><th>Inasistencia</th><th>Promedio Act.</th><th style={{ textAlign: 'right' }}>Nivel de Riesgo</th></tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    const porAlumno: Record<number, { total: number; pres: number }> = {}
-                    for (const a of asistencias) {
-                      if (!porAlumno[a.user_id]) porAlumno[a.user_id] = { total: 0, pres: 0 }
-                      porAlumno[a.user_id].total++
-                      if (a.presente) porAlumno[a.user_id].pres++
-                    }
-                    const rows = Object.entries(porAlumno)
-                      .map(([uid, c]) => {
-                        const inas = Math.round((1 - c.pres / c.total) * 100)
-                        const notas = puntajes.filter(p => p.user_id === Number(uid)).map(p => Number(p.valor))
-                        const prom = notas.length ? Math.round(notas.reduce((x, y) => x + y, 0) / notas.length * 10) / 10 : null
-                        return { uid: Number(uid), inas, prom }
-                      })
-                      .filter(r => r.inas >= 10)
-                      .sort((a, b) => b.inas - a.inas)
-                      .slice(0, 5)
-                    if (!rows.length) return (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12.5 }}>Sin alertas críticas este período.</td></tr>
+                  {alertas.length === 0 ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12.5 }}>Sin alertas críticas este período.</td></tr>
+                  ) : alertas.map(r => {
+                    const nivel = r.inasistencia_pct >= 25 ? { l: 'ALTO', c: 'var(--danger)', bg: 'var(--danger-subtle)' } : r.inasistencia_pct >= 15 ? { l: 'MEDIO', c: 'var(--warning)', bg: 'var(--warning-subtle)' } : { l: 'BAJO', c: 'var(--success)', bg: 'var(--success-subtle)' }
+                    return (
+                      <tr key={r.user_id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>#{r.user_id}</span>
+                            <span style={{ fontWeight: 700, fontSize: 13 }}>{r.nombre}</span>
+                          </div>
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: nivel.c }}>{r.inasistencia_pct}%</td>
+                        <td style={{ fontFamily: 'var(--font-mono)' }}>{r.promedio ?? '—'} / 10</td>
+                        <td style={{ textAlign: 'right' }}><span className="badge" style={{ background: nivel.bg, color: nivel.c }}>{nivel.l}</span></td>
+                      </tr>
                     )
-                    return rows.map(r => {
-                      const nivel = r.inas >= 25 ? { l: 'ALTO', c: 'var(--danger)', bg: 'var(--danger-subtle)' } : r.inas >= 15 ? { l: 'MEDIO', c: 'var(--warning)', bg: 'var(--warning-subtle)' } : { l: 'BAJO', c: 'var(--success)', bg: 'var(--success-subtle)' }
-                      return (
-                        <tr key={r.uid}>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>#{r.uid}</span>
-                              <span style={{ fontWeight: 700, fontSize: 13 }}>Alumno ID: {r.uid}</span>
-                            </div>
-                          </td>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: nivel.c }}>{r.inas}%</td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{r.prom ?? '—'} / 10</td>
-                          <td style={{ textAlign: 'right' }}><span className="badge" style={{ background: nivel.bg, color: nivel.c }}>{nivel.l}</span></td>
-                        </tr>
-                      )
-                    })
-                  })()}
+                  })}
                 </tbody>
               </table>
             </div>
