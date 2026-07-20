@@ -26,5 +26,6 @@ def list_carreras(
     skip: int = Query(0, ge=0),
     limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
 ):
     return db.query(models.carrera.Carrera).offset(skip).limit(limit).all()

@@ -5,8 +5,72 @@ from app.models.correlatividad import Correlatividad
 from app.models.puntaje import Puntaje
 from app.models.oferta_materia import OfertaMateria
 from app.models.inscripcion import Inscripcion
+from app import models as m
 
 PESOS = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
+
+
+def _dia_nombre(d: int) -> str:
+    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    return dias[d] if 0 <= d <= 6 else "?"
+
+
+def verificar_solapamiento_inscripcion(
+    db: Session, alumno_id: int, materia_id_nueva: int
+) -> list[str]:
+    """
+    Verifica si el horario de la materia nueva se superpone
+    con materias ya cursadas por el alumno.
+    Retorna lista de descripciones de conflictos.
+    """
+    conflictos = []
+    horario_nuevo = (
+        db.query(m.horario.Horario)
+        .filter(m.horario.Horario.materia_id == materia_id_nueva)
+        .all()
+    )
+    if not horario_nuevo:
+        return []
+
+    inscripciones = (
+        db.query(m.inscripcion.Inscripcion)
+        .filter(
+            m.inscripcion.Inscripcion.alumno_id == alumno_id,
+        )
+        .all()
+    )
+    materia_ids_existentes = [
+        i.oferta.materia_id
+        for i in inscripciones
+        if i.oferta.materia_id != materia_id_nueva
+    ]
+
+    for h_nuevo in horario_nuevo:
+        horarios_exist = (
+            db.query(m.horario.Horario)
+            .filter(
+                m.horario.Horario.materia_id.in_(materia_ids_existentes),
+                m.horario.Horario.dia_semana == h_nuevo.dia_semana,
+            )
+            .all()
+        )
+        for h_exist in horarios_exist:
+            if (
+                h_nuevo.hora_inicio < h_exist.hora_fin
+                and h_nuevo.hora_fin > h_exist.hora_inicio
+            ):
+                materia_exist = (
+                    db.query(m.materia.Materia)
+                    .filter(m.materia.Materia.id == h_exist.materia_id)
+                    .first()
+                )
+                conflictos.append(
+                    f"'{materia_exist.nombre if materia_exist else '?'}' el día "
+                    f"{_dia_nombre(h_exist.dia_semana)} "
+                    f"de {h_exist.hora_inicio} a {h_exist.hora_fin}"
+                )
+
+    return conflictos
 
 
 def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> bool:

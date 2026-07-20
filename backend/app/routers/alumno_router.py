@@ -5,6 +5,7 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.security import hash_password
 from app.services.storage import obtener_url_firmada
+from app.services.puntajes_utils import calcular_promedio_final
 
 router = APIRouter(prefix="/alumno", tags=["alumno"])
 
@@ -124,19 +125,15 @@ def mis_notas(
             }
         por_materia[mid][p.tipo] = float(p.valor)
 
-    PESOS = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
     result = []
     for mid, data in por_materia.items():
-        existentes = {k: v for k, v in data.items() if k in PESOS and v is not None}
-        if existentes:
-            peso_total = sum(PESOS[k] for k in existentes)
-            prom = (
-                round(sum(PESOS[k] * v for k, v in existentes.items()) / peso_total, 2)
-                if peso_total > 0
-                else None
-            )
-        else:
-            prom = None
+        scores = {
+            "parcial1": data.get("parcial1"),
+            "parcial2": data.get("parcial2"),
+            "practico": data.get("practico"),
+            "final": data.get("final"),
+        }
+        prom = calcular_promedio_final(scores)
         result.append({**data, "promedio": prom})
 
     return result

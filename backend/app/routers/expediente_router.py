@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.expediente import calcular_ppa, calcular_regularidad
-from app.routers.puntajes_router import _calcular_promedio_final, PESOS
+from app.services.puntajes_utils import PESOS, calcular_promedio_final
 
 router = APIRouter(prefix="/expediente", tags=["expediente"])
 
@@ -53,7 +53,7 @@ def cerrar_materia(
         .all()
     )
     notas = {p.tipo: float(p.valor) for p in puntajes if p.tipo in PESOS}
-    nota_final = _calcular_promedio_final(notas)
+    nota_final = calcular_promedio_final(notas)
     if nota_final is None:
         raise HTTPException(
             status_code=422, detail="El alumno no tiene notas cargadas para esta oferta"

@@ -22,29 +22,48 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    # SQLite via create_all() ya tiene estas columnas; solo aplica en PostgreSQL
-    if bind.dialect.name == "postgresql":
+    insp = sa.inspect(bind)
+    
+    # Check which columns already exist
+    materias_cols = [c['name'] for c in insp.get_columns('materias')]
+    asistencias_cols = [c['name'] for c in insp.get_columns('asistencias')]
+    
+    # SQLite via create_all() may already have these columns; check before adding
+    if 'creditos' not in materias_cols:
         op.add_column(
             "materias",
             sa.Column("creditos", sa.Integer(), nullable=True, server_default="4"),
         )
+    if 'cupos' not in materias_cols:
         op.add_column(
             "materias",
             sa.Column("cupos", sa.Integer(), nullable=True, server_default="40"),
         )
+    if 'horario' not in materias_cols:
         op.add_column("materias", sa.Column("horario", sa.String(), nullable=True))
+    if 'secciones' not in materias_cols:
         op.add_column(
             "materias",
             sa.Column("secciones", sa.Integer(), nullable=True, server_default="1"),
         )
+    if 'motivo' not in asistencias_cols:
         op.add_column("asistencias", sa.Column("motivo", sa.String(), nullable=True))
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.drop_column("asistencias", "motivo")
+    insp = sa.inspect(bind)
+    
+    materias_cols = [c['name'] for c in insp.get_columns('materias')]
+    asistencias_cols = [c['name'] for c in insp.get_columns('asistencias')]
+    
+    if 'secciones' in materias_cols:
         op.drop_column("materias", "secciones")
+    if 'horario' in materias_cols:
         op.drop_column("materias", "horario")
+    if 'cupos' in materias_cols:
         op.drop_column("materias", "cupos")
+    if 'creditos' in materias_cols:
         op.drop_column("materias", "creditos")
+    if 'motivo' in asistencias_cols:
+        op.drop_column("asistencias", "motivo")
