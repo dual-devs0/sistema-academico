@@ -37,6 +37,20 @@ def upgrade() -> None:
             existing_nullable=True,
             postgresql_using="editado_en AT TIME ZONE 'UTC'",
         )
+    else:
+        # SQLite: just change the type (SQLite doesn't store timezone info anyway)
+        op.alter_column(
+            "users",
+            "created_at",
+            type_=sa.DateTime(timezone=True),
+            existing_nullable=True,
+        )
+        op.alter_column(
+            "puntajes",
+            "editado_en",
+            type_=sa.DateTime(timezone=True),
+            existing_nullable=True,
+        )
 
 
 def downgrade() -> None:
@@ -44,6 +58,20 @@ def downgrade() -> None:
     dialect = bind.dialect.name
 
     if dialect == "postgresql":
+        op.alter_column(
+            "users",
+            "created_at",
+            type_=sa.DateTime(timezone=False),
+            existing_nullable=True,
+        )
+        op.alter_column(
+            "puntajes",
+            "editado_en",
+            type_=sa.DateTime(timezone=False),
+            existing_nullable=True,
+        )
+    else:
+        # SQLite: just change the type
         op.alter_column(
             "users",
             "created_at",

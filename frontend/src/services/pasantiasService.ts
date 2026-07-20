@@ -1,4 +1,4 @@
-import { api, getAccessToken } from '../lib/api'
+import { api } from '../lib/api'
 
 export interface EmpresaReceptora {
   id: number
@@ -43,15 +43,8 @@ export const crearEmpresa = (data: Partial<EmpresaReceptora>) =>
 export const solicitarPasantia = (empresa_id: number, fecha_inicio: string, horas_requeridas: number) =>
   api.post<Pasantia>('/pasantias/solicitudes', { empresa_id, fecha_inicio, horas_requeridas })
 
-export const aprobarPasantia = async (id: number, tutor_id: number) => {
-  const token = getAccessToken()
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/pasantias/${id}/aprobar?tutor_id=${tutor_id}`,
-    { method: 'PUT', headers: { Authorization: `Bearer ${token}` } },
-  )
-  if (!res.ok) throw new Error('Error al aprobar pasantía')
-  return res.json()
-}
+export const aprobarPasantia = (id: number, tutor_id: number) =>
+  api.put<Pasantia>(`/pasantias/${id}/aprobar?tutor_id=${tutor_id}`, {})
 
 export const actualizarHoras = (id: number, horas_completadas: number) =>
   api.put<Pasantia>(`/pasantias/${id}/horas`, { horas_completadas })
@@ -59,15 +52,9 @@ export const actualizarHoras = (id: number, horas_completadas: number) =>
 export const finalizarPasantia = (id: number) =>
   api.put<Pasantia>(`/pasantias/${id}/finalizar`, {})
 
-export const subirInforme = async (id: number, tipo: string, archivo?: File) => {
+export const subirInforme = (id: number, tipo: string, archivo?: File) => {
   const form = new FormData()
   form.append('tipo', tipo)
   if (archivo) form.append('archivo', archivo)
-  const token = getAccessToken()
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/pasantias/${id}/informes`,
-    { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form },
-  )
-  if (!res.ok) throw new Error('Error al subir informe')
-  return res.json()
+  return api.upload<InformePasantia>(`/pasantias/${id}/informes`, form)
 }

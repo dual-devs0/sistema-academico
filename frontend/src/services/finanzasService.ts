@@ -194,18 +194,9 @@ export const getEstadoDeuda = (alumnoId: number) =>
   api.get<EstadoDeuda>(`/finanzas/alumno/${alumnoId}/estado-deuda-inscripcion`)
 
 // Rendición Excel
-export const downloadRendicion = async (fuente: string, periodo?: string): Promise<void> => {
-  const token = (window as {__auth_token__?: string}).__auth_token__ || ''
+export const downloadRendicion = (fuente: string, periodo?: string): Promise<void> => {
   const url = `/finanzas/../becas/reportes/rendicion?fuente=${encodeURIComponent(fuente)}${periodo ? `&periodo=${periodo}` : ''}`
-  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error descargando rendición')
-  const blob = await res.blob()
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `rendicion_${fuente}_${periodo || 'todos'}.xlsx`
-  a.click()
+  return api.download(url, `rendicion_${fuente}_${periodo || 'todos'}.xlsx`)
 }
 
 // ── Pagos Online ──────────────────────────────────────────────────────

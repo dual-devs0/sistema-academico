@@ -5,22 +5,9 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_materia
+from app.services.puntajes_utils import PESOS, calcular_promedio_final
 
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
-
-PESOS = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
-
-
-def _oferta_activa_id(db: Session, materia_id: int) -> int | None:
-    oferta = (
-        db.query(models.oferta_materia.OfertaMateria)
-        .filter(
-            models.oferta_materia.OfertaMateria.materia_id == materia_id,
-            models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
-        )
-        .first()
-    )
-    return oferta.id if oferta else None
 
 
 def _get_puntajes_por_materia(db: Session, materia_id: int):
@@ -38,21 +25,6 @@ def _get_puntajes_por_materia(db: Session, materia_id: int):
         .filter(models.puntaje.Puntaje.oferta_materia_id == oferta_id)
         .all()
     )
-
-
-def _calcular_promedio_final(notas: dict[str, float | None]) -> float | None:
-    """
-    Calcula promedio ponderado.
-    Si falta alguna nota se calcula con las disponibles (proporcional).
-    """
-    existentes = {k: v for k, v in notas.items() if v is not None}
-    if not existentes:
-        return None
-    peso_total = sum(PESOS[k] for k in existentes)
-    if peso_total == 0:
-        return None
-    ponderado = sum(PESOS[k] * v for k, v in existentes.items())
-    return round(ponderado / peso_total, 2)
 
 
 @router.post("/", response_model=schemas.puntaje.PuntajeOut)
@@ -293,7 +265,7 @@ def puntajes_por_materia(
 
     result = []
     for uid, data in alumno_map.items():
-        prom = _calcular_promedio_final(data)
+        prom = calcular_promedio_final(data)
         result.append(
             schemas.puntaje.PromedioFinalOut(user_id=uid, **data, promedio_final=prom)
         )
@@ -328,7 +300,7 @@ def promedio_final_alumno(
 
     alumno = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     nombre = alumno.nombre if alumno else ""
-    prom = _calcular_promedio_final(notas)
+    prom = calcular_promedio_final(notas)
 
     return schemas.puntaje.PromedioFinalOut(
         user_id=user_id, nombre=nombre, **notas, promedio_final=prom
@@ -381,7 +353,7 @@ def exportar_materia(
 
     alumnos_out = []
     for uid, data in alumno_map.items():
-        prom = _calcular_promedio_final(data)
+        prom = calcular_promedio_final(data)
         tot, pres = asist_map.get(uid, (0, 0))
         asist_pct = round((pres / tot) * 100, 1) if tot > 0 else None
         alumnos_out.append(schemas.puntaje.AlumnoExportRow(user_id=uid, **data, promedio=prom, asistencia_pct=asist_pct))

@@ -9,13 +9,12 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 revision: str = 'c6d7e8f9g0h1'
 down_revision: Union[str, Sequence[str], None] = 'b890f76d76ae'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
-
 
 def upgrade() -> None:
     op.create_table('pagos_online',
@@ -26,7 +25,7 @@ def upgrade() -> None:
         sa.Column('transaction_id', sa.String(length=100), nullable=True),
         sa.Column('estado', sa.String(length=20), nullable=False, server_default='pendiente'),
         sa.Column('gateway_url', sa.String(length=500), nullable=True),
-        sa.Column('gateway_response', postgresql.JSON(), nullable=True),
+        sa.Column('gateway_response', sa.JSON(), nullable=True),
         sa.Column('creado_en', sa.DateTime(timezone=True), nullable=True),
         sa.Column('confirmado_en', sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(['alumno_id'], ['users.id'], ),

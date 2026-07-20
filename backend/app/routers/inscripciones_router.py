@@ -121,20 +121,16 @@ def inscribir(
             status_code=400, detail="El alumno ya esta inscripto en esta materia"
         )
     # Check for schedule overlap
-    try:
-        from app.routers.horarios_router import verificar_solapamiento_inscripcion
+    from app.services.pensum import verificar_solapamiento_inscripcion
 
-        conflictos = verificar_solapamiento_inscripcion(
-            db, alumno_id, inscripcion.materia_id
+    conflictos = verificar_solapamiento_inscripcion(
+        db, alumno_id, inscripcion.materia_id
+    )
+    if conflictos:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Solapamiento de horario: {', '.join(conflictos)}",
         )
-        if conflictos:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Solapamiento de horario: {', '.join(conflictos)}",
-            )
-    except ImportError:
-        import logging
-        logging.getLogger(__name__).warning("horarios_router no disponible — saltando verificación de solapamiento")
     nueva = models.inscripcion.Inscripcion(
         alumno_id=alumno_id,
         oferta_materia_id=oferta.id,

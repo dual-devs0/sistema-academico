@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCurrentUser, emitToast } from '../lib/api'
+import { getCurrentUser, emitToast, api } from '../lib/api'
 import {
   getCatalogoBecas,
   postularBeca,

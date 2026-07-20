@@ -52,8 +52,6 @@ def upgrade() -> None:
     sa.UniqueConstraint('examen_id', 'alumno_id', name='uq_inscripcion_examen_alumno')
     )
     op.create_index(op.f('ix_inscripciones_examen_id'), 'inscripciones_examen', ['id'], unique=False)
-    op.drop_table('solicitudes')
-    op.drop_table('tipos_tramite')
     op.alter_column('apuntes', 'tipo_contenido',
                existing_type=sa.VARCHAR(length=50),
                nullable=True,
@@ -170,31 +168,6 @@ def downgrade() -> None:
                existing_type=sa.VARCHAR(length=50),
                nullable=False,
                existing_server_default=sa.text("'pdf'::character varying"))
-    op.create_table('tipos_tramite',
-    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
-    sa.Column('nombre', sa.VARCHAR(length=200), autoincrement=False, nullable=False),
-    sa.Column('descripcion', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.Column('requiere_aprobacion', sa.BOOLEAN(), server_default=sa.text('false'), autoincrement=False, nullable=False),
-    sa.Column('dias_estimados', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.PrimaryKeyConstraint('id', name=op.f('tipos_tramite_pkey')),
-    sa.UniqueConstraint('nombre', name=op.f('tipos_tramite_nombre_key'), postgresql_include=[], postgresql_nulls_not_distinct=False)
-    )
-    op.create_table('solicitudes',
-    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
-    sa.Column('alumno_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('tipo_tramite_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('estado', sa.VARCHAR(length=20), server_default=sa.text("'pendiente'::character varying"), autoincrement=False, nullable=False),
-    sa.Column('fecha_solicitud', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.Column('fecha_resolucion', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
-    sa.Column('resuelto_por', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('storage_key_resultado', sa.VARCHAR(length=500), autoincrement=False, nullable=True),
-    sa.Column('motivo_rechazo', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.CheckConstraint("estado::text = ANY (ARRAY['pendiente'::character varying, 'en_proceso'::character varying, 'resuelta'::character varying, 'rechazada'::character varying]::text[])", name=op.f('ck_solicitud_estado')),
-    sa.ForeignKeyConstraint(['alumno_id'], ['users.id'], name=op.f('solicitudes_alumno_id_fkey')),
-    sa.ForeignKeyConstraint(['resuelto_por'], ['users.id'], name=op.f('solicitudes_resuelto_por_fkey')),
-    sa.ForeignKeyConstraint(['tipo_tramite_id'], ['tipos_tramite.id'], name=op.f('solicitudes_tipo_tramite_id_fkey')),
-    sa.PrimaryKeyConstraint('id', name=op.f('solicitudes_pkey'))
-    )
     op.drop_index(op.f('ix_inscripciones_examen_id'), table_name='inscripciones_examen')
     op.drop_table('inscripciones_examen')
     op.drop_index(op.f('ix_examenes_id'), table_name='examenes')

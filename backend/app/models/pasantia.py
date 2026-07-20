@@ -11,6 +11,7 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     CheckConstraint,
+    Text,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -43,6 +44,7 @@ class Pasantia(Base):
     horas_requeridas = Column(Integer, nullable=False)
     horas_completadas = Column(Integer, nullable=False, default=0)
     estado = Column(String(20), nullable=False, default="pendiente")
+    motivo_rechazo = Column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
