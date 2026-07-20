@@ -142,6 +142,8 @@ export default function Estadisticas() {
   const lineData = (dashboard?.asistencia_por_materia ?? [])
     .map(m => ({ name: truncate(m.materia_nombre), asistencia: m.asistencia_pct }))
 
+  const alertas = dashboard?.alertas ?? []
+
   const kpiCards = [
     {
       label: 'Promedio general',
