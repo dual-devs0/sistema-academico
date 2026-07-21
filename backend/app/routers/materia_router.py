@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
-from app.dependencias import get_current_user
+from app.dependencias import get_current_user, require_role
 
 router = APIRouter(prefix="/materias", tags=["materias"])
 
@@ -73,10 +73,8 @@ def _enrich(m, db: Session) -> dict:
 def create_materia(
     materia: schemas.materia.MateriaCreate,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.materia.Materia)
         .filter(
@@ -129,10 +127,8 @@ def list_materias(
 @router.get("/stats")
 def materias_stats(
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
 
     M = models.materia.Materia
     O = models.oferta_materia.OfertaMateria
@@ -213,10 +209,8 @@ def patch_materia(
     materia_id: int,
     data: MateriaPatchBody,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == materia_id)
@@ -240,11 +234,9 @@ def patch_materia(
 def crear_oferta(
     oferta: schemas.oferta_materia.OfertaMateriaCreate,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
     """Admin: asigna un profesor a una materia para un período dado."""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == oferta.materia_id)

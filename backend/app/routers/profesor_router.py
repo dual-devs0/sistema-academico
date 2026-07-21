@@ -12,9 +12,9 @@ router = APIRouter(prefix="/profesor", tags=["profesor"])
 
 
 def _requiere_profesor(current_user: CurrentUser):
-    if current_user.role != "profesor":
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(
-            status_code=403, detail="Solo profesores pueden acceder a este recurso"
+            status_code=403, detail="Solo administradores o profesores pueden acceder a este recurso"
         )
 
 

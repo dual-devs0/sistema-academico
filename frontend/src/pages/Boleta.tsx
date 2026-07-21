@@ -62,7 +62,7 @@ export default function Boleta() {
 
   useEffect(() => {
     if (!esAlumno) {
-      api.get<AlumnoOpt[]>('/profesor/lista-alumnos').then(setAlumnos).catch(e => {
+      api.get<{items: AlumnoOpt[]}>('/profesor/lista-alumnos').then(r => setAlumnos(r.items)).catch(e => {
         console.error('Error al cargar alumnos:', e)
         emitToast('Error al cargar lista de alumnos', 'error')
       })
@@ -80,8 +80,9 @@ export default function Boleta() {
       Promise.all([
         api.get<{id:number;nombre:string}[]>('/materias/'),
         api.get<{materia_id:number;tipo:string;valor:number}[]>(`/puntajes/?user_id=${selId}`),
-        api.get<AlumnoOpt[]>('/profesor/lista-alumnos'),
-      ]).then(([mats, pts, us]) => {
+        api.get<{items: AlumnoOpt[]}>('/profesor/lista-alumnos'),
+      ]).then(([mats, pts, res]) => {
+        const us = res.items
         const al = us.find(u => u.id === selId)
         const notas: NotaRow[] = mats.map((m: {id:number;nombre:string}) => {
           const de = (t: string) => pts.find((p: {materia_id:number;tipo:string;valor:number}) => p.materia_id === m.id && p.tipo === t)?.valor ?? null
