@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 from app import models, schemas, database
 from app.security import hash_password
-from app.dependencias import get_current_user
+from app.dependencias import get_current_user, require_role
 from app.models.refresh_token import RefreshToken
 from app.services.storage import subir_archivo, obtener_url_firmada
 
@@ -23,10 +23,8 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/stats")
 def users_stats(
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
 
     U = models.user.User
 
@@ -71,10 +69,8 @@ def users_stats(
 def create_user(
     user: schemas.user.UserCreate,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     new_user = models.user.User(
         username=user.username,
         hashed_password=hash_password(user.password),
@@ -110,10 +106,8 @@ def get_me(
 def get_user(
     user_id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -124,10 +118,8 @@ def get_user(
 def get_user_materias(
     user_id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -170,10 +162,8 @@ def list_users(
     es_becado: Optional[bool] = Query(None),
     carrera_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     query = db.query(models.user.User)
     if role:
         query = query.filter(models.user.User.role == role)
@@ -243,9 +233,8 @@ def update_user(
     update_data = data.model_dump(exclude_unset=True)
     new_password = update_data.get("password")
 
-    # Non-admin users cannot change role, carrera_id, or es_becado
     if current_user.role != "admin":
-        for forbidden in ("role", "carrera_id", "es_becado"):
+        for forbidden in ("role", "carrera_id", "es_becado", "activo", "fecha_ingreso", "cedula", "cv"):
             update_data.pop(forbidden, None)
 
     if "password" in update_data:
@@ -260,7 +249,7 @@ def update_user(
     if new_password and user.email:
         try:
             send_password_reset_email_bg(
-                background_tasks, user.email, user.nombre or user.username, new_password
+                background_tasks, user.email, user.nombre or user.username
             )
         except Exception as e:
             print("Error sending password reset email:", e)
@@ -272,10 +261,8 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

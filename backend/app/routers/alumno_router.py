@@ -106,6 +106,7 @@ def mis_notas(
     user_id = current_user.user_id
     puntajes = (
         db.query(models.puntaje.Puntaje)
+        .options(joinedload(models.puntaje.Puntaje.oferta))
         .filter(models.puntaje.Puntaje.user_id == user_id)
         .all()
     )
@@ -150,6 +151,7 @@ def mi_asistencia(
     user_id = current_user.user_id
     asistencias = (
         db.query(models.asistencia.Asistencia)
+        .options(joinedload(models.asistencia.Asistencia.oferta))
         .filter(models.asistencia.Asistencia.user_id == user_id)
         .all()
     )

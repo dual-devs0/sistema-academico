@@ -76,7 +76,7 @@ def test_password_reset_email_mocked_when_no_credentials(capsys):
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
-        send_password_reset_email_bg(bg, "test@example.com", "Juan", "abc123")
+        send_password_reset_email_bg(bg, "test@example.com", "Juan")
 
     captured = capsys.readouterr()
     assert "Mock" in captured.out
@@ -88,7 +88,7 @@ def test_password_reset_email_queues_task_when_credentials_present():
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "real_app_password"}, clear=False):
-        send_password_reset_email_bg(bg, "test@example.com", "Juan", "abc123")
+        send_password_reset_email_bg(bg, "test@example.com", "Juan")
 
     assert len(bg.tasks) == 1
 

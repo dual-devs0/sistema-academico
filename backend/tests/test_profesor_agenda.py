@@ -60,7 +60,7 @@ def test_agenda_incluye_evento_institucional(client, seed, tokens, db):
 def test_agenda_requiere_rol_profesor(client, seed, tokens):
     hoy = date.today().isoformat()
     res = client.get(
-        f"/profesor/mi-agenda?desde={hoy}&hasta={hoy}", headers=auth(tokens["admin"])
+        f"/profesor/mi-agenda?desde={hoy}&hasta={hoy}", headers=auth(tokens["alumno"])
     )
     assert res.status_code == 403
 

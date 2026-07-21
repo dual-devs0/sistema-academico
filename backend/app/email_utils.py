@@ -59,17 +59,16 @@ def send_password_reset_email_bg(
     background_tasks: BackgroundTasks,
     email_to: str,
     user_name: str,
-    new_password: str,
 ) -> None:
     if not _credentials_configured():
-        print(f"Mock Email sent to {email_to}: Password reset to {new_password}")
+        print(f"Mock Email sent to {email_to}: Password was reset by admin")
         return
 
     html = f"""
     <h3>Hola {user_name},</h3>
-    <p>Tu contraseña ha sido restablecida.</p>
-    <p>Nueva contraseña temporal: <b>{new_password}</b></p>
-    <p>Por favor, cámbiala lo antes posible.</p>
+    <p>Un administrador ha restablecido tu contraseña en el Sistema Académico UCA.</p>
+    <p>Usá la opción <b>"Recuperar contraseña"</b> en la pantalla de inicio de sesión para establecer una nueva.</p>
+    <p>Si no solicitaste este cambio, contactá al administrador del sistema.</p>
     """
     message = MessageSchema(
         subject="UCA - Restablecimiento de contraseña",

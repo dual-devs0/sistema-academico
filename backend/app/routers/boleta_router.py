@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -350,10 +350,7 @@ def get_boleta(
             carrera_nombre = c.nombre
 
     rows = (
-        db.query(
-            models.puntaje.Puntaje,
-            models.materia.Materia.nombre.label("materia_nombre"),
-        )
+        db.query(models.puntaje.Puntaje)
         .join(
             models.oferta_materia.OfertaMateria,
             models.puntaje.Puntaje.oferta_materia_id
@@ -363,7 +360,9 @@ def get_boleta(
             models.materia.Materia,
             models.oferta_materia.OfertaMateria.materia_id == models.materia.Materia.id,
         )
+        .options(contains_eager(models.puntaje.Puntaje.oferta))
         .filter(models.puntaje.Puntaje.user_id == user_id)
+        .add_columns(models.materia.Materia.nombre.label("materia_nombre"))
         .all()
     )
 
