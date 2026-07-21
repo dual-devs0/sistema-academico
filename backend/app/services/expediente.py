@@ -87,41 +87,61 @@ def calcular_regularidad(alumno_id: int, db: Session) -> dict:
             )
             .all()
         )
-        for r in reprobadas:
-            oferta_r = (
-                db.query(OfertaMateria)
-                .filter(OfertaMateria.id == r.oferta_materia_id)
-                .first()
+
+        ofertas_reprobadas = {
+            o.id: o
+            for o in db.query(OfertaMateria).filter(
+                OfertaMateria.id.in_([r.oferta_materia_id for r in reprobadas])
             )
+        }
+
+        candidatas = []  # (r, oferta_r) que superaron el plazo de recursado
+        for r in reprobadas:
+            oferta_r = ofertas_reprobadas.get(r.oferta_materia_id)
             if not oferta_r or oferta_r.periodo not in periodos_sistema:
                 continue
             idx_r = periodos_sistema.index(oferta_r.periodo)
             if idx_reciente - idx_r <= PLAZO_RECURSAR_PERIODOS:
                 continue
-            aprobada_posterior = (
-                db.query(ExpedienteMateria)
+            candidatas.append((r, oferta_r))
+
+        if candidatas:
+            materia_ids = {oferta_r.materia_id for _, oferta_r in candidatas}
+            materias_con_aprobada = {
+                oferta_id
+                for (oferta_id,) in db.query(OfertaMateria.materia_id)
                 .join(
-                    OfertaMateria,
+                    ExpedienteMateria,
                     ExpedienteMateria.oferta_materia_id == OfertaMateria.id,
                 )
                 .filter(
                     ExpedienteMateria.alumno_id == alumno_id,
                     ExpedienteMateria.condicion == "aprobada",
-                    OfertaMateria.materia_id == oferta_r.materia_id,
+                    OfertaMateria.materia_id.in_(materia_ids),
                 )
-                .first()
-            )
-            if aprobada_posterior:
-                continue
-            materia = (
-                db.query(Materia).filter(Materia.id == oferta_r.materia_id).first()
-            )
-            nombre = materia.nombre if materia else f"materia #{oferta_r.materia_id}"
-            return {
-                "estado": "irregular",
-                "motivo": f"{nombre} reprobada, sin recursar en {PLAZO_RECURSAR_PERIODOS} periodos",  # noqa: E501
-                "ppa_acumulado": ppa,
+                .distinct()
             }
+
+            pendientes = [
+                oferta_r
+                for _, oferta_r in candidatas
+                if oferta_r.materia_id not in materias_con_aprobada
+            ]
+            if pendientes:
+                oferta_r = pendientes[0]
+                materia = (
+                    db.query(Materia)
+                    .filter(Materia.id == oferta_r.materia_id)
+                    .first()
+                )
+                nombre = (
+                    materia.nombre if materia else f"materia #{oferta_r.materia_id}"
+                )
+                return {
+                    "estado": "irregular",
+                    "motivo": f"{nombre} reprobada, sin recursar en {PLAZO_RECURSAR_PERIODOS} periodos",  # noqa: E501
+                    "ppa_acumulado": ppa,
+                }
 
     # 3. En riesgo: PPA bajo umbral o asistencia global < umbral.
     if ppa is not None and ppa < PPA_UMBRAL_RIESGO:

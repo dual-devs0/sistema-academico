@@ -17,7 +17,7 @@ pymupdf
 pdfplumber
 
 # Gemini API
-google-generativeai
+google-genai
 
 # Generación de PDFs y QR
 reportlab

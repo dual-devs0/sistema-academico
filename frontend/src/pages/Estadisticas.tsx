@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
   LineChart, Line,
 } from 'recharts'
 import { api } from '../lib/api'
+
+const POLL_MS = 30000
 
 interface DashboardData {
   kpis: { promedio_general: number; aprobacion_pct: number; asistencia_pct: number; alumnos_activos: number }
@@ -27,13 +29,10 @@ const css = `
 
   .est-root { display:flex; flex-direction:column; flex:1; font-family:Inter,system-ui,sans-serif; color:var(--text-primary); min-height:0; }
 
-  .est-topbar {
-    display:flex; align-items:center; padding:0 24px; height:56px;
-    border-bottom:1px solid #2a3040; background:var(--bg-base);
-    position:sticky; top:0; z-index:20; flex-shrink:0;
-  }
-  .est-topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; margin:0; }
-  .est-topbar p  { font-size:12px; color:var(--text-muted); margin:2px 0 0; }
+  .est-last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+  .est-last-upd svg { width:13px; height:13px; }
+  .est-last-upd svg.spin { animation:est-spin 1s linear infinite; }
+  @keyframes est-spin { to{transform:rotate(360deg)} }
 
   .est-content { padding:20px 24px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
 
@@ -90,27 +89,31 @@ function SkeletonChart({ h = 200 }: { h?: number }) {
 
 export default function Estadisticas() {
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+
+  const load = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true)
+    try {
+      const res = await api.get<DashboardData>('/reportes/dashboard')
+      setData(res)
+      setError(null)
+      setLastUpdate(new Date())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al cargar estadísticas')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await api.get<DashboardData>('/reportes/dashboard')
-        if (cancelled) return
-        setData(res)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar estadísticas')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
     load()
-    return () => { cancelled = true }
-  }, [])
+    const id = setInterval(() => load(), POLL_MS)
+    return () => clearInterval(id)
+  }, [load])
 
   const dashboard = data
   const sinDatos = !loading && !error && dashboard?.materias.every(m => (m.total_notas ?? 0) === 0)
@@ -200,35 +203,18 @@ export default function Estadisticas() {
             <h1 className="page-title" style={{ fontSize: 27 }}>System Performance</h1>
             <p className="page-subtitle">Vista completa de KPIs institucionales y estabilidad académica.</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <span className="btn-ghost" style={{ cursor: 'default' }}><i className="ti ti-calendar" /> Últimos 30 días</span>
-            <button className="btn-ghost"><i className="ti ti-download" /> Exportar Reporte</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {lastUpdate && (
+              <span className="est-last-upd">
+                <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                {lastUpdate.toLocaleTimeString('es-PY')}
+              </span>
+            )}
+            <button className="btn-ghost" onClick={() => load(true)} disabled={refreshing}>
+              <i className="ti ti-refresh" /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+            </button>
           </div>
         </header>
-
-        {/* KPIs institucionales */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, padding: '14px 24px 0' }}>
-          <div className="kpi-card">
-            <div className="mono-label" style={{ marginBottom: 6 }}>Tasa de Deserción</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.max(0, Math.round((100 - kpis.asistencia_pct) / 5))}%`}</span>
-            <div style={{ fontSize: 10.5, color: 'var(--danger)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↑ vs semestre anterior</div>
-          </div>
-          <div className="kpi-card">
-            <div className="mono-label" style={{ marginBottom: 6 }}>Uso del Sistema</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${kpis.asistencia_pct}%`}</span>
-            <div style={{ fontSize: 10.5, color: 'var(--success)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↗ usuarios activos</div>
-          </div>
-          <div className="kpi-card">
-            <div className="mono-label" style={{ marginBottom: 6 }}>Rendimiento Académico</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${kpis.promedio_general}/10`}</span>
-            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>— Estable</div>
-          </div>
-          <div className="kpi-card">
-            <div className="mono-label" style={{ marginBottom: 6 }}>Retención Estudiantil</div>
-            <span className="kpi-value" style={{ fontSize: 26 }}>{loading ? '—' : `${Math.min(100, kpis.aprobacion_pct + 8)}%`}</span>
-            <div style={{ fontSize: 10.5, color: 'var(--success)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>↗ En meta proyectada</div>
-          </div>
-        </div>
 
         <div className="est-content">
 

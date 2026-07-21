@@ -1,20 +1,23 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
+from typing import Optional
+from sqlalchemy import Integer, String, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
 class Materia(Base):
     __tablename__ = "materias"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, index=True, nullable=False)
-    codigo = Column(String(20), nullable=True)
-    carrera_id = Column(Integer, ForeignKey("carreras.id"), nullable=True)
-    anio = Column(Integer, default=1)
-    semestre = Column(Integer, default=1)
-    creditos = Column(Integer, default=4)
-    cupos = Column(Integer, default=40)
-    horario = Column(String, nullable=True)
-    secciones = Column(Integer, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    codigo: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    carrera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carreras.id"), nullable=True)
+    anio: Mapped[Optional[int]] = mapped_column(Integer, default=1)
+    semestre: Mapped[Optional[int]] = mapped_column(Integer, default=1)
+    creditos: Mapped[Optional[int]] = mapped_column(Integer, default=4)
+    cupos: Mapped[Optional[int]] = mapped_column(Integer, default=40)
+    horario: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    secciones: Mapped[Optional[int]] = mapped_column(Integer, default=1)
+    carrera = relationship("Carrera")
 
     __table_args__ = (
         UniqueConstraint("nombre", "carrera_id", name="uq_materia_nombre_carrera"),

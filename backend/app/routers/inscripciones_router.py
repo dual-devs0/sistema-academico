@@ -1,10 +1,19 @@
-from typing import Optional
+from typing import Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.pensum import validar_correlatividades
 from app.services.financiero import verificar_deuda_inscripcion, registrar_override_mora
+
+
+class PromocionarBody(BaseModel):
+    carrera_id: int
+    desde_anio: int
+    desde_semestre: int
+    hasta_anio: int
+    hasta_semestre: int
 
 router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
 
@@ -28,12 +37,11 @@ def _oferta_activa_o_404(db: Session, materia_id: int):
 def _to_out(
     ins: "models.inscripcion.Inscripcion"
 ) -> schemas.inscripcion.InscripcionOut:
-    materia_id = ins.oferta.materia_id if ins.oferta else None
     return schemas.inscripcion.InscripcionOut(
-        id=ins.id,
-        alumno_id=ins.alumno_id,
-        materia_id=materia_id,
-        oferta_materia_id=ins.oferta_materia_id,
+        id=cast(int, ins.id),
+        alumno_id=cast(int, ins.alumno_id),
+        materia_id=ins.oferta.materia_id if ins.oferta else None,
+        oferta_materia_id=cast(int, ins.oferta_materia_id),
     )
 
 
@@ -90,7 +98,7 @@ def inscribir(
                 alumno_id=alumno_id,
                 admin_id=current_user.user_id,
                 db=db,
-                oferta_materia_id=oferta.id,
+                oferta_materia_id=cast(int, oferta.id),
                 motivo="Override manual en inscripción. Cuotas vencidas: "
                 f"{estado_deuda.cuotas_vencidas}",
             )
@@ -138,7 +146,7 @@ def inscribir(
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
-    return _to_out(db, nueva)
+    return _to_out(nueva)
 
 
 @router.delete("/{inscripcion_id}")
@@ -213,3 +221,172 @@ def list_inscripciones(
         q = q.filter(models.inscripcion.Inscripcion.alumno_id == alumno_id)
     rows = q.all()
     return [_to_out(i) for i in rows]
+
+
+@router.post("/promocionar")
+def promocionar_grupo(
+    body: PromocionarBody,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Admin: promueve alumnos de un semestre origen al destino."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    M = models.materia.Materia
+    O = models.oferta_materia.OfertaMateria
+    I = models.inscripcion.Inscripcion
+
+    # Materias origen
+    src_materias = (
+        db.query(M)
+        .filter(
+            M.carrera_id == body.carrera_id,
+            M.anio == body.desde_anio,
+            M.semestre == body.desde_semestre,
+        )
+        .all()
+    )
+    if not src_materias:
+        raise HTTPException(status_code=404, detail="No hay materias en el semestre origen")
+
+    # Materias destino
+    dst_materias = (
+        db.query(M)
+        .filter(
+            M.carrera_id == body.carrera_id,
+            M.anio == body.hasta_anio,
+            M.semestre == body.hasta_semestre,
+        )
+        .all()
+    )
+    if not dst_materias:
+        raise HTTPException(status_code=404, detail="No hay materias en el semestre destino")
+
+    src_ids = {m.id for m in src_materias}
+    dst_ids = {m.id for m in dst_materias}
+
+    # Alumnos con al menos una inscripcion en origen
+    src_ofertas = (
+        db.query(O).filter(O.materia_id.in_(src_ids), O.activa == True).all()
+    )
+    src_oferta_ids = {o.id for o in src_ofertas}
+    src_oferta_por_materia = {o.materia_id: o.id for o in src_ofertas}
+
+    alumnos_con_inscripcion = (
+        db.query(I.alumno_id)
+        .filter(I.oferta_materia_id.in_(src_oferta_ids))
+        .distinct()
+        .all()
+    )
+    alumno_ids = {r[0] for r in alumnos_con_inscripcion}
+
+    if not alumno_ids:
+        raise HTTPException(status_code=400, detail="No hay alumnos inscriptos en el semestre origen")
+
+    # Ofertas destino
+    dst_ofertas = (
+        db.query(O).filter(O.materia_id.in_(dst_ids), O.activa == True).all()
+    )
+    dst_oferta_por_materia = {o.materia_id: o.id for o in dst_ofertas}
+
+    # Inscripciones existentes destino
+    dst_oferta_ids = {o.id for o in dst_ofertas}
+    existentes = set()
+    if dst_oferta_ids:
+        rows = (
+            db.query(I.alumno_id, I.oferta_materia_id)
+            .filter(
+                I.alumno_id.in_(list(alumno_ids)),
+                I.oferta_materia_id.in_(list(dst_oferta_ids)),
+            )
+            .all()
+        )
+        existentes = {(r.alumno_id, r.oferta_materia_id) for r in rows}
+
+    promovidos = 0
+    ya_inscriptos = 0
+    errores = 0
+
+    for aid in alumno_ids:
+        for dst_m in dst_materias:
+            oferta_id = dst_oferta_por_materia.get(dst_m.id)
+            if not oferta_id:
+                errores += 1
+                continue
+            key = (aid, oferta_id)
+            if key in existentes:
+                ya_inscriptos += 1
+                continue
+            db.add(I(alumno_id=aid, oferta_materia_id=oferta_id))
+            promovidos += 1
+
+    db.commit()
+    return {
+        "detail": f"{promovidos} inscripciones creadas, {ya_inscriptos} ya existentes, {errores} errores",
+        "promovidos": promovidos,
+        "ya_inscriptos": ya_inscriptos,
+        "errores": errores,
+        "alumnos_afectados": len(alumno_ids),
+    }
+
+
+@router.get("/carrera/{carrera_id}")
+def inscripciones_por_carrera(
+    carrera_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Admin: lista todas las materias de una carrera con sus alumnos inscriptos."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    materias = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.carrera_id == carrera_id)
+        .order_by(models.materia.Materia.anio, models.materia.Materia.semestre, models.materia.Materia.nombre)
+        .all()
+    )
+    result = []
+    for m in materias:
+        oferta = (
+            db.query(models.oferta_materia.OfertaMateria)
+            .filter(
+                models.oferta_materia.OfertaMateria.materia_id == m.id,
+                models.oferta_materia.OfertaMateria.activa == True,
+            )
+            .first()
+        )
+        alumnos = []
+        if oferta:
+            inscripciones = (
+                db.query(models.inscripcion.Inscripcion)
+                .filter(models.inscripcion.Inscripcion.oferta_materia_id == oferta.id)
+                .all()
+            )
+            if inscripciones:
+                alumno_ids = [i.alumno_id for i in inscripciones]
+                alumnos_map = {
+                    u.id: u
+                    for u in db.query(models.user.User)
+                    .filter(models.user.User.id.in_(alumno_ids))
+                    .all()
+                }
+                for i in inscripciones:
+                    alumno = alumnos_map.get(i.alumno_id)
+                    if alumno:
+                        alumnos.append({
+                            "inscripcion_id": i.id,
+                            "alumno_id": alumno.id,
+                            "nombre": alumno.nombre or alumno.username,
+                            "username": alumno.username,
+                        })
+        result.append({
+            "materia_id": m.id,
+            "materia_nombre": m.nombre,
+            "codigo": m.codigo,
+            "anio": m.anio,
+            "semestre": m.semestre,
+            "creditos": m.creditos,
+            "alumnos": alumnos,
+        })
+    return result

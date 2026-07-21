@@ -15,6 +15,8 @@ from app.models.users import User
 from app.models.carrera import Carrera
 from app.models.pensum_materia import PensumMateria
 from app.models.avance_alumno_pensum import AvanceAlumnoPensum
+from app.models.expediente_materia import ExpedienteMateria
+from app.models.pasantia import Pasantia
 from app.services.expediente import calcular_ppa
 from app.services.pasantia import pasantia_completada_por_alumno
 
@@ -108,9 +110,8 @@ def listar_candidatos(
 ) -> tuple[list[dict], int]:
     """Lista paginada de alumnos con su condición de egreso resuelta por fila.
 
-    Nota: recalcula verificar_condicion_egreso por alumno (no hay una query
-    agregada); aceptable a escala de desarrollo, no pensado para cohortes
-    grandes sin reescribir a SQL agregado.
+    Condición de egreso calculada con queries agregadas por lote (no una por
+    alumno) para evitar N+1 en cohortes grandes.
     """
     query = db.query(User).filter(User.role == "alumno")
     if carrera_id is not None:
@@ -167,10 +168,83 @@ def listar_candidatos(
         for e in db.query(EtapaTesis).filter(EtapaTesis.id.in_(etapa_ids)).all():
             etapa_map[e.proceso_id] = e
 
+    # batch ExpedienteMateria aprobadas — para PPA por alumno
+    aprobadas_por_alumno: dict[int, list[ExpedienteMateria]] = {}
+    for em in (
+        db.query(ExpedienteMateria)
+        .filter(
+            ExpedienteMateria.alumno_id.in_(alumno_ids),
+            ExpedienteMateria.condicion == "aprobada",
+        )
+        .all()
+    ):
+        aprobadas_por_alumno.setdefault(em.alumno_id, []).append(em)
+
+    # batch creditos aprobados (PensumMateria vía AvanceAlumnoPensum)
+    creditos_por_alumno: dict[int, int] = {}
+    for avance_alumno_id, creditos in (
+        db.query(AvanceAlumnoPensum.alumno_id, PensumMateria.creditos)
+        .join(PensumMateria, AvanceAlumnoPensum.pensum_materia_id == PensumMateria.id)
+        .filter(
+            AvanceAlumnoPensum.alumno_id.in_(alumno_ids),
+            AvanceAlumnoPensum.estado == "aprobada",
+        )
+        .all()
+    ):
+        creditos_por_alumno[avance_alumno_id] = (
+            creditos_por_alumno.get(avance_alumno_id, 0) + creditos
+        )
+
+    # batch pasantía completada
+    alumnos_pasantia_completada = {
+        p.alumno_id
+        for p in db.query(Pasantia.alumno_id)
+        .filter(
+            Pasantia.alumno_id.in_(alumno_ids),
+            Pasantia.estado == "completada",
+        )
+        .all()
+    }
+
     items = []
     for alumno in alumnos:
-        condicion = verificar_condicion_egreso(alumno.id, db)
         carrera = carreras_map.get(alumno.carrera_id) if alumno.carrera_id else None
+
+        aprobadas = aprobadas_por_alumno.get(alumno.id, [])
+        creditos_totales = carrera.creditos_totales or 0 if carrera else 0
+        creditos_aprobados = creditos_por_alumno.get(alumno.id, 0)
+        cumple_creditos = (
+            creditos_aprobados >= creditos_totales if creditos_totales > 0 else False
+        )
+
+        creditos_ppa = sum(a.creditos for a in aprobadas)
+        ppa_actual = (
+            round(
+                sum(float(a.nota_final) * a.creditos for a in aprobadas)
+                / creditos_ppa,
+                2,
+            )
+            if creditos_ppa > 0
+            else None
+        )
+        cumple_ppa = ppa_actual is not None and ppa_actual >= PPA_MINIMO_INSTITUCIONAL
+
+        pasantia_completada = alumno.id in alumnos_pasantia_completada
+        pasantia_exigida = False
+        puede_graduarse = (
+            cumple_creditos
+            and cumple_ppa
+            and (not pasantia_exigida or pasantia_completada)
+        )
+
+        condicion = {
+            "creditos_aprobados": creditos_aprobados,
+            "creditos_totales": creditos_totales,
+            "ppa_actual": ppa_actual,
+            "ppa_minimo": PPA_MINIMO_INSTITUCIONAL,
+            "pasantia_completada": pasantia_completada,
+            "puede_graduarse": puede_graduarse,
+        }
         proceso = proceso_map.get(alumno.id)
         tesina_estado = None
         if proceso:

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.equivalencia import (
     SolicitudEquivalencia,
@@ -64,9 +64,36 @@ def resolver_materia(
     )
     if not eq:
         raise ValueError("Equivalencia de materia no encontrada")
-    eq.resolucion = resolucion
+    setattr(eq, 'resolucion', resolucion)
     if materia_destino_id is not None:
-        eq.materia_destino_id = materia_destino_id
+        setattr(eq, 'materia_destino_id', materia_destino_id)
+
+    # AUDIT-FIX: sincronizar el estado de la solicitud padre — antes quedaba
+    # eternamente en 'pendiente' porque solo se actualizaba la materia hija,
+    # y el frontend nunca reflejaba la resolución del admin.
+    solicitud_ref = (
+        db.query(SolicitudEquivalencia)
+        .filter(SolicitudEquivalencia.id == solicitud_id)
+        .first()
+    )
+    if solicitud_ref:
+        pendientes_restantes = (
+            db.query(EquivalenciaMateria)
+            .filter(
+                EquivalenciaMateria.solicitud_id == solicitud_id,
+                EquivalenciaMateria.id != materia_eq_id,
+                EquivalenciaMateria.resolucion.is_(None),
+            )
+            .count()
+        )
+        if pendientes_restantes == 0:
+            setattr(
+                solicitud_ref,
+                'estado',
+                'resuelta' if resolucion == 'aprobada' else 'rechazada',
+            )
+        else:
+            setattr(solicitud_ref, 'estado', 'en_proceso')
 
     # Si se aprueba, integrar con expediente y avance
     if resolucion == "aprobada" and materia_destino_id is not None:
@@ -78,17 +105,19 @@ def resolver_materia(
         if solicitud:
             alumno_id = solicitud.alumno_id
 
+            # AUDIT-FIX B-9: guard contra None — extraer carrera_id de forma segura
+            _materia_dest = (
+                db.query(Materia)
+                .filter(Materia.id == materia_destino_id)
+                .first()
+            )
+            _carrera_id = _materia_dest.carrera_id if _materia_dest else None
+
             pensum = (
                 db.query(PensumMateria)
                 .filter(
                     PensumMateria.materia_id == materia_destino_id,
-                    PensumMateria.carrera_id
-                    == (
-                        db.query(Materia)
-                        .filter(Materia.id == materia_destino_id)
-                        .first()
-                        .carrera_id if db.query(Materia).filter(Materia.id == materia_destino_id).first() else None
-                    ),
+                    PensumMateria.carrera_id == _carrera_id,
                 )
                 .first()
             )
@@ -143,7 +172,7 @@ def resolver_materia(
                 else None
             )
             if avance:
-                avance.estado = "aprobada"
+                setattr(avance, 'estado', "aprobada")
             elif pensum:
                 avance_nuevo = AvanceAlumnoPensum(
                     alumno_id=alumno_id,
@@ -168,10 +197,17 @@ def crear_examen_suficiencia(
 def obtener_equivalencias_alumno(
     alumno_id: int, db: Session
 ) -> list[SolicitudEquivalencia]:
-    return (
+    solicitudes = (
         db.query(SolicitudEquivalencia)
+        .options(joinedload(SolicitudEquivalencia.alumno))
         .filter(
             SolicitudEquivalencia.alumno_id == alumno_id,
         )
+        .order_by(SolicitudEquivalencia.id.desc())
         .all()
     )
+    # Enriquecer con el nombre real del alumno (evita exponer solo el ID crudo
+    # en la tabla del admin).
+    for s in solicitudes:
+        s.alumno_nombre = s.alumno.nombre if s.alumno else None  # type: ignore[attr-defined]
+    return solicitudes

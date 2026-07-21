@@ -2,8 +2,9 @@
 Modelos SQLAlchemy — Fase 5A: Solicitudes y trámites.
 """
 
+from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Boolean,
@@ -12,19 +13,18 @@ from sqlalchemy import (
     ForeignKey,
     CheckConstraint,
 )
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
 class TipoTramite(Base):
     __tablename__ = "tipos_tramite"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(200), nullable=False, unique=True)
-    descripcion = Column(Text, nullable=True)
-    requiere_aprobacion = Column(Boolean, nullable=False, default=False)
-    dias_estimados = Column(Integer, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    descripcion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    requiere_aprobacion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    dias_estimados: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     solicitudes = relationship("Solicitud", back_populates="tipo_tramite")
 
@@ -32,20 +32,20 @@ class TipoTramite(Base):
 class Solicitud(Base):
     __tablename__ = "solicitudes"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    tipo_tramite_id = Column(Integer, ForeignKey("tipos_tramite.id"), nullable=False)
-    estado = Column(String(20), nullable=False, default="pendiente")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    tipo_tramite_id: Mapped[int] = mapped_column(Integer, ForeignKey("tipos_tramite.id"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
     # pendiente / en_proceso / resuelta / rechazada
-    fecha_solicitud = Column(
+    fecha_solicitud: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    fecha_resolucion = Column(DateTime(timezone=True), nullable=True)
-    resuelto_por = Column(
+    fecha_resolucion: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resuelto_por: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )  # null = auto-generada
-    storage_key_resultado = Column(String(500), nullable=True)
-    motivo_rechazo = Column(Text, nullable=True)
+    storage_key_resultado: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    motivo_rechazo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(

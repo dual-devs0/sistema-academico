@@ -118,7 +118,7 @@ def materia_detalle(
             p = tipos_existentes[tipo]
             nota_val = float(p.valor) if p.valor is not None else None
             max_pts = PUNTAJE_POR_TIPO.get(tipo, 100)
-            logrado = int(round(nota_val * (max_pts / 10))) if nota_val is not None else None
+            logrado = round(nota_val * (max_pts / 10)) if nota_val is not None else None
 
             desglose.append({
                 "tipo": tipo,

@@ -25,7 +25,6 @@ from app.routers import (  # noqa: E402
     reportes,
     boleta,
     alumno,
-    foro,
     horarios,
     profesor,
     pensum,
@@ -39,6 +38,7 @@ from app.routers import (  # noqa: E402
     examenes,
     notificaciones,
     notas,
+    admin,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -108,7 +108,6 @@ app.include_router(programas.router)
 app.include_router(reportes.router)
 app.include_router(boleta.router)
 app.include_router(alumno.router)
-app.include_router(foro.router)
 app.include_router(horarios.router)
 app.include_router(profesor.router)
 app.include_router(pensum.router)
@@ -122,6 +121,7 @@ app.include_router(equivalencias.router)
 app.include_router(examenes.router)
 app.include_router(notificaciones.router)
 app.include_router(notas.router)
+app.include_router(admin.router)
 app.include_router(test_router.router)
 
 

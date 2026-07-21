@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
+from app.models import evento_calendario
 from app.dependencias import get_current_user
 from app.security import hash_password
 from app.services.storage import obtener_url_firmada
@@ -114,6 +115,8 @@ def mis_notas(
     por_materia: dict[int, dict] = {}
     for p in puntajes:
         mid = p.materia_id
+        if mid is None:
+            continue
         if mid not in por_materia:
             por_materia[mid] = {
                 "materia_id": mid,
@@ -154,6 +157,8 @@ def mi_asistencia(
     por_materia: dict[int, dict] = {}
     for a in asistencias:
         mid = a.materia_id
+        if mid is None:
+            continue
         if mid not in por_materia:
             por_materia[mid] = {"total": 0, "presentes": 0}
         por_materia[mid]["total"] += 1
@@ -231,12 +236,12 @@ def dashboard(
     hoy = date.today()
     hasta = hoy + timedelta(days=30)
     eventos = (
-        db.query(models.evento_calendario.EventoCalendario)
+        db.query(evento_calendario.EventoCalendario)
         .filter(
-            models.evento_calendario.EventoCalendario.fecha >= hoy,
-            models.evento_calendario.EventoCalendario.fecha <= hasta,
+            evento_calendario.EventoCalendario.fecha >= hoy,
+            evento_calendario.EventoCalendario.fecha <= hasta,
         )
-        .order_by(models.evento_calendario.EventoCalendario.fecha.asc())
+        .order_by(evento_calendario.EventoCalendario.fecha.asc())
         .all()
     )
     eventos_cercanos = [

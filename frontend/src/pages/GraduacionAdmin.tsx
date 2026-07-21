@@ -49,9 +49,22 @@ const css = `
   .gr-timeline-item.fail::before { background:#ef4444; }
   .gr-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
   .gr-filtros { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
-  .gr-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:999; }
-  .gr-modal { background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:16px; padding:24px; min-width:380px; max-width:480px; width:100%; }
+  .gr-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:999; padding:16px; }
+  .gr-modal { background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:16px; padding:24px; min-width:0; width:100%; max-width:480px; }
+  .gr-last-upd { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-secondary); font-family:var(--font-mono); }
+  .gr-last-upd svg { width:13px; height:13px; }
+  .gr-last-upd svg.spin, i.ti.spin { animation: gr-spin 1s linear infinite; display:inline-block; }
+  @keyframes gr-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  .gr-error-banner {
+    padding:10px 14px; border-radius:10px; background:var(--danger-subtle, rgba(239,68,68,.12));
+    color:var(--danger, #ef4444); font-size:12.5px; margin-bottom:14px; display:flex; align-items:center; gap:8px;
+  }
+  @media(max-width:640px){
+    .gr-kpis { grid-template-columns:1fr; }
+  }
 `
+
+const POLL_MS = 30000
 
 const ESTADOS_ETAPA = ['pendiente', 'en_curso', 'aprobada', 'rechazada'] as const
 
@@ -75,6 +88,9 @@ export default function GraduacionAdmin() {
   const [busquedaDebounced, setBusquedaDebounced] = useState('')
   const [modalCandidato, setModalCandidato] = useState<CandidatoGraduacion | null>(null)
   const [confirmando, setConfirmando] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [errorTabla, setErrorTabla] = useState('')
 
   // ── verificación por ID (flujo existente) ──
   const [mostrarVerificarId, setMostrarVerificarId] = useState(false)
@@ -93,7 +109,9 @@ export default function GraduacionAdmin() {
   const [loadingEtapa, setLoadingEtapa] = useState(false)
 
   useEffect(() => {
-    api.get<{ id: number; nombre: string }[]>('/carreras/').then(setCarreras).catch(() => {})
+    api.get<{ id: number; nombre: string }[]>('/carreras/').then(setCarreras).catch(() => {
+      emitToast('No se pudieron cargar las carreras', 'error')
+    })
   }, [])
 
   useEffect(() => {
@@ -101,20 +119,26 @@ export default function GraduacionAdmin() {
     return () => clearTimeout(t)
   }, [busqueda])
 
-  const cargarCandidatos = useCallback(() => {
-    setLoadingTabla(true)
+  const cargarCandidatos = useCallback((manual = false) => {
+    if (manual) setRefreshing(true)
+    else setLoadingTabla(true)
     getCandidatos({
       carrera_id: carreraFiltro ? Number(carreraFiltro) : undefined,
       q: busquedaDebounced || undefined,
       skip: (page - 1) * PAGE_SIZE,
       limit: PAGE_SIZE,
     })
-      .then(res => { setCandidatos(res.items); setTotal(res.total) })
-      .catch(() => {})
-      .finally(() => setLoadingTabla(false))
+      .then(res => { setCandidatos(res.items); setTotal(res.total); setErrorTabla(''); setLastUpdate(new Date()) })
+      .catch(() => setErrorTabla('No se pudieron cargar los candidatos. Mostrando el último dato disponible.'))
+      .finally(() => { setLoadingTabla(false); setRefreshing(false) })
   }, [page, carreraFiltro, busquedaDebounced])
 
   useEffect(() => { cargarCandidatos() }, [cargarCandidatos])
+
+  useEffect(() => {
+    const id = setInterval(() => cargarCandidatos(true), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargarCandidatos])
 
   const kpiElegibles = candidatos.filter(c => c.estado_candidato === 'elegible').length
   const kpiEnProceso = candidatos.filter(c => c.proceso_id && c.proceso_estado !== 'graduado').length
@@ -268,13 +292,31 @@ export default function GraduacionAdmin() {
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 className="gr-title" style={{ marginBottom: 4 }}>Graduación — Admin</h2>
+          <h2 className="gr-title" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <i className="ti ti-graduation-cap" style={{ color: 'var(--accent-bright)' }} />
+            Graduación — Admin
+          </h2>
           <p className="page-subtitle">Candidatos a graduación de todas las carreras.</p>
         </div>
-        <button type="button" className="btn-ghost" onClick={() => setMostrarVerificarId(v => !v)}>
-          <i className="ti ti-search" /> Verificar por ID
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {lastUpdate && (
+            <span className="gr-last-upd">
+              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" /></svg>
+              {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button type="button" className="btn-ghost" onClick={() => cargarCandidatos(true)} disabled={refreshing}>
+            <i className={`ti ti-refresh ${refreshing ? 'spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setMostrarVerificarId(v => !v)}>
+            <i className="ti ti-search" /> Verificar por ID
+          </button>
+        </div>
       </div>
+
+      {errorTabla && (
+        <div className="gr-error-banner"><i className="ti ti-alert-triangle" />{errorTabla}</div>
+      )}
 
       <div className="gr-kpis">
         <div className="kpi-card">
@@ -325,89 +367,14 @@ export default function GraduacionAdmin() {
           )}
 
           {proceso && (
-            <>
-              <div style={{ marginTop: 16, display:'flex', alignItems:'center', gap:12, fontSize:13 }}>
-                <strong>Proceso #{proceso.id}</strong>
-                <span className={`gr-badge ${['graduado', 'tesis_aprobada'].includes(proceso.estado) ? 'ok' : 'info'}`}>
-                  {proceso.estado}
-                </span>
-                {proceso.tutor_id && <span>Tutor ID: {proceso.tutor_id}</span>}
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <h3 className="gr-section-title">Asignar tutor</h3>
-                <div className="gr-label">ID del tutor (profesor)</div>
-                <div style={{display:'flex', gap:8}}>
-                  <input className="gr-input" type="number" value={tutorId}
-                    onChange={e => setTutorId(e.target.value)} placeholder="Ej: 15" style={{ marginBottom: 0 }} />
-                  <button className="gr-btn" onClick={handleAsignarTutor}
-                    disabled={loadingTutor || !tutorId}>Asignar Tutor</button>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <h3 className="gr-section-title">Actualizar etapa</h3>
-                {etapas.length > 0 ? (
-                  <>
-                    <div className="gr-label">Etapa</div>
-                    <select className="gr-select" value={etapaId}
-                      onChange={e => setEtapaId(e.target.value ? Number(e.target.value) : '')}>
-                      <option value="">Seleccionar etapa</option>
-                      {etapas.map(e => (
-                        <option key={e.id} value={e.id}>{e.nombre_etapa} ({e.estado})</option>
-                      ))}
-                    </select>
-                    <div className="gr-label">Nuevo estado</div>
-                    <select className="gr-select" value={etapaEstado}
-                      onChange={e => setEtapaEstado(e.target.value)}>
-                      {ESTADOS_ETAPA.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <div className="gr-label">Observaciones</div>
-                    <textarea className="gr-textarea" rows={2} value={etapaObservaciones}
-                      onChange={e => setEtapaObservaciones(e.target.value)}
-                      placeholder="Observaciones opcionales" />
-                    <button className="gr-btn" onClick={handleActualizarEtapa}
-                      disabled={loadingEtapa || etapaId === ''}>
-                      Actualizar etapa
-                    </button>
-                  </>
-                ) : (
-                  <p className="gr-placeholder">No hay etapas registradas para este proceso.</p>
-                )}
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <h3 className="gr-section-title">Documentos CONES</h3>
-                <p className="gr-placeholder">
-                  En desarrollo — Próximamente podrás consultar los documentos de CONES desde aquí.
-                </p>
-              </div>
-
-              {etapas.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <h3 className="gr-section-title">Historial del proceso</h3>
-                  <div className="gr-timeline">
-                    {etapas.map(e => (
-                      <div key={e.id}
-                        className={`gr-timeline-item ${e.estado === 'aprobada' ? 'complete' : ''} ${e.estado === 'rechazada' ? 'fail' : ''}`}>
-                        <div style={{fontWeight:600, fontSize:13}}>{e.nombre_etapa}</div>
-                        <div style={{fontSize:12, color:'var(--text-secondary)'}}>
-                          <span className={`gr-badge ${badgeClass(e.estado)}`}>{e.estado}</span>
-                          {e.fecha_limite && <span style={{marginLeft:8}}>Límite: {e.fecha_limite}</span>}
-                        </div>
-                        {e.observaciones && (
-                          <div style={{fontSize:11, color:'var(--text-secondary)', marginTop:4}}>
-                            {e.observaciones}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
+              <strong>Proceso #{proceso.id}</strong>
+              <span className={`gr-badge ${['graduado', 'tesis_aprobada'].includes(proceso.estado) ? 'ok' : 'info'}`}>
+                {proceso.estado}
+              </span>
+              {proceso.tutor_nombre && <span>Tutor: {proceso.tutor_nombre}</span>}
+              <span className="gr-placeholder" style={{ marginLeft: 'auto' }}>Gestión del proceso abajo ↓</span>
+            </div>
           )}
         </div>
       )}
@@ -468,6 +435,95 @@ export default function GraduacionAdmin() {
             </div>
           </div>
         </div>
+      )}
+
+      {proceso && (
+        <>
+          <div className="gr-card">
+            <div style={{display:'flex', alignItems:'center', gap:12, fontSize:13, flexWrap: 'wrap'}}>
+              <strong>Proceso #{proceso.id}</strong>
+              {proceso.alumno_nombre && <span className="mono-label">{proceso.alumno_nombre}</span>}
+              <span className={`gr-badge ${['graduado', 'tesis_aprobada'].includes(proceso.estado) ? 'ok' : 'info'}`}>
+                {proceso.estado}
+              </span>
+              {proceso.tutor_nombre && <span>Tutor: {proceso.tutor_nombre}</span>}
+            </div>
+          </div>
+
+          <div className="gr-card">
+            <h3 className="gr-section-title">Asignar tutor</h3>
+            <div className="gr-label">ID del tutor (profesor)</div>
+            <div style={{display:'flex', gap:8}}>
+              <input className="gr-input" type="number" value={tutorId}
+                onChange={e => setTutorId(e.target.value)} placeholder="Ej: 15" />
+              <button className="gr-btn" onClick={handleAsignarTutor}
+                disabled={loadingTutor || !tutorId}>Asignar Tutor</button>
+            </div>
+          </div>
+
+          <div className="gr-card">
+            <h3 className="gr-section-title">Actualizar etapa</h3>
+            {etapas.length > 0 ? (
+              <>
+                <div className="gr-label">Etapa</div>
+                <select className="gr-select" value={etapaId}
+                  onChange={e => setEtapaId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">Seleccionar etapa</option>
+                  {etapas.map(e => (
+                    <option key={e.id} value={e.id}>{e.nombre_etapa} ({e.estado})</option>
+                  ))}
+                </select>
+                <div className="gr-label">Nuevo estado</div>
+                <select className="gr-select" value={etapaEstado}
+                  onChange={e => setEtapaEstado(e.target.value)}>
+                  {ESTADOS_ETAPA.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <div className="gr-label">Observaciones</div>
+                <textarea className="gr-textarea" rows={2} value={etapaObservaciones}
+                  onChange={e => setEtapaObservaciones(e.target.value)}
+                  placeholder="Observaciones opcionales" />
+                <button className="gr-btn" onClick={handleActualizarEtapa}
+                  disabled={loadingEtapa || etapaId === ''}>
+                  Actualizar etapa
+                </button>
+              </>
+            ) : (
+              <p className="gr-placeholder">No hay etapas registradas para este proceso.</p>
+            )}
+          </div>
+
+          <div className="gr-card">
+            <h3 className="gr-section-title">Documentos CONES</h3>
+            <p className="gr-placeholder">
+              En desarrollo — Próximamente podrás consultar los documentos de CONES desde aquí.
+            </p>
+          </div>
+
+          {etapas.length > 0 && (
+            <div className="gr-card">
+              <h3 className="gr-section-title">Historial del proceso</h3>
+              <div className="gr-timeline">
+                {etapas.map(e => (
+                  <div key={e.id}
+                    className={`gr-timeline-item ${e.estado === 'aprobada' ? 'complete' : ''} ${e.estado === 'rechazada' ? 'fail' : ''}`}>
+                    <div style={{fontWeight:600, fontSize:13}}>{e.nombre_etapa}</div>
+                    <div style={{fontSize:12, color:'var(--text-secondary)'}}>
+                      <span className={`gr-badge ${badgeClass(e.estado)}`}>{e.estado}</span>
+                      {e.fecha_limite && <span style={{marginLeft:8}}>Límite: {e.fecha_limite}</span>}
+                    </div>
+                    {e.observaciones && (
+                      <div style={{fontSize:11, color:'var(--text-secondary)', marginTop:4}}>
+                        {e.observaciones}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

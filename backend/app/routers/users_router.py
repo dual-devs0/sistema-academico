@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import (
     APIRouter,
     Depends,
@@ -7,8 +8,8 @@ from fastapi import (
     File,
     Query,
 )
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 from app import models, schemas, database
 from app.security import hash_password
@@ -17,6 +18,53 @@ from app.models.refresh_token import RefreshToken
 from app.services.storage import subir_archivo, obtener_url_firmada
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/stats")
+def users_stats(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    U = models.user.User
+
+    role_counts = {
+        row.role: row.cnt
+        for row in db.query(U.role, func.count(U.id).label("cnt"))
+        .group_by(U.role)
+        .all()
+    }
+
+    total_becados = db.query(U).filter(U.es_becado.is_(True)).count()
+
+    now = datetime.now(timezone.utc)
+    six_months_ago = now.replace(month=now.month - 6 if now.month > 6 else now.month + 6, year=now.year - 1 if now.month <= 6 else now.year)
+
+    rows = (
+        db.query(
+            func.date_trunc("month", U.created_at).label("month"),
+            func.count(U.id).label("cnt"),
+        )
+        .filter(U.created_at >= six_months_ago)
+        .group_by(func.date_trunc("month", U.created_at))
+        .order_by(func.date_trunc("month", U.created_at))
+        .all()
+    )
+
+    crecimiento_mensual: list[dict] = []
+    for r in rows:
+        month_str = r.month.strftime("%Y-%m") if r.month else ""
+        crecimiento_mensual.append({"month": month_str, "count": r.cnt})
+
+    return {
+        "total_alumnos": role_counts.get("alumno", 0),
+        "total_profesores": role_counts.get("profesor", 0),
+        "total_admins": role_counts.get("admin", 0),
+        "total_becados": total_becados,
+        "crecimiento_mensual": crecimiento_mensual,
+    }
 
 
 @router.post("/", response_model=schemas.user.UserOut)
@@ -58,12 +106,69 @@ def get_me(
     return user
 
 
+@router.get("/{user_id}", response_model=schemas.user.UserOut)
+def get_user(
+    user_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return user
+
+
+@router.get("/{user_id}/materias")
+def get_user_materias(
+    user_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    O = models.oferta_materia.OfertaMateria
+    M = models.materia.Materia
+    C = models.carrera.Carrera
+
+    results = (
+        db.query(O, M, C)
+        .join(M, M.id == O.materia_id)
+        .outerjoin(C, C.id == M.carrera_id)
+        .filter(O.profesor_id == user_id)
+        .order_by(O.periodo.desc(), M.anio, M.semestre)
+        .all()
+    )
+
+    return [
+        {
+            "id": o.id,
+            "materia_id": m.id,
+            "materia_nombre": m.nombre,
+            "carrera_id": m.carrera_id,
+            "carrera_nombre": c.nombre if c else None,
+            "anio": m.anio,
+            "semestre": m.semestre,
+            "periodo": o.periodo,
+            "activa": o.activa,
+        }
+        for o, m, c in results
+    ]
+
+
 @router.get("/", response_model=schemas.user.UserListOut)
 def list_users(
     skip: int = 0,
     limit: int = 20,
     q: Optional[str] = Query(None),
     role: Optional[str] = Query(None),
+    es_becado: Optional[bool] = Query(None),
+    carrera_id: Optional[int] = Query(None),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -72,6 +177,10 @@ def list_users(
     query = db.query(models.user.User)
     if role:
         query = query.filter(models.user.User.role == role)
+    if es_becado is not None:
+        query = query.filter(models.user.User.es_becado.is_(True))
+    if carrera_id is not None:
+        query = query.filter(models.user.User.carrera_id == carrera_id)
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -108,6 +217,8 @@ async def upload_foto_perfil(
         .filter(models.user.User.id == current_user.user_id)
         .first()
     )
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     user.foto_url = key
     db.commit()
     return {"storage_key": key, "url": obtener_url_firmada(key)}

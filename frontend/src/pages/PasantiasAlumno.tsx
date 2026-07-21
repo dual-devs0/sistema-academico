@@ -1,10 +1,26 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { emitToast } from '../lib/api'
 import { solicitarPasantia, getEmpresas, getMisPasantias,
   type EmpresaReceptora, type Pasantia } from '../services/pasantiasService'
 
+const POLL_MS = 30000
+
 const css = `
-  .ps-title { font-size:22px; font-weight:800; margin-bottom:20px; color:var(--text-primary); }
+  .ps-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+  .ps-title { font-size:22px; font-weight:800; color:var(--text-primary); margin:0; }
+  .ps-last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+  .ps-last-upd svg { width:13px; height:13px; }
+  .ps-last-upd svg.spin { animation:ps-spin 1s linear infinite; }
+  @keyframes ps-spin { to{transform:rotate(360deg)} }
+  .ps-btn-refresh {
+    display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:9px;
+    background:transparent; border:1px solid var(--border-subtle); color:var(--text-secondary);
+    font-size:11.5px; font-weight:700; font-family:inherit; cursor:pointer; transition:border-color .15s,color .15s;
+  }
+  .ps-btn-refresh:hover { border-color:var(--accent-bright); color:var(--text-primary); }
+  .ps-btn-refresh:disabled { opacity:.5; cursor:not-allowed; }
+  .ps-btn-refresh svg { width:12px; height:12px; }
+  .ps-err-banner { display:flex; align-items:center; gap:8px; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25); color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12px; font-weight:600; margin-bottom:16px; }
   .ps-card {
     background:var(--bg-elevated); border:1px solid var(--border-subtle);
     border-radius:16px; padding:18px 22px; margin-bottom:12px;
@@ -39,13 +55,35 @@ export default function PasantiasAlumno() {
   const [fechaInicio, setFechaInicio] = useState('')
   const [horas, setHoras] = useState(200)
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [error, setError] = useState('')
+  const firstLoad = useRef(true)
 
-  const cargar = () => {
-    getEmpresas().then(setEmpresas).catch(() => emitToast('Error cargando empresas', 'error'))
-    getMisPasantias().then(setPasantias).catch(() => {})
-  }
+  const cargar = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true)
+    const [empRes, pasRes] = await Promise.allSettled([getEmpresas(), getMisPasantias()])
+    const fails: string[] = []
+    if (empRes.status === 'fulfilled') setEmpresas(empRes.value)
+    else fails.push('empresas')
+    if (pasRes.status === 'fulfilled') setPasantias(pasRes.value)
+    else fails.push('pasantías')
+    if (fails.length) {
+      setError(`No se pudieron cargar: ${fails.join(', ')}. Mostrando último dato disponible.`)
+      if (firstLoad.current) emitToast('Error cargando datos de pasantías', 'error')
+    } else {
+      setError('')
+    }
+    setLastUpdate(new Date())
+    setRefreshing(false)
+    firstLoad.current = false
+  }, [])
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const activa = pasantias.find(p => p.estado !== 'rechazada')
 
@@ -68,7 +106,28 @@ export default function PasantiasAlumno() {
   return (
     <div>
       <style>{css}</style>
-      <h2 className="ps-title">Mis Pasantías</h2>
+      <div className="ps-header">
+        <h2 className="ps-title">Mis Pasantías</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastUpdate && (
+            <span className="ps-last-upd">
+              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button className="ps-btn-refresh" onClick={() => cargar(true)} disabled={refreshing}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="ps-err-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14, flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {error}
+        </div>
+      )}
 
       <div className="ps-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>

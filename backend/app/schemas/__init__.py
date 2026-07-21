@@ -1,7 +1,7 @@
 from . import users_schemas as user
-from . import materia_shemas as materia
+from . import materia_schema as materia
 from . import oferta_materia_schema as oferta_materia
-from . import inscripcion_shemas as inscripcion
+from . import inscripcion_schema as inscripcion
 from . import carrera_schema as carrera
 from . import asistencia_schema as asistencia
 from . import puntaje_schema as puntaje
@@ -18,6 +18,7 @@ from . import pasantia
 from . import graduacion
 from . import equivalencia
 from . import examen_schema as examen
+from . import tramites
 
 __all__ = [
     "user",
@@ -40,4 +41,5 @@ __all__ = [
     "graduacion",
     "equivalencia",
     "examen",
+    "tramites",
 ]

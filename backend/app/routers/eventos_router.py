@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app import models, schemas, database
 from app.dependencias import get_current_user
@@ -137,10 +137,11 @@ def list_eventos(
     if current_user.role == "alumno":
         inscripciones = (
             db.query(models.inscripcion.Inscripcion)
+            .options(joinedload(models.inscripcion.Inscripcion.oferta))
             .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
-        materia_ids = {i.oferta.materia_id for i in inscripciones}
+        materia_ids = {i.oferta.materia_id for i in inscripciones if i.oferta}
         from sqlalchemy import or_
 
         if materia_ids:
@@ -294,10 +295,11 @@ def eventos_mes(
     if current_user.role == "alumno":
         inscripciones = (
             db.query(models.inscripcion.Inscripcion)
+            .options(joinedload(models.inscripcion.Inscripcion.oferta))
             .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
-        materia_ids = {i.oferta.materia_id for i in inscripciones}
+        materia_ids = {i.oferta.materia_id for i in inscripciones if i.oferta}
 
         from sqlalchemy import or_
 
@@ -334,10 +336,11 @@ def eventos_dia(
     if current_user.role == "alumno":
         inscripciones = (
             db.query(models.inscripcion.Inscripcion)
+            .options(joinedload(models.inscripcion.Inscripcion.oferta))
             .filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
             .all()
         )
-        materia_ids = {i.oferta.materia_id for i in inscripciones}
+        materia_ids = {i.oferta.materia_id for i in inscripciones if i.oferta}
         from sqlalchemy import or_
 
         query = query.filter(

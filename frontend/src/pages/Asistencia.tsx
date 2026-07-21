@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, decodeToken, getCurrentUser, getAccessToken } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 import QRModal from '../components/QRModal'
 

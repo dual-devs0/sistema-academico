@@ -1,17 +1,20 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, UniqueConstraint
+from decimal import Decimal
+from typing import Optional
+from sqlalchemy import Integer, String, Numeric, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
 class ExpedienteSemestre(Base):
     __tablename__ = "expediente_semestres"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    periodo = Column(String(10), nullable=False)
-    ppa_periodo = Column(Numeric(5, 2), nullable=True)
-    creditos_periodo = Column(Integer, nullable=False, default=0)
-    materias_aprobadas = Column(Integer, nullable=False, default=0)
-    materias_reprobadas = Column(Integer, nullable=False, default=0)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    periodo: Mapped[str] = mapped_column(String(10), nullable=False)
+    ppa_periodo: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    creditos_periodo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    materias_aprobadas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    materias_reprobadas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     __table_args__ = (
         UniqueConstraint(

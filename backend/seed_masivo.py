@@ -4,8 +4,10 @@ Uso: python seed_masivo.py
 """
 import sys, random, time as time_mod
 from datetime import date, timedelta, time
+from io import TextIOWrapper
 
-sys.stdout.reconfigure(encoding="utf-8")
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8")
 print = lambda *a, **kw: (__builtins__.print(*a, **kw) or sys.stdout.flush())
 t0 = time_mod.time()
 def elapsed():
@@ -34,7 +36,7 @@ def bulk_ignore(tbl, rows):
     """Insert batch ignoring conflicts (PostgreSQL + SQLite)."""
     if not rows:
         return
-    if db.bind.dialect.name == "postgresql":
+    if db.get_bind().dialect.name == "postgresql":
         db.execute(pg_insert(tbl).values(rows).on_conflict_do_nothing())
     else:
         db.execute(tbl.insert().prefix_with("OR IGNORE"), rows)
@@ -284,7 +286,7 @@ print(f"{elapsed()} Cuotas: {c_count}")
 # ── FIN ──
 db.close()
 print(f"\n{'='*50}")
-print(f"SEED MASIVO COMPLETADO en {time.time()-t0:.0f}s")
+print(f"SEED MASIVO COMPLETADO en {time_mod.time()-t0:.0f}s")
 print(f"{'='*50}")
 print(f"  Director --> director@uca.edu.py / Director1234!")
 print(f"  Profesor  --> prof01@uca.edu.py  / Profesor1234! (prof01..prof20)")

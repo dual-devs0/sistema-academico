@@ -35,7 +35,7 @@ class FuenteBecaOut(BaseModel):
 class BecaCatalogoCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=200)
     fuente_id: int
-    porcentaje_descuento: Decimal = Field(..., ge=0, le=100)
+    porcentaje_descuento: Decimal = Field(..., ge=Decimal("0"), le=Decimal("100"))
     monto_fijo: Optional[Decimal] = None
     requisitos: Optional[str] = None
     cupos_totales: Optional[int] = None
@@ -114,8 +114,15 @@ class BecaActivaOut(BaseModel):
 class ConceptoArancelCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=200)
     carrera_id: Optional[int] = None
-    monto_base: Decimal = Field(..., gt=0)
+    monto_base: Decimal = Field(..., gt=Decimal("0"))
     periodicidad: str = Field(default="mensual", max_length=80)
+
+
+class ConceptoArancelUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=2, max_length=200)
+    monto_base: Optional[Decimal] = Field(None, gt=Decimal("0"))
+    periodicidad: Optional[str] = Field(None, max_length=80)
+    activo: Optional[bool] = None
 
 
 class ConceptoArancelOut(BaseModel):
@@ -172,7 +179,7 @@ class CuotaOut(BaseModel):
 
 class PagoCreate(BaseModel):
     cuota_id: int
-    monto_pagado: Decimal = Field(..., gt=0)
+    monto_pagado: Decimal = Field(..., gt=Decimal("0"))
     metodo: str = Field(
         ..., pattern="^(transferencia|efectivo|cheque|tarjeta|deposito)$"
     )
@@ -299,3 +306,16 @@ class PagoOnlineOut(BaseModel):
     creado_en: Optional[datetime]
 
     model_config = {"from_attributes": True}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# RESUMEN — KPIs del panel financiero admin
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class FinanzasResumenOut(BaseModel):
+    total_recaudado: Decimal
+    cuotas_pendientes: int
+    cuotas_vencidas: int
+    becas_activas: int
+    comprobantes_pendientes: int

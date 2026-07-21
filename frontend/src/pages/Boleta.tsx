@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, getCurrentUser, getAccessToken, emitToast } from '../lib/api'
+import { api, getCurrentUser, emitToast } from '../lib/api'
 
 type NotaRow = {
   materia_id: number; materia_nombre: string
@@ -110,15 +110,8 @@ export default function Boleta() {
     if (!selId) return
     setDescargando(true)
     try {
-      const token = getAccessToken()
-      const res = await fetch(`/api/boleta/${selId}`, { headers: { Authorization: `Bearer ${token}` } })
-      if (!res.ok) throw new Error('No se pudo generar la boleta')
-      const blob = await res.blob()
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `boleta_${resumen?.alumno.nombre?.replace(/\s/g, '_') || selId}.pdf`
-      a.click()
-      URL.revokeObjectURL(a.href)
+      const filename = `boleta_${resumen?.alumno.nombre?.replace(/\s/g, '_') || selId}.pdf`
+      await api.download(`/boleta/${selId}`, filename)
       emitToast('Boleta descargada')
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al descargar', 'error')

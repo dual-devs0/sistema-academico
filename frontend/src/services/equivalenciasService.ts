@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 export interface SolicitudEquivalencia {
   id: number
   alumno_id: number
+  alumno_nombre?: string | null
   tipo: string
   universidad_origen: string | null
   estado: string

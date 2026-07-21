@@ -2,8 +2,9 @@
 Modelos SQLAlchemy — Fase 5B: Graduación y tesis.
 """
 
+from datetime import date, datetime, timezone
+from typing import Optional
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Boolean,
@@ -13,21 +14,20 @@ from sqlalchemy import (
     ForeignKey,
     CheckConstraint,
 )
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
 class ProcesoGraduacion(Base):
     __tablename__ = "procesos_graduacion"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    fecha_inicio = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    fecha_inicio: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    estado = Column(String(20), nullable=False, default="en_proceso")
-    tutor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="en_proceso")
+    tutor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -46,12 +46,12 @@ class ProcesoGraduacion(Base):
 class EtapaTesis(Base):
     __tablename__ = "etapas_tesis"
 
-    id = Column(Integer, primary_key=True, index=True)
-    proceso_id = Column(Integer, ForeignKey("procesos_graduacion.id"), nullable=False)
-    nombre_etapa = Column(String(200), nullable=False)
-    fecha_limite = Column(Date, nullable=True)
-    estado = Column(String(20), nullable=False, default="pendiente")
-    observaciones = Column(Text, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    proceso_id: Mapped[int] = mapped_column(Integer, ForeignKey("procesos_graduacion.id"), nullable=False)
+    nombre_etapa: Mapped[str] = mapped_column(String(200), nullable=False)
+    fecha_limite: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    observaciones: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -66,11 +66,11 @@ class EtapaTesis(Base):
 class VerificacionSolvencia(Base):
     __tablename__ = "verificacion_solvencia"
 
-    id = Column(Integer, primary_key=True, index=True)
-    proceso_id = Column(Integer, ForeignKey("procesos_graduacion.id"), nullable=False)
-    solvencia_financiera = Column(Boolean, nullable=False, default=False)
-    solvencia_biblioteca = Column(Boolean, nullable=False, default=False)
-    fecha_verificacion = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    proceso_id: Mapped[int] = mapped_column(Integer, ForeignKey("procesos_graduacion.id"), nullable=False)
+    solvencia_financiera: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    solvencia_biblioteca: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    fecha_verificacion: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 

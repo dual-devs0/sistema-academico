@@ -113,6 +113,7 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
   );
 }
 
+// AUDIT-FIX M-1: función duplicada eliminada post-merge
 function ThemeStatusBar() {
   const { effective } = useTheme();
   return <StatusBar style={effective === "dark" ? "light" : "dark"} />;

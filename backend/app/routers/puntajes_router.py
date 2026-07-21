@@ -6,6 +6,8 @@ from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_materia
 from app.services.puntajes_utils import PESOS, calcular_promedio_final
+# AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
+from app.routers.asistencias_router import _oferta_activa_id
 
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
 
@@ -101,10 +103,10 @@ def create_puntaje(
     if target and target.email and materia:
         send_new_grade_email_bg(
             background_tasks,
-            target.email,
-            target.nombre or target.username,
-            materia.nombre,
-            puntaje.tipo,
+            str(target.email),
+            str(target.nombre or target.username),
+            str(materia.nombre),
+            str(puntaje.tipo),
             puntaje.valor,
         )
 
@@ -162,7 +164,10 @@ def update_puntaje(
         raise HTTPException(status_code=404, detail="Puntaje no encontrado")
     # Verify profesor owns this materia
     if current_user.role == "profesor":
-        if not es_profesor_de_materia(db, existing.materia_id, current_user.user_id):
+        mid: int | None = existing.materia_id
+        if mid is None:
+            raise HTTPException(status_code=400, detail="Materia no asociada al puntaje")
+        if not es_profesor_de_materia(db, mid, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -174,7 +179,7 @@ def update_puntaje(
             raise HTTPException(
                 status_code=404, detail="No hay oferta activa para esta materia"
             )
-        existing.oferta_materia_id = nuevo_oferta_id
+        setattr(existing, 'oferta_materia_id', nuevo_oferta_id)
     for key, value in data.items():
         setattr(existing, key, value)
     existing.editado_por = user.id
@@ -195,11 +200,11 @@ def update_puntaje(
     if target and target.email and materia:
         send_new_grade_email_bg(
             background_tasks,
-            target.email,
-            target.nombre or target.username,
-            materia.nombre,
-            existing.tipo,
-            existing.valor,
+            str(target.email),
+            str(target.nombre or target.username),
+            str(materia.nombre),
+            str(existing.tipo),
+            float(str(existing.valor)),
         )
 
     return existing
@@ -222,7 +227,10 @@ def delete_puntaje(
         raise HTTPException(status_code=404, detail="Puntaje no encontrado")
     # Verify profesor owns this materia
     if current_user.role == "profesor":
-        if not es_profesor_de_materia(db, existing.materia_id, current_user.user_id):
+        mid: int | None = existing.materia_id
+        if mid is None:
+            raise HTTPException(status_code=400, detail="Materia no asociada al puntaje")
+        if not es_profesor_de_materia(db, mid, current_user.user_id):
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
@@ -294,12 +302,13 @@ def promedio_final_alumno(
         query = query.filter(models.puntaje.Puntaje.oferta_materia_id == oferta_id)
     puntajes = query.all()
 
-    notas = {"parcial1": None, "parcial2": None, "practico": None, "final": None}
+    notas: dict[str, float | None] = {"parcial1": None, "parcial2": None, "practico": None, "final": None}
     for p in puntajes:
-        notas[p.tipo] = float(p.valor)
+        notas[str(p.tipo)] = float(str(p.valor))
 
     alumno = db.query(models.user.User).filter(models.user.User.id == user_id).first()
-    nombre = alumno.nombre if alumno else ""
+    nombre_val: str | None = getattr(alumno, 'nombre', None) if alumno else None
+    nombre: str = nombre_val if nombre_val else ""
     prom = calcular_promedio_final(notas)
 
     return schemas.puntaje.PromedioFinalOut(
@@ -358,7 +367,7 @@ def exportar_materia(
         asist_pct = round((pres / tot) * 100, 1) if tot > 0 else None
         alumnos_out.append(schemas.puntaje.AlumnoExportRow(user_id=uid, **data, promedio=prom, asistencia_pct=asist_pct))
 
-    return schemas.puntaje.ExportacionMateriaOut(materia_id=materia_id, materia_nombre=materia.nombre, alumnos=alumnos_out)
+    return schemas.puntaje.ExportacionMateriaOut(materia_id=materia_id, materia_nombre=str(materia.nombre), alumnos=alumnos_out)
 
 
 @router.get("/materia/{materia_id}/estadisticas")
@@ -434,7 +443,7 @@ def promedio_puntajes(
     )
     if not puntajes:
         raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
-    valores = [float(p.valor) for p in puntajes]
+    valores = [float(str(p.valor)) for p in puntajes]
     promedio = round(sum(valores) / len(valores), 2)
     return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
     

@@ -25,7 +25,10 @@ class SolicitudCreate(BaseModel):
 class SolicitudOut(BaseModel):
     id: int
     alumno_id: int
+    alumno_nombre: Optional[str] = None
+    alumno_username: Optional[str] = None
     tipo_tramite_id: int
+    tipo_tramite_nombre: Optional[str] = None
     estado: str
     fecha_solicitud: datetime
     fecha_resolucion: Optional[datetime]
@@ -39,3 +42,11 @@ class SolicitudOut(BaseModel):
 class SolicitudResolverRequest(BaseModel):
     estado: Literal["resuelta", "rechazada"]
     motivo_rechazo: Optional[str] = None
+
+
+class TramitesStatsOut(BaseModel):
+    total: int
+    pendientes: int
+    en_proceso: int
+    resueltas: int
+    rechazadas: int

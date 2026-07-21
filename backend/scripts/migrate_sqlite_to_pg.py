@@ -110,69 +110,69 @@ def migrate():
 
     try:
         with pg_engine.begin() as pg_conn:
-        pg_insp = inspect(pg_engine)
-        existing_tables = pg_insp.get_table_names()
+            pg_insp = inspect(pg_engine)
+            existing_tables = pg_insp.get_table_names()
 
-        sqlite_tables = {
-            r[0]
-            for r in sqlite_conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+            sqlite_tables = {
+                r[0]
+                for r in sqlite_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
 
-        for table in TABLE_ORDER:
-            if table not in existing_tables:
-                print(f"  SKIP {table} (no existe en PG aún)")
-                continue
-            if table not in sqlite_tables:
-                print(f"  SKIP {table} (no existe en SQLite — tabla nueva)")
-                continue
+            for table in TABLE_ORDER:
+                if table not in existing_tables:
+                    print(f"  SKIP {table} (no existe en PG aún)")
+                    continue
+                if table not in sqlite_tables:
+                    print(f"  SKIP {table} (no existe en SQLite — tabla nueva)")
+                    continue
 
-            rows = sqlite_conn.execute(f"SELECT * FROM {table}").fetchall()  # noqa: S608
-            if not rows:
-                print(f"  SKIP {table} (vacía en SQLite)")
-                continue
+                rows = sqlite_conn.execute(f"SELECT * FROM {table}").fetchall()  # noqa: S608
+                if not rows:
+                    print(f"  SKIP {table} (vacía en SQLite)")
+                    continue
 
-            pg_cols = get_columns(pg_engine, table)
-            sqlite_cols = list(rows[0].keys())
-            common_cols = [c for c in sqlite_cols if c in pg_cols]
-            col_list = ", ".join(f'"{c}"' for c in common_cols)
-            placeholders = ", ".join(f":{c}" for c in common_cols)
+                pg_cols = get_columns(pg_engine, table)
+                sqlite_cols = list(rows[0].keys())
+                common_cols = [c for c in sqlite_cols if c in pg_cols]
+                col_list = ", ".join(f'"{c}"' for c in common_cols)
+                placeholders = ", ".join(f":{c}" for c in common_cols)
 
-            # Borrar destino antes de insertar (orden inverso no necesario — truncate cascade)  # noqa: E501
-            pg_conn.execute(text(f'DELETE FROM "{table}"'))
+                # Borrar destino antes de insertar (orden inverso no necesario — truncate cascade)  # noqa: E501
+                pg_conn.execute(text(f'DELETE FROM "{table}"'))
 
-            bool_cols = get_bool_cols(pg_engine, table)
-            dt_cols = get_datetime_cols(pg_engine, table)
-            records = [
-                coerce_row(
-                    dict(zip(common_cols, [row[c] for c in common_cols])),
-                    bool_cols,
-                    dt_cols,
-                )
-                for row in rows
-            ]
-            pg_conn.execute(
-                text(f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})'),
-                records,
-            )
-            print(f"  OK  {table}: {len(records)} filas")
-
-        # Resetear sequences de PG para que auto-increment no colisione.
-        # Solo tablas con columna 'id' serial (no alembic_version ni join tables).
-        for table in existing_tables:
-            has_id = any(c["name"] == "id" for c in pg_insp.get_columns(table))
-            if not has_id:
-                continue
-            try:
-                pg_conn.execute(
-                    text(
-                        f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
-                        f'COALESCE(MAX(id), 1)) FROM "{table}"'
+                bool_cols = get_bool_cols(pg_engine, table)
+                dt_cols = get_datetime_cols(pg_engine, table)
+                records = [
+                    coerce_row(
+                        dict(zip(common_cols, [row[c] for c in common_cols])),
+                        bool_cols,
+                        dt_cols,
                     )
+                    for row in rows
+                ]
+                pg_conn.execute(
+                    text(f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})'),
+                    records,
                 )
-            except Exception as exc:
-                print(f"  AVISO: no se pudo resetear sequence para {table}: {exc}")
+                print(f"  OK  {table}: {len(records)} filas")
+
+            # Resetear sequences de PG para que auto-increment no colisione.
+            # Solo tablas con columna 'id' serial (no alembic_version ni join tables).
+            for table in existing_tables:
+                has_id = any(c["name"] == "id" for c in pg_insp.get_columns(table))
+                if not has_id:
+                    continue
+                try:
+                    pg_conn.execute(
+                        text(
+                            f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                            f'COALESCE(MAX(id), 1)) FROM "{table}"'
+                        )
+                    )
+                except Exception as exc:
+                    print(f"  AVISO: no se pudo resetear sequence para {table}: {exc}")
 
     finally:
         sqlite_conn.close()

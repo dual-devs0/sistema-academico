@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../lib/api'
 
 interface CarreraStats {
@@ -25,12 +25,35 @@ interface BecadoUser {
   role: string
 }
 
-const MOCK_RESUMEN: Resumen = { total_alumnos:245, total_becados:87, total_materias:18, total_profesores:12 }
-const MOCK_CARRERAS: CarreraStats[] = [
-  { carrera:'Ing. Informática', total_alumnos:125, asistencia_pct:89, aprobados_pct:92, en_riesgo:10 },
-  { carrera:'Ing. Civil',       total_alumnos:80,  asistencia_pct:85, aprobados_pct:88, en_riesgo:8  },
-  { carrera:'Arquitectura',     total_alumnos:40,  asistencia_pct:91, aprobados_pct:94, en_riesgo:3  },
-]
+interface MateriaStat {
+  materia_id: number
+  materia_nombre: string
+  total_alumnos: number
+  total_notas: number
+  promedio_grupo: number
+  aprobados: number
+  en_riesgo: number
+}
+
+interface AsistenciaMateria {
+  materia_id: number
+  materia_nombre: string
+  asistencia_pct: number
+}
+
+interface Alerta {
+  user_id: number
+  nombre: string
+  inasistencia_pct: number
+  promedio: number | null
+}
+
+interface DashboardResp {
+  kpis: { promedio_general: number; aprobacion_pct: number; asistencia_pct: number; alumnos_activos: number }
+  materias: MateriaStat[]
+  asistencia_por_materia: AsistenciaMateria[]
+  alertas: Alerta[]
+}
 
 const CYAN   = 'var(--accent)'
 const GREEN  = '#22c55e'
@@ -38,14 +61,14 @@ const YELLOW = '#f59e0b'
 const RED    = '#ef4444'
 const PURPLE = '#a855f7'
 const BLUE   = '#3b82f6'
+const POLL_MS = 30000
 
-const reportes = [
-  { id:1, titulo:'Reporte de asistencia general',  descripcion:'Asistencia de todos los alumnos por materia y fecha', tipo:'asistencia', generado:'2026-06-20' },
-  { id:2, titulo:'Reporte de puntajes por carrera', descripcion:'Promedios y distribución de notas por carrera',       tipo:'puntajes',   generado:'2026-06-20' },
-  { id:3, titulo:'Reporte de alumnos becados',      descripcion:'Lista completa de alumnos con beca activa',           tipo:'becados',    generado:'2026-06-19' },
-  { id:4, titulo:'Reporte de materias y docentes',  descripcion:'Materias activas con profesor asignado y cantidad',   tipo:'materias',   generado:'2026-06-18' },
+const reportesCfg = [
+  { id:1, titulo:'Reporte de asistencia general',  descripcion:'Asistencia de alumnos por carrera',            tipo:'asistencia' as const },
+  { id:2, titulo:'Reporte de puntajes por materia', descripcion:'Promedios, aprobados y en riesgo por materia', tipo:'puntajes'   as const },
+  { id:3, titulo:'Reporte de alumnos becados',      descripcion:'Lista completa de alumnos con beca activa',    tipo:'becados'    as const },
+  { id:4, titulo:'Reporte de materias',             descripcion:'Alumnos, asistencia y promedio por materia',   tipo:'materias'   as const },
 ]
-
 
 const tipoCfg: Record<string,{color:string;bg:string;label:string}> = {
   asistencia: { color:GREEN,  bg:'#22c55e15', label:'Asistencia' },
@@ -58,18 +81,47 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
-function buildReportePdfHtml(tipo: string, carrerasData: CarreraStats[], res: Resumen): string {
-  const r   = reportes.find(x=>x.tipo===tipo)!
+function buildReportePdfHtml(
+  tipo: string,
+  carrerasData: CarreraStats[],
+  materiasData: MateriaStat[],
+  becadosData: BecadoUser[],
+  res: Resumen,
+  generadoAt: Date,
+): string {
+  const r   = reportesCfg.find(x=>x.tipo===tipo)!
   const cfg = tipoCfg[tipo]
   const fecha = new Date().toLocaleDateString('es-PY',{day:'2-digit',month:'long',year:'numeric'})
+  const generadoStr = generadoAt.toLocaleString('es-PY',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
 
-  const filas = carrerasData.map(c=>`<tr>
-    <td style="font-weight:600;color:#1e293b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(c.carrera)}</td>
-    <td style="text-align:center;color:#64748b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.total_alumnos}</td>
-    <td style="text-align:center;font-weight:700;color:#16a34a;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.asistencia_pct}%</td>
-    <td style="text-align:center;font-weight:700;color:#0284c7;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.aprobados_pct}%</td>
-    <td style="text-align:center;font-weight:700;color:#dc2626;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.en_riesgo}</td>
-  </tr>`).join('')
+  let head = ''
+  let filas = ''
+  if (tipo === 'asistencia') {
+    head = `<th>Carrera</th><th class="c">Alumnos</th><th class="c">Asistencia</th><th class="c">Aprobados</th><th class="c">En riesgo</th>`
+    filas = carrerasData.map(c=>`<tr>
+      <td style="font-weight:600;color:#1e293b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(c.carrera)}</td>
+      <td style="text-align:center;color:#64748b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.total_alumnos}</td>
+      <td style="text-align:center;font-weight:700;color:#16a34a;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.asistencia_pct}%</td>
+      <td style="text-align:center;font-weight:700;color:#0284c7;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.aprobados_pct}%</td>
+      <td style="text-align:center;font-weight:700;color:#dc2626;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${c.en_riesgo}</td>
+    </tr>`).join('')
+  } else if (tipo === 'puntajes' || tipo === 'materias') {
+    head = `<th>Materia</th><th class="c">Alumnos</th><th class="c">Promedio</th><th class="c">Aprobados</th><th class="c">En riesgo</th>`
+    filas = materiasData.map(m=>`<tr>
+      <td style="font-weight:600;color:#1e293b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(m.materia_nombre)}</td>
+      <td style="text-align:center;color:#64748b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${m.total_alumnos}</td>
+      <td style="text-align:center;font-weight:700;color:#0284c7;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${m.promedio_grupo}</td>
+      <td style="text-align:center;font-weight:700;color:#16a34a;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${m.aprobados}</td>
+      <td style="text-align:center;font-weight:700;color:#dc2626;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${m.en_riesgo}</td>
+    </tr>`).join('')
+  } else {
+    head = `<th>Nombre</th><th>Usuario</th><th>Email</th>`
+    filas = becadosData.map(u=>`<tr>
+      <td style="font-weight:600;color:#1e293b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(u.nombre || u.username)}</td>
+      <td style="color:#64748b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(u.username)}</td>
+      <td style="color:#64748b;padding:11px 16px;border-bottom:1px solid #f1f5f9;">${escapeHtml(u.email || '—')}</td>
+    </tr>`).join('')
+  }
 
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
 <style>
@@ -94,11 +146,6 @@ function buildReportePdfHtml(tipo: string, carrerasData: CarreraStats[], res: Re
   table{width:100%;border-collapse:collapse;}
   thead th{padding:9px 16px;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;text-align:left;border-bottom:2px solid #e2e8f0;background:#f8fafc;}
   thead th.c{text-align:center;}
-  .rep-list{padding:14px 28px 20px;}
-  .rep-row{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;}
-  .rep-dot{width:10px;height:10px;border-radius:50%;background:${cfg.color};flex-shrink:0;margin-top:3px;}
-  .rep-t{font-size:13px;font-weight:600;color:#1e293b;}
-  .rep-d{font-size:11px;color:#64748b;margin-top:2px;}
   .foot{display:flex;align-items:center;justify-content:space-between;padding:10px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;}
   .foot span{font-size:10px;color:#94a3b8;}
 </style>
@@ -113,7 +160,7 @@ function buildReportePdfHtml(tipo: string, carrerasData: CarreraStats[], res: Re
 <div class="meta">
   <div class="mi"><div class="ml">Reporte</div><div class="mc">${r.titulo}</div></div>
   <div class="mi"><div class="ml">Descripción</div><div class="mv">${r.descripcion}</div></div>
-  <div class="mi"><div class="ml">Generado</div><div class="mv">${new Date(r.generado+'T00:00:00').toLocaleDateString('es-PY')}</div></div>
+  <div class="mi"><div class="ml">Datos actualizados</div><div class="mv">${generadoStr}</div></div>
 </div>
 <div class="kpi-row">
   <div class="kpi"><div class="kpi-v" style="color:var(--accent);">${res.total_alumnos}</div><div class="kpi-l">Total alumnos</div></div>
@@ -121,15 +168,11 @@ function buildReportePdfHtml(tipo: string, carrerasData: CarreraStats[], res: Re
   <div class="kpi"><div class="kpi-v" style="color:#a855f7;">${res.total_materias}</div><div class="kpi-l">Materias</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#f59e0b;">${res.total_profesores}</div><div class="kpi-l">Docentes</div></div>
 </div>
-<div class="sec">Resumen por carrera</div>
+<div class="sec">${r.titulo}</div>
 <table>
-  <thead><tr><th>Carrera</th><th class="c">Alumnos</th><th class="c">Asistencia</th><th class="c">Aprobados</th><th class="c">En riesgo</th></tr></thead>
-  <tbody>${filas}</tbody>
+  <thead><tr>${head}</tr></thead>
+  <tbody>${filas || `<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">Sin datos</td></tr>`}</tbody>
 </table>
-<div class="sec" style="margin-top:12px;">Reportes incluidos</div>
-<div class="rep-list">
-  ${reportes.map(x=>`<div class="rep-row"><div class="rep-dot"></div><div><div class="rep-t">${x.titulo}</div><div class="rep-d">${x.descripcion}</div></div></div>`).join('')}
-</div>
 <div class="foot">
   <span>Documento generado por el Sistema Académico UCA · Uso oficial</span>
   <span>Semestre 1 · 2026</span>
@@ -153,13 +196,21 @@ const css = `
   .rep-root { display:flex; flex-direction:column; flex:1; font-family:'Inter',system-ui,sans-serif; color:var(--text-primary); }
 
   .topbar {
-    display:flex; align-items:center; padding:0 24px; height:56px;
+    display:flex; align-items:center; justify-content:space-between; padding:0 24px; height:56px;
     border-bottom:1px solid #2a3040; background:var(--bg-base);
-    position:sticky; top:0; z-index:20; flex-shrink:0;
+    position:sticky; top:-24px; z-index:20; flex-shrink:0;
+    margin:-24px -24px 0; width:calc(100% + 48px);
   }
   .topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; }
+  .topbar-r { display:flex; align-items:center; gap:10px; }
+  .last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+  .last-upd svg { width:13px; height:13px; }
+  .last-upd svg.spin { animation:spin 1s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
 
   .content { padding:20px 24px; flex:1; overflow-y:auto; }
+
+  .err-banner { display:flex; align-items:center; gap:8px; background:#ef444415; border:1px solid #ef444440; color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12px; font-weight:600; margin-bottom:16px; }
 
   /* KPIs */
   .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
@@ -182,16 +233,20 @@ const css = `
   .card-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 18px 12px; border-bottom:1px solid #2a3040; }
   .card-hdr h3 { font-size:13px; font-weight:700; color:var(--text-primary); }
   .card-hdr p  { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .card.full { grid-column:1 / -1; }
 
   /* Botones */
   .btn-primary { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:var(--accent); border:none; border-radius:9px; color:#000; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
   .btn-primary:hover { opacity:.85; }
+  .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
   .btn-primary svg { width:12px; height:12px; }
   .btn-ghost  { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; background:transparent; border:1px solid var(--border-light); border-radius:8px; color:var(--text-secondary); font-size:11px; font-weight:600; font-family:inherit; cursor:pointer; white-space:nowrap; transition:border-color .15s,color .15s; }
   .btn-ghost:hover { border-color:var(--text-muted); color:var(--text-primary); }
+  .btn-ghost:disabled { opacity:.5; cursor:not-allowed; }
   .btn-ghost svg { width:11px; height:11px; }
   .btn-export { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; background:var(--accent-muted); border:1px solid var(--accent-hover); border-radius:8px; color:var(--accent); font-size:11px; font-weight:700; font-family:inherit; cursor:pointer; white-space:nowrap; transition:background .15s; }
   .btn-export:hover { background:var(--accent-muted); }
+  .btn-export:disabled { opacity:.5; cursor:not-allowed; }
   .btn-export svg { width:11px; height:11px; }
 
   /* Reporte item desktop */
@@ -225,6 +280,24 @@ const css = `
   .distrib-bar { flex:1; height:6px; background:#2a3040; border-radius:3px; overflow:hidden; }
   .distrib-fill { height:100%; border-radius:3px; }
   .distrib-pct { font-size:12px; font-weight:700; color:var(--accent); width:36px; text-align:right; }
+
+  /* Alertas de riesgo */
+  .alert-row { display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:1px solid #2a304022; }
+  .alert-row:last-child { border-bottom:none; }
+  .alert-badge { width:30px; height:30px; border-radius:9px; background:#ef444418; color:#ef4444; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .alert-badge svg { width:14px; height:14px; }
+  .alert-name { font-size:12.5px; font-weight:600; color:var(--text-primary); }
+  .alert-sub  { font-size:10.5px; color:var(--text-muted); margin-top:1px; }
+  .alert-pct  { font-size:13px; font-weight:800; color:#ef4444; margin-left:auto; }
+
+  /* Export RUE-ES */
+  .rue-row { display:flex; align-items:center; gap:12px; padding:13px 16px; border-bottom:1px solid #2a304022; }
+  .rue-row:last-child { border-bottom:none; }
+  .rue-icon { width:36px; height:36px; border-radius:9px; background:#3b82f615; color:#3b82f6; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .rue-icon svg { width:15px; height:15px; }
+  .rue-info { flex:1; min-width:0; }
+  .rue-title { font-size:12.5px; font-weight:600; color:var(--text-primary); }
+  .rue-desc  { font-size:10.5px; color:var(--text-muted); margin-top:2px; }
 
   /* Mobile cards */
   .rep-cards { display:none; flex-direction:column; gap:8px; padding:12px; }
@@ -313,60 +386,73 @@ export default function Reportes() {
   const [toast,        setToast]        = useState('')
   const [verModal,     setVerModal]     = useState<string|null>(null)
   const [loading,      setLoading]      = useState(true)
+  const [refreshing,   setRefreshing]   = useState(false)
+  const [lastUpdate,   setLastUpdate]   = useState<Date | null>(null)
+  const [error,        setError]        = useState<string>('')
+  const [exportando,   setExportando]   = useState<string>('')
   const [resumen,      setResumen]      = useState<Resumen>({ total_alumnos:0, total_becados:0, total_materias:0, total_profesores:0 })
   const [carrerasData, setCarrerasData] = useState<CarreraStats[]>([])
   const [becadosData,  setBecadosData]  = useState<BecadoUser[]>([])
+  const [materiasData, setMateriasData] = useState<MateriaStat[]>([])
+  const [asistenciaMat, setAsistenciaMat] = useState<AsistenciaMateria[]>([])
+  const [alertas,      setAlertas]      = useState<Alerta[]>([])
+  const firstLoad = useRef(true)
 
-  useEffect(() => {
-    Promise.allSettled([
+  const cargar = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true)
+    if (firstLoad.current) setLoading(true)
+    const [res, car, bec, dash] = await Promise.allSettled([
       api.get<Resumen>('/reportes/resumen'),
       api.get<CarreraStats[]>('/reportes/por-carrera'),
       api.get<BecadoUser[]>('/reportes/becados'),
-    ]).then(([res, car, bec]) => {
-      if (res.status === 'fulfilled') setResumen(res.value)
-      else setResumen(MOCK_RESUMEN)
-      if (car.status === 'fulfilled') setCarrerasData(car.value)
-      else setCarrerasData(MOCK_CARRERAS)
-      if (bec.status === 'fulfilled') setBecadosData(bec.value)
-    }).finally(() => setLoading(false))
+      api.get<DashboardResp>('/reportes/dashboard'),
+    ])
+    const fails: string[] = []
+    if (res.status === 'fulfilled') setResumen(res.value)
+    else fails.push('resumen')
+    if (car.status === 'fulfilled') setCarrerasData(car.value)
+    else fails.push('carreras')
+    if (bec.status === 'fulfilled') setBecadosData(bec.value)
+    else fails.push('becados')
+    if (dash.status === 'fulfilled') {
+      setMateriasData(dash.value.materias)
+      setAsistenciaMat(dash.value.asistencia_por_materia)
+      setAlertas(dash.value.alertas)
+    } else fails.push('dashboard')
+    setError(fails.length ? `No se pudieron cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
+    setLastUpdate(new Date())
+    setLoading(false)
+    setRefreshing(false)
+    firstLoad.current = false
   }, [])
+
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   function showToast(msg:string){ setToast(msg); setTimeout(()=>setToast(''),2400) }
 
   async function exportarPDF(tipo:string){
+    setExportando(tipo)
     showToast('Generando PDF…')
     const html2pdf = (await import('html2pdf.js')).default
-    const r = reportes.find(x=>x.tipo===tipo)!
-    // Renderizar visible (fuera de pantalla pero no display:none)
+    const r = reportesCfg.find(x=>x.tipo===tipo)!
     const container = document.createElement('div')
     container.style.cssText = [
-      'position:fixed',
-      'top:0',
-      'left:0',
-      'width:794px',
-      'min-height:100px',
-      'background:#ffffff',
-      'z-index:-9999',
-      'opacity:0.01',
-      'pointer-events:none',
+      'position:fixed', 'top:0', 'left:0', 'width:794px', 'min-height:100px',
+      'background:#ffffff', 'z-index:-9999', 'opacity:0.01', 'pointer-events:none',
     ].join(';')
-    container.innerHTML = buildReportePdfHtml(tipo, carrerasData, resumen)
+    container.innerHTML = buildReportePdfHtml(tipo, carrerasData, materiasData, becadosData, resumen, lastUpdate || new Date())
     document.body.appendChild(container)
-    // Esperar render completo
     await new Promise(res=>setTimeout(res,600))
     try {
       await (html2pdf() as {set(o:Record<string,unknown>):{from(e:HTMLElement):{save():Promise<void>}}}).set({
         margin:[8,8],
-        filename:`reporte_${r.tipo}_2026.pdf`,
+        filename:`reporte_${r.tipo}_${new Date().toISOString().slice(0,10)}.pdf`,
         image:{type:'jpeg',quality:1},
-        html2canvas:{
-          scale:2,
-          useCORS:true,
-          backgroundColor:'#ffffff',
-          logging:false,
-          allowTaint:true,
-          windowWidth:794,
-        },
+        html2canvas:{ scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false, allowTaint:true, windowWidth:794 },
         jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
       }).from(container).save()
       showToast('PDF descargado ✓')
@@ -374,6 +460,20 @@ export default function Reportes() {
       showToast('Error al generar PDF')
     } finally {
       document.body.removeChild(container)
+      setExportando('')
+    }
+  }
+
+  async function exportarRueEs(tipo: 'matricula' | 'trayecto-academico') {
+    setExportando(`rue-${tipo}`)
+    showToast('Generando CSV…')
+    try {
+      await api.download(`/reportes/rue-es/${tipo}`, `rue_es_${tipo.replace('-','_')}.csv`)
+      showToast('CSV descargado ✓')
+    } catch {
+      showToast('Error al generar CSV')
+    } finally {
+      setExportando('')
     }
   }
 
@@ -396,9 +496,28 @@ export default function Reportes() {
 
         <header className="topbar">
           <h1>Reportes globales</h1>
+          <div className="topbar-r">
+            {lastUpdate && (
+              <span className="last-upd">
+                <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                {lastUpdate.toLocaleTimeString('es-PY')}
+              </span>
+            )}
+            <button className="btn-ghost" onClick={()=>cargar(true)} disabled={refreshing}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+              {refreshing ? 'Actualizando…' : 'Actualizar'}
+            </button>
+          </div>
         </header>
 
         <div className="content">
+
+          {error && (
+            <div className="err-banner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:14,height:14,flexShrink:0}}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {error}
+            </div>
+          )}
 
           {/* KPIs */}
           <div className="kpi-row">
@@ -423,15 +542,11 @@ export default function Reportes() {
             <div className="card">
               <div className="card-hdr">
                 <h3>Reportes disponibles</h3>
-                <button className="btn-primary" onClick={()=>exportarPDF('asistencia')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Exportar todo
-                </button>
               </div>
 
               {/* Desktop */}
               <div>
-                {reportes.map(r=>{
+                {reportesCfg.map(r=>{
                   const cfg = tipoCfg[r.tipo]
                   return (
                     <div key={r.id} className="rep-item">
@@ -439,16 +554,16 @@ export default function Reportes() {
                       <div className="rep-info">
                         <div className="rep-title">{r.titulo}</div>
                         <div className="rep-desc">{r.descripcion}</div>
-                        <div className="rep-date">Generado: {new Date(r.generado+'T00:00:00').toLocaleDateString('es-PY')}</div>
+                        <div className="rep-date">{lastUpdate ? `Datos al ${lastUpdate.toLocaleString('es-PY')}` : 'Cargando…'}</div>
                       </div>
                       <div className="rep-acts">
                         <button className="btn-ghost" onClick={()=>setVerModal(r.tipo)}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           Ver
                         </button>
-                        <button className="btn-export" onClick={()=>exportarPDF(r.tipo)}>
+                        <button className="btn-export" onClick={()=>exportarPDF(r.tipo)} disabled={exportando===r.tipo}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                          PDF
+                          {exportando===r.tipo ? '…' : 'PDF'}
                         </button>
                       </div>
                     </div>
@@ -458,7 +573,7 @@ export default function Reportes() {
 
               {/* Mobile cards */}
               <div className="rep-cards">
-                {reportes.map(r=>{
+                {reportesCfg.map(r=>{
                   const cfg=tipoCfg[r.tipo]
                   return (
                     <div key={r.id} className="rep-card">
@@ -476,9 +591,9 @@ export default function Reportes() {
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           Ver
                         </button>
-                        <button className="btn-export" onClick={()=>exportarPDF(r.tipo)}>
+                        <button className="btn-export" onClick={()=>exportarPDF(r.tipo)} disabled={exportando===r.tipo}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                          Exportar PDF
+                          {exportando===r.tipo ? 'Generando…' : 'Exportar PDF'}
                         </button>
                       </div>
                     </div>
@@ -550,12 +665,74 @@ export default function Reportes() {
               </div>
             </div>
 
+            {/* Alertas de riesgo */}
+            <div className="card">
+              <div className="card-hdr">
+                <div>
+                  <h3>Alertas de riesgo</h3>
+                  <p>Top alumnos por inasistencia (materias activas)</p>
+                </div>
+              </div>
+              <div>
+                {loading ? (
+                  <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:12}}>Cargando…</div>
+                ) : alertas.length === 0 ? (
+                  <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:12}}>Sin alertas activas</div>
+                ) : alertas.map(a=>(
+                  <div key={a.user_id} className="alert-row">
+                    <div className="alert-badge">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <div>
+                      <div className="alert-name">{a.nombre}</div>
+                      <div className="alert-sub">Promedio: {a.promedio ?? '—'}</div>
+                    </div>
+                    <div className="alert-pct">{a.inasistencia_pct}% inas.</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Exportación RUE-ES (MEC) */}
+            <div className="card">
+              <div className="card-hdr">
+                <div>
+                  <h3>Exportación RUE-ES (MEC)</h3>
+                  <p>Reportes oficiales en formato CSV</p>
+                </div>
+              </div>
+              <div>
+                <div className="rue-row">
+                  <div className="rue-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+                  <div className="rue-info">
+                    <div className="rue-title">Matrícula</div>
+                    <div className="rue-desc">Cédula, carrera, condición de beca y estado por alumno</div>
+                  </div>
+                  <button className="btn-export" onClick={()=>exportarRueEs('matricula')} disabled={exportando==='rue-matricula'}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    {exportando==='rue-matricula' ? '…' : 'CSV'}
+                  </button>
+                </div>
+                <div className="rue-row">
+                  <div className="rue-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+                  <div className="rue-info">
+                    <div className="rue-title">Trayecto académico</div>
+                    <div className="rue-desc">Nota final, estado y asistencia por alumno y materia</div>
+                  </div>
+                  <button className="btn-export" onClick={()=>exportarRueEs('trayecto-academico')} disabled={exportando==='rue-trayecto-academico'}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    {exportando==='rue-trayecto-academico' ? '…' : 'CSV'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
         {/* Modal Ver reporte */}
         {verModal && (() => {
-          const r   = reportes.find(x=>x.tipo===verModal)!
+          const r   = reportesCfg.find(x=>x.tipo===verModal)!
           const cfg = tipoCfg[verModal]
           return (
             <div className="modal-backdrop" onClick={()=>setVerModal(null)}>
@@ -575,7 +752,7 @@ export default function Reportes() {
 
                   {/* Descripción */}
                   <div style={{fontSize:12,color:'var(--text-secondary)',lineHeight:1.6,background:'var(--bg-input)',border:'1px solid #2a3040',borderRadius:8,padding:'10px 13px'}}>
-                    {r.descripcion} · Generado: {new Date(r.generado+'T00:00:00').toLocaleDateString('es-PY')}
+                    {r.descripcion} · Datos al {lastUpdate ? lastUpdate.toLocaleString('es-PY') : '—'}
                   </div>
 
                   {/* KPIs */}
@@ -596,18 +773,12 @@ export default function Reportes() {
                     </div>
                   </div>
 
-                  {/* Tabla — becados o carreras */}
+                  {/* Tabla según tipo */}
                   {verModal === 'becados' ? (
                     <div>
                       <div className="modal-section-title">Alumnos con beca activa ({becadosData.length})</div>
                       <div className="modal-scroll"><table className="modal-table">
-                        <thead>
-                          <tr>
-                            <th>Nombre</th>
-                            <th>Usuario</th>
-                            <th>Email</th>
-                          </tr>
-                        </thead>
+                        <thead><tr><th>Nombre</th><th>Usuario</th><th>Email</th></tr></thead>
                         <tbody>
                           {becadosData.length === 0
                             ? <tr><td colSpan={3} style={{textAlign:'center',padding:'18px',color:'var(--text-muted)',fontSize:12}}>Sin becados registrados</td></tr>
@@ -618,6 +789,42 @@ export default function Reportes() {
                                   <td style={{color:'var(--text-secondary)'}}>{u.email || '—'}</td>
                                 </tr>
                               ))
+                          }
+                        </tbody>
+                      </table></div>
+                    </div>
+                  ) : verModal === 'puntajes' || verModal === 'materias' ? (
+                    <div>
+                      <div className="modal-section-title">
+                        {verModal === 'puntajes' ? 'Promedios por materia' : 'Detalle por materia'}
+                      </div>
+                      <div className="modal-scroll"><table className="modal-table">
+                        <thead>
+                          <tr>
+                            <th>Materia</th>
+                            <th className="c">Alumnos</th>
+                            {verModal === 'materias' && <th className="c">Asistencia</th>}
+                            <th className="c">Promedio</th>
+                            <th className="c">Aprobados</th>
+                            <th className="c">Riesgo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {materiasData.length === 0
+                            ? <tr><td colSpan={6} style={{textAlign:'center',padding:'18px',color:'var(--text-muted)',fontSize:12}}>Sin datos</td></tr>
+                            : materiasData.map(m=>{
+                                const asis = asistenciaMat.find(a=>a.materia_id===m.materia_id)?.asistencia_pct
+                                return (
+                                  <tr key={m.materia_id}>
+                                    <td style={{fontWeight:600,color:'var(--text-primary)'}}>{m.materia_nombre}</td>
+                                    <td className="c" style={{color:'var(--text-secondary)'}}>{m.total_alumnos}</td>
+                                    {verModal === 'materias' && <td className="c" style={{color:GREEN}}>{asis ?? '—'}%</td>}
+                                    <td className="c" style={{color:BLUE}}>{m.promedio_grupo || '—'}</td>
+                                    <td className="c" style={{color:GREEN}}>{m.aprobados}</td>
+                                    <td className="c" style={{color:RED}}>{m.en_riesgo}</td>
+                                  </tr>
+                                )
+                              })
                           }
                         </tbody>
                       </table></div>

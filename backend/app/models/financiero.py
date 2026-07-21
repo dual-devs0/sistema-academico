@@ -4,8 +4,10 @@ Modelos SQLAlchemy — Fase 4: Módulo Financiero + Becas Diferenciadas.
 REGLA: todos los montos monetarios usan Numeric(12,2) — nunca float.
 """
 
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Any, Optional
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Boolean,
@@ -17,20 +19,19 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
 )
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
 class FuenteBeca(Base):
     __tablename__ = "fuentes_beca"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(150), nullable=False, unique=True)
-    tipo = Column(String(80), nullable=False)
-    es_externa = Column(Boolean, nullable=False, default=False)
-    requiere_reporte_externo = Column(Boolean, nullable=False, default=False)
-    editable_porcentaje = Column(Boolean, nullable=False, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    tipo: Mapped[str] = mapped_column(String(80), nullable=False)
+    es_externa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    requiere_reporte_externo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    editable_porcentaje: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     becas = relationship("BecaCatalogo", back_populates="fuente")
     becas_activas = relationship("BecaActiva", back_populates="fuente")
@@ -39,14 +40,14 @@ class FuenteBeca(Base):
 class BecaCatalogo(Base):
     __tablename__ = "becas_catalogo"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(200), nullable=False)
-    fuente_id = Column(Integer, ForeignKey("fuentes_beca.id"), nullable=False)
-    porcentaje_descuento = Column(Numeric(5, 2), nullable=False)
-    monto_fijo = Column(Numeric(12, 2), nullable=True)
-    requisitos = Column(Text, nullable=True)
-    cupos_totales = Column(Integer, nullable=True)
-    cupos_disponibles = Column(Integer, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    fuente_id: Mapped[int] = mapped_column(Integer, ForeignKey("fuentes_beca.id"), nullable=False)
+    porcentaje_descuento: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    monto_fijo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    requisitos: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cupos_totales: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cupos_disponibles: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -63,17 +64,17 @@ class BecaCatalogo(Base):
 class PostulacionBeca(Base):
     __tablename__ = "postulaciones_beca"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    beca_id = Column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
-    estado = Column(String(20), nullable=False, default="pendiente")
-    fecha_postulacion = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    beca_id: Mapped[int] = mapped_column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    fecha_postulacion: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    documentos_storage_keys = Column(JSON, nullable=True)
-    motivo_rechazo = Column(Text, nullable=True)
-    revisado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
-    revisado_en = Column(DateTime(timezone=True), nullable=True)
+    documentos_storage_keys: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    motivo_rechazo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    revisado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    revisado_en: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -90,19 +91,19 @@ class PostulacionBeca(Base):
 class BecaActiva(Base):
     __tablename__ = "becas_activas"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    beca_id = Column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
-    fuente_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    beca_id: Mapped[int] = mapped_column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
+    fuente_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("fuentes_beca.id"), nullable=False
     )  # denorm para reportes
-    periodo_inicio = Column(String(10), nullable=False)
-    periodo_fin = Column(String(10), nullable=True)
-    promedio_minimo_requerido = Column(Numeric(5, 2), nullable=True)
-    promedio_actual = Column(Numeric(5, 2), nullable=True)
-    estado_renovacion = Column(String(30), nullable=False, default="vigente")
-    otorgado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
-    otorgado_en = Column(
+    periodo_inicio: Mapped[str] = mapped_column(String(10), nullable=False)
+    periodo_fin: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    promedio_minimo_requerido: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    promedio_actual: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    estado_renovacion: Mapped[str] = mapped_column(String(30), nullable=False, default="vigente")
+    otorgado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    otorgado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
@@ -123,12 +124,12 @@ class BecaActiva(Base):
 class ConceptoArancel(Base):
     __tablename__ = "conceptos_arancel"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(200), nullable=False)
-    carrera_id = Column(Integer, ForeignKey("carreras.id"), nullable=True)
-    monto_base = Column(Numeric(12, 2), nullable=False)
-    periodicidad = Column(String(80), nullable=False, default="mensual")
-    activo = Column(Boolean, nullable=False, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    carrera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carreras.id"), nullable=True)
+    monto_base: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    periodicidad: Mapped[str] = mapped_column(String(80), nullable=False, default="mensual")
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     carrera = relationship("Carrera")
     cuotas = relationship("Cuota", back_populates="concepto")
@@ -137,19 +138,19 @@ class ConceptoArancel(Base):
 class Cuota(Base):
     __tablename__ = "cuotas"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    concepto_id = Column(Integer, ForeignKey("conceptos_arancel.id"), nullable=False)
-    periodo = Column(String(10), nullable=False)
-    monto = Column(Numeric(12, 2), nullable=False)
-    monto_descuento = Column(Numeric(12, 2), nullable=False, default=0)
-    fecha_vencimiento = Column(Date, nullable=False)
-    estado = Column(String(20), nullable=False, default="pendiente")
-    beca_aplicada_id = Column(Integer, ForeignKey("becas_activas.id"), nullable=True)
-    generado_en = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    concepto_id: Mapped[int] = mapped_column(Integer, ForeignKey("conceptos_arancel.id"), nullable=False)
+    periodo: Mapped[str] = mapped_column(String(10), nullable=False)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    monto_descuento: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    fecha_vencimiento: Mapped[date] = mapped_column(Date, nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    beca_aplicada_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("becas_activas.id"), nullable=True)
+    generado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    generado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
+    generado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -174,18 +175,18 @@ class Pago(Base):
 
     __tablename__ = "pagos"
 
-    id = Column(Integer, primary_key=True, index=True)
-    cuota_id = Column(Integer, ForeignKey("cuotas.id"), nullable=False)
-    monto_pagado = Column(Numeric(12, 2), nullable=False)
-    fecha_pago = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    cuota_id: Mapped[int] = mapped_column(Integer, ForeignKey("cuotas.id"), nullable=False)
+    monto_pagado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    fecha_pago: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    metodo = Column(String(50), nullable=False)
-    referencia = Column(String(200), nullable=True)
-    registrado_por = Column(Integer, ForeignKey("users.id"), nullable=False)
-    pago_ajuste_ref_id = Column(Integer, ForeignKey("pagos.id"), nullable=True)
-    es_ajuste = Column(Boolean, nullable=False, default=False)
-    nota_ajuste = Column(Text, nullable=True)
+    metodo: Mapped[str] = mapped_column(String(50), nullable=False)
+    referencia: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    registrado_por: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    pago_ajuste_ref_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("pagos.id"), nullable=True)
+    es_ajuste: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    nota_ajuste: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     cuota = relationship("Cuota", back_populates="pagos")
     registrador = relationship("User", foreign_keys=[registrado_por])
@@ -195,19 +196,19 @@ class Pago(Base):
 class Comprobante(Base):
     __tablename__ = "comprobantes"
 
-    id = Column(Integer, primary_key=True, index=True)
-    pago_id = Column(Integer, ForeignKey("pagos.id"), nullable=False, unique=True)
-    tipo = Column(String(20), nullable=False, default="factura")
-    numero_comprobante = Column(String(50), nullable=True)
-    cdc = Column(String(44), nullable=True)  # DNIT
-    timbrado = Column(String(20), nullable=True)
-    url_pdf = Column(String(500), nullable=True)  # PDF servido por guarani.app
-    storage_key = Column(String(500), nullable=True)
-    estado_emision = Column(String(20), nullable=False, default="pendiente")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    pago_id: Mapped[int] = mapped_column(Integer, ForeignKey("pagos.id"), nullable=False, unique=True)
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="factura")
+    numero_comprobante: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    cdc: Mapped[Optional[str]] = mapped_column(String(44), nullable=True)  # DNIT
+    timbrado: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    url_pdf: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # PDF servido por guarani.app
+    storage_key: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    estado_emision: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
     # pendiente / emitido / error / reintentando
-    intentos = Column(Integer, nullable=False, default=0)
-    ultimo_error = Column(Text, nullable=True)
-    fecha_emision = Column(DateTime(timezone=True), nullable=True)
+    intentos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ultimo_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    fecha_emision: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -224,12 +225,12 @@ class AuditoriaOverrideMora(Base):
 
     __tablename__ = "auditoria_override_mora"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    oferta_materia_id = Column(Integer, ForeignKey("ofertas_materia.id"), nullable=True)
-    motivo = Column(Text, nullable=True)
-    registrado_en = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    admin_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    oferta_materia_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("ofertas_materia.id"), nullable=True)
+    motivo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    registrado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
@@ -242,18 +243,18 @@ class PagoOnline(Base):
 
     __tablename__ = "pagos_online"
 
-    id = Column(Integer, primary_key=True, index=True)
-    cuota_id = Column(Integer, ForeignKey("cuotas.id"), nullable=False)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    monto = Column(Numeric(12, 2), nullable=False)
-    transaction_id = Column(String(100), unique=True, nullable=True)
-    estado = Column(String(20), nullable=False, default="pendiente")
-    gateway_url = Column(String(500), nullable=True)
-    gateway_response = Column(JSON, nullable=True)
-    creado_en = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    cuota_id: Mapped[int] = mapped_column(Integer, ForeignKey("cuotas.id"), nullable=False)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    transaction_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    gateway_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    gateway_response: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    creado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    confirmado_en = Column(DateTime(timezone=True), nullable=True)
+    confirmado_en: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     cuota = relationship("Cuota")
     alumno = relationship("User", foreign_keys=[alumno_id])
@@ -264,13 +265,13 @@ class SuscripcionPush(Base):
 
     __tablename__ = "suscripciones_push"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    endpoint = Column(String(500), nullable=False)
-    p256dh = Column(String(200), nullable=False)
-    auth = Column(String(200), nullable=False)
-    user_agent = Column(String(300), nullable=True)
-    created_at = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(500), nullable=False)
+    p256dh: Mapped[str] = mapped_column(String(200), nullable=False)
+    auth: Mapped[str] = mapped_column(String(200), nullable=False)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 

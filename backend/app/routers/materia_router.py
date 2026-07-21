@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
@@ -42,13 +43,27 @@ def _enrich(m, db: Session) -> dict:
         if carrera:
             carrera_nombre = carrera.nombre
 
+    inscritos = 0
+    if oferta:
+        inscritos = (
+            db.query(models.inscripcion.Inscripcion)
+            .filter(models.inscripcion.Inscripcion.oferta_materia_id == oferta.id)
+            .count()
+        )
+
     return {
         "id": m.id,
         "nombre": m.nombre,
+        "codigo": m.codigo,
         "profesor_id": profesor_id,
         "carrera_id": m.carrera_id,
         "anio": m.anio,
         "semestre": m.semestre,
+        "creditos": m.creditos,
+        "cupos": m.cupos,
+        "horario": m.horario,
+        "secciones": m.secciones,
+        "inscritos": inscritos,
         "profesor_nombre": prof_nombre,
         "carrera_nombre": carrera_nombre,
     }
@@ -109,6 +124,65 @@ def list_materias(
         query = query.filter(models.materia.Materia.carrera_id == carrera_id)
     query = query.order_by(models.materia.Materia.id).offset(skip).limit(limit)
     return [_enrich(m, db) for m in query.all()]
+
+
+@router.get("/stats")
+def materias_stats(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    M = models.materia.Materia
+    O = models.oferta_materia.OfertaMateria
+    C = models.carrera.Carrera
+    U = models.user.User
+
+    total_materias = db.query(M).count()
+    total_profesores = db.query(U).filter(U.role == "profesor").count()
+
+    ofertas_activas = db.query(O.materia_id).filter(O.activa.is_(True)).distinct().all()
+    materia_ids_con_oferta = {r[0] for r in ofertas_activas}
+    materias_con_profesor = len(materia_ids_con_oferta)
+    materias_sin_profesor = total_materias - materias_con_profesor
+
+    profesores_con_carga = (
+        db.query(O.profesor_id)
+        .filter(O.activa.is_(True))
+        .distinct()
+        .count()
+    )
+
+    carga_promedio = 0.0
+    if profesores_con_carga > 0:
+        carga_promedio = round(materias_con_profesor / profesores_con_carga, 1)
+
+    carreras = db.query(C).all()
+    por_carrera = []
+    for c in carreras:
+        ids = {m.id for m in db.query(M.id).filter(M.carrera_id == c.id).all()}
+        total_c = len(ids)
+        con_prof = len(ids & materia_ids_con_oferta)
+        por_carrera.append({
+            "carrera": c.nombre,
+            "materias": total_c,
+            "con_profesor": con_prof,
+            "sin_profesor": total_c - con_prof,
+        })
+
+    profesores_sin_asignacion = total_profesores - profesores_con_carga
+
+    return {
+        "total_materias": total_materias,
+        "materias_con_profesor": materias_con_profesor,
+        "materias_sin_profesor": materias_sin_profesor,
+        "total_profesores": total_profesores,
+        "profesores_con_carga": profesores_con_carga,
+        "profesores_sin_asignacion": profesores_sin_asignacion,
+        "carga_promedio": carga_promedio,
+        "por_carrera": por_carrera,
+    }
 
 
 @router.get("/{materia_id}")

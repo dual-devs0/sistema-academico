@@ -6,10 +6,10 @@ Tablas:
   - inscripciones_examen: Inscripción de alumno a una mesa
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from typing import Optional
 
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Date,
@@ -17,7 +17,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.database import Base
 
@@ -25,22 +25,22 @@ from app.database import Base
 class Examen(Base):
     __tablename__ = "examenes"
 
-    id = Column(Integer, primary_key=True, index=True)
-    materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
-    fecha = Column(Date, nullable=False)
-    hora_inicio = Column(String(5), nullable=True)  # HH:MM
-    hora_fin = Column(String(5), nullable=True)
-    aula = Column(String(50), nullable=True)
-    tipo = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    materia_id: Mapped[int] = mapped_column(Integer, ForeignKey("materias.id"), nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    hora_inicio: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # HH:MM
+    hora_fin: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    aula: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    tipo: Mapped[str] = mapped_column(
         String(20), nullable=False, default="final"
     )  # parcial | final | recuperatorio
-    periodo = Column(String(10), nullable=False)  # ej. '2026-1'
-    cupos = Column(Integer, nullable=True)  # null = sin límite
-    estado = Column(
+    periodo: Mapped[str] = mapped_column(String(10), nullable=False)  # ej. '2026-1'
+    cupos: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # null = sin límite
+    estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default="programado"
     )  # programado | en_curso | finalizado | cancelado
-    profesor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(
+    profesor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
@@ -54,16 +54,16 @@ class Examen(Base):
 class InscripcionExamen(Base):
     __tablename__ = "inscripciones_examen"
 
-    id = Column(Integer, primary_key=True, index=True)
-    examen_id = Column(Integer, ForeignKey("examenes.id"), nullable=False)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    estado = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    examen_id: Mapped[int] = mapped_column(Integer, ForeignKey("examenes.id"), nullable=False)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default="inscripto"
     )  # inscripto | presente | ausente | cancelada
-    inscripto_en = Column(
+    inscripto_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    cancelado_en = Column(DateTime(timezone=True), nullable=True)
+    cancelado_en: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     examen = relationship("Examen", back_populates="inscripciones")
     alumno = relationship("User", foreign_keys=[alumno_id])
