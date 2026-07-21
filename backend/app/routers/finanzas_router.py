@@ -164,11 +164,13 @@ def generar_cuotas(
 
 
 @router.get(
-    "/alumno/me/cuotas",
+    "/alumno/{alumno_id}/cuotas",
     response_model=List[CuotaOut],
-    summary="Listar cuotas del alumno logueado",
+    summary="Cuotas de un alumno",
 )
-def listar_mis_cuotas(
+def cuotas_alumno(
+    alumno_id: int,
+    estado: Optional[str] = None,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
@@ -180,23 +182,10 @@ def listar_mis_cuotas(
     )
     return [cuota_to_out(c) for c in cuotas]
 
-
-@router.get(
-    "/alumno/{alumno_id}/cuotas",
-    response_model=List[CuotaOut],
-    summary="Listar cuotas de un alumno (admin)",
-)
-def listar_cuotas_alumno(
-    alumno_id: int,
-    db: Session = Depends(database.get_db),
-    current_user=Depends(require_role("admin")),
-):
-    cuotas = (
-        db.query(Cuota)
-        .filter(Cuota.alumno_id == alumno_id)
-        .order_by(Cuota.fecha_vencimiento.asc())
-        .all()
-    )
+    q = db.query(Cuota).filter(Cuota.alumno_id == alumno_id)
+    if estado:
+        q = q.filter(Cuota.estado == estado)
+    cuotas = q.order_by(Cuota.fecha_vencimiento.asc()).all()
     return [cuota_to_out(c) for c in cuotas]
 
 

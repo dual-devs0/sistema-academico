@@ -44,7 +44,6 @@ class RefreshRequest(BaseModel):
 
 class RecuperarRequest(BaseModel):
     username_or_email: str
-    matricula: str | None = None  # verificación adicional opcional
 
 
 class RegistroRequest(BaseModel):
@@ -59,10 +58,6 @@ class UserOut(BaseModel):
     nombre: str | None = None
     email: str | None = None
     carrera_id: int | None = None
-    carrera_nombre: str | None = None   # nombre de la carrera (join)
-    semestre: int | None = None          # semestre actual de la carrera
-    legajo: str | None = None            # legajo real del alumno (= username para esta institución)
-    fuente_beca: str | None = None       # fuente de la beca si es becado
     es_becado: bool | None = None
     foto_url: str | None = None
     fecha_ingreso: date | None = None

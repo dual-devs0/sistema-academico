@@ -1,4 +1,3 @@
-import { colors } from "../constants/design";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { BackHandler, View } from "react-native";
@@ -121,8 +120,7 @@ function ThemeStatusBar() {
 }
 
 export default function RootLayout() {
-  const { colors } = useTheme();
-const [fontsLoaded, fontError] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
