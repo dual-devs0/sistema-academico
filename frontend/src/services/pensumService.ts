@@ -5,6 +5,7 @@ export interface PensumMateriaOut {
   carrera_id: number
   materia_id: number
   materia_nombre: string | null
+  materia_codigo: string | null
   semestre: number
   creditos: number
   es_electiva: boolean
@@ -76,6 +77,10 @@ export function crearCorrelatividad(data: CorrelatividadCreate) {
 
 export function eliminarCorrelatividad(id: number) {
   return api.delete(`/pensum/correlatividades/${id}`)
+}
+
+export function actualizarPensumMateria(id: number, data: { semestre?: number; creditos?: number; es_electiva?: boolean }) {
+  return api.patch<PensumMateriaOut>(`/pensum/materias/${id}`, data)
 }
 
 export function obtenerAvanceAlumno(alumnoId: number) {

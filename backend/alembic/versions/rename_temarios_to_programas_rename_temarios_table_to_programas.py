@@ -26,7 +26,9 @@ def upgrade() -> None:
     # Only rename if temarios exists and programas doesn't
     if insp.has_table('temarios') and not insp.has_table('programas'):
         op.rename_table('temarios', 'programas')
-        op.rename_index('ix_temarios_id', 'ix_programas_id')
+        # AUDIT-FIX B-1: rename_index no existe en Alembic, usar drop+create
+        op.drop_index('ix_temarios_id', table_name='programas', if_exists=True)
+        op.create_index('ix_programas_id', 'programas', ['id'])
 
 
 def downgrade() -> None:
@@ -35,5 +37,7 @@ def downgrade() -> None:
     insp = sa.inspect(bind)
     
     if insp.has_table('programas') and not insp.has_table('temarios'):
-        op.rename_index('ix_programas_id', 'ix_temarios_id')
+        # AUDIT-FIX B-1: rename_index no existe en Alembic, usar drop+create
+        op.drop_index('ix_programas_id', table_name='temarios', if_exists=True)
+        op.create_index('ix_temarios_id', 'temarios', ['id'])
         op.rename_table('programas', 'temarios')

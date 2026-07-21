@@ -14,7 +14,10 @@ export interface TipoTramite {
 export interface Solicitud {
   id: number
   alumno_id: number
+  alumno_nombre: string | null
+  alumno_username: string | null
   tipo_tramite_id: number
+  tipo_tramite_nombre: string | null
   estado: 'pendiente' | 'en_proceso' | 'resuelta' | 'rechazada'
   fecha_solicitud: string
   fecha_resolucion: string | null
@@ -23,14 +26,30 @@ export interface Solicitud {
   motivo_rechazo: string | null
 }
 
+export interface TramitesStats {
+  total: number
+  pendientes: number
+  en_proceso: number
+  resueltas: number
+  rechazadas: number
+}
+
 export const getTiposTramite = () => api.get<TipoTramite[]>('/tramites/tipos')
 
 export const crearSolicitud = (tipo_tramite_id: number) =>
   api.post<Solicitud>('/tramites/solicitudes', { tipo_tramite_id })
 
-// Alumno: solicitudes propias. Admin: todas (filtro opcional por estado) — mismo endpoint.
-export const getMisSolicitudes = (estado?: string) =>
-  api.get<Solicitud[]>(`/tramites/solicitudes/mias${estado ? `?estado=${estado}` : ''}`)
+// Alumno: solicitudes propias. Admin: todas (filtros opcionales) — mismo endpoint.
+export const getMisSolicitudes = (params?: { estado?: string; tipo_tramite_id?: number; q?: string }) => {
+  const qs = new URLSearchParams()
+  if (params?.estado) qs.set('estado', params.estado)
+  if (params?.tipo_tramite_id) qs.set('tipo_tramite_id', String(params.tipo_tramite_id))
+  if (params?.q) qs.set('q', params.q)
+  const query = qs.toString()
+  return api.get<Solicitud[]>(`/tramites/solicitudes/mias${query ? `?${query}` : ''}`)
+}
+
+export const getStatsTramites = () => api.get<TramitesStats>('/tramites/stats')
 
 export const getDescargaUrl = (solicitudId: number) =>
   api.get<{ download_url: string }>(`/tramites/solicitudes/${solicitudId}/descargar`)

@@ -19,7 +19,6 @@ const menuAlumno: MenuItem[] = [
   { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
-  { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Pasantías', path: '/mis-pasantias', icon: 'ti-briefcase' },
   { label: 'Equivalencias', path: '/mis-equivalencias', icon: 'ti-shuffle' },
   { label: 'Graduación', path: '/mi-graduacion', icon: 'ti-graduation-cap' },
@@ -37,7 +36,6 @@ const menuProfesor: MenuItem[] = [
   { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-pie' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
   { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
-  { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
@@ -55,7 +53,6 @@ const menuAdmin: MenuItem[] = [
   { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
   { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-bar' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
-  { label: 'Foro', path: '/foro', icon: 'ti-messages' },
   { label: 'Graduación', path: '/graduacion-admin', icon: 'ti-graduation-cap' },
   { label: 'Pasantías', path: '/pasantias-admin', icon: 'ti-briefcase' },
   { label: 'Equivalencias', path: '/equivalencias-admin', icon: 'ti-shuffle' },
@@ -305,10 +302,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Footer */}
           <div style={{ padding: '12px', flexShrink: 0 }}>
-            <button onClick={() => setHelpOpen(true)} className="btn-ghost" style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, background: 'var(--accent-muted)', color: 'var(--accent-bright)', border: '1px solid transparent' }}>
-              <i className="ti ti-help" style={{ fontSize: 14 }} />
-              Centro de Ayuda
-            </button>
+            {role !== 'admin' && (
+              <button onClick={() => setHelpOpen(true)} className="btn-ghost" style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, background: 'var(--accent-muted)', color: 'var(--accent-bright)', border: '1px solid transparent' }}>
+                <i className="ti ti-help" style={{ fontSize: 14 }} />
+                Centro de Ayuda
+              </button>
+            )}
             <button onClick={logout}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 8,

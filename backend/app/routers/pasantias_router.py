@@ -10,7 +10,7 @@ PUT    /pasantias/{id}/finalizar
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 
 from app import database
@@ -63,7 +63,11 @@ def listar_solicitudes(
 ):
     from app.models.pasantia import Pasantia
 
-    q = db.query(Pasantia)
+    q = db.query(Pasantia).options(
+        joinedload(Pasantia.alumno),
+        joinedload(Pasantia.empresa),
+        joinedload(Pasantia.tutor_academico),
+    )
     if current_user.role == "admin":
         if estado:
             q = q.filter(Pasantia.estado == estado)

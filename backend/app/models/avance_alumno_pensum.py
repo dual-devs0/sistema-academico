@@ -1,4 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from datetime import datetime
+from typing import Optional
+from sqlalchemy import Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -6,15 +9,15 @@ from app.database import Base
 class AvanceAlumnoPensum(Base):
     __tablename__ = "avance_alumno_pensum"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    pensum_materia_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    pensum_materia_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("pensum_materias.id"), nullable=False
     )
-    estado = Column(
+    estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pendiente"
     )  # pendiente|cursando|aprobada|reprobada|bloqueada
-    fecha_actualizacion = Column(
+    fecha_actualizacion: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 

@@ -10,7 +10,7 @@ GET    /graduacion/procesos/{id}/documentos-cones
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
 from app import database
@@ -35,6 +35,22 @@ from app.services.graduacion import (
 from app.models.graduacion import ProcesoGraduacion, VerificacionSolvencia, EtapaTesis
 
 router = APIRouter(prefix="/graduacion", tags=["graduacion"])
+
+
+def _enriquecer_proceso(proceso: ProcesoGraduacion, db: Session) -> ProcesoGraduacion:
+    """Adjunta nombres reales de alumno/tutor al objeto para el response_model."""
+    completo = (
+        db.query(ProcesoGraduacion)
+        .options(
+            joinedload(ProcesoGraduacion.alumno),
+            joinedload(ProcesoGraduacion.tutor),
+        )
+        .filter(ProcesoGraduacion.id == proceso.id)
+        .first()
+    )
+    completo.alumno_nombre = completo.alumno.nombre if completo.alumno else None
+    completo.tutor_nombre = completo.tutor.nombre if completo.tutor else None
+    return completo
 
 
 @router.get(
@@ -104,7 +120,7 @@ def crear_proceso(
         proceso = iniciar_proceso(alumno_id=data.alumno_id, db=db)
         db.commit()
         db.refresh(proceso)
-        return proceso
+        return _enriquecer_proceso(proceso, db)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e))
@@ -125,7 +141,7 @@ def asignar_tutor_endpoint(
         proceso = asignar_tutor(proceso_id=id, tutor_id=data.tutor_id, db=db)
         db.commit()
         db.refresh(proceso)
-        return proceso
+        return _enriquecer_proceso(proceso, db)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e))

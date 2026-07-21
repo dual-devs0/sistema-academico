@@ -17,6 +17,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from uuid import uuid4
@@ -29,10 +30,12 @@ from app.models.financiero import (
     Pago,
     Comprobante,
     PagoOnline,
+    BecaActiva,
 )
 from app.models.users import User
 from app.schemas.financiero import (
     ConceptoArancelCreate,
+    ConceptoArancelUpdate,
     ConceptoArancelOut,
     GenerarCuotasRequest,
     CuotaOut,
@@ -45,6 +48,7 @@ from app.schemas.financiero import (
     PagoOnlineInitResponse,
     PagoOnlineConfirmRequest,
     PagoOnlineOut,
+    FinanzasResumenOut,
 )
 from app.services.financiero import (
     generar_cuotas_alumno,
@@ -89,16 +93,40 @@ def crear_concepto(
 )
 def listar_conceptos(
     carrera_id: Optional[int] = None,
+    incluir_inactivos: bool = False,
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role(["admin"])),
 ):
-    q = db.query(ConceptoArancel).filter(ConceptoArancel.activo == True)  # noqa: E712
+    q = db.query(ConceptoArancel)
+    if not incluir_inactivos:
+        q = q.filter(ConceptoArancel.activo == True)  # noqa: E712
     if carrera_id:
         q = q.filter(
             (ConceptoArancel.carrera_id == carrera_id)
             | (ConceptoArancel.carrera_id == None)  # noqa: E711
         )
-    return q.all()
+    return q.order_by(ConceptoArancel.nombre).all()
+
+
+@router.patch(
+    "/conceptos/{concepto_id}",
+    response_model=ConceptoArancelOut,
+    summary="Editar o activar/desactivar un concepto de arancel",
+)
+def actualizar_concepto(
+    concepto_id: int,
+    data: ConceptoArancelUpdate,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    concepto = db.query(ConceptoArancel).filter(ConceptoArancel.id == concepto_id).first()
+    if not concepto:
+        raise HTTPException(status_code=404, detail="Concepto no encontrado")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(concepto, key, value)
+    db.commit()
+    db.refresh(concepto)
+    return concepto
 
 
 # ── Generación de cuotas ──────────────────────────────────────────────
@@ -144,9 +172,13 @@ def listar_mis_cuotas(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    # Alumno solo puede ver las suyas
-    if current_user.role == "alumno" and current_user.user_id != alumno_id:
-        raise HTTPException(status_code=403, detail="No autorizado")
+    cuotas = (
+        db.query(Cuota)
+        .filter(Cuota.alumno_id == current_user.user_id)
+        .order_by(Cuota.fecha_vencimiento.asc())
+        .all()
+    )
+    return [cuota_to_out(c) for c in cuotas]
 
 
 @router.get(
@@ -169,56 +201,6 @@ def listar_cuotas_alumno(
 
 
 # ── Pagos ─────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/pagos/online/iniciar",
-    response_model=PagoOnlineInitResponse,
-    summary="Iniciar pago online (simulado)",
-)
-def iniciar_pago_online(
-    data: PagoOnlineInitRequest,
-    db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
-):
-    """
-    Simula la creación de una intención de pago.
-    En producción, aquí se llamaría a la API de Bancard o similar
-    para obtener un process_id o token de pago.
-    """
-    # Verificar que las cuotas existan y sean del usuario
-    cuotas = db.query(Cuota).filter(
-        Cuota.id.in_(data.cuota_ids),
-        Cuota.alumno_id == current_user.user_id,
-        Cuota.estado != "pagado"
-    ).all()
-    
-    if len(cuotas) != len(data.cuota_ids):
-        raise HTTPException(
-            status_code=400, detail="Algunas cuotas no son válidas o ya están pagadas."
-        )
-
-    monto_total = sum(c.monto_a_pagar for c in cuotas)
-    
-    # Crear registro de intento de pago
-    intento = PagoOnline(
-        usuario_id=current_user.user_id,
-        cuotas_ids=data.cuota_ids,
-        monto=monto_total,
-        estado="pendiente",
-        transaction_id=f"PAY-{uuid4().hex[:8].upper()}"
-    )
-    db.add(intento)
-    db.commit()
-    db.refresh(intento)
-
-    # Devolvemos una URL de checkout simulada
-    return PagoOnlineInitResponse(
-        gateway_url=f"https://sandbox.bancard.com.py/checkout/test_{intento.transaction_id}",
-        transaction_id=intento.transaction_id,
-        monto=monto_total,
-        pago_id=intento.id
-    )
 
 
 @router.post(
@@ -463,3 +445,47 @@ def pago_online_status(
     if pago.alumno_id != current_user.user_id:
         raise HTTPException(403, "Acceso denegado")
     return pago
+
+
+# ── Resumen / KPIs ───────────────────────────────────────────────────
+
+
+@router.get(
+    "/resumen",
+    response_model=FinanzasResumenOut,
+    summary="KPIs del panel financiero (admin)",
+)
+def resumen_finanzas(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    total_recaudado = (
+        db.query(func.sum(Pago.monto_pagado)).filter(Pago.es_ajuste == False).scalar()  # noqa: E712
+        or Decimal("0")
+    )
+    cuotas_pendientes = (
+        db.query(func.count(Cuota.id)).filter(Cuota.estado == "pendiente").scalar() or 0
+    )
+    cuotas_vencidas = (
+        db.query(func.count(Cuota.id)).filter(Cuota.estado == "vencida").scalar() or 0
+    )
+    becas_activas = (
+        db.query(func.count(BecaActiva.id))
+        .filter(BecaActiva.estado_renovacion == "vigente")
+        .scalar()
+        or 0
+    )
+    comprobantes_pendientes = (
+        db.query(func.count(Comprobante.id))
+        .filter(Comprobante.estado_emision.in_(["pendiente", "error", "reintentando"]))
+        .scalar()
+        or 0
+    )
+
+    return FinanzasResumenOut(
+        total_recaudado=total_recaudado,
+        cuotas_pendientes=cuotas_pendientes,
+        cuotas_vencidas=cuotas_vencidas,
+        becas_activas=becas_activas,
+        comprobantes_pendientes=comprobantes_pendientes,
+    )

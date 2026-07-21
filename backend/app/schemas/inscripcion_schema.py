@@ -16,7 +16,7 @@ class InscripcionCreate(InscripcionBase):
 class InscripcionOut(BaseModel):
     id: int
     alumno_id: int
-    materia_id: int
+    materia_id: int | None = None
     oferta_materia_id: int
 
     model_config = {"from_attributes": True}

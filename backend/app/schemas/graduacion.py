@@ -29,9 +29,11 @@ class ProcesoGraduacionCreate(BaseModel):
 class ProcesoGraduacionOut(BaseModel):
     id: int
     alumno_id: int
+    alumno_nombre: Optional[str] = None
     fecha_inicio: datetime
     estado: str
     tutor_id: Optional[int]
+    tutor_nombre: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

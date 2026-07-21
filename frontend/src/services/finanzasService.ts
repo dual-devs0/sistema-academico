@@ -155,10 +155,23 @@ export const getPostulaciones = (fuente_id: number, estado?: string) =>
 export const revisarPostulacion = (id: number, estado: string, motivo_rechazo?: string) =>
   api.put<Postulacion>(`/becas/postulaciones/${id}/revisar`, { estado, motivo_rechazo })
 
+export const crearBecaCatalogo = (data: {
+  nombre: string
+  fuente_id: number
+  porcentaje_descuento: string
+  monto_fijo?: string | null
+  requisitos?: string | null
+  cupos_totales?: number | null
+  cupos_disponibles?: number | null
+}) => api.post<BecaCatalogo>('/becas/catalogo', data)
+
 // Conceptos arancel
-export const getConceptos = () => api.get<ConceptoArancel[]>('/finanzas/conceptos')
+export const getConceptos = (incluirInactivos = false) =>
+  api.get<ConceptoArancel[]>(`/finanzas/conceptos${incluirInactivos ? '?incluir_inactivos=true' : ''}`)
 export const crearConcepto = (data: Omit<ConceptoArancel, 'id' | 'activo'>) =>
   api.post<ConceptoArancel>('/finanzas/conceptos', data)
+export const actualizarConcepto = (id: number, data: Partial<Pick<ConceptoArancel, 'nombre' | 'monto_base' | 'periodicidad' | 'activo'>>) =>
+  api.patch<ConceptoArancel>(`/finanzas/conceptos/${id}`, data)
 
 // Cuotas
 export const getCuotasAlumno = (alumnoId: number, estado?: string) =>
@@ -195,7 +208,7 @@ export const getEstadoDeuda = (alumnoId: number) =>
 
 // Rendición Excel
 export const downloadRendicion = (fuente: string, periodo?: string): Promise<void> => {
-  const url = `/finanzas/../becas/reportes/rendicion?fuente=${encodeURIComponent(fuente)}${periodo ? `&periodo=${periodo}` : ''}`
+  const url = `/becas/reportes/rendicion?fuente=${encodeURIComponent(fuente)}${periodo ? `&periodo=${periodo}` : ''}`
   return api.download(url, `rendicion_${fuente}_${periodo || 'todos'}.xlsx`)
 }
 
@@ -222,6 +235,17 @@ export const initPagoOnline = (cuota_id: number) =>
 
 export const getPagoOnlineStatus = (pago_id: number) =>
   api.get<PagoOnlineStatus>(`/finanzas/pagos/online/${pago_id}`)
+
+// Resumen / KPIs del panel financiero
+export interface FinanzasResumen {
+  total_recaudado: string
+  cuotas_pendientes: number
+  cuotas_vencidas: number
+  becas_activas: number
+  comprobantes_pendientes: number
+}
+
+export const getResumenFinanzas = () => api.get<FinanzasResumen>('/finanzas/resumen')
 
 // Formatear Guaraníes
 export const formatGs = (valor: string | number): string => {

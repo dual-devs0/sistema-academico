@@ -41,6 +41,13 @@ const css = `
   .pagi-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .pagi-btn:disabled { opacity:.4; cursor:not-allowed; }
   @media(max-width:900px){ .exp-stats { grid-template-columns:1fr; } }
+  .stat-card {
+    background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius);
+    padding:14px 20px; min-width:120px; border-left:4px solid var(--accent);
+  }
+  .stat-value { display:block; font-family:var(--font-mono); font-size:22px; font-weight:800; color:var(--accent-bright); }
+  .stat-label { display:block; font-size:11.5px; font-weight:600; color:var(--text-secondary); margin-top:2px; text-transform:uppercase; letter-spacing:.04em; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 `
 
 type Puntaje = { id: number; user_id: number; materia_id: number; tipo: string; valor: number }
@@ -476,24 +483,67 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
   )
 }
 
-/* ═══ ADMIN — Selector de alumno ════════════════════════════════ */
+/* ═══ ADMIN — Gestión de Calificaciones ═════════════════════════ */
 
 type AlumnoOpt = { id: number; nombre: string; username: string }
-type MateriaAdm = { nombre: string; profesor: string; p1: number | null; p2: number | null; tp: number | null; final: number | null }
+type MateriaAdm = { nombre: string; anio?: number | null; semestre?: number | null; codigo?: string | null; profesor: string; p1: number | null; p2: number | null; tp: number | null; final: number | null }
+type CarreraOpt = { id: number; nombre: string }
+
+const POLL_MS = 30000
+
+function Skeleton({ width = '100%', height }: { width?: string | number; height: number }) {
+  return (
+    <div style={{
+      width, height, borderRadius: 8,
+      background: 'rgba(255,255,255,0.06)',
+      animation: 'shimmer 1.4s ease-in-out infinite',
+      backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 100%)',
+      backgroundSize: '200% 100%',
+    }} />
+  )
+}
 
 function AdminView() {
   const [alumnos, setAlumnos] = useState<AlumnoOpt[]>([])
+  const [carreras, setCarreras] = useState<CarreraOpt[]>([])
+  const [carSelId, setCarSelId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [dropOpen, setDropOpen] = useState(false)
   const [selected, setSelected] = useState<AlumnoOpt | null>(null)
   const [materias, setMaterias] = useState<MateriaAdm[]>([])
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [globalStats, setGlobalStats] = useState<{ alumnos: number; materias: number }>({ alumnos: 0, materias: 0 })
   const dropRef = useRef<HTMLDivElement>(null)
 
+  async function fetchGlobalStats() {
+    try {
+      const [s, users] = await Promise.all([
+        api.get<{ total_materias?: number }>('/materias/stats').catch(() => ({ total_materias: 0 })),
+        api.get<(AlumnoOpt & { role: string })[]>('/users/').catch(() => []),
+      ])
+      setGlobalStats({
+        materias: s.total_materias ?? 0,
+        alumnos: users.filter(u => u.role === 'alumno').length,
+      })
+    } catch { /* ignore */ }
+  }
+
   useEffect(() => {
-    api.get<(AlumnoOpt & { role: string })[]>('/users/').then(data => {
-      setAlumnos(data.filter(u => u.role === 'alumno'))
-    }).catch(() => {})
+    Promise.all([
+      api.get<(AlumnoOpt & { role: string })[]>('/users/').then(d => d.filter(u => u.role === 'alumno')).catch(() => []),
+      api.get<CarreraOpt[]>('/carreras/').catch(() => []),
+      fetchGlobalStats(),
+    ]).then(([al, cars]) => {
+      setAlumnos(al)
+      setCarreras(cars)
+    })
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(fetchGlobalStats, POLL_MS)
+    return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -504,69 +554,152 @@ function AdminView() {
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  function selectAlumno(a: AlumnoOpt) {
+  async function selectAlumno(a: AlumnoOpt) {
     setSelected(a); setSearch(''); setDropOpen(false); setLoading(true)
-    Promise.all([
-      api.get<MateriaApi[]>('/materias/'),
-      api.get<Puntaje[]>(`/puntajes/?user_id=${a.id}`),
-    ]).then(([mats, pts]) => {
+    try {
+      const [mats, pts] = await Promise.all([
+        api.get<(MateriaApi & { anio?: number | null; semestre?: number | null; codigo?: string | null })[]>('/materias/'),
+        api.get<Puntaje[]>(`/puntajes/?user_id=${a.id}`),
+      ])
       const rows: MateriaAdm[] = mats.map(m => {
         const de = (tipo: string) => pts.find(p => p.materia_id === m.id && p.tipo === tipo)?.valor ?? null
-        return { nombre: m.nombre, profesor: m.profesor_nombre || '—', p1: de('parcial1'), p2: de('parcial2'), tp: de('practico'), final: de('final') }
+        return {
+          nombre: m.nombre, codigo: m.codigo, anio: m.anio, semestre: m.semestre,
+          profesor: m.profesor_nombre || '—',
+          p1: de('parcial1'), p2: de('parcial2'), tp: de('practico'), final: de('final'),
+        }
       }).filter(m => m.p1 !== null || m.p2 !== null || m.tp !== null || m.final !== null)
       setMaterias(rows)
-    }).finally(() => setLoading(false))
+      setLastUpdate(new Date())
+    } catch { /* ignore */ }
+    setLoading(false)
   }
 
-  const filtered = alumnos.filter(a =>
-    (a.nombre || a.username).toLowerCase().includes(search.toLowerCase()) ||
-    a.username.toLowerCase().includes(search.toLowerCase())
-  )
+  async function handleRefresh() {
+    if (!selected) return
+    setRefreshing(true)
+    await selectAlumno(selected)
+    setRefreshing(false)
+  }
+
+  const filtered = search
+    ? alumnos.filter(a =>
+        (a.nombre || a.username).toLowerCase().includes(search.toLowerCase()) ||
+        a.username.toLowerCase().includes(search.toLowerCase())
+      ).slice(0, 12)
+    : []
 
   const calc = (m: MateriaAdm) => {
     const ns = [m.p1, m.p2, m.tp, m.final].filter((n): n is number => n !== null)
     return ns.length ? Math.round(ns.reduce((a, b) => a + b, 0) / ns.length * 10) / 10 : null
   }
 
+  const proms = materias.map(calc).filter((p): p is number => p !== null)
+  const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : null
+  const aprobadas = materias.filter(m => (calc(m) ?? 0) >= 6).length
+
+  /* ── Agrupar por año → semestre ──────────────────────────── */
+  const grupos = new Map<number, Map<number, MateriaAdm[]>>()
+  for (const m of materias) {
+    const anio = m.anio ?? 1
+    const sem = m.semestre ?? 1
+    if (!grupos.has(anio)) grupos.set(anio, new Map())
+    const g = grupos.get(anio)!
+    if (!g.has(sem)) g.set(sem, [])
+    g.get(sem)!.push(m)
+  }
+  const anios = [...grupos.entries()].sort(([a], [b]) => a - b)
+
   return (
     <>
-      <div style={{ marginBottom: 18 }}>
-        <h1 className="page-title">Calificaciones — Administrador</h1>
-        <p className="page-subtitle">Consultá el expediente de cualquier alumno</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 className="page-title">Calificaciones — Administrador</h1>
+          <p className="page-subtitle">Consultá el expediente de cualquier alumno</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {lastUpdate && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
+              <i className="ti ti-refresh" style={{ fontSize: 14 }} />
+              <span>{lastUpdate.toLocaleTimeString()}</span>
+            </div>
+          )}
+          {selected && (
+            <button className="btn-ghost" onClick={handleRefresh} disabled={refreshing} style={{ padding: '9px 14px', fontSize: 12 }}>
+              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div style={{ maxWidth: 420, marginBottom: 22 }}>
-        <div className="mono-label" style={{ marginBottom: 6 }}>Alumno</div>
+      {/* ── Stats siempre visibles ── */}
+      <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div className="stat-card" style={{ borderLeftColor: 'var(--accent)' }}>
+          <span className="stat-value">{selected ? materias.length : globalStats.materias}</span>
+          <span className="stat-label">Materias</span>
+        </div>
+        <div className="stat-card" style={{ borderLeftColor: 'var(--info)' }}>
+          <span className="stat-value" style={{ color: 'var(--info)' }}>
+            {selected ? (promGeneral?.toFixed(2) ?? '—') : globalStats.alumnos}
+          </span>
+          <span className="stat-label">{selected ? 'Promedio General' : 'Alumnos'}</span>
+        </div>
         {selected ? (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'var(--accent-muted)', border: '1px solid var(--accent-hover)', borderRadius: 10, padding: '8px 14px' }}>
-            <span className="avatar-initials" style={{ width: 26, height: 26, fontSize: 10 }}>{(selected.nombre || selected.username).slice(0, 2)}</span>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>{selected.nombre || selected.username}</span>
-            <button onClick={() => { setSelected(null); setMaterias([]) }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
-              <i className="ti ti-x" />
-            </button>
+          <div className="stat-card" style={{ borderLeftColor: 'var(--success)' }}>
+            <span className="stat-value" style={{ color: 'var(--success)' }}>{aprobadas}<span className="mono-label" style={{ fontSize: 12, color: 'var(--text-muted)' }}> /{materias.length}</span></span>
+            <span className="stat-label">Aprobadas</span>
           </div>
         ) : (
-          <div ref={dropRef} style={{ position: 'relative' }}>
-            <input className="input-uca" placeholder="Buscar alumno…" value={search}
-              onChange={e => { setSearch(e.target.value); setDropOpen(true) }} onFocus={() => setDropOpen(true)} />
-            {dropOpen && filtered.length > 0 && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', borderRadius: 12, zIndex: 50, maxHeight: 230, overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,.5)' }}>
-                {filtered.map(a => (
-                  <div key={a.id} onClick={() => selectAlumno(a)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                    <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(a.nombre || a.username).slice(0, 2)}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{a.nombre || a.username}</div>
-                      <div className="mono-label" style={{ fontSize: 9 }}>@{a.username}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="stat-card" style={{ borderLeftColor: 'var(--warning)' }}>
+            <span className="stat-value" style={{ color: 'var(--warning)' }}>{carreras.length}</span>
+            <span className="stat-label">Carreras</span>
           </div>
         )}
+      </div>
+
+      {/* ── Buscador + Carrera ── */}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 260, maxWidth: 380 }}>
+          <div className="mono-label" style={{ marginBottom: 6 }}>Carrera (filtro)</div>
+          <select className="input-uca" value={carSelId ?? ''}
+            onChange={e => setCarSelId(Number(e.target.value) || null)}>
+            <option value="">Todas las carreras</option>
+            {carreras.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 2, minWidth: 260 }}>
+          <div className="mono-label" style={{ marginBottom: 6 }}>Alumno</div>
+          {selected ? (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'var(--accent-muted)', border: '1px solid var(--accent-hover)', borderRadius: 10, padding: '8px 14px' }}>
+              <span className="avatar-initials" style={{ width: 24, height: 24, fontSize: 9 }}>{(selected.nombre || selected.username).slice(0, 2).toUpperCase()}</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{selected.nombre || selected.username}</span>
+              <button onClick={() => { setSelected(null); setMaterias([]) }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
+                <i className="ti ti-x" />
+              </button>
+            </div>
+          ) : (
+            <div ref={dropRef} style={{ position: 'relative' }}>
+              <input className="input-uca" placeholder="Buscar alumno por nombre o usuario…" value={search}
+                onChange={e => { setSearch(e.target.value); setDropOpen(true) }} onFocus={() => setDropOpen(true)} />
+              {dropOpen && filtered.length > 0 && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', borderRadius: 12, zIndex: 50, maxHeight: 230, overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,.5)' }}>
+                  {filtered.map(a => (
+                    <div key={a.id} onClick={() => selectAlumno(a)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                      <span className="avatar-initials" style={{ width: 28, height: 28, fontSize: 10 }}>{(a.nombre || a.username).slice(0, 2).toUpperCase()}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>{a.nombre || a.username}</div>
+                        <div className="mono-label" style={{ fontSize: 9 }}>@{a.username}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {!selected ? (
@@ -575,37 +708,77 @@ function AdminView() {
           <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 13 }}>Seleccioná un alumno para ver sus calificaciones.</p>
         </div>
       ) : loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando…</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[1, 2].map(i => (
+            <div key={i} className="card" style={{ padding: '14px 18px' }}>
+              <Skeleton width={140} height={16} />
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                {[1, 2, 3].map(j => <Skeleton key={j} width={60} height={40} />)}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : materias.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 46 }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Este alumno no tiene notas cargadas aún.</p>
+          <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Este alumno no tiene notas cargadas aún.</p>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="table-uca">
-            <thead>
-              <tr><th>Materia</th><th style={{ textAlign: 'center' }}>P1</th><th style={{ textAlign: 'center' }}>P2</th><th style={{ textAlign: 'center' }}>Trabajos</th><th style={{ textAlign: 'center' }}>Final</th><th style={{ textAlign: 'right' }}>Estado</th></tr>
-            </thead>
-            <tbody>
-              {materias.map(m => {
-                const p = calc(m)
-                const est = estadoDe(p)
-                return (
-                  <tr key={m.nombre}>
-                    <td>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{m.nombre}</div>
-                      <div className="mono-label" style={{ fontSize: 9 }}>{m.profesor}</div>
-                    </td>
-                    {[m.p1, m.p2, m.tp, m.final].map((n, i) => (
-                      <td key={i} style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700, color: notaColor(n) }}>{n ?? '—'}</td>
-                    ))}
-                    <td style={{ textAlign: 'right' }}><span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* ── Pills por año ── */}
+          {anios.length > 1 && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              {anios.map(([anio]) => (
+                <span key={anio} className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)', fontSize: 11, padding: '5px 14px' }}>
+                  <i className="ti ti-calendar-stats" style={{ marginRight: 4, fontSize: 11 }} />{anio}° Año
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* ── Materias por semestre ── */}
+          {anios.map(([anio, semMap]) => (
+            <div key={anio} style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-bright)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="ti ti-calendar-stats" /> {anio}° Año
+              </div>
+              {[...semMap.entries()].sort(([a], [b]) => a - b).map(([sem, lista]) => (
+                <div key={sem} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent-bright)' }} />
+                    {sem}° Semestre · {lista.length} materia{lista.length !== 1 ? 's' : ''}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
+                    {lista.map(m => {
+                      const p = calc(m)
+                      const est = estadoDe(p)
+                      return (
+                        <div key={m.nombre} className="card" style={{ padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.3 }}>{m.nombre}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 800, color: notaColor(p), flexShrink: 0, marginLeft: 8 }}>{p ?? '—'}</span>
+                          </div>
+                          <div className="mono-label" style={{ fontSize: 10, marginBottom: 8 }}>
+                            {m.codigo || `MAT-${String(materias.indexOf(m) + 1).padStart(3, '0')}`} · {m.profesor}
+                          </div>
+                          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6 }}>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Parcial 1</span><b style={{ color: notaColor(m.p1) }}>{m.p1 ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Parcial 2</span><b style={{ color: notaColor(m.p2) }}>{m.p2 ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Trabajos</span><b style={{ color: notaColor(m.tp) }}>{m.tp ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Final</span><b style={{ color: notaColor(m.final) }}>{m.final ?? '—'}</b></div>
+                          </div>
+                          <div style={{ marginTop: 8 }}>
+                            <span className="badge" style={{ background: est.bg, color: est.color, fontSize: 10 }}>{est.label}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </>
       )}
     </>
   )

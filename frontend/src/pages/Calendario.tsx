@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, emitToast, getCurrentUser } from '../lib/api'
+
+const POLL_MS = 30000
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -37,6 +39,13 @@ const css = `
   }
   .prox-item { border-radius:12px; background:var(--bg-elevated); padding:11px 13px; margin-bottom:10px; }
   .cal-timeline { display:none; }
+  .cal-last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+  .cal-last-upd i.spin { animation:cal-spin 1s linear infinite; }
+  @keyframes cal-spin { to { transform:rotate(360deg); } }
+  .cal-err-banner {
+    display:flex; align-items:center; gap:8px; background:#ef444415; border:1px solid #ef444440;
+    color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12.5px; font-weight:600; margin-bottom:16px;
+  }
   @media(max-width:1024px){ .cal-grid-page { grid-template-columns:1fr; } }
   @media(max-width:768px){
     .cal-month-card { display:none; }
@@ -53,11 +62,17 @@ export default function Calendario() {
   const [actual, setActual] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
   const [eventos, setEventos] = useState<Evento[]>([])
   const [selDia, setSelDia] = useState<string | null>(null)
+  const [verTodosProximos, setVerTodosProximos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [draft, setDraft] = useState<Evento>({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '' })
   const [saving, setSaving] = useState(false)
   const [cargandoPdf, setCargandoPdf] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
+  const firstLoad = useRef(true)
   const role = getCurrentUser()?.role
 
   function onPdfSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -88,10 +103,28 @@ export default function Calendario() {
     reader.readAsDataURL(file)
   }
 
-  function cargar() {
-    api.get<Evento[]>('/eventos/').then(setEventos).catch(() => {})
-  }
-  useEffect(cargar, [])
+  const cargar = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true)
+    if (firstLoad.current) setLoading(true)
+    try {
+      const res = await api.get<Evento[]>('/eventos/')
+      setEventos(res)
+      setError('')
+      setLastUpdate(new Date())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar los eventos. Mostrando último dato disponible.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+      firstLoad.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const y = actual.getFullYear(), m = actual.getMonth()
   const primerDia = (new Date(y, m, 1).getDay() + 6) % 7 // lunes=0
@@ -104,7 +137,8 @@ export default function Calendario() {
 
   const porDia = (k: string) => eventos.filter(e => e.fecha === k)
   const hoyKey = dateKey(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
-  const proximos = [...eventos].filter(e => e.fecha >= hoyKey).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 5)
+  const proximosTodos = [...eventos].filter(e => e.fecha >= hoyKey).sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const proximos = verTodosProximos ? proximosTodos : proximosTodos.slice(0, 5)
   const delMes = eventos.filter(e => e.fecha.startsWith(`${y}-${String(m + 1).padStart(2, '0')}`)).sort((a, b) => a.fecha.localeCompare(b.fecha))
 
   async function guardarEvento() {
@@ -129,16 +163,33 @@ export default function Calendario() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <h1 className="page-title">{MESES[m]} {y}</h1>
           <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
-            <i className="ti ti-sparkles" /> {delMes.length} eventos este mes
+            <i className="ti ti-sparkles" /> {loading ? 'Cargando…' : `${delMes.length} eventos este mes`}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-ghost" onClick={() => setActual(new Date(y, m - 1, 1))} aria-label="Mes anterior"><i className="ti ti-chevron-left" /></button>
-          <button className="btn-ghost" onClick={() => setActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}>Hoy</button>
-          <button className="btn-ghost" onClick={() => setActual(new Date(y, m + 1, 1))} aria-label="Mes siguiente"><i className="ti ti-chevron-right" /></button>
-          <button className="btn-ghost" onClick={() => emitToast('Sincronización — próximamente', 'warning')}><i className="ti ti-refresh" /> Sincronizar</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {lastUpdate && (
+            <span className="cal-last-upd">
+              <i className={`ti ti-refresh${refreshing ? ' spin' : ''}`} />
+              {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-ghost" onClick={() => setActual(new Date(y, m - 1, 1))} aria-label="Mes anterior"><i className="ti ti-chevron-left" /></button>
+            <button className="btn-ghost" onClick={() => setActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}>Hoy</button>
+            <button className="btn-ghost" onClick={() => setActual(new Date(y, m + 1, 1))} aria-label="Mes siguiente"><i className="ti ti-chevron-right" /></button>
+            <button className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}>
+              <i className={`ti ti-refresh${refreshing ? ' spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {error && (
+        <div className="cal-err-banner">
+          <i className="ti ti-alert-circle" style={{ flexShrink: 0 }} />
+          {error}
+        </div>
+      )}
 
       <div className="cal-grid-page">
         <div>
@@ -213,48 +264,48 @@ export default function Calendario() {
         {/* Panel derecho */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="card">
-            <div className="mono-label" style={{ marginBottom: 10 }}>Sincronización <i className="ti ti-refresh" style={{ float: 'right' }} /></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-                <i className="ti ti-brand-google" style={{ color: 'var(--accent-bright)' }} />
-              </span>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 700 }}>Google Calendar</div>
-                <div className="mono-label" style={{ fontSize: 9 }}>Última sinc: —</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ fontSize: 15, fontWeight: 800 }}>Próximos</h3>
-              <span className="mono-label" style={{ color: 'var(--accent-bright)', cursor: 'pointer' }}>Ver todo</span>
+              {proximosTodos.length > 5 && (
+                <button
+                  className="mono-label"
+                  style={{ color: 'var(--accent-bright)', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+                  onClick={() => setVerTodosProximos(v => !v)}>
+                  {verTodosProximos ? 'Ver menos' : 'Ver todo'}
+                </button>
+              )}
             </div>
             {proximos.length === 0 ? (
               <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Sin eventos próximos.</p>
-            ) : proximos.map(e => {
-              const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
-              return (
-                <div key={e.id} className="prox-item">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.badge}</span>
-                    <span className="mono-label" style={{ fontSize: 9 }}>{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{e.titulo}</div>
-                  {e.descripcion && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>{e.descripcion}</div>}
-                </div>
-              )
-            })}
+            ) : (
+              <div style={verTodosProximos ? { maxHeight: 420, overflowY: 'auto', paddingRight: 4 } : undefined}>
+                {proximos.map(e => {
+                  const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
+                  return (
+                    <div key={e.id} className="prox-item">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                        <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.badge}</span>
+                        <span className="mono-label" style={{ fontSize: 9 }}>{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{e.titulo}</div>
+                      {e.descripcion && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>{e.descripcion}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
-          <button className="card" onClick={() => setModalOpen(true)}
-            style={{ cursor: 'pointer', textAlign: 'center', borderStyle: 'dashed', color: 'var(--text-secondary)' }}>
-            <i className="ti ti-circle-plus" style={{ fontSize: 24, display: 'block', marginBottom: 6, color: 'var(--accent-bright)' }} />
-            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Agendar Evento</span>
-            <div style={{ fontSize: 11.5, marginTop: 3 }}>Presiona para crear un nuevo recordatorio</div>
-          </button>
+          {(role === 'admin' || role === 'profesor') && (
+            <button className="card" onClick={() => setModalOpen(true)}
+              style={{ cursor: 'pointer', textAlign: 'center', borderStyle: 'dashed', color: 'var(--text-secondary)' }}>
+              <i className="ti ti-circle-plus" style={{ fontSize: 24, display: 'block', marginBottom: 6, color: 'var(--accent-bright)' }} />
+              <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Agendar Evento</span>
+              <div style={{ fontSize: 11.5, marginTop: 3 }}>Presiona para crear un nuevo recordatorio</div>
+            </button>
+          )}
 
-          {role === 'admin' && (
+          {(role === 'admin' || role === 'profesor') && (
             <div className="card" style={{ padding: '14px 16px' }}>
               <div className="mono-label" style={{ marginBottom: 6 }}>Carga automática (PDF)</div>
               <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>

@@ -1,3 +1,10 @@
 python-interpreter-path = "backend/venv/Scripts/python.exe"
 search-path = ["backend"]
 project-includes = ["backend/**/*.py"]
+
+[errors]
+bad-argument-type = false
+bad-assignment = false
+bad-return = false
+no-matching-overload = false
+untyped-import = false

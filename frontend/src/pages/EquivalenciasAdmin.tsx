@@ -1,24 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { emitToast } from '../lib/api'
 import { api } from '../lib/api'
 import type { SolicitudEquivalencia } from '../services/equivalenciasService'
 
 type Tab = 'pendientes' | 'resueltas' | 'todas'
 
+const POLL_MS = 30000
+
 const css = `
-  .eqa-title { font-size:22px; font-weight:800; margin-bottom:20px; color:var(--text-primary); }
+  .eqa-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+  .eqa-title { display:flex; align-items:center; gap:10px; font-size:22px; font-weight:800; color:var(--text-primary); margin:0; }
+  .eqa-title i { color:var(--accent-bright); font-size:22px; }
+  .eqa-last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+  .eqa-last-upd svg { width:13px; height:13px; }
+  .eqa-last-upd svg.spin { animation:eqa-spin 1s linear infinite; }
+  @keyframes eqa-spin { to { transform:rotate(360deg); } }
   .eqa-card {
     background:var(--bg-elevated); border:1px solid var(--border-subtle);
     border-radius:16px; padding:18px 22px; margin-bottom:12px;
   }
+  .eqa-search-row { display:flex; gap:10px; align-items:flex-end; }
+  .eqa-search-row > div:first-child { flex:1; }
   .eqa-input {
     padding:8px 12px; border-radius:10px; font-size:13px;
     background:var(--bg-base); border:1px solid var(--border-subtle);
-    color:var(--text-primary); width:100%; margin-bottom:12px;
+    color:var(--text-primary); width:100%;
   }
   .eqa-btn {
-    padding:8px 18px; border-radius:10px; font-size:13px; font-weight:700;
+    padding:9px 18px; border-radius:10px; font-size:13px; font-weight:700;
     border:none; cursor:pointer; background:var(--accent-bright); color:#fff; transition:opacity .18s;
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
   }
   .eqa-btn:hover { opacity:.88; }
   .eqa-btn:disabled { opacity:.5; cursor:not-allowed; }
@@ -28,10 +39,11 @@ const css = `
   .eqa-label { font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:4px; }
   .eqa-badge {
     padding:4px 12px; border-radius:999px; font-size:11px; font-weight:700;
-    text-transform:uppercase; letter-spacing:.05em;
+    text-transform:uppercase; letter-spacing:.05em; white-space:nowrap;
   }
   .eqa-badge.pendiente { background:rgba(245,158,11,.15); color:#f59e0b; }
-  .eqa-badge.aprobada { background:rgba(16,185,129,.15); color:#10b981; }
+  .eqa-badge.en_proceso { background:rgba(59,130,246,.15); color:#3b82f6; }
+  .eqa-badge.resuelta { background:rgba(16,185,129,.15); color:#10b981; }
   .eqa-badge.rechazada { background:rgba(239,68,68,.15); color:#ef4444; }
   .eqa-tabs { display:flex; gap:4px; margin-bottom:16px; }
   .eqa-tab {
@@ -42,16 +54,21 @@ const css = `
   .eqa-tab.active { background:var(--accent-bright); color:#fff; border-color:var(--accent-bright); }
   .eqa-table { width:100%; border-collapse:collapse; font-size:13px; }
   .eqa-table th { text-align:left; padding:10px 14px; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border-subtle); }
-  .eqa-table td { padding:10px 14px; border-bottom:1px solid var(--border-subtle); color:var(--text-primary); }
+  .eqa-table td { padding:12px 14px; border-bottom:1px solid var(--border-subtle); color:var(--text-primary); vertical-align:middle; }
   .eqa-table tr:last-child td { border-bottom:none; }
   .eqa-empty { text-align:center; padding:32px; color:var(--text-secondary); font-size:14px; }
+  .eqa-err { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
 `
 
 export default function EquivalenciasAdmin() {
   const [alumnoId, setAlumnoId] = useState('')
   const [solicitudes, setSolicitudes] = useState<SolicitudEquivalencia[]>([])
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('todas')
+  const buscadoIdRef = useRef('')
 
   const [detalle, setDetalle] = useState<SolicitudEquivalencia | null>(null)
 
@@ -67,18 +84,32 @@ export default function EquivalenciasAdmin() {
 
   const [saving, setSaving] = useState(false)
 
-  const buscar = () => {
+  const buscar = useCallback((manual = false) => {
+    const id = buscadoIdRef.current
+    if (!id) return
+    if (manual) setRefreshing(true)
+    else setLoading(true)
+    api.get<SolicitudEquivalencia[]>(`/equivalencias/alumno/${Number(id)}`)
+      .then(res => { setSolicitudes(res); setError(''); setLastUpdate(new Date()) })
+      .catch(() => setError('No se pudieron cargar las equivalencias. Mostrando el último dato disponible.'))
+      .finally(() => { setLoading(false); setRefreshing(false) })
+  }, [])
+
+  const handleBuscarClick = () => {
     if (!alumnoId) { emitToast('Ingresá un ID de alumno', 'error'); return }
-    setLoading(true)
-    api.get<SolicitudEquivalencia[]>(`/equivalencias/alumno/${Number(alumnoId)}`)
-      .then(setSolicitudes)
-      .catch(() => emitToast('Error cargando equivalencias', 'error'))
-      .finally(() => setLoading(false))
+    buscadoIdRef.current = alumnoId
+    buscar()
   }
 
+  // Auto-refresh en tiempo real mientras haya un alumno buscado.
+  useEffect(() => {
+    const intervalId = setInterval(() => { if (buscadoIdRef.current) buscar(true) }, POLL_MS)
+    return () => clearInterval(intervalId)
+  }, [buscar])
+
   const filtradas = solicitudes.filter(s => {
-    if (tab === 'pendientes') return s.estado === 'pendiente'
-    if (tab === 'resueltas') return s.estado === 'aprobada' || s.estado === 'rechazada'
+    if (tab === 'pendientes') return s.estado === 'pendiente' || s.estado === 'en_proceso'
+    if (tab === 'resueltas') return s.estado === 'resuelta' || s.estado === 'rechazada'
     return true
   })
 
@@ -100,7 +131,7 @@ export default function EquivalenciasAdmin() {
       })
       emitToast('Solicitud resuelta', 'success')
       setResolver(null)
-      buscar()
+      buscar(true)
     } catch (e: unknown) {
       emitToast(e instanceof Error ? e.message : 'Error al resolver', 'error')
     } finally { setSaving(false) }
@@ -128,7 +159,7 @@ export default function EquivalenciasAdmin() {
       })
       emitToast('Examen registrado', 'success')
       setExamen(null)
-      buscar()
+      buscar(true)
     } catch (e: unknown) {
       emitToast(e instanceof Error ? e.message : 'Error al registrar examen', 'error')
     } finally { setSaving(false) }
@@ -137,16 +168,36 @@ export default function EquivalenciasAdmin() {
   return (
     <div>
       <style>{css}</style>
-      <h2 className="eqa-title">Equivalencias — Admin</h2>
+
+      <div className="eqa-header">
+        <h2 className="eqa-title"><i className="ti ti-arrows-exchange" /> Equivalencias — Admin</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastUpdate && (
+            <span className="eqa-last-upd">
+              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" /></svg>
+              {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button className="eqa-btn ghost" onClick={() => buscar(true)} disabled={refreshing || !buscadoIdRef.current}>
+            <i className="ti ti-refresh" /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="eqa-err"><i className="ti ti-alert-circle" /> {error}</div>
+      )}
 
       <div className="eqa-card">
         <div className="eqa-label">ID del alumno</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input className="eqa-input" type="number" value={alumnoId}
-            onChange={e => setAlumnoId(e.target.value)}
-            placeholder="Ej: 42" />
-          <button className="eqa-btn" onClick={buscar} disabled={loading} style={{ marginBottom: 12 }}>
-            {loading ? 'Buscando…' : 'Buscar'}
+        <div className="eqa-search-row">
+          <div>
+            <input className="eqa-input" type="number" value={alumnoId}
+              onChange={e => setAlumnoId(e.target.value)}
+              placeholder="Ej: 42" />
+          </div>
+          <button className="eqa-btn" onClick={handleBuscarClick} disabled={loading}>
+            <i className="ti ti-search" /> {loading ? 'Buscando…' : 'Buscar'}
           </button>
         </div>
       </div>
@@ -161,14 +212,14 @@ export default function EquivalenciasAdmin() {
 
       {filtradas.length === 0 ? (
         <div className="eqa-card eqa-empty">
-          {alumnoId ? 'No hay solicitudes para este alumno.' : 'Buscá un alumno para ver sus solicitudes.'}
+          {buscadoIdRef.current ? 'No hay solicitudes para este alumno.' : 'Buscá un alumno para ver sus solicitudes.'}
         </div>
       ) : (
         <div className="eqa-card" style={{ padding: 0, overflow: 'hidden' }}>
           <table className="eqa-table">
             <thead>
               <tr>
-                <th>Alumno ID</th>
+                <th>Alumno</th>
                 <th>Tipo</th>
                 <th>Universidad Origen</th>
                 <th>Estado</th>
@@ -178,15 +229,18 @@ export default function EquivalenciasAdmin() {
             <tbody>
               {filtradas.map(s => (
                 <tr key={s.id}>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{s.alumno_id}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{s.alumno_nombre || `Alumno #${s.alumno_id}`}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>ID {s.alumno_id}</div>
+                  </td>
                   <td style={{ textTransform: 'capitalize' }}>{s.tipo}</td>
                   <td>{s.universidad_origen || '—'}</td>
-                  <td><span className={`eqa-badge ${s.estado}`}>{s.estado}</span></td>
+                  <td><span className={`eqa-badge ${s.estado}`}>{s.estado.replace('_', ' ')}</span></td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button className="eqa-btn ghost" onClick={() => setDetalle(s)}
                         style={{ padding: '4px 10px', fontSize: 11 }}>Ver</button>
-                      {s.estado === 'pendiente' && (
+                      {(s.estado === 'pendiente' || s.estado === 'en_proceso') && (
                         <>
                           <button className="eqa-btn" onClick={() => abrirResolver(s)}
                             style={{ padding: '4px 10px', fontSize: 11 }}>Resolver</button>
@@ -212,14 +266,10 @@ export default function EquivalenciasAdmin() {
               <button onClick={() => setDetalle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
             </div>
             <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
-              <div><strong>Alumno ID:</strong> {detalle.alumno_id}</div>
+              <div><strong>Alumno:</strong> {detalle.alumno_nombre || `Alumno #${detalle.alumno_id}`} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>(ID {detalle.alumno_id})</span></div>
               <div><strong>Tipo:</strong> {detalle.tipo}</div>
               <div><strong>Universidad origen:</strong> {detalle.universidad_origen || '—'}</div>
-              <div><strong>Estado:</strong> <span className={`eqa-badge ${detalle.estado}`}>{detalle.estado}</span></div>
-              <hr style={{ borderColor: 'var(--border-subtle)', margin: '8px 0' }} />
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12, fontStyle: 'italic' }}>
-                Documentos adjuntos no disponibles (placeholder).
-              </div>
+              <div><strong>Estado:</strong> <span className={`eqa-badge ${detalle.estado}`}>{detalle.estado.replace('_', ' ')}</span></div>
             </div>
           </div>
         </div>

@@ -1,19 +1,36 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { getCondicionEgreso, type CondicionEgreso } from '../services/graduacionService'
+
+const POLL_MS = 30000
 
 export default function GraduacionAlumno() {
   const [condicion, setCondicion] = useState<CondicionEgreso | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [error, setError] = useState('')
   const user = getCurrentUser()
+  const firstLoad = useRef(true)
+
+  const cargar = useCallback((manual = false) => {
+    if (!user?.user_id) return
+    if (manual) setRefreshing(true)
+    if (firstLoad.current) setLoading(true)
+    getCondicionEgreso(user.user_id)
+      .then(c => { setCondicion(c); setError(''); setLastUpdate(new Date()) })
+      .catch(() => {
+        setError('No se pudo actualizar la condición de egreso. Mostrando el último dato disponible.')
+        if (firstLoad.current) emitToast('Error cargando condición', 'error')
+      })
+      .finally(() => { setLoading(false); setRefreshing(false); firstLoad.current = false })
+  }, [user?.user_id])
 
   useEffect(() => {
-    if (!user?.user_id) return
-    getCondicionEgreso(user.user_id)
-      .then(setCondicion)
-      .catch(() => emitToast('Error cargando condición', 'error'))
-      .finally(() => setLoading(false))
-  }, [user?.user_id])
+    cargar()
+    const id = setInterval(() => cargar(true), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   if (loading) return <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 32 }}>Cargando...</div>
 
@@ -23,10 +40,31 @@ export default function GraduacionAlumno() {
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 4 }}>🎓 Mi Graduación</h1>
+      <style>{'@keyframes gaSpin{to{transform:rotate(360deg)}}'}</style>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
+        <h1 className="page-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <i className="ti ti-graduation-cap" style={{ color: 'var(--accent-bright)' }} /> Mi Graduación
+        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastUpdate && (
+            <span className="mono-label" style={{ fontSize: 11 }}>
+              Actualizado {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button type="button" className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}>
+            <i className="ti ti-refresh" style={refreshing ? { animation: 'gaSpin 1s linear infinite' } : {}} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
       <p className="page-subtitle" style={{ marginBottom: 20 }}>
         Verificá tu condición de egreso y gestioná tu proceso de graduación.
       </p>
+
+      {error && (
+        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--danger-subtle)', color: 'var(--danger)', fontSize: 12.5, marginBottom: 16 }}>
+          <i className="ti ti-alert-triangle" style={{ marginRight: 6 }} />{error}
+        </div>
+      )}
 
       {condicion ? (
         <>

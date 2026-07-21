@@ -266,7 +266,6 @@ def crear_solicitud(alumno_id: int, tipo_tramite_id: int, db: Session) -> Solici
                 f"{' — ' + regularidad['motivo'] if regularidad['motivo'] else ''})"
             )
 
-    if not tipo.requiere_aprobacion and generador:
         solicitud = Solicitud(
             alumno_id=alumno_id, tipo_tramite_id=tipo_tramite_id, estado="pendiente"
         )

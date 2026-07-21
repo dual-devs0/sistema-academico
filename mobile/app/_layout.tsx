@@ -59,7 +59,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const inAuthGroup = segments[0] === "(auth)";
     if (status === "anon" && !inAuthGroup) {
-  const { colors } = useTheme();
       router.replace("/(auth)/login");
     } else if (status === "auth" && inAuthGroup) {
       router.replace("/(tabs)");
@@ -115,62 +114,10 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
   );
 }
 
+// AUDIT-FIX M-1: función duplicada eliminada post-merge
 function ThemeStatusBar() {
   const { effective } = useTheme();
   return <StatusBar style={effective === "dark" ? "light" : "dark"} />;
-}
-
-/**
- * Orquesta la splash animada contra el auth check.
- * - Muestra `SplashAnimated` hasta que se cumplan AMBAS condiciones:
- *   1. la animación terminó su secuencia propia (onFinish, ~2000ms)
- *   2. `useAuth().status` ya no es 'loading' (SecureStore + refresh resueltos)
- * - Si el auth check demora más de 2s, la splash queda en su frame final
- *   (todos los valores animados ya asentados) hasta que status resuelva —
- *   no vuelve a disparar la secuencia.
- */
-function AppGate() {
-  const { colors } = useTheme();
-
-  const { status } = useAuth();
-  const [animDone, setAnimDone] = useState(false);
-
-  if (!animDone || status === "loading") {
-  const { colors } = useTheme();
-    return <SplashAnimated onFinish={() => setAnimDone(true)} />;
-  }
-
-  return (
-    <AuthGate>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-          animation: "fade",
-        }}
-      >
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="scanner"
-          options={{
-            presentation: "modal",
-            animation: "fade",
-          }}
-        />
-        <Stack.Screen name="cuenta" />
-        <Stack.Screen name="examenes" />
-        <Stack.Screen name="cursos/[id]" />
-      </Stack>
-    </AuthGate>
-  );
-}
-
-function ThemeStatusBar() {
-  const { colors } = useTheme();
-
-  const { effective } = useTheme();
-  return <StatusBar style="light" />;
 }
 
 export default function RootLayout() {

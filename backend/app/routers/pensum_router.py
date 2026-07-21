@@ -5,6 +5,7 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.pensum import (
     validar_correlatividades,
+    validar_correlatividad_estructural,
     promedio_y_estado_intento,
     _calcular_estado_cached,
     _tiene_nota_aprobatoria_cached,
@@ -98,6 +99,55 @@ def quitar_materia_de_malla(
     return {"detail": "Materia removida de la malla"}
 
 
+from pydantic import BaseModel
+
+
+class PensumMateriaUpdate(BaseModel):
+    semestre: int | None = None
+    creditos: int | None = None
+    es_electiva: bool | None = None
+
+
+@router.patch("/materias/{pensum_materia_id}", response_model=schemas.pensum.PensumMateriaOut)
+def actualizar_pensum_materia(
+    pensum_materia_id: int,
+    data: PensumMateriaUpdate,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    pm = (
+        db.query(models.pensum_materia.PensumMateria)
+        .filter(models.pensum_materia.PensumMateria.id == pensum_materia_id)
+        .first()
+    )
+    if not pm:
+        raise HTTPException(status_code=404, detail="PensumMateria no encontrada")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(pm, key, value)
+    db.commit()
+    db.refresh(pm)
+
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == pm.materia_id)
+        .first()
+    )
+    return schemas.pensum.PensumMateriaOut(
+        id=pm.id,
+        carrera_id=pm.carrera_id,
+        materia_id=pm.materia_id,
+        materia_nombre=materia.nombre if materia else None,
+        materia_codigo=materia.codigo if materia else None,
+        semestre=pm.semestre,
+        creditos=pm.creditos,
+        es_electiva=pm.es_electiva,
+    )
+
+
 @router.get("/correlatividades", response_model=list[schemas.pensum.CorrelatividadOut])
 def listar_correlatividades(
     carrera_id: int | None = None,
@@ -141,6 +191,19 @@ def crear_correlatividad(
             .first()
         ):
             raise HTTPException(status_code=404, detail=f"Materia {mid} no encontrada")
+
+    # Find the carrera_id from any pensum_materia containing materia_id
+    pm = (
+        db.query(models.pensum_materia.PensumMateria)
+        .filter(models.pensum_materia.PensumMateria.materia_id == data.materia_id)
+        .first()
+    )
+    if pm:
+        validacion = validar_correlatividad_estructural(
+            pm.carrera_id, data.materia_id, data.prerrequisito_id, db
+        )
+        if not validacion["valido"]:
+            raise HTTPException(status_code=422, detail=validacion["error"])
 
     nueva = models.correlatividad.Correlatividad(
         materia_id=data.materia_id,

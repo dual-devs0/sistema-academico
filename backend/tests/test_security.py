@@ -291,37 +291,6 @@ def test_eventos_get_requires_auth(client, seed):
 # ===================== FORUM ENROLLMENT CHECK =====================
 
 
-def test_alumno_cannot_create_thread_in_unenrolled_materia(client, seed, tokens, db):
-    from app.models.materia import Materia
-
-    other = Materia(nombre="Materia Sin Inscripcion")
-    db.add(other)
-    db.commit()
-    db.refresh(other)
-
-    res = client.post(
-        "/foro/hilos",
-        json={"materia_id": other.id, "titulo": "Thread sin inscripcion"},
-        headers=auth(tokens["alumno"]),
-    )
-    assert res.status_code == 403
-
-
-def test_alumno_can_create_thread_in_enrolled_materia(client, seed, tokens, db):
-    from app.models.inscripcion import Inscripcion
-
-    insc = Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=seed["oferta"].id)
-    db.add(insc)
-    db.commit()
-
-    res = client.post(
-        "/foro/hilos",
-        json={"materia_id": seed["materia"].id, "titulo": "Thread valido"},
-        headers=auth(tokens["alumno"]),
-    )
-    assert res.status_code == 200
-
-
 # ===================== EVENT FILTER FIX =====================
 
 

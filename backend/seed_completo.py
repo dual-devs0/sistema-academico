@@ -1,6 +1,8 @@
 import sys
+from io import TextIOWrapper
 
-sys.stdout.reconfigure(encoding="utf-8")
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from datetime import date, timedelta  # noqa: E402
 from app.database import engine, SessionLocal, Base  # noqa: E402
@@ -466,7 +468,7 @@ eventos_data = [
     },
 ]
 for ev in eventos_data:
-    mat_id = materias_map[ev["materia"]].id if ev["materia"] else None
+    mat_id = materias_map[str(ev["materia"])].id if ev["materia"] else None
     existe = (
         db.query(EventoCalendario)
         .filter(

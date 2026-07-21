@@ -20,7 +20,6 @@ import Estadisticas from './pages/Estadisticas'
 import AsistenciaScan from './pages/AsistenciaScan'
 import Inscripciones from './pages/Inscripciones'
 import NotFound from './pages/NotFound'
-import Foro from './pages/Foro'
 import Malla from './pages/Malla'
 import Expediente from './pages/Expediente'
 import Finanzas from './pages/Finanzas'
@@ -50,7 +49,6 @@ const rolesPermitidos: Record<string, string[]> = {
   '/inscripciones':      ['admin', 'alumno'],
   '/mis-materias':        ['profesor'],
   '/gestion-asignaciones': ['admin'],
-  '/foro':               ['admin', 'profesor', 'alumno'],
   '/malla':              ['admin', 'alumno'],
   '/expediente':         ['admin', 'alumno'],
   '/finanzas':           ['admin'],
@@ -116,7 +114,6 @@ function App() {
         <Route path="/miscursos" element={<Navigate to="/mis-materias" replace />} />
         <Route path="/mismaterias" element={<Navigate to="/mis-materias" replace />} />
         <Route path="/gestion-asignaciones" element={<Layout><RutaProtegida path="/gestion-asignaciones"><GestionAsignaciones /></RutaProtegida></Layout>} />
-        <Route path="/foro" element={<Layout><RutaProtegida path="/foro"><Foro /></RutaProtegida></Layout>} />
         <Route path="/malla" element={<Layout><RutaProtegida path="/malla"><Malla /></RutaProtegida></Layout>} />
         <Route path="/expediente" element={<Layout><RutaProtegida path="/expediente"><Expediente /></RutaProtegida></Layout>} />
         <Route path="/finanzas" element={<Layout><RutaProtegida path="/finanzas"><Finanzas /></RutaProtegida></Layout>} />

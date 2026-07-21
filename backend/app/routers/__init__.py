@@ -1,6 +1,7 @@
 # backend/app/routers/__init__.py
 from . import users_router as users
 from . import auth_router as auth
+from . import test
 from . import materia_router as materias
 from . import inscripciones_router as inscripciones
 from . import carreras_router as carreras
@@ -12,7 +13,6 @@ from . import programas_router as programas
 from . import reportes_router as reportes
 from . import boleta_router as boleta
 from . import alumno_router as alumno
-from . import foro_router as foro
 from . import horarios_router as horarios
 from . import profesor_router as profesor
 from . import pensum_router as pensum
@@ -26,6 +26,7 @@ from . import equivalencias_router as equivalencias
 from . import examenes_router as examenes
 from . import notificaciones_router as notificaciones
 from . import notas_router as notas
+from . import admin_router as admin
 
 __all__ = [
     "users",
@@ -41,7 +42,6 @@ __all__ = [
     "reportes",
     "boleta",
     "alumno",
-    "foro",
     "horarios",
     "profesor",
     "pensum",
@@ -55,4 +55,6 @@ __all__ = [
     "examenes",
     "notificaciones",
     "notas",
+    "admin",
+    "test",
 ]

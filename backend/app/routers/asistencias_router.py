@@ -789,7 +789,7 @@ def generar_qr(
 
     qr = qrcode.make(token)
     buf = io.BytesIO()
-    qr.save(buf, format="PNG")
+    qr.save(buf)
     qr_base64 = base64.b64encode(buf.getvalue()).decode()
 
     scan_url = f"/asistencia/scan?token={token}"

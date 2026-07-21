@@ -1,15 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { crearSolicitudEquivalencia, getEquivalenciasAlumno,
   type SolicitudEquivalencia } from '../services/equivalenciasService'
 
+const POLL_MS = 30000
+
 const badgeEstilo = (estado: string) => {
   const colores: Record<string, { bg: string; color: string }> = {
     pendiente: { bg: 'var(--warning-subtle)', color: 'var(--warning)' },
+    en_proceso: { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
     resuelta: { bg: 'var(--success-subtle)', color: 'var(--success)' },
     rechazada: { bg: 'var(--danger-subtle)', color: 'var(--danger)' },
   }
   return colores[estado] ?? colores.pendiente
+}
+
+const badgeLabel = (estado: string) => {
+  const labels: Record<string, string> = {
+    pendiente: 'Pendiente',
+    en_proceso: 'En proceso',
+    resuelta: 'Aprobada',
+    rechazada: 'Rechazada',
+  }
+  return labels[estado] ?? 'Pendiente'
 }
 
 export default function EquivalenciasAlumno() {
@@ -17,17 +30,27 @@ export default function EquivalenciasAlumno() {
   const [tipo, setTipo] = useState('equivalencia')
   const [universidad, setUniversidad] = useState('')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [error, setError] = useState('')
   const user = getCurrentUser()
+  const firstLoad = useRef(true)
 
-  const cargar = () => {
+  const cargar = useCallback((manual = false) => {
     if (!user?.user_id) return
+    if (manual) setRefreshing(true)
+    else if (firstLoad.current) setLoading(true)
     getEquivalenciasAlumno(user.user_id)
-      .then(setSolicitudes)
-      .catch(() => emitToast('Error cargando equivalencias', 'error'))
-      .finally(() => setLoading(false))
-  }
+      .then(res => { setSolicitudes(res); setError(''); setLastUpdate(new Date()) })
+      .catch(() => { emitToast('Error cargando equivalencias', 'error'); setError('No se pudieron actualizar tus solicitudes. Mostrando el último dato disponible.') })
+      .finally(() => { setLoading(false); setRefreshing(false); firstLoad.current = false })
+  }, [user?.user_id])
 
-  useEffect(() => { cargar() }, [user?.user_id])
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(true), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const solicitar = async () => {
     setLoading(true)
@@ -35,7 +58,7 @@ export default function EquivalenciasAlumno() {
       await crearSolicitudEquivalencia(tipo, universidad || undefined)
       emitToast('Solicitud creada', 'success')
       setTipo('equivalencia'); setUniversidad('')
-      cargar()
+      cargar(true)
     } catch (e: unknown) {
       emitToast(e instanceof Error ? e.message : 'Error creando solicitud', 'error')
     } finally { setLoading(false) }
@@ -43,10 +66,33 @@ export default function EquivalenciasAlumno() {
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 4 }}>🔄 Equivalencias</h1>
-      <p className="page-subtitle" style={{ marginBottom: 20 }}>
-        Solicitá equivalencias o convalidaciones de materias cursadas en otras instituciones.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title" style={{ marginBottom: 4 }}><i className="ti ti-arrows-exchange" style={{ color: 'var(--accent-bright)', marginRight: 8 }} />Equivalencias</h1>
+          <p className="page-subtitle" style={{ marginBottom: 20 }}>
+            Solicitá equivalencias o convalidaciones de materias cursadas en otras instituciones.
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastUpdate && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+              <i className={`ti ti-refresh${refreshing ? ' spin-icon' : ''}`} />
+              {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button type="button" className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}>
+            <i className="ti ti-refresh" /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      <style>{`@keyframes eqal-spin { to { transform: rotate(360deg); } } .spin-icon { display:inline-block; animation: eqal-spin 1s linear infinite; }`}</style>
+
+      {error && (
+        <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: 'var(--danger)', borderRadius: 10, padding: '10px 14px', fontSize: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className="ti ti-alert-circle" /> {error}
+        </div>
+      )}
 
       {/* Formulario de nueva solicitud */}
       <div className="card" style={{ maxWidth: 520, marginBottom: 24 }}>
@@ -57,7 +103,6 @@ export default function EquivalenciasAlumno() {
           <select className="input-uca" value={tipo} onChange={e => setTipo(e.target.value)}>
             <option value="equivalencia">Equivalencia</option>
             <option value="convalidacion">Convalidación</option>
-            <option value="homologacion">Homologación</option>
           </select>
         </div>
 
@@ -68,7 +113,7 @@ export default function EquivalenciasAlumno() {
         </div>
 
         <button type="button" className="btn-primary" onClick={solicitar} disabled={loading}>
-          {loading ? 'Enviando...' : '📤 Solicitar Equivalencia'}
+          <i className="ti ti-send" /> {loading ? 'Enviando...' : 'Solicitar Equivalencia'}
         </button>
       </div>
 
@@ -100,8 +145,8 @@ export default function EquivalenciasAlumno() {
                     </div>
                   )}
                 </div>
-                <span className="badge" style={{ background: b.bg, color: b.color }}>
-                  {s.estado === 'resuelta' ? 'Aprobada' : s.estado === 'rechazada' ? 'Rechazada' : 'Pendiente'}
+                <span className="badge" style={{ background: b.bg, color: b.color, whiteSpace: 'nowrap' }}>
+                  {badgeLabel(s.estado)}
                 </span>
               </div>
             )

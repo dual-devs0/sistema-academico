@@ -13,6 +13,7 @@ export interface EmpresaReceptora {
 export interface Pasantia {
   id: number
   alumno_id: number
+  alumno_nombre: string | null
   empresa_id: number
   empresa_nombre: string | null
   tutor_academico_id: number | null

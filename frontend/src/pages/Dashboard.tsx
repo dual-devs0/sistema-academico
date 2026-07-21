@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, api, emitHelp } from '../lib/api'
 import { obtenerCreditosAlumno, type CreditosAlumnoOut } from '../services/pensumService'
+import { obtenerDashboardAdmin, type AdminDashboardData } from '../services/adminService'
 
 /* ── Tipos y datos ─────────────────────────────────────────────── */
 type MateriaRow = { nombre: string; profesor: string; ultimaNota: number | null; estado: string }
@@ -64,8 +65,21 @@ const css = `
     padding:16px 18px; border:1px solid var(--border-subtle); transition:border-color .15s;
   }
   .dash-access-card:hover { border-color:var(--accent-hover); }
-  @media(max-width:1024px){ .dash-grid { grid-template-columns:1fr; } .dash-kpis { grid-template-columns:repeat(2,1fr); } }
-  @media(max-width:560px){ .dash-kpis { grid-template-columns:1fr 1fr; gap:10px; } .greet-banner{ padding:16px 18px; } .greet-icon{ display:none; } }
+  .kpi-grid-6 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+  .modulo-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; margin-bottom:24px; }
+  .modulo-card {
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    padding:18px 12px; border:1px solid var(--border-subtle); border-radius:var(--radius-md);
+    cursor:pointer; transition:border-color .15s, transform .1s; text-align:center;
+  }
+  .modulo-card:hover { border-color:var(--accent-hover); transform:translateY(-1px); }
+  .modulo-card i { font-size:24px; }
+  .modulo-card span { font-size:12.5px; font-weight:700; }
+  .modulo-card small { font-size:10.5px; color:var(--text-secondary); }
+  @media(max-width:1024px){ .dash-grid { grid-template-columns:1fr; } .dash-kpis { grid-template-columns:repeat(2,1fr); } .kpi-grid-6 { grid-template-columns:repeat(2,1fr); } }
+  @media(max-width:560px){ .dash-kpis { grid-template-columns:1fr 1fr; gap:10px; } .greet-banner{ padding:16px 18px; } .greet-icon{ display:none; } .kpi-grid-6 { grid-template-columns:1fr 1fr; } .modulo-grid { grid-template-columns:repeat(2,1fr); } }
+  .skeleton { background:var(--bg-elevated); border-radius:var(--radius-md); animation:pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
 `
 
 /* ── Sub-vistas por rol ────────────────────────────────────────── */
@@ -83,6 +97,10 @@ function Ring({ pct, size = 52 }: { pct: number; size?: number }) {
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: size > 60 ? 14 : 9, fontWeight: 800, color: 'var(--accent-bright)' }}>{pct}%</span>
     </div>
   )
+}
+
+function SkeletonCard({ height = 100 }: { height?: number }) {
+  return <div className="skeleton" style={{ height }} />
 }
 
 function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos }:
@@ -155,7 +173,6 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos 
       </div>
 
       <div className="dash-grid">
-        {/* Materias Semestrales */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h2 style={{ fontSize: 19, fontWeight: 800 }}>Materias Semestrales</h2>
@@ -196,7 +213,6 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos 
           </div>
         </div>
 
-        {/* Timeline de Hoy */}
         <div>
           <h2 style={{ fontSize: 19, fontWeight: 800, marginBottom: 12 }}>Timeline de Hoy</h2>
           <div className="card" style={{ padding: '14px 18px' }}>
@@ -220,7 +236,6 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos 
         </div>
       </div>
 
-      {/* Cards de acceso rápido: Graduación y Equivalencias */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, marginTop: 20 }}>
         <button type="button" onClick={() => navigate('/mi-graduacion')}
           className="card dash-access-card">
@@ -354,149 +369,262 @@ function ProfesorDash({ nombre, materias, eventos }:
   )
 }
 
-function AdminDash({ nombre, totalUsuarios }: { nombre: string; totalUsuarios: number }) {
+/* ── Admin Dashboard (real data + live polling) ────────────────── */
+
+interface AdminDashProps {
+  nombre: string
+}
+
+function AdminDash({ nombre }: AdminDashProps) {
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'gestion' | 'seguridad' | 'logs'>('gestion')
+  const [data, setData] = useState<AdminDashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'gestion' | 'alertas' | 'usuarios'>('gestion')
+
+  useEffect(() => {
+    let mounted = true
+    const fetchData = async () => {
+      try {
+        const res = await obtenerDashboardAdmin()
+        if (mounted) {
+          setData(res)
+          setLoading(false)
+        }
+      } catch {
+        if (mounted) setLoading(false)
+      }
+    }
+    fetchData()
+    const interval = setInterval(fetchData, 30_000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
 
   const modulos = [
-    { icon: 'ti-database', color: 'var(--info)', titulo: 'Base de Datos Estudiantil', sub: 'Modificar registros, historial académico', path: '/usuarios' },
-    { icon: 'ti-building-bank', color: 'var(--warning)', titulo: 'Gestión Financiera', sub: 'Aranceles, becas y conciliaciones', path: '/reportes' },
-    { icon: 'ti-api', color: 'var(--purple)', titulo: 'Configuración API', sub: 'Integraciones externas, Webhooks', path: '/perfil' },
+    { icon: 'ti-users', color: 'var(--info)', titulo: 'Usuarios y Roles', sub: 'CRUD completo de usuarios', path: '/usuarios', badge: data?.resumen.total_alumnos },
+    { icon: 'ti-hierarchy-2', color: 'var(--accent)', titulo: 'Malla Curricular', sub: 'Pensum y correlatividades', path: '/malla' },
+    { icon: 'ti-building-bank', color: 'var(--warning)', titulo: 'Finanzas', sub: 'Conceptos, cuotas, pagos, becas', path: '/finanzas' },
+    { icon: 'ti-school', color: 'var(--purple)', titulo: 'Asignaciones', sub: 'Profesores a materias', path: '/gestion-asignaciones' },
+    { icon: 'ti-file-text', color: 'var(--success)', titulo: 'Expediente', sub: 'Cierre de materias', path: '/expediente' },
+    { icon: 'ti-clipboard-list', color: 'var(--orange)', titulo: 'Inscripciones', sub: 'Inscripciones activas', path: '/inscripciones' },
+    { icon: 'ti-report-analytics', color: 'var(--danger)', titulo: 'Reportes', sub: 'PDF y estadísticas', path: '/reportes' },
+    { icon: 'ti-chart-pie', color: 'var(--info)', titulo: 'Estadísticas', sub: 'Gráficos y análisis', path: '/estadisticas' },
+    { icon: 'ti-certificate-2', color: 'var(--accent)', titulo: 'Graduación', sub: 'Candidatos y procesos', path: '/graduacion-admin' },
+    { icon: 'ti-briefcase', color: 'var(--warning)', titulo: 'Pasantías', sub: 'Solicitudes y tutorías', path: '/pasantias-admin' },
+    { icon: 'ti-arrows-shuffle', color: 'var(--purple)', titulo: 'Equivalencias', sub: 'Convalidación de materias', path: '/equivalencias-admin' },
+    { icon: 'ti-file-description', color: 'var(--success)', titulo: 'Trámites', sub: 'Solicitudes pendientes', path: '/tramites', badge: data?.resumen.tramites_pendientes },
+    { icon: 'ti-calendar', color: 'var(--orange)', titulo: 'Calendario', sub: 'Eventos académicos', path: '/calendario' },
+    { icon: 'ti-messages', color: 'var(--info)', titulo: 'Foro', sub: 'Comunicaciones', path: '/foro' },
   ]
-  const micro = [
-    { nombre: 'Autenticación Auth0', estado: 'SANO', color: 'var(--success)' },
-    { nombre: 'Gestor de Archivos (S3)', estado: 'SANO', color: 'var(--success)' },
-    { nombre: 'Motor de Calificaciones', estado: 'LATENCIA', color: 'var(--warning)' },
-    { nombre: 'Base de Datos Core (PostgreSQL)', estado: 'SANO', color: 'var(--success)' },
-  ]
-  const logs = [
-    { evento: 'Intento de Login Fallido', usuario: '192.168.1.144', modulo: 'Auth_Service', ts: 'Hoy, 14:32:01', nivel: 'ALTO', color: 'var(--danger)' },
-    { evento: 'Actualización de API Key', usuario: 'admin_master_01', modulo: 'Integration_Hub', ts: 'Hoy, 13:15:44', nivel: 'INFO', color: 'var(--success)' },
-    { evento: 'Exportación masiva de datos', usuario: 'm_rodriguez_adm', modulo: 'DB_Manager', ts: 'Hoy, 10:02:11', nivel: 'MEDIO', color: 'var(--warning)' },
-  ]
+
+  const roleColor: Record<string, string> = {
+    admin: 'var(--danger)',
+    profesor: 'var(--info)',
+    alumno: 'var(--success)',
+  }
+
+  if (loading) {
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 22, alignItems: 'center', marginBottom: 20 }}>
+          <SkeletonCard height={84} />
+          <div style={{ flex: 1 }}>
+            <SkeletonCard height={24} />
+            <SkeletonCard height={14} />
+          </div>
+        </div>
+        <div className="kpi-grid-6">
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} height={90} />)}
+        </div>
+      </>
+    )
+  }
+
+  const r = data!.resumen
+  const k = data!.kpis
 
   return (
     <>
       {/* Hero */}
       <div className="card" style={{ display: 'flex', gap: 22, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
         <div className="avatar-initials" style={{ width: 84, height: 84, borderRadius: 20, fontSize: 28 }}>
-          {(nombre || '?').slice(0, 2)}
+          {(nombre || '?').slice(0, 2).toUpperCase()}
         </div>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: 24, fontWeight: 900 }}>{nombre}</h1>
-            <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>Administrador Senior</span>
+            <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>Administrador</span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 520, marginBottom: 12 }}>
-            Responsable de la integridad del ecosistema digital UCA. Acceso total a módulos de seguridad,
-            gestión de datos maestros y auditoría de sistemas de alto nivel.
+            Panel de control del sistema académico UCA. Gestión de usuarios, materias, finanzas y más.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={() => navigate('/usuarios')}>
-              <i className="ti ti-shield-lock" /> Panel de Control Total
+              <i className="ti ti-users" /> Gestionar Usuarios
             </button>
-            <button className="btn-ghost"><i className="ti ti-mail" /> Mensajes del Sistema</button>
+            <button className="btn-ghost" onClick={() => navigate('/reportes')}>
+              <i className="ti ti-report-analytics" /> Reportes
+            </button>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div className="mono-label">Estado del Sistema</div>
+          <div className="mono-label">Sistema</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'flex-end' }}>
             <span className="live-dot" /> OPERATIVO
           </div>
-          <div className="mono-label" style={{ marginTop: 8 }}>Última auditoría</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Hace 14 minutos</div>
+          <div className="mono-label" style={{ marginTop: 8 }}>Alumnos activos</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--accent-bright)' }}>{k.alumnos_activos.toLocaleString('es-PY')}</div>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="dash-kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+      {/* KPIs Reales (3 columns) */}
+      <div className="kpi-grid-6">
         <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Usuarios Activos</span><span className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)' }}>+12%</span></div>
-          <span className="kpi-value">{totalUsuarios ? totalUsuarios.toLocaleString('es-PY') : '—'}</span>
+          <div className="kpi-top"><span className="mono-label">Total Alumnos</span><i className="ti ti-users" style={{ color: 'var(--info)', fontSize: 15 }} /></div>
+          <span className="kpi-value">{r.total_alumnos.toLocaleString('es-PY')}</span>
         </div>
         <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Reportes Pendientes</span><span className="badge" style={{ background: 'var(--warning-subtle)', color: 'var(--warning)' }}>Nivel 2 Crítico</span></div>
-          <span className="kpi-value">08</span>
-          <div className="progress-track" style={{ marginTop: 10 }}><div className="progress-fill" style={{ width: '65%', background: 'var(--warning)' }} /></div>
+          <div className="kpi-top"><span className="mono-label">Profesores</span><i className="ti ti-school" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+          <span className="kpi-value">{r.total_profesores.toLocaleString('es-PY')}</span>
         </div>
         <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Uptime Sistema</span><span className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)' }}>SLA Cumplido</span></div>
-          <span className="kpi-value">99.98%</span>
+          <div className="kpi-top"><span className="mono-label">Materias</span><i className="ti ti-book" style={{ color: 'var(--warning)', fontSize: 15 }} /></div>
+          <span className="kpi-value">{r.total_materias.toLocaleString('es-PY')}</span>
+          {r.materias_sin_oferta > 0 && (
+            <div className="mono-label" style={{ color: 'var(--warning)', marginTop: 4 }}>{r.materias_sin_oferta} sin oferta</div>
+          )}
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-top"><span className="mono-label">Alumnos Becados</span><i className="ti ti-affiliate" style={{ color: 'var(--success)', fontSize: 15 }} /></div>
+          <span className="kpi-value">{r.total_becados.toLocaleString('es-PY')}</span>
+          <div className="progress-track" style={{ marginTop: 6 }}>
+            <div className="progress-fill" style={{ width: `${r.total_alumnos ? Math.round(r.total_becados / r.total_alumnos * 100) : 0}%`, background: 'var(--success)' }} />
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-chart-bar" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+          <span className="kpi-value">{k.promedio_general.toFixed(1)}</span>
+          <div className="mono-label">Aprobación: {k.aprobacion_pct}%</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-top"><span className="mono-label">Asistencia Global</span><i className="ti ti-calendar-check" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Ring pct={k.asistencia_pct} />
+            <span className="kpi-value">{k.asistencia_pct}<span className="kpi-unit">%</span></span>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="line-tabs" style={{ marginBottom: 20 }}>
-        <button className={`line-tab${tab === 'gestion' ? ' active' : ''}`} onClick={() => setTab('gestion')}><i className="ti ti-layout-grid" /> Gestión</button>
-        <button className={`line-tab${tab === 'seguridad' ? ' active' : ''}`} onClick={() => setTab('seguridad')}><i className="ti ti-shield" /> Seguridad (MFA)</button>
-        <button className={`line-tab${tab === 'logs' ? ' active' : ''}`} onClick={() => setTab('logs')}><i className="ti ti-list-details" /> Logs de Actividad</button>
+        <button className={`line-tab${tab === 'gestion' ? ' active' : ''}`} onClick={() => setTab('gestion')}>
+          <i className="ti ti-layout-grid" /> Módulos
+        </button>
+        <button className={`line-tab${tab === 'alertas' ? ' active' : ''}`} onClick={() => setTab('alertas')}>
+          <i className="ti ti-alert-triangle" /> Alertas {data!.alertas.length > 0 && <span className="badge" style={{ background: 'var(--danger-subtle)', color: 'var(--danger)', marginLeft: 6 }}>{data!.alertas.length}</span>}
+        </button>
+        <button className={`line-tab${tab === 'usuarios' ? ' active' : ''}`} onClick={() => setTab('usuarios')}>
+          <i className="ti ti-user-plus" /> Últimos Registros
+        </button>
       </div>
 
+      {/* Tab: Módulos */}
       {tab === 'gestion' && (
-        <div className="dash-grid" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
-          <div>
-            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 14 }}>Módulos de Acceso Rápido</h2>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800 }}>Módulos del Sistema</h2>
+            <span className="mono-label" style={{ fontSize: 11 }}>{data!.timestamp ? new Date(data!.timestamp).toLocaleTimeString('es-PY') : ''}</span>
+          </div>
+          <div className="modulo-grid">
             {modulos.map(m => (
               <button key={m.titulo} onClick={() => navigate(m.path)}
-                className="card" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12, cursor: 'pointer', textAlign: 'left', padding: '16px 18px' }}>
-                <span style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--bg-elevated)', color: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                className="card modulo-card">
+                <span style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', color: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
                   <i className={`ti ${m.icon}`} />
                 </span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{m.titulo}</span>
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{m.sub}</span>
-                </span>
-                <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} />
+                <span>{m.titulo}</span>
+                <small>{m.sub}</small>
+                {m.badge !== undefined && (
+                  <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)', fontSize: 10 }}>
+                    {m.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 800 }}>Estado de Microservicios</h3>
-              <i className="ti ti-refresh" style={{ color: 'var(--text-muted)', cursor: 'pointer' }} />
-            </div>
-            {micro.map(s => (
-              <div key={s.nombre} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{s.nombre}</span>
-                <span className="badge" style={{ background: 'transparent', color: s.color }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, display: 'inline-block' }} /> {s.estado}
-                </span>
-              </div>
-            ))}
-            <div className="mono-label" style={{ marginTop: 14, fontStyle: 'italic' }}>
-              Próximo mantenimiento programado: 24/09 — 02:00 AM
-            </div>
+        </>
+      )}
+
+      {/* Tab: Alertas */}
+      {tab === 'alertas' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 800 }}>Estudiantes en Riesgo de Deserción</h3>
+            <div className="mono-label">Top alumnos con mayor inasistencia y bajo rendimiento</div>
           </div>
+          {data!.alertas.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 36, color: 'var(--text-secondary)', fontSize: 13 }}>
+              <i className="ti ti-check" style={{ fontSize: 32, color: 'var(--success)' }} /><br />
+              No hay alertas activas. Todos los estudiantes tienen asistencia regular.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table-uca">
+                <thead>
+                  <tr><th>Estudiante</th><th>Inasistencia</th><th>Promedio</th><th>Nivel de Riesgo</th></tr>
+                </thead>
+                <tbody>
+                  {data!.alertas.map(a => {
+                    const riesgo = a.inasistencia_pct >= 40 ? 'CRÍTICO' : a.inasistencia_pct >= 25 ? 'ALTO' : 'MEDIO'
+                    const color = a.inasistencia_pct >= 40 ? 'var(--danger)' : a.inasistencia_pct >= 25 ? 'var(--warning)' : 'var(--orange)'
+                    return (
+                      <tr key={a.user_id}>
+                        <td style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre}</td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--danger)' }}>{a.inasistencia_pct}%</td>
+                        <td style={{ fontFamily: 'var(--font-mono)' }}>{a.promedio !== null ? a.promedio.toFixed(1) : '—'}</td>
+                        <td><span className="badge" style={{ background: 'var(--bg-elevated)', color }}>{riesgo}</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {tab === 'seguridad' && (
-        <div className="card" style={{ textAlign: 'center', padding: 46 }}>
-          <i className="ti ti-shield-lock" style={{ fontSize: 40, color: 'var(--accent)' }} />
-          <h3 style={{ fontSize: 16, fontWeight: 800, margin: '12px 0 6px' }}>Autenticación Multifactor</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Configuración MFA disponible próximamente para cuentas administrativas.</p>
-        </div>
-      )}
-
-      {tab === 'logs' && (
+      {/* Tab: Últimos Usuarios */}
+      {tab === 'usuarios' && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800 }}>Logs de Seguridad Recientes</h3>
-            <button style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              Exportar a CSV <i className="ti ti-download" />
+            <h3 style={{ fontSize: 15, fontWeight: 800 }}>Últimos Usuarios Registrados</h3>
+            <button onClick={() => navigate('/usuarios')}
+              style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              Ver todos →
             </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table-uca">
-              <thead><tr><th>Evento</th><th>Usuario / IP</th><th>Módulo</th><th>Timestamp</th><th>Nivel</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Registro</th></tr></thead>
               <tbody>
-                {logs.map(l => (
-                  <tr key={l.evento}>
-                    <td style={{ fontWeight: 700, fontSize: 12.5 }}>{l.evento}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--info)' }}>{l.usuario}</td>
-                    <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{l.modulo}</td>
-                    <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{l.ts}</td>
-                    <td><span className="badge" style={{ background: 'var(--bg-elevated)', color: l.color }}>{l.nivel}</span></td>
+                {data!.ultimos_usuarios.map(u => (
+                  <tr key={u.id}>
+                    <td style={{ fontWeight: 700, fontSize: 13 }}>{u.nombre}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{u.email || '—'}</td>
+                    <td>
+                      <span className="badge" style={{
+                        background: 'var(--bg-elevated)',
+                        color: roleColor[u.role] ?? 'var(--text-secondary)',
+                        textTransform: 'capitalize',
+                      }}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString('es-PY') : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -516,7 +644,6 @@ export default function Dashboard() {
   const [eventos, setEventos] = useState<EventoRow[]>(eventosMock)
   const [promedio, setPromedio] = useState(8.7)
   const [asistencia, setAsistencia] = useState(92)
-  const [totalUsuarios, setTotalUsuarios] = useState(0)
   const [creditos, setCreditos] = useState<CreditosAlumnoOut | null>(null)
 
   useEffect(() => {
@@ -527,11 +654,7 @@ export default function Dashboard() {
 
     ;(async () => {
       try {
-        if (user.role === 'admin') {
-          const users = await api.get<unknown[]>('/users/').catch(() => [] as unknown[])
-          if (users.length) setTotalUsuarios(users.length)
-          return
-        }
+        if (user.role === 'admin') return
         const [materiasRes, puntajesRes, asistenciasRes, eventosRes] = await Promise.all([
           api.get<{id:number;nombre:string;profesor_nombre:string|null;profesor_id:number}[]>(isProfesor && !isNaN(uid) ? `/materias/?profesor_id=${uid}` : '/materias/').catch(() => []),
           api.get<{materia_id:number;valor:number}[]>(isAlumno && !isNaN(uid) ? `/puntajes/?user_id=${uid}` : '/puntajes/').catch(() => []),
@@ -582,7 +705,7 @@ export default function Dashboard() {
     <>
       <style>{css}</style>
       {user?.role === 'admin'
-        ? <AdminDash nombre={nombre} totalUsuarios={totalUsuarios} />
+        ? <AdminDash nombre={nombre} />
         : user?.role === 'profesor'
           ? <ProfesorDash nombre={nombre} materias={materias} eventos={eventos} />
           : <AlumnoDash nombre={nombre} materias={materias} eventos={eventos} promedio={promedio} asistencia={asistencia} creditos={creditos} />}

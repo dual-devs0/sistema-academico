@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, emitToast } from '../lib/api'
 import {
   aprobarPasantia, finalizarPasantia,
@@ -10,8 +10,31 @@ interface PasantiaSolicitud extends Pasantia {
   motivo_rechazo?: string
 }
 
+const POLL_MS = 30000
+
 const css = `
-  .ps-title { font-size:22px; font-weight:800; margin-bottom:20px; color:var(--text-primary); }
+  .ps-topbar {
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    padding:0 24px; min-height:56px;
+    border-bottom:1px solid var(--border-subtle); background:var(--bg-base);
+    position:sticky; top:-24px; z-index:20;
+    margin:-24px -24px 20px; width:calc(100% + 48px);
+  }
+  .ps-title { font-size:22px; font-weight:800; color:var(--text-primary); margin:12px 0; }
+  .ps-topbar-r { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:10px 0; }
+  .ps-last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+  .ps-last-upd svg { width:13px; height:13px; }
+  .ps-last-upd svg.spin { animation:ps-spin 1s linear infinite; }
+  @keyframes ps-spin { to{transform:rotate(360deg)} }
+  .ps-btn-refresh {
+    display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:9px;
+    background:transparent; border:1px solid var(--border-subtle); color:var(--text-secondary);
+    font-size:12px; font-weight:700; font-family:inherit; cursor:pointer; transition:border-color .15s,color .15s;
+  }
+  .ps-btn-refresh:hover { border-color:var(--accent-bright); color:var(--text-primary); }
+  .ps-btn-refresh:disabled { opacity:.5; cursor:not-allowed; }
+  .ps-btn-refresh svg { width:12px; height:12px; }
+  .ps-err-banner { display:flex; align-items:center; gap:8px; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25); color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12px; font-weight:600; margin-bottom:16px; }
   .ps-tabs { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
   .ps-tab {
     padding:8px 18px; border-radius:10px; font-size:13px; font-weight:700;
@@ -22,9 +45,9 @@ const css = `
   .ps-tab.active { background:var(--accent-bright); color:#fff; border-color:var(--accent-bright); }
   .ps-table-wrap {
     background:var(--bg-elevated); border:1px solid var(--border-subtle);
-    border-radius:16px; overflow:hidden;
+    border-radius:16px; overflow-x:auto;
   }
-  .ps-table { width:100%; border-collapse:collapse; }
+  .ps-table { width:100%; border-collapse:collapse; min-width:640px; }
   .ps-table th {
     padding:12px 14px; text-align:left; font-size:11px; font-weight:700;
     color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;
@@ -106,6 +129,9 @@ function estadoLabel(e: string) {
 export default function PasantiasAdmin() {
   const [pasantias, setPasantias] = useState<PasantiaSolicitud[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('pendiente')
   const [selected, setSelected] = useState<PasantiaSolicitud | null>(null)
   const [showDetail, setShowDetail] = useState(false)
@@ -115,20 +141,31 @@ export default function PasantiasAdmin() {
   const [motivo, setMotivo] = useState('')
   const [processing, setProcessing] = useState(false)
   const [finalizando, setFinalizando] = useState<number | null>(null)
+  const firstLoad = useRef(true)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true)
+    if (firstLoad.current) setLoading(true)
     try {
       const data = await api.get<PasantiaSolicitud[]>('/pasantias/solicitudes')
       setPasantias(data)
+      setError('')
+      setLastUpdate(new Date())
     } catch {
+      setError('No se pudieron cargar las solicitudes. Mostrando último dato disponible.')
       emitToast('Error al cargar solicitudes de pasantía', 'error')
     } finally {
       setLoading(false)
+      setRefreshing(false)
+      firstLoad.current = false
     }
-  }
+  }, [])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+    const id = setInterval(() => fetchData(), POLL_MS)
+    return () => clearInterval(id)
+  }, [fetchData])
 
   const filtered = pasantias.filter(p => tab === 'todas' || p.estado === tab)
 
@@ -204,7 +241,28 @@ export default function PasantiasAdmin() {
     <div>
       <style>{css}</style>
 
-      <h2 className="ps-title">Pasantías — Admin</h2>
+      <div className="ps-topbar">
+        <h2 className="ps-title">Pasantías — Admin</h2>
+        <div className="ps-topbar-r">
+          {lastUpdate && (
+            <span className="ps-last-upd">
+              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button className="ps-btn-refresh" onClick={() => fetchData(true)} disabled={refreshing}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="ps-err-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14, flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {error}
+        </div>
+      )}
 
       <div className="ps-tabs">
         {TABS.map(t => (
@@ -233,7 +291,7 @@ export default function PasantiasAdmin() {
             <tbody>
               {filtered.map(p => (
                 <tr key={p.id}>
-                  <td>#{p.alumno_id}</td>
+                  <td>{p.alumno_nombre ?? `#${p.alumno_id}`}</td>
                   <td>{p.empresa_nombre ?? `#${p.empresa_id}`}</td>
                   <td>{p.fecha_solicitud ? new Date(p.fecha_solicitud).toLocaleDateString('es-PY') : '—'}</td>
                   <td><span className={`ps-badge ${p.estado}`}>{estadoLabel(p.estado)}</span></td>
@@ -263,7 +321,7 @@ export default function PasantiasAdmin() {
             <div className="ps-detail-grid">
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Alumno</span>
-                <span className="ps-detail-value">#{selected.alumno_id}</span>
+                <span className="ps-detail-value">{selected.alumno_nombre ?? `#${selected.alumno_id}`}</span>
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Empresa</span>

@@ -1,21 +1,21 @@
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     ForeignKey,
     UniqueConstraint,
     CheckConstraint,
 )
+from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
 class Correlatividad(Base):
     __tablename__ = "correlatividades"
 
-    id = Column(Integer, primary_key=True, index=True)
-    materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
-    prerrequisito_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
-    tipo = Column(String(20), nullable=False)  # 'aprobada' | 'cursando'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    materia_id: Mapped[int] = mapped_column(Integer, ForeignKey("materias.id"), nullable=False)
+    prerrequisito_id: Mapped[int] = mapped_column(Integer, ForeignKey("materias.id"), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)  # 'aprobada' | 'cursando'
 
     __table_args__ = (
         CheckConstraint(

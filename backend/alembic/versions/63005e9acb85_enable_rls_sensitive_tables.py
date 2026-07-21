@@ -31,11 +31,12 @@ depends_on: Union[str, Sequence[str], None] = None
 TABLES = ["puntajes", "asistencias", "apuntes", "inscripciones"]
 
 
-def _db_user() -> str:
+def _db_user() -> str | None:
     """Extract DB user from the live connection, not a hardcoded constant."""
     bind = op.get_bind()
+    # AUDIT-FIX B-11: tipo de retorno correcto — scalar() puede ser None
     row = bind.execute(__import__("sqlalchemy").text("SELECT current_user")).scalar()
-    return row
+    return row or ""
 
 
 def upgrade() -> None:

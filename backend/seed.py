@@ -1,6 +1,8 @@
 import sys
+from io import TextIOWrapper
 
-sys.stdout.reconfigure(encoding="utf-8")
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from app.database import engine, SessionLocal, Base  # noqa: E402
 from app.models.users import User  # noqa: E402

@@ -38,6 +38,7 @@ class PasantiaCreate(BaseModel):
 class PasantiaOut(BaseModel):
     id: int
     alumno_id: int
+    alumno_nombre: Optional[str] = None
     empresa_id: int
     empresa_nombre: Optional[str] = None
     tutor_academico_id: Optional[int]

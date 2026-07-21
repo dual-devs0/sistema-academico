@@ -5,8 +5,10 @@ Idempotente: si los datos ya existen, no falla ni duplica.
 """
 
 import sys
+import io
 
-sys.stdout.reconfigure(encoding="utf-8")
+if isinstance(sys.stdout, io.TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 import os  # noqa: E402
 import unicodedata  # noqa: E402
@@ -54,7 +56,7 @@ print("\n=== SEED PILOTO — Pensum y Correlatividades (neondb_test) ===\n")
 # 1. Carrera
 target_carrera = normalizar("Ing. Informatica")
 carrera = next(
-    (c for c in db.query(Carrera).all() if normalizar(c.nombre) == target_carrera), None
+    (c for c in db.query(Carrera).all() if normalizar(str(c.nombre)) == target_carrera), None
 )
 if not carrera:
     carrera = Carrera(
@@ -72,7 +74,7 @@ materias_carrera = db.query(Materia).filter(Materia.carrera_id == carrera.id).al
 materias = {}
 for nombre in materias_data:
     target = normalizar(nombre)
-    m = next((x for x in materias_carrera if normalizar(x.nombre) == target), None)
+    m = next((x for x in materias_carrera if normalizar(str(x.nombre)) == target), None)
     if not m:
         m = Materia(
             nombre=nombre, carrera_id=carrera.id, anio=1, semestre=1, creditos=4

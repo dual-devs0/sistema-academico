@@ -1,5 +1,7 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Optional
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Numeric,
@@ -7,23 +9,22 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
 )
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
 class Puntaje(Base):
     __tablename__ = "puntajes"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    oferta_materia_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    oferta_materia_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("ofertas_materia.id"), nullable=False, index=True
     )
-    tipo = Column(String(20), nullable=False)  # parcial1, parcial2, practico, final
-    valor = Column(Numeric(5, 2), nullable=False)
-    editado_por = Column(Integer, ForeignKey("users.id"), nullable=True)
-    editado_en = Column(
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)  # parcial1, parcial2, practico, final
+    valor: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    editado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    editado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 

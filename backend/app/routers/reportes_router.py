@@ -1,5 +1,5 @@
 import csv, io
-from typing import Optional
+from typing import Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, case
@@ -22,12 +22,12 @@ def resumen(
     _=Depends(get_admin_user),
 ):
     U = models.user.User
-    counts = dict(
+    counts = {role: cnt for role, cnt in
         db.query(U.role, func.count(U.id))
         .filter(U.role.in_(["alumno", "profesor"]))
         .group_by(U.role)
         .all()
-    )
+    }
     return {
         "total_alumnos": counts.get("alumno", 0),
         "total_becados": db.query(U).filter(U.es_becado).count(),
@@ -48,12 +48,12 @@ def por_carrera(
     id_a_nombre = {c.id: c.nombre for c in carreras}
 
     # 1) Count alumnos per carrera (single query)
-    alumno_counts = dict(
+    alumno_counts = {cid: cnt for cid, cnt in
         db.query(U.carrera_id, func.count(U.id))
         .filter(U.role == "alumno", U.carrera_id.in_(carrera_ids))
         .group_by(U.carrera_id)
         .all()
-    )
+    }
 
     # 2) Attendance stats per carrera via subquery
     alumno_ids_por_carrera = {
@@ -78,8 +78,9 @@ def por_carrera(
             func.count(A.id).label("total"),
             func.sum(case((A.presente, 1), else_=0)).label("presentes"),
         ).filter(A.user_id.in_(a_ids)).first()
-        total_a = asist_stats.total or 0
-        pres_a = asist_stats.presentes or 0
+        # AUDIT-FIX B-7: scalar puede ser None
+        total_a = (asist_stats.total if asist_stats else 0) or 0
+        pres_a = (asist_stats.presentes if asist_stats else 0) or 0
         asist_pct = round((pres_a / total_a * 100) if total_a > 0 else 0.0, 1)
 
         # Puntajes: aggregate per user to find "en_riesgo" (avg < 6)
@@ -140,7 +141,7 @@ def dashboard(
         if not oid:
             materia_stats.append({
                 "materia_id": m.id, "materia_nombre": m.nombre,
-                "total_alumnos": 0, "total_notas": 0, "promedio_grupo": 0,
+                "total_alumnos": 0, "total_notas": 0, "promedio_grupo": 0.0,
                 "distribucion": {}, "aprobados": 0, "en_riesgo": 0,
             })
             continue
@@ -148,7 +149,7 @@ def dashboard(
         if not rows:
             materia_stats.append({
                 "materia_id": m.id, "materia_nombre": m.nombre,
-                "total_alumnos": 0, "total_notas": 0, "promedio_grupo": 0,
+                "total_alumnos": 0, "total_notas": 0, "promedio_grupo": 0.0,
                 "distribucion": {}, "aprobados": 0, "en_riesgo": 0,
             })
             continue
@@ -174,7 +175,7 @@ def dashboard(
         })
 
     # ─── 3) Attendance % per materia (single aggregate query) ───
-    asis_por_materia = {}
+    asis_por_materia: dict[int, float] = {}
     if oferta_ids:
         for r in db.query(
             A.oferta_materia_id,
@@ -194,7 +195,7 @@ def dashboard(
         asistencia_materias.append({
             "materia_id": m.id,
             "materia_nombre": m.nombre,
-            "asistencia_pct": asis_por_materia.get(m.id, 0),
+            "asistencia_pct": asis_por_materia.get(cast(int, m.id), 0),
         })
 
     # ─── 4) Global KPIs ───
@@ -211,7 +212,7 @@ def dashboard(
             func.count(A.id).label("total"),
             func.sum(case((A.presente, 1), else_=0)).label("pres"),
         ).filter(A.oferta_materia_id.in_(oferta_ids)).first()
-        asis_global = {"total": row.total or 0, "pres": row.pres or 0}
+        asis_global = {"total": row.total or 0, "pres": row.pres or 0} if row else {"total": 0, "pres": 0}
 
     global_asistencia_pct = round(
         (asis_global["pres"] / asis_global["total"] * 100) if asis_global["total"] > 0 else 0, 1
@@ -246,7 +247,7 @@ def dashboard(
             asis_por_alumno[r.user_id] = {"total": total, "pres": pres}
 
         # Average per student across all active materias
-        prom_por_alumno = {}
+        prom_por_alumno: dict[int, float | None] = {}
         if oferta_ids:
             for r in db.query(P.user_id, func.avg(P.valor).label("prom"))\
                 .filter(P.user_id.in_(list(alumno_ids)), P.oferta_materia_id.in_(oferta_ids))\
@@ -272,7 +273,7 @@ def dashboard(
         # Get names for top 5
         top5 = raw[:5]
         if top5:
-            names = dict(db.query(U.id, U.nombre).filter(U.id.in_([r["user_id"] for r in top5])).all())
+            names = {uid: name for uid, name in db.query(U.id, U.nombre).filter(U.id.in_([r["user_id"] for r in top5])).all()}
             for r in top5:
                 alertas.append({
                     "user_id": r["user_id"],
@@ -330,11 +331,11 @@ def asistencia_por_materia(
 
     materias = db.query(M).all()
     mat_ids = [m.id for m in materias]
-    ofertas = dict(
+    ofertas = {mid: oid for mid, oid in
         db.query(O.materia_id, O.id)
         .filter(O.materia_id.in_(mat_ids), O.activa)
         .all()
-    )
+    }
     oferta_ids = list(ofertas.values())
     id_a_nombre = {m.id: m.nombre for m in materias}
     oferta_a_materia = {v: k for k, v in ofertas.items()}
@@ -439,7 +440,7 @@ def exportar_trayecto_academico_rue_es(
             )
             .all()
         ):
-            punt_map.setdefault((p.user_id, p.oferta_materia_id), []).append(p)
+            punt_map.setdefault((cast(int, p.user_id), cast(int, p.oferta_materia_id)), []).append(p)
 
     # Pre-cache attendance counts per (user_id, oferta_materia_id)
     asis_total = {}
@@ -474,7 +475,7 @@ def exportar_trayecto_academico_rue_es(
         if not alumno or not oferta or not oferta.materia:
             continue
 
-        notas = {p.tipo: float(p.valor) for p in punt_map.get((alumno.id, oferta.id), []) if p.tipo in PESOS}
+        notas: dict[str, float | None] = {str(p.tipo): float(str(p.valor)) for p in punt_map.get((cast(int, alumno.id), cast(int, oferta.id)), []) if str(p.tipo) in PESOS}
         promedio = calcular_promedio_final({k: notas.get(k) for k in PESOS})
         if promedio is None:
             estado = "CURSANDO"

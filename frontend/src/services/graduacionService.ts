@@ -12,14 +12,18 @@ export interface CondicionEgreso {
   pasantia_completada: boolean
   puede_graduarse: boolean
   motivo: string | null
+  // AUDIT-FIX F-1: campo faltante en tipo CondicionEgreso — backend no lo retorna aún, opcional
+  tesina_aprobada?: boolean
 }
 
 export interface ProcesoGraduacion {
   id: number
   alumno_id: number
+  alumno_nombre?: string | null
   fecha_inicio: string
   estado: string
   tutor_id: number | null
+  tutor_nombre?: string | null
 }
 
 export interface EtapaTesis {

@@ -15,7 +15,7 @@ from __future__ import annotations
 import io
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
@@ -88,20 +88,20 @@ def get_becas_activas_out(alumno_id: int, db: Session) -> List[BecaActivaOut]:
         beca = ba.beca
         fuente = ba.fuente
         result.append(
-            BecaActivaOut(
-                id=ba.id,
-                beca_nombre=beca.nombre if beca else "—",
-                fuente=fuente.nombre if fuente else "—",
-                es_externa=fuente.es_externa if fuente else False,
-                porcentaje_descuento=beca.porcentaje_descuento
-                if beca
-                else Decimal("0"),
-                periodo_inicio=ba.periodo_inicio,
-                periodo_fin=ba.periodo_fin,
-                promedio_minimo_requerido=ba.promedio_minimo_requerido,
-                promedio_actual=ba.promedio_actual,
-                estado_renovacion=ba.estado_renovacion,
-            )
+        BecaActivaOut(
+            id=cast(int, ba.id),
+            beca_nombre=str(beca.nombre) if beca else "—",
+            fuente=str(fuente.nombre) if fuente else "—",
+            es_externa=bool(fuente.es_externa) if fuente else False,
+            porcentaje_descuento=beca.porcentaje_descuento
+            if beca
+            else Decimal("0"),
+            periodo_inicio=str(ba.periodo_inicio),
+            periodo_fin=str(ba.periodo_fin) if ba.periodo_fin else None,
+            promedio_minimo_requerido=cast(Decimal, ba.promedio_minimo_requerido),
+            promedio_actual=cast(Decimal, ba.promedio_actual),
+            estado_renovacion=str(ba.estado_renovacion),
+        )
         )
     return result
 
@@ -175,23 +175,24 @@ def cuota_to_out(cuota: Cuota) -> CuotaOut:
     pago_id = None
     comprobante_estado = None
     comprobante_url_pdf = None
-    if cuota.pagos:
-        ultimo_pago = max(cuota.pagos, key=lambda p: p.fecha_pago)
+    pagos_list: list = list(cast(list[Any], cuota.pagos or []))
+    if pagos_list:
+        ultimo_pago = max(pagos_list, key=lambda p: p.fecha_pago)
         pago_id = ultimo_pago.id
         if ultimo_pago.comprobante:
             comprobante_estado = ultimo_pago.comprobante.estado_emision
             comprobante_url_pdf = ultimo_pago.comprobante.url_pdf
 
     return CuotaOut(
-        id=cuota.id,
-        alumno_id=cuota.alumno_id,
-        concepto_id=cuota.concepto_id,
-        periodo=cuota.periodo,
-        monto=cuota.monto,
-        monto_descuento=cuota.monto_descuento,
-        monto_a_pagar=cuota.monto - cuota.monto_descuento,
-        fecha_vencimiento=cuota.fecha_vencimiento,
-        estado=cuota.estado,
+        id=cast(int, cuota.id),
+        alumno_id=cast(int, cuota.alumno_id),
+        concepto_id=cast(int, cuota.concepto_id),
+        periodo=str(cuota.periodo),
+        monto=cast(Decimal, cuota.monto),
+        monto_descuento=cast(Decimal, cuota.monto_descuento),
+        monto_a_pagar=cast(Decimal, cuota.monto - cuota.monto_descuento),
+        fecha_vencimiento=cast(date, cuota.fecha_vencimiento),
+        estado=str(cuota.estado),
         beca_nombre=beca_nombre,
         fuente_beca=fuente_beca,
         es_beca_externa=es_beca_externa,
@@ -252,7 +253,7 @@ def registrar_pago(
     )
     monto_a_pagar = cuota.monto - cuota.monto_descuento
     if total_pagado >= monto_a_pagar:
-        cuota.estado = "pagada"
+        setattr(cuota, 'estado', "pagada")
         db.flush()
 
     return pago
@@ -297,10 +298,10 @@ def verificar_deuda_inscripcion(
 
     detalle = [
         CuotaVencidaDetalle(
-            cuota_id=c.id,
-            periodo=c.periodo,
-            monto_a_pagar=c.monto - c.monto_descuento,
-            fecha_vencimiento=c.fecha_vencimiento,
+            cuota_id=cast(int, c.id),
+            periodo=str(c.periodo),
+            monto_a_pagar=cast(Decimal, c.monto - c.monto_descuento),
+            fecha_vencimiento=cast(date, c.fecha_vencimiento),
             dias_vencida=(hoy - c.fecha_vencimiento).days,
         )
         for c in cuotas_vencidas
@@ -310,9 +311,9 @@ def verificar_deuda_inscripcion(
     bloqueado = len(cuotas_vencidas) >= max_mora and not _tiene_beca_100
 
     return EstadoDeudaOut(
-        bloqueado=bloqueado,
+        bloqueado=bool(bloqueado),
         cuotas_vencidas=len(cuotas_vencidas),
-        max_permitidas=max_mora,
+        max_permitidas=cast(int, max_mora),
         detalle=detalle,
         tiene_beca_100=_tiene_beca_100,
         override_disponible=es_admin,
@@ -374,8 +375,22 @@ def export_rendicion_excel(
 
     rows = query.all()
 
+    beca_activa_ids = [ba.id for ba, *_ in rows]
+    montos_becados: dict[int, Decimal] = {}
+    if beca_activa_ids:
+        montos_q = (
+            db.query(Cuota.beca_aplicada_id, func.sum(Cuota.monto_descuento))
+            .filter(Cuota.beca_aplicada_id.in_(beca_activa_ids))
+        )
+        if periodo:
+            montos_q = montos_q.filter(Cuota.periodo == periodo)
+        montos_becados = dict(montos_q.group_by(Cuota.beca_aplicada_id).all())
+
     wb = openpyxl.Workbook()
     ws = wb.active
+    # AUDIT-FIX B-8: sheet puede ser None en openpyxl
+    if ws is None:
+        raise ValueError("No se encontró el worksheet activo en el Excel")
     ws.title = "Rendición Becas"
 
     # Header
@@ -399,14 +414,7 @@ def export_rendicion_excel(
 
     # Data
     for row_idx, (ba, user, carrera, beca, fuente) in enumerate(rows, 2):
-        # Calcular monto becado: sum de descuentos en cuotas del período
-        cuotas_q = db.query(func.sum(Cuota.monto_descuento)).filter(
-            Cuota.alumno_id == ba.alumno_id,
-            Cuota.beca_aplicada_id == ba.id,
-        )
-        if periodo:
-            cuotas_q = cuotas_q.filter(Cuota.periodo == periodo)
-        monto_becado = cuotas_q.scalar() or Decimal("0")
+        monto_becado = montos_becados.get(ba.id) or Decimal("0")
 
         ws.cell(row=row_idx, column=1, value=user.nombre or user.username)
         ws.cell(
@@ -420,9 +428,14 @@ def export_rendicion_excel(
         ws.cell(row=row_idx, column=8, value=periodo or ba.periodo_inicio)
 
     # Auto-width
+    from openpyxl.utils import get_column_letter
     for col in ws.columns:
         max_len = max((len(str(c.value or "")) for c in col), default=10)
-        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+        # AUDIT-FIX: col[0] puede ser MergedCell que no tiene column_letter
+        col_idx: int | None = getattr(col[0], 'column', None)
+        if col_idx is not None:
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = min(max_len + 4, 40)
 
     buf = io.BytesIO()
     wb.save(buf)

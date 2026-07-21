@@ -132,7 +132,7 @@ def login(
         .first()
     )
     if not db_user or not security.verify_password(
-        user.password, db_user.hashed_password
+        user.password, str(db_user.hashed_password)
     ):
         _register_login_failure(rate_limit_key)
         raise HTTPException(status_code=400, detail="Credenciales inválidas")
@@ -197,12 +197,15 @@ def refresh(
     if not rt:
         raise HTTPException(status_code=401, detail="Refresh token inválido o expirado")
 
-    rt.revocado = True
+    setattr(rt, 'revocado', True)
     db.flush()
 
     db_user = (
         db.query(models.user.User).filter(models.user.User.id == rt.usuario_id).first()
     )
+    # AUDIT-FIX B-6: guard contra None antes de acceder a atributos
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     access_token = create_access_token(
         {"sub": db_user.username, "role": db_user.role, "user_id": db_user.id}
     )
@@ -235,7 +238,7 @@ def logout(
         hashed = hashlib.sha256(refresh_token.encode()).hexdigest()
         rt = db.query(RefreshToken).filter(RefreshToken.token_hash == hashed).first()
         if rt:
-            rt.revocado = True
+            setattr(rt, 'revocado', True)
             db.commit()
 
     response.delete_cookie(key="refresh_token", path="/")
@@ -274,11 +277,11 @@ def recuperar_contrasena(
 
     alphabet = string.ascii_letters + string.digits
     new_password = "".join(secrets.choice(alphabet) for _ in range(10))
-    db_user.hashed_password = security.hash_password(new_password)
+    setattr(db_user, 'hashed_password', security.hash_password(new_password))
     db.commit()
 
-    user_name = db_user.nombre or db_user.username
-    user_email = db_user.email
+    user_name: str = str(db_user.nombre or db_user.username)
+    user_email: str | None = str(db_user.email) if db_user.email else None
     if user_email:
         send_password_reset_email_bg(
             background_tasks, user_email, user_name, new_password
@@ -316,11 +319,11 @@ def solicitar_registro(
 
     alphabet = string.ascii_letters + string.digits
     new_password = "".join(secrets.choice(alphabet) for _ in range(10))
-    db_user.hashed_password = security.hash_password(new_password)
+    setattr(db_user, 'hashed_password', security.hash_password(new_password))
     db.commit()
 
-    user_name = db_user.nombre or db_user.username
-    user_email = db_user.email
+    user_name: str = str(db_user.nombre or db_user.username)
+    user_email: str | None = str(db_user.email) if db_user.email else None
     if user_email:
         send_password_reset_email_bg(
             background_tasks, user_email, user_name, new_password

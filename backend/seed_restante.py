@@ -1,8 +1,10 @@
 """Seed complementario: asistencias + cuotas (rápido)."""
 import sys, random, time as time_mod
 from datetime import date, timedelta
+from io import TextIOWrapper
 
-sys.stdout.reconfigure(encoding="utf-8")
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8")
 print = lambda *a, **kw: (__builtins__.print(*a, **kw) or sys.stdout.flush())
 t0 = time_mod.time()
 
@@ -20,7 +22,7 @@ db = SessionLocal()
 
 def bulk_ignore(tbl, rows):
     if not rows: return
-    if db.bind.dialect.name == "postgresql":
+    if db.get_bind().dialect.name == "postgresql":
         db.execute(pg_insert(tbl).values(rows).on_conflict_do_nothing())
     else:
         db.execute(tbl.insert().prefix_with("OR IGNORE"), rows)

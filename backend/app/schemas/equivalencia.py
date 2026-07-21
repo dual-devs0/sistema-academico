@@ -16,6 +16,7 @@ class SolicitudEquivalenciaCreate(BaseModel):
 class SolicitudEquivalenciaOut(BaseModel):
     id: int
     alumno_id: int
+    alumno_nombre: Optional[str] = None
     tipo: str
     universidad_origen: Optional[str]
     estado: str

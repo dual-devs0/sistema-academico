@@ -286,3 +286,62 @@ def validar_correlatividades(alumno_id: int, materia_id: int, db: Session) -> di
                 )
 
     return {"valido": len(pendientes) == 0, "pendientes": pendientes}
+
+
+def validar_correlatividad_estructural(
+    carrera_id: int, materia_id: int, prerrequisito_id: int, db: Session
+) -> dict:
+    """Validaciones estructurales de una correlatividad (sin considerar alumnos).
+
+    Retorna {"valido": bool, "error": str|None}.
+    - Evita ciclos: verifica que materia_id no aparezca en la cadena de
+      prerrequisitos de prerrequisito_id (BFS).
+    - Evita semestre >=: el prerrequisito debe pertenecer a un semestre
+      anterior al de materia_id dentro de la misma carrera.
+    """
+    PM = m.pensum_materia.PensumMateria
+
+    # 1. Semestre check
+    pensum_origen = (
+        db.query(PM)
+        .filter(PM.carrera_id == carrera_id, PM.materia_id == materia_id)
+        .first()
+    )
+    pensum_prerreq = (
+        db.query(PM)
+        .filter(PM.carrera_id == carrera_id, PM.materia_id == prerrequisito_id)
+        .first()
+    )
+
+    if not pensum_origen:
+        return {"valido": False, "error": "La materia no pertenece a la malla de esta carrera"}
+    if not pensum_prerreq:
+        return {"valido": False, "error": "El prerrequisito no pertenece a la malla de esta carrera"}
+
+    if pensum_prerreq.semestre >= pensum_origen.semestre:
+        return {
+            "valido": False,
+            "error": (
+                f"El prerrequisito debe estar en un semestre anterior "
+                f"(semestre {pensum_prerreq.semestre} >= {pensum_origen.semestre})"
+            ),
+        }
+
+    # 2. Cycle detection (BFS)
+    visitados = {prerrequisito_id}
+    cola = [prerrequisito_id]
+    while cola:
+        actual = cola.pop(0)
+        hijos = (
+            db.query(Correlatividad)
+            .filter(Correlatividad.materia_id == actual)
+            .all()
+        )
+        for h in hijos:
+            if h.prerrequisito_id == materia_id:
+                return {"valido": False, "error": "La correlatividad crearía un ciclo"}
+            if h.prerrequisito_id not in visitados:
+                visitados.add(h.prerrequisito_id)
+                cola.append(h.prerrequisito_id)
+
+    return {"valido": True, "error": None}

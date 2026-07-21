@@ -2,26 +2,27 @@
 Modelos SQLAlchemy — Fase 5D: Equivalencias y suficiencia.
 """
 
+from datetime import date
+from typing import Optional
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Date,
     ForeignKey,
     CheckConstraint,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
 class SolicitudEquivalencia(Base):
     __tablename__ = "solicitudes_equivalencia"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    tipo = Column(String(30), nullable=False)
-    universidad_origen = Column(String(200), nullable=True)
-    estado = Column(String(20), nullable=False, default="pendiente")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    universidad_origen: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
 
     __table_args__ = (
         CheckConstraint(
@@ -41,14 +42,14 @@ class SolicitudEquivalencia(Base):
 class EquivalenciaMateria(Base):
     __tablename__ = "equivalencias_materia"
 
-    id = Column(Integer, primary_key=True, index=True)
-    solicitud_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    solicitud_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("solicitudes_equivalencia.id"), nullable=False
     )
-    materia_origen_nombre = Column(String(200), nullable=False)
-    materia_destino_id = Column(Integer, ForeignKey("materias.id"), nullable=True)
-    programa_analitico_storage_key = Column(String(500), nullable=True)
-    resolucion = Column(String(30), nullable=True)
+    materia_origen_nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    materia_destino_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("materias.id"), nullable=True)
+    programa_analitico_storage_key: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    resolucion: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -63,11 +64,11 @@ class EquivalenciaMateria(Base):
 class ExamenSuficiencia(Base):
     __tablename__ = "examenes_suficiencia"
 
-    id = Column(Integer, primary_key=True, index=True)
-    alumno_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
-    fecha = Column(Date, nullable=False)
-    resultado = Column(String(20), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    materia_id: Mapped[int] = mapped_column(Integer, ForeignKey("materias.id"), nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    resultado: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
