@@ -22,6 +22,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 from app import models, database
 from app.dependencias import get_current_user
+from app.services.autorizacion import es_profesor_de_alumno
 from app.services.puntajes_utils import PESOS, calcular_promedio_final
 
 router = APIRouter(prefix="/boleta", tags=["boleta"])
@@ -332,6 +333,10 @@ def get_boleta(
     if (
         current_user.role not in ("admin", "profesor")
         and current_user.user_id != user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user.role == "profesor" and not es_profesor_de_alumno(
+        db, current_user.user_id, user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
 

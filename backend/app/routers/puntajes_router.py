@@ -4,7 +4,7 @@ from typing import Optional
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
-from app.services.autorizacion import es_profesor_de_materia
+from app.services.autorizacion import es_profesor_de_alumno, es_profesor_de_materia
 from app.services.puntajes_utils import PESOS, calcular_promedio_final
 # AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
 from app.routers.asistencias_router import _oferta_activa_id
@@ -126,6 +126,26 @@ def list_puntajes(
     query = db.query(models.puntaje.Puntaje)
     if current_user.role == "alumno":
         query = query.filter(models.puntaje.Puntaje.user_id == current_user.user_id)
+    elif current_user.role == "profesor":
+        if user_id is not None:
+            if not es_profesor_de_alumno(db, current_user.user_id, user_id):
+                raise HTTPException(status_code=403, detail="No autorizado")
+            query = query.filter(models.puntaje.Puntaje.user_id == user_id)
+        else:
+            query = query.filter(
+                models.puntaje.Puntaje.user_id.in_(
+                    db.query(models.inscripcion.Inscripcion.alumno_id)
+                    .join(
+                        models.oferta_materia.OfertaMateria,
+                        models.oferta_materia.OfertaMateria.id
+                        == models.inscripcion.Inscripcion.oferta_materia_id,
+                    )
+                    .filter(
+                        models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id,
+                        models.oferta_materia.OfertaMateria.activa == True,
+                    )
+                )
+            )
     else:
         if user_id is not None:
             query = query.filter(models.puntaje.Puntaje.user_id == user_id)
@@ -291,7 +311,7 @@ def promedio_final_alumno(
     current_user=Depends(get_current_user),
 ):
     """Promedio ponderado final de un alumno. Si materia_id es None, por cada materia."""  # noqa: E501
-    if current_user.role == "alumno" and current_user.user_id != user_id:
+    if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     query = db.query(models.puntaje.Puntaje).filter(
