@@ -445,7 +445,7 @@ def porcentaje_asistencia_alumno(
     current_user=Depends(get_current_user),
 ):
     """Porcentaje de asistencia de un alumno (global o por materia)."""
-    if current_user.role == "alumno" and current_user.user_id != user_id:
+    if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     query = db.query(models.asistencia.Asistencia).filter(
