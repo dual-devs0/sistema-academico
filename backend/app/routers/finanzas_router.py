@@ -174,13 +174,8 @@ def cuotas_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    cuotas = (
-        db.query(Cuota)
-        .filter(Cuota.alumno_id == current_user.user_id)
-        .order_by(Cuota.fecha_vencimiento.asc())
-        .all()
-    )
-    return [cuota_to_out(c) for c in cuotas]
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
 
     q = db.query(Cuota).filter(Cuota.alumno_id == alumno_id)
     if estado:
@@ -368,7 +363,7 @@ def pago_online_init(
     pago = PagoOnline(
         cuota_id=cuota.id,
         alumno_id=current_user.user_id,
-        monto=cuota.monto_a_pagar,
+        monto=cuota.monto - cuota.monto_descuento,
         transaction_id=transaction_id,
         estado="pendiente",
         gateway_url=f"https://gateway.stub/bancard/checkout?transaction={transaction_id}",

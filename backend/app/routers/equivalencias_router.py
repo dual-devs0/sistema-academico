@@ -161,7 +161,7 @@ def listar_equivalencias(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user.role == "alumno" and current_user.user_id != id:
+    if current_user.role != "admin" and current_user.user_id != id:
         raise HTTPException(status_code=403, detail="No autorizado")
     if current_user.role not in ("admin", "alumno"):
         raise HTTPException(status_code=403, detail="No autorizado")

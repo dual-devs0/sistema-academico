@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -22,6 +22,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 from app import models, database
 from app.dependencias import get_current_user
+from app.services.autorizacion import es_profesor_de_alumno
 from app.services.puntajes_utils import PESOS, calcular_promedio_final
 
 router = APIRouter(prefix="/boleta", tags=["boleta"])
@@ -334,6 +335,10 @@ def get_boleta(
         and current_user.user_id != user_id
     ):
         raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user.role == "profesor" and not es_profesor_de_alumno(
+        db, current_user.user_id, user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado")
 
     user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if not user:
@@ -350,10 +355,7 @@ def get_boleta(
             carrera_nombre = c.nombre
 
     rows = (
-        db.query(
-            models.puntaje.Puntaje,
-            models.materia.Materia.nombre.label("materia_nombre"),
-        )
+        db.query(models.puntaje.Puntaje)
         .join(
             models.oferta_materia.OfertaMateria,
             models.puntaje.Puntaje.oferta_materia_id
@@ -363,7 +365,9 @@ def get_boleta(
             models.materia.Materia,
             models.oferta_materia.OfertaMateria.materia_id == models.materia.Materia.id,
         )
+        .options(contains_eager(models.puntaje.Puntaje.oferta))
         .filter(models.puntaje.Puntaje.user_id == user_id)
+        .add_columns(models.materia.Materia.nombre.label("materia_nombre"))
         .all()
     )
 

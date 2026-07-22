@@ -277,7 +277,7 @@ def recuperar_contrasena(
     user_email: str | None = str(db_user.email) if db_user.email else None
     if user_email:
         send_password_reset_email_bg(
-            background_tasks, user_email, user_name, new_password
+            background_tasks, user_email, user_name
         )
 
     return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}
@@ -319,7 +319,7 @@ def solicitar_registro(
     user_email: str | None = str(db_user.email) if db_user.email else None
     if user_email:
         send_password_reset_email_bg(
-            background_tasks, user_email, user_name, new_password
+            background_tasks, user_email, user_name
         )
 
     return {"detail": "Si los datos son correctos, recibirás un email con tus credenciales."}

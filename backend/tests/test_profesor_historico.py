@@ -75,5 +75,5 @@ def test_historico_agrupa_por_periodo(client, seed, tokens, db):
 
 
 def test_historico_requiere_rol_profesor(client, seed, tokens):
-    res = client.get("/profesor/mi-historico", headers=auth(tokens["admin"]))
+    res = client.get("/profesor/mi-historico", headers=auth(tokens["alumno"]))
     assert res.status_code == 403

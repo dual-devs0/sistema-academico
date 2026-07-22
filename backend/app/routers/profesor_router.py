@@ -6,14 +6,15 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
 from app.schemas.users_schemas import AlumnoSimpleOut
+from app.services.autorizacion import es_profesor_de_alumno
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 
 
 def _requiere_profesor(current_user: CurrentUser):
-    if current_user.role != "profesor":
+    if current_user.role not in ("admin", "profesor"):
         raise HTTPException(
-            status_code=403, detail="Solo profesores pueden acceder a este recurso"
+            status_code=403, detail="Solo administradores o profesores pueden acceder a este recurso"
         )
 
 
@@ -290,8 +291,16 @@ def lista_alumnos(
     q = (
         db.query(models.user.User)
         .filter(models.user.User.role == "alumno")
-        .order_by(models.user.User.nombre, models.user.User.username)
     )
+    if current_user.role == "profesor":
+        q = q.join(models.inscripcion.Inscripcion, models.inscripcion.Inscripcion.alumno_id == models.user.User.id)
+        q = q.join(models.oferta_materia.OfertaMateria, models.oferta_materia.OfertaMateria.id == models.inscripcion.Inscripcion.oferta_materia_id)
+        q = q.filter(
+            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id,
+            models.oferta_materia.OfertaMateria.activa == True,
+        )
+        q = q.distinct()
+    q = q.order_by(models.user.User.nombre, models.user.User.username)
     total = q.count()
     alumnos = q.offset(skip).limit(limit).all()
     items = [

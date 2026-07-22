@@ -267,7 +267,7 @@ def becas_activas_alumno(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user.role == "alumno" and current_user.user_id != alumno_id:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     return get_becas_activas_out(alumno_id, db)
 
