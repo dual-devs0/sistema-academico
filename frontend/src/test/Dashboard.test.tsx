@@ -56,10 +56,10 @@ describe('Dashboard', () => {
         </Layout>
       </MemoryRouter>
     )
-    // El sidebar debe renderizar 17 items
+    // El sidebar debe renderizar 15 items
     await waitFor(() => {
       const sideItems = document.querySelectorAll('button.side-item')
-      expect(sideItems.length).toBe(17)
+      expect(sideItems.length).toBe(15)
     })
   })
 
@@ -74,7 +74,7 @@ describe('Dashboard', () => {
     )
     await waitFor(() => {
       const sideItems = document.querySelectorAll('button.side-item')
-      expect(sideItems.length).toBe(9)
+      expect(sideItems.length).toBe(8)
     })
   })
 
