@@ -33,7 +33,7 @@ class FuenteBeca(Base):
     requiere_reporte_externo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     editable_porcentaje: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    becas = relationship("BecaCatalogo", back_populates="fuente")
+    becas = relationship("BecaCatalogo", back_populates="fuente", cascade="all, delete-orphan")
     becas_activas = relationship("BecaActiva", back_populates="fuente")
 
 
@@ -42,7 +42,7 @@ class BecaCatalogo(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     nombre: Mapped[str] = mapped_column(String(200), nullable=False)
-    fuente_id: Mapped[int] = mapped_column(Integer, ForeignKey("fuentes_beca.id"), nullable=False)
+    fuente_id: Mapped[int] = mapped_column(Integer, ForeignKey("fuentes_beca.id", ondelete="CASCADE"), nullable=False)
     porcentaje_descuento: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     monto_fijo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     requisitos: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -57,8 +57,8 @@ class BecaCatalogo(Base):
     )
 
     fuente = relationship("FuenteBeca", back_populates="becas")
-    postulaciones = relationship("PostulacionBeca", back_populates="beca")
-    activas = relationship("BecaActiva", back_populates="beca")
+    postulaciones = relationship("PostulacionBeca", back_populates="beca", cascade="all, delete-orphan")
+    activas = relationship("BecaActiva", back_populates="beca", cascade="all, delete-orphan")
 
 
 class PostulacionBeca(Base):
@@ -66,14 +66,14 @@ class PostulacionBeca(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    beca_id: Mapped[int] = mapped_column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
+    beca_id: Mapped[int] = mapped_column(Integer, ForeignKey("becas_catalogo.id", ondelete="CASCADE"), nullable=False)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
     fecha_postulacion: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     documentos_storage_keys: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     motivo_rechazo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    revisado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    revisado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     revisado_en: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
@@ -93,7 +93,7 @@ class BecaActiva(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    beca_id: Mapped[int] = mapped_column(Integer, ForeignKey("becas_catalogo.id"), nullable=False)
+    beca_id: Mapped[int] = mapped_column(Integer, ForeignKey("becas_catalogo.id", ondelete="CASCADE"), nullable=False)
     fuente_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("fuentes_beca.id"), nullable=False
     )  # denorm para reportes
@@ -102,7 +102,7 @@ class BecaActiva(Base):
     promedio_minimo_requerido: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     promedio_actual: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     estado_renovacion: Mapped[str] = mapped_column(String(30), nullable=False, default="vigente")
-    otorgado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    otorgado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     otorgado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -132,7 +132,7 @@ class ConceptoArancel(Base):
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     carrera = relationship("Carrera")
-    cuotas = relationship("Cuota", back_populates="concepto")
+    cuotas = relationship("Cuota", back_populates="concepto", cascade="all, delete-orphan")
 
 
 class Cuota(Base):
@@ -140,7 +140,7 @@ class Cuota(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    concepto_id: Mapped[int] = mapped_column(Integer, ForeignKey("conceptos_arancel.id"), nullable=False)
+    concepto_id: Mapped[int] = mapped_column(Integer, ForeignKey("conceptos_arancel.id", ondelete="CASCADE"), nullable=False)
     periodo: Mapped[str] = mapped_column(String(10), nullable=False)
     monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     monto_descuento: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
@@ -150,7 +150,7 @@ class Cuota(Base):
     generado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    generado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    generado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -163,7 +163,7 @@ class Cuota(Base):
     generador = relationship("User", foreign_keys=[generado_por])
     concepto = relationship("ConceptoArancel", back_populates="cuotas")
     beca_aplicada = relationship("BecaActiva", back_populates="cuotas")
-    pagos = relationship("Pago", back_populates="cuota")
+    pagos = relationship("Pago", back_populates="cuota", cascade="all, delete-orphan")
 
 
 class Pago(Base):
@@ -176,7 +176,7 @@ class Pago(Base):
     __tablename__ = "pagos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    cuota_id: Mapped[int] = mapped_column(Integer, ForeignKey("cuotas.id"), nullable=False)
+    cuota_id: Mapped[int] = mapped_column(Integer, ForeignKey("cuotas.id", ondelete="CASCADE"), nullable=False)
     monto_pagado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     fecha_pago: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
@@ -190,14 +190,14 @@ class Pago(Base):
 
     cuota = relationship("Cuota", back_populates="pagos")
     registrador = relationship("User", foreign_keys=[registrado_por])
-    comprobante = relationship("Comprobante", back_populates="pago", uselist=False)
+    comprobante = relationship("Comprobante", back_populates="pago", uselist=False, cascade="all, delete-orphan")
 
 
 class Comprobante(Base):
     __tablename__ = "comprobantes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    pago_id: Mapped[int] = mapped_column(Integer, ForeignKey("pagos.id"), nullable=False, unique=True)
+    pago_id: Mapped[int] = mapped_column(Integer, ForeignKey("pagos.id", ondelete="CASCADE"), nullable=False, unique=True)
     tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="factura")
     numero_comprobante: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     cdc: Mapped[Optional[str]] = mapped_column(String(44), nullable=True)  # DNIT
@@ -239,7 +239,7 @@ class AuditoriaOverrideMora(Base):
 
 
 class PagoOnline(Base):
-    """Pago iniciado por gateway online (Bancard stub)."""
+    """Pago iniciado por gateway online (Stripe Checkout)."""
 
     __tablename__ = "pagos_online"
 
@@ -248,6 +248,7 @@ class PagoOnline(Base):
     alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     transaction_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
+    stripe_session_id: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
     gateway_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     gateway_response: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
@@ -266,7 +267,7 @@ class SuscripcionPush(Base):
     __tablename__ = "suscripciones_push"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     endpoint: Mapped[str] = mapped_column(String(500), nullable=False)
     p256dh: Mapped[str] = mapped_column(String(200), nullable=False)
     auth: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -275,4 +276,4 @@ class SuscripcionPush(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
-    user = relationship("User")
+    user = relationship("User", back_populates="suscripciones_push")

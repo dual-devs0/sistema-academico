@@ -10,14 +10,14 @@ def _seed_puntajes(db, seed):
         user_id=seed["alumno"].id,
         oferta_materia_id=seed["oferta"].id,
         tipo="parcial1",
-        valor=8.5,
+        valor=17.0,
         editado_por=seed["admin"].id,
     )
     p2 = Puntaje(
         user_id=seed["admin"].id,
         oferta_materia_id=seed["oferta"].id,
         tipo="parcial1",
-        valor=9.0,
+        valor=18.0,
         editado_por=seed["admin"].id,
     )
     db.add_all([p1, p2])

@@ -4,13 +4,21 @@ from io import TextIOWrapper
 if isinstance(sys.stdout, TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from app.database import engine, SessionLocal, Base  # noqa: E402
+from app.database import engine, SessionLocal  # noqa: E402
 from app.models.users import User  # noqa: E402
 from app.models.carrera import Carrera  # noqa: E402
 from app.models.materia import Materia  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from sqlalchemy import inspect  # noqa: E402
 
-Base.metadata.create_all(bind=engine)
+# Verificar que las tablas existen (Alembic debe haberlas creado)
+inspector = inspect(engine)
+tablas_existentes = set(inspector.get_table_names())
+requeridas = {"users", "carreras", "materias"}
+faltantes = requeridas - tablas_existentes
+if faltantes:
+    print(f"ERROR: Faltan tablas: {faltantes}. Ejecutá 'alembic upgrade head' primero.")
+    sys.exit(1)
 
 db = SessionLocal()
 

@@ -6,8 +6,7 @@ from app.models.puntaje import Puntaje
 from app.models.oferta_materia import OfertaMateria
 from app.models.inscripcion import Inscripcion
 from app import models as m
-
-PESOS = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos, PESO_DEFAULT_FLOAT
 
 
 def _dia_nombre(d: int) -> str:
@@ -93,15 +92,10 @@ def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> boo
     por_oferta: dict[int, dict] = {}
     for p in puntajes:
         por_oferta.setdefault(p.oferta_materia_id, {})[p.tipo] = float(p.valor)
+    pesos = get_pesos(db, materia_id)
     for notas in por_oferta.values():
-        existentes = {k: v for k, v in notas.items() if k in PESOS}
-        if not existentes:
-            continue
-        peso_total = sum(PESOS[k] for k in existentes)
-        if peso_total == 0:
-            continue
-        promedio = sum(PESOS[k] * v for k, v in existentes.items()) / peso_total
-        if promedio >= 6:
+        promedio = calcular_promedio_final(notas, pesos)
+        if promedio is not None and promedio >= 6:
             return True
     return False
 
@@ -129,7 +123,7 @@ def promedio_y_estado_intento(
         )
         .all()
     }
-    inscripto_en_activa = any(activa_por_oferta.get(oid) for oid in inscriptas_ids)
+    inscripto_en_activa = any(activa_por_oferta.get(oid) for oid in inscriptas_ids if oid is not None)
 
     puntajes = (
         db.query(Puntaje)
@@ -142,16 +136,13 @@ def promedio_y_estado_intento(
     for p in puntajes:
         por_oferta.setdefault(p.oferta_materia_id, {})[p.tipo] = float(p.valor)
 
+    pesos = get_pesos(db, materia_id)
     mejor_promedio: float | None = None
     reprobado_en_oferta_cerrada = False
     for oferta_id, notas in por_oferta.items():
-        existentes = {k: v for k, v in notas.items() if k in PESOS}
-        if not existentes:
+        promedio = calcular_promedio_final(notas, pesos)
+        if promedio is None:
             continue
-        peso_total = sum(PESOS[k] for k in existentes)
-        if peso_total == 0:
-            continue
-        promedio = sum(PESOS[k] * v for k, v in existentes.items()) / peso_total
         if mejor_promedio is None or promedio > mejor_promedio:
             mejor_promedio = promedio
         if promedio < 6 and not activa_por_oferta.get(oferta_id, True):
@@ -164,17 +155,14 @@ def _tiene_nota_aprobatoria_cached(
     materia_id: int,
     ofertas_por_materia: dict,
     puntajes_por_oferta: dict,
+    pesos_por_materia: dict[int, dict] | None = None,
 ) -> bool:
     """Version sin DB — usa datos pre-cargados."""
+    pesos = (pesos_por_materia or {}).get(materia_id, PESO_DEFAULT_FLOAT)
     for oferta in ofertas_por_materia.get(materia_id, []):
         notas = puntajes_por_oferta.get(oferta.id, {})
-        existentes = {k: v for k, v in notas.items() if k in PESOS}
-        if not existentes:
-            continue
-        peso_total = sum(PESOS[k] for k in existentes)
-        if peso_total == 0:
-            continue
-        if sum(PESOS[k] * v for k, v in existentes.items()) / peso_total >= 6:
+        promedio = calcular_promedio_final(notas, pesos)
+        if promedio is not None and promedio >= 6:
             return True
     return False
 
@@ -187,25 +175,24 @@ def _calcular_estado_cached(
     activa_por_oferta_id: dict,
     correlatividades_por_materia: dict,
     prereq_nombres: dict,
+    pesos_por_materia: dict[int, dict] | None = None,
 ) -> tuple[str, list[dict], float | None]:
     """Versión sin DB de _calcular_estado_materia — usa datos pre-cargados en batch."""
     mejor_promedio: float | None = None
     inscripto_en_activa = False
     reprobado_en_cerrada = False
+    pesos = (pesos_por_materia or {}).get(materia_id, PESO_DEFAULT_FLOAT)
 
     for oferta in ofertas_por_materia.get(materia_id, []):
         if oferta.id in inscriptas_oferta_ids and activa_por_oferta_id.get(oferta.id):
             inscripto_en_activa = True
         notas = puntajes_por_oferta.get(oferta.id, {})
-        existentes = {k: v for k, v in notas.items() if k in PESOS}
-        if existentes:
-            peso_total = sum(PESOS[k] for k in existentes)
-            if peso_total > 0:
-                promedio = sum(PESOS[k] * v for k, v in existentes.items()) / peso_total
-                if mejor_promedio is None or promedio > mejor_promedio:
-                    mejor_promedio = promedio
-                if promedio < 6 and not activa_por_oferta_id.get(oferta.id, True):
-                    reprobado_en_cerrada = True
+        promedio = calcular_promedio_final(notas, pesos)
+        if promedio is not None:
+            if mejor_promedio is None or promedio > mejor_promedio:
+                mejor_promedio = promedio
+            if promedio < 6 and not activa_por_oferta_id.get(oferta.id, True):
+                reprobado_en_cerrada = True
 
     if mejor_promedio is not None and mejor_promedio >= 6:
         return "aprobada", [], mejor_promedio
@@ -222,7 +209,7 @@ def _calcular_estado_cached(
     for c in corrs:
         cumple = False
         if c.tipo == "aprobada":
-            cumple = _tiene_nota_aprobatoria_cached(c.prerrequisito_id, ofertas_por_materia, puntajes_por_oferta)
+            cumple = _tiene_nota_aprobatoria_cached(c.prerrequisito_id, ofertas_por_materia, puntajes_por_oferta, pesos_por_materia)
         elif c.tipo == "cursando":
             cumple = any(
                 o.id in inscriptas_oferta_ids

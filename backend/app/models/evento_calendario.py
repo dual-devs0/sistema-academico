@@ -18,7 +18,7 @@ class EventoCalendario(Base):
     materia_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("materias.id"), nullable=True)
     carrera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carreras.id"), nullable=True)
     descripcion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    creado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    creado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     anio: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     semestre: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     archivo_pdf: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

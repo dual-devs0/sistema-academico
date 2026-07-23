@@ -19,6 +19,7 @@ from . import graduacion
 from . import equivalencia
 from . import examen_schema as examen
 from . import tramites
+from . import global_settings
 
 __all__ = [
     "user",
@@ -42,4 +43,5 @@ __all__ = [
     "equivalencia",
     "examen",
     "tramites",
+    "global_settings",
 ]

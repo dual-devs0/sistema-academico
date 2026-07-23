@@ -10,6 +10,7 @@ from app.services.pensum import (
     _calcular_estado_cached,
     _tiene_nota_aprobatoria_cached,
 )
+from app.services.puntajes_utils import PESO_DEFAULT_FLOAT
 
 router = APIRouter(prefix="/pensum", tags=["pensum"])
 
@@ -69,7 +70,7 @@ def agregar_materia_a_malla(
         materia_nombre=materia.nombre,
         semestre=nuevo.semestre,
         creditos=nuevo.creditos,
-        es_electiva=nuevo.es_electiva,
+        es_electiva=bool(nuevo.es_electiva),
     )
 
 
@@ -144,7 +145,7 @@ def actualizar_pensum_materia(
         materia_codigo=materia.codigo if materia else None,
         semestre=pm.semestre,
         creditos=pm.creditos,
-        es_electiva=pm.es_electiva,
+        es_electiva=bool(pm.es_electiva),
     )
 
 
@@ -276,7 +277,7 @@ def obtener_malla_carrera(
                 materia_codigo=materia.codigo if materia else None,
                 semestre=pm.semestre,
                 creditos=pm.creditos,
-                es_electiva=pm.es_electiva,
+                es_electiva=bool(pm.es_electiva),
             )
         )
     return result
@@ -374,6 +375,27 @@ def avance_alumno(
         .all()
     }
 
+    # 1b. Pesos de evaluación por materia (default 20/20/10/50 si no está configurado)
+    pesos_configurados = {
+        pe.materia_id: pe
+        for pe in db.query(models.peso_evaluacion.PesoEvaluacion)
+        .filter(models.peso_evaluacion.PesoEvaluacion.materia_id.in_(materia_ids))
+        .all()
+    }
+    pesos_por_materia = {
+        mid: (
+            {
+                "parcial1": float(pesos_configurados[mid].parcial1_max),
+                "parcial2": float(pesos_configurados[mid].parcial2_max),
+                "practico": float(pesos_configurados[mid].practico_max),
+                "final": float(pesos_configurados[mid].final_max),
+            }
+            if mid in pesos_configurados
+            else PESO_DEFAULT_FLOAT
+        )
+        for mid in materia_ids
+    }
+
     # 2. Correlatividades
     correlatividades_por_materia: dict = defaultdict(list)
     for c in (
@@ -445,10 +467,12 @@ def avance_alumno(
     } if prereq_ids else {}
     # ---------------------------------------------------------------------------------
 
+    from app.schemas.pensum_schema import PendienteOut as PendienteOutSchema
+
     result = []
     for pm in filas:
         materia = materias_map.get(pm.materia_id)
-        estado, pendientes, nota = _calcular_estado_cached(
+        estado, pendientes_raw, nota = _calcular_estado_cached(
             pm.materia_id,
             ofertas_por_materia,
             inscriptas_oferta_ids,
@@ -456,14 +480,15 @@ def avance_alumno(
             activa_por_oferta_id,
             correlatividades_por_materia,
             prereq_nombres,
+            pesos_por_materia,
         )
         # prerequisitos completos (todos, no solo pendientes)
         prerequisitos = [
-            {
-                "materia_id": c.prerrequisito_id,
-                "materia_nombre": prereq_nombres.get(c.prerrequisito_id, "—"),
-                "tipo": c.tipo,
-            }
+            PendienteOutSchema(
+                materia_id=c.prerrequisito_id,
+                materia_nombre=prereq_nombres.get(c.prerrequisito_id, "—"),
+                tipo=c.tipo,
+            )
             for c in correlatividades_por_materia.get(pm.materia_id, [])
         ]
 
@@ -489,7 +514,7 @@ def avance_alumno(
                 creditos=pm.creditos,
                 estado=estado,
                 nota=round(nota, 2) if nota is not None else None,
-                pendientes=pendientes,
+                pendientes=[PendienteOutSchema(**p) for p in pendientes_raw],
                 prerequisitos=prerequisitos,
             )
         )
@@ -546,10 +571,31 @@ def creditos_alumno(
     ):
         puntajes_por_oferta_cred[p.oferta_materia_id][p.tipo] = float(p.valor)
 
+    pesos_configurados_cred = {
+        pe.materia_id: pe
+        for pe in db.query(models.peso_evaluacion.PesoEvaluacion)
+        .filter(models.peso_evaluacion.PesoEvaluacion.materia_id.in_(materia_ids))
+        .all()
+    }
+    pesos_por_materia_cred = {
+        mid: (
+            {
+                "parcial1": float(pesos_configurados_cred[mid].parcial1_max),
+                "parcial2": float(pesos_configurados_cred[mid].parcial2_max),
+                "practico": float(pesos_configurados_cred[mid].practico_max),
+                "final": float(pesos_configurados_cred[mid].final_max),
+            }
+            if mid in pesos_configurados_cred
+            else PESO_DEFAULT_FLOAT
+        )
+        for mid in materia_ids
+    }
+
     acumulados = 0
     for pm in filas:
         if _tiene_nota_aprobatoria_cached(
-            pm.materia_id, ofertas_por_materia_cred, puntajes_por_oferta_cred
+            pm.materia_id, ofertas_por_materia_cred, puntajes_por_oferta_cred,
+            pesos_por_materia_cred,
         ):
             acumulados += pm.creditos
 

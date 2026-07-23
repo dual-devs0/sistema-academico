@@ -48,7 +48,7 @@ export default function AdminLogin() {
       --bg: #07090d; --surface: #0e131a; --surface-glass: rgba(14, 19, 26, 0.6);
       --border: #1e2d3d; --border-glass: rgba(30, 45, 61, 0.5);
       --cyan: #2563eb; --cyan-glow: rgba(37, 99, 235, 0.18);
-      --cyan-bright: #60a5fa;
+      --cyan-bright: #60a5fa; --cyan-border: rgba(37, 99, 235, 0.25);
       --text-1: #ffffff; --text-2: #94a3b8; --text-3: #64748b;
       --danger: rgba(239, 68, 68, 0.1); --danger-border: rgba(239, 68, 68, 0.3);
     }
@@ -83,7 +83,7 @@ export default function AdminLogin() {
     }
     .panel-deco-overlay {
       position: absolute; inset: 0; z-index: 1;
-      background: linear-gradient(135deg, rgba(7,9,13,0.85) 0%, rgba(7,9,13,0.4) 50%, rgba(0,180,216,0.1) 100%);
+      background: linear-gradient(135deg, rgba(7,9,13,0.85) 0%, rgba(7,9,13,0.4) 50%, var(--cyan-glow) 100%);
     }
     .panel-deco-content {
       position: relative; z-index: 3;
@@ -93,7 +93,7 @@ export default function AdminLogin() {
     
     .hero-eyebrow {
       display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(0,180,216,0.1); border: 1px solid rgba(0,180,216,0.25);
+      background: var(--cyan-glow); border: 1px solid var(--cyan-border);
       border-radius: 20px; padding: 6px 14px;
       font-size: 12px; font-weight: 600; color: var(--cyan-bright);
       backdrop-filter: blur(8px);
@@ -104,8 +104,8 @@ export default function AdminLogin() {
       font-size: clamp(32px, 4vw, 54px); font-weight: 800;
       line-height: 1.1; color: #fff; letter-spacing: -0.03em;
     }
-    .hero-title span { 
-      background: linear-gradient(135deg, #2563eb, #93c5fd);
+    .hero-title span {
+      background: linear-gradient(135deg, var(--cyan), var(--cyan-bright));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -151,7 +151,7 @@ export default function AdminLogin() {
       transition: all 0.2s; outline: none;
     }
     .input-field:focus {
-      background: rgba(0,180,216,0.02);
+      background: var(--cyan-glow);
       border-color: var(--cyan);
       box-shadow: 0 0 0 4px var(--cyan-glow);
     }
@@ -170,10 +170,10 @@ export default function AdminLogin() {
       background: var(--cyan); border: none; border-radius: 10px;
       color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,180,216,0.3);
+      transition: all 0.2s; box-shadow: 0 4px 14px rgba(37,99,235,0.3);
     }
-    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,180,216,0.4); }
-    .btn-submit:active { transform: translateY(1px); box-shadow: 0 2px 8px rgba(0,180,216,0.3); }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.4); }
+    .btn-submit:active { transform: translateY(1px); box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 
     .error-msg {
@@ -190,21 +190,21 @@ export default function AdminLogin() {
       .admin-root { flex-direction: column; overflow-y: auto; height: 100dvh; background: var(--bg); }
       html, body { overflow-y: auto; }
       
-      .panel-deco { order: 1; padding: 40px 24px 80px; min-height: 40vh; border-bottom: 1px solid var(--border); }
-      .panel-form { order: 2; width: 100%; height: auto; border-right: none; background: transparent; box-shadow: none; margin-top: -60px; z-index: 20; }
+      .panel-deco { order: 1; padding: 40px 24px 80px; min-height: 40vh; }
+      .panel-form { order: 2; width: 100%; height: auto; border-right: none; background: transparent; box-shadow: none; z-index: 20; }
       
       .panel-deco-overlay {
         background: linear-gradient(180deg, rgba(7,9,13,0.3) 0%, rgba(7,9,13,0.8) 60%, var(--bg) 100%);
       }
       
       .form-content {
-        padding: 32px 24px; margin: 0 20px 40px;
+        padding: 32px 24px; margin: -60px 20px 40px;
         background: rgba(14, 19, 26, 0.85); backdrop-filter: blur(20px);
         border: 1px solid var(--border-glass); border-radius: 20px;
         box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
       }
-      
-      .form-header { padding: 0 0 24px 0; }
+
+      .form-header { padding: 24px 0; }
       .form-logo { width: 180px; }
       .form-footer { border-top: none; padding: 0 20px 30px; }
     }

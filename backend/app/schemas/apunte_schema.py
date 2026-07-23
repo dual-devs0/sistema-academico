@@ -45,3 +45,16 @@ class ApunteSearchParams(BaseModel):
     materia_id: int | None = None
     tipo_contenido: TipoContenido | None = None
     aprobado: bool | None = None
+
+
+class ValidarRequest(BaseModel):
+    titulo: str
+    descripcion: str | None = None
+    tags: str | None = None
+    tipo_contenido: TipoContenido = "pdf"
+    materia_id: int
+
+
+class ValidarResponse(BaseModel):
+    valido: bool
+    advertencias: list[str]

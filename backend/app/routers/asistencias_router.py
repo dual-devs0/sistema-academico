@@ -216,7 +216,13 @@ def list_asistencias(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    query = db.query(models.asistencia.Asistencia)
+    from sqlalchemy.orm import joinedload
+
+    query = db.query(models.asistencia.Asistencia).options(
+        joinedload(models.asistencia.Asistencia.oferta).joinedload(
+            models.oferta_materia.OfertaMateria.materia
+        )
+    )
     # Alumno solo ve sus propias asistencias
     if current_user.role == "alumno":
         query = query.filter(
@@ -233,7 +239,17 @@ def list_asistencias(
     if fecha is not None:
         query = query.filter(models.asistencia.Asistencia.fecha == fecha)
     query = query.order_by(models.asistencia.Asistencia.id).offset(skip).limit(limit)
-    return query.all()
+    rows = query.all()
+
+    # Enriquecer con el nombre real de la materia (evita N+1: ya viene
+    # precargada vía joinedload arriba).
+    result = []
+    for a in rows:
+        out = schemas.asistencia.AsistenciaOut.model_validate(a)
+        if a.oferta and a.oferta.materia:
+            out.materia_nombre = a.oferta.materia.nombre
+        result.append(out)
+    return result
 
 
 @router.put("/{asistencia_id}", response_model=schemas.asistencia.AsistenciaOut)
@@ -392,10 +408,10 @@ def alumnos_asistencia(
         return []
 
     alumno_ids = [i.alumno_id for i in inscripciones]
-    alumnos = db.query(models.user.User).filter(models.user.User.id.in_(alumno_ids))
+    query_alumnos = db.query(models.user.User).filter(models.user.User.id.in_(alumno_ids))
     if becado is not None:
-        alumnos = alumnos.filter(models.user.User.es_becado == becado)
-    alumnos = alumnos.all()
+        query_alumnos = query_alumnos.filter(models.user.User.es_becado == becado)
+    alumnos = query_alumnos.all()
 
     from sqlalchemy import func, case as sa_case
 
@@ -427,7 +443,7 @@ def alumnos_asistencia(
                 user_id=a.id,
                 nombre=a.nombre,
                 username=a.username,
-                es_becado=a.es_becado,
+                es_becado=a.es_becado or False,
                 total_clases=total,
                 presentes=presentes,
                 porcentaje=pct,

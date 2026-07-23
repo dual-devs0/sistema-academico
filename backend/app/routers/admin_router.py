@@ -56,9 +56,11 @@ def admin_dashboard(
     kpis = {
         "promedio_general": 0.0,
         "aprobacion_pct": 0,
-        "asistencia_pct": 0.0,
+        "asistencia_pct": 0,
         "alumnos_activos": 0,
     }
+    alumnos_por_oferta: set = set()
+    punt_por_alumno: dict = {}
     if oferta_ids:
         punt_agg = (
             db.query(
@@ -108,8 +110,8 @@ def admin_dashboard(
             .filter(A.oferta_materia_id.in_(oferta_ids))
             .first()
         )
-        total_a = asis_row.total or 0
-        pres_a = asis_row.pres or 0
+        total_a = asis_row.total if asis_row else 0
+        pres_a = asis_row.pres if asis_row else 0
         kpis["asistencia_pct"] = (
             round(pres_a / total_a * 100, 1) if total_a > 0 else 0.0
         )
@@ -134,7 +136,7 @@ def admin_dashboard(
 
     # ── Alertas de estudiantes en riesgo ──
     alertas = []
-    if oferta_ids and alumnos_por_oferta:
+    if oferta_ids:
         alumno_ids = list(alumnos_por_oferta)
 
         asis_por_alumno = {}

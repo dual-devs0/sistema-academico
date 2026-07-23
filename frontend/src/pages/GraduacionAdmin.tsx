@@ -4,6 +4,7 @@ import TablaPaginada, { type ColumnaTabla } from '../components/common/TablaPagi
 import { crearProcesoGraduacion, getCondicionEgreso, getEtapasProceso, getCandidatos,
   asignarTutor, actualizarEtapa,
   type CondicionEgreso, type ProcesoGraduacion, type EtapaTesis, type CandidatoGraduacion } from '../services/graduacionService'
+import { GraduationCapIcon } from '../components/Layout'
 
 const css = `
   .gr-title { font-size:22px; font-weight:800; margin-bottom:20px; color:var(--text-primary); }
@@ -293,7 +294,7 @@ export default function GraduacionAdmin() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 className="gr-title" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <i className="ti ti-graduation-cap" style={{ color: 'var(--accent-bright)' }} />
+            <span style={{ color: 'var(--accent-bright)', display: 'inline-flex' }}><GraduationCapIcon size={20} /></span>
             Graduación — Admin
           </h2>
           <p className="page-subtitle">Candidatos a graduación de todas las carreras.</p>

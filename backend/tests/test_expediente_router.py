@@ -36,8 +36,8 @@ def test_cerrar_materia_admin_ok(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()
@@ -84,8 +84,8 @@ def test_cerrar_materia_fuera_del_pensum_404(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()
@@ -121,8 +121,8 @@ def test_cerrar_materia_es_upsert_rectificacion(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta.id,
-            tipo="final",
-            valor=5.0,
+            tipo="final1",
+            valor=25.0,
         )
     )
     db.commit()
@@ -139,7 +139,7 @@ def test_cerrar_materia_es_upsert_rectificacion(client, seed, tokens, db):
     id1 = r1.json()["id"]
 
     puntaje = db.query(Puntaje).filter(Puntaje.oferta_materia_id == oferta.id).first()
-    puntaje.valor = 9.0
+    puntaje.valor = 45.0
     db.commit()
 
     r2 = client.post(
@@ -169,8 +169,8 @@ def test_ppa_endpoint_ok(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()
@@ -196,8 +196,8 @@ def test_expediente_alumno_endpoint(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()
@@ -228,8 +228,8 @@ def test_regularidad_endpoint(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()

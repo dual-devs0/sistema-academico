@@ -47,6 +47,7 @@ from app.models import (  # noqa: F401, E402
     equivalencia,
     examen,
     tramites,
+    peso_evaluacion,
 )
 
 target_metadata = Base.metadata

@@ -4,59 +4,132 @@ import { getRole, getUsername } from '../hooks/useRole'
 import { api } from '../lib/api'
 import logoUCA from '../assets/uc_logo_sist_academico.png'
 
-type MenuItem = { label: string; path: string; icon: string }
+type MenuItem = { label: string; path: string; icon: string; group?: string }
 
-// ─── Menús por rol (estilo capturas: lista corta) ───────────────────────────
+// ─── Íconos custom (reemplazan Tabler en Graduación/Equivalencias) ──────────
+
+export function GraduationCapIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      {/* Birrete */}
+      <path d="M11.5 3 3.5 6.7l8 3.7 8-3.7-8-3.7z" />
+      <path d="M6.2 5.8 9 7.1" />
+      <path d="M15.8 8.4v3.4c0 1.2-2 2.3-4.3 2.3-1 0-1.9-.2-2.6-.5" />
+      <path d="M17.8 8.4v3.6" />
+      <rect x="16.9" y="12" width="1.8" height="1.4" rx="0.4" />
+      {/* Diploma con sello */}
+      <path d="M4.2 9.6 2.2 15.4c-.15.45.15.9.6.9l1.9-.35" />
+      <path d="M4.2 9.6l3.6 1.8c.9.45 1.9.6 2.85.4" />
+      <path d="M4.7 16 3.9 19.5l1.6-1.1 1 1.7 1.2-3.3" />
+      <circle cx="8.6" cy="14.4" r="2.1" />
+      <circle cx="8.6" cy="14.4" r="0.9" />
+    </svg>
+  )
+}
+
+function HandChartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+      <circle cx="14" cy="8" r="6" />
+      <path d="M14 2v6h6M14 8 9.5 12.5M14 8l-2 5" />
+      <path d="M2 20l3-3h4l4 1.4c1 .3 2-.4 1.6-1.4-.2-.6-.7-1-1.3-1.2L9 14.2H6.5L4 16.5" />
+    </svg>
+  )
+}
+
+export function GraduationNetworkIcon({ size = 26 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className="gni-anim">
+      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+        <circle cx="4" cy="4" r="2" />
+        <path d="M2.2 8.6a2.6 2.6 0 0 1 3.6 0" />
+        <circle cx="20" cy="4" r="2" />
+        <path d="M18.2 8.6a2.6 2.6 0 0 1 3.6 0" />
+        <circle cx="4" cy="20" r="2" />
+        <path d="M2.2 15.4a2.6 2.6 0 0 0 3.6 0" />
+        <circle cx="20" cy="20" r="2" />
+        <path d="M18.2 15.4a2.6 2.6 0 0 0 3.6 0" />
+      </g>
+      <g className="gni-arcs" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.85">
+        <path d="M8.5 4.2h7" />
+        <path d="M8.5 19.8h7" />
+        <path d="M3.6 8.6v6.8" />
+        <path d="M20.4 8.6v6.8" />
+      </g>
+      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 8.5 6.5 11l5.5 2.5 5.5-2.5z" />
+        <path d="M9 12.3v2.4c0 1 1.3 1.8 3 1.8s3-.8 3-1.8v-2.4" />
+      </g>
+    </svg>
+  )
+}
+
+const iconOverride: Record<string, React.ComponentType<{ size?: number }>> = {
+  '/mi-graduacion': GraduationCapIcon,
+  '/graduacion-admin': GraduationCapIcon,
+  '/mis-equivalencias': HandChartIcon,
+  '/equivalencias-admin': HandChartIcon,
+}
+
+// ─── Menús por rol, agrupados en secciones (PRINCIPAL/ACADÉMICO/RECURSOS/TRÁMITES) ──
 
 const menuAlumno: MenuItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
-  { label: 'Cursos', path: '/programa', icon: 'ti-school' },
-  { label: 'Mi Progreso', path: '/malla', icon: 'ti-hierarchy-3' },
-  { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
-  { label: 'Expediente', path: '/expediente', icon: 'ti-file-certificate' },
-  { label: 'Inscripción', path: '/inscripciones', icon: 'ti-clipboard-list' },
-  { label: 'Asistencia', path: '/asistencia', icon: 'ti-qrcode' },
-  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
-  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
-  { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
-  { label: 'Pasantías', path: '/mis-pasantias', icon: 'ti-briefcase' },
-  { label: 'Equivalencias', path: '/mis-equivalencias', icon: 'ti-shuffle' },
-  { label: 'Graduación', path: '/mi-graduacion', icon: 'ti-graduation-cap' },
-  { label: 'Trámites', path: '/tramites', icon: 'ti-file-description' },
-  { label: 'Mis Cuotas', path: '/mis-cuotas', icon: 'ti-coin' },
-  { label: 'Becas', path: '/mis-becas', icon: 'ti-receipt-2' },
+  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard', group: 'Principal' },
+  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar', group: 'Principal' },
+
+  { label: 'Cursos', path: '/programa', icon: 'ti-school', group: 'Académico' },
+  { label: 'Boleta', path: '/boleta', icon: 'ti-file-text', group: 'Académico' },
+  { label: 'Inscripción', path: '/inscripciones', icon: 'ti-clipboard-list', group: 'Académico' },
+  { label: 'Mi Progreso', path: '/malla', icon: 'ti-hierarchy-3', group: 'Académico' },
+  { label: 'Expediente', path: '/expediente', icon: 'ti-file-certificate', group: 'Académico' },
+  { label: 'Graduación', path: '/mi-graduacion', icon: 'ti-graduation-cap', group: 'Académico' },
+  { label: 'Equivalencias', path: '/mis-equivalencias', icon: 'ti-shuffle', group: 'Académico' },
+
+  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books', group: 'Recursos' },
+  { label: 'Becas', path: '/mis-becas', icon: 'ti-receipt-2', group: 'Recursos' },
+  { label: 'Pasantías', path: '/mis-pasantias', icon: 'ti-briefcase', group: 'Recursos' },
+
+  { label: 'Mis Cuotas', path: '/mis-cuotas', icon: 'ti-coin', group: 'Trámites' },
+  { label: 'Trámites', path: '/tramites', icon: 'ti-file-description', group: 'Trámites' },
+
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
 const menuProfesor: MenuItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
-  { label: 'Mis Materias', path: '/mis-materias', icon: 'ti-book-2' },
-  { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
-  { label: 'Asistencia', path: '/asistencia', icon: 'ti-qrcode' },
-  { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-pie' },
-  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
-  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books' },
-  { label: 'Boleta', path: '/boleta', icon: 'ti-file-text' },
+  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard', group: 'Principal' },
+  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar', group: 'Principal' },
+  { label: 'Asistencia', path: '/asistencia', icon: 'ti-qrcode', group: 'Principal' },
+
+  { label: 'Mis Materias', path: '/mis-materias', icon: 'ti-book-2', group: 'Académico' },
+  { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate', group: 'Académico' },
+  { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-pie', group: 'Académico' },
+
+  { label: 'Biblioteca', path: '/biblioteca', icon: 'ti-books', group: 'Recursos' },
+
   { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
 ]
 
 const menuAdmin: MenuItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard' },
-  { label: 'Usuarios & Roles', path: '/usuarios', icon: 'ti-users' },
-  { label: 'Asignaciones', path: '/gestion-asignaciones', icon: 'ti-binary-tree' },
-  { label: 'Malla Curricular', path: '/malla', icon: 'ti-hierarchy-3' },
-  { label: 'Expediente', path: '/expediente', icon: 'ti-file-certificate' },
-  { label: 'Inscripciones', path: '/inscripciones', icon: 'ti-clipboard-list' },
-  { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
-  { label: 'Finanzas', path: '/finanzas', icon: 'ti-coin' },
-  { label: 'Trámites', path: '/tramites', icon: 'ti-file-description' },
-  { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
-  { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-bar' },
-  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar' },
-  { label: 'Graduación', path: '/graduacion-admin', icon: 'ti-graduation-cap' },
-  { label: 'Pasantías', path: '/pasantias-admin', icon: 'ti-briefcase' },
-  { label: 'Equivalencias', path: '/equivalencias-admin', icon: 'ti-shuffle' },
-  { label: 'Ajustes Globales', path: '/perfil', icon: 'ti-settings' },
+  { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard', group: 'Principal' },
+  { label: 'Calendario', path: '/calendario', icon: 'ti-calendar', group: 'Principal' },
+  { label: 'Usuarios & Roles', path: '/usuarios', icon: 'ti-users', group: 'Principal' },
+  { label: 'Asignaciones', path: '/gestion-asignaciones', icon: 'ti-binary-tree', group: 'Principal' },
+
+  { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate', group: 'Académico' },
+  { label: 'Inscripciones', path: '/inscripciones', icon: 'ti-clipboard-list', group: 'Académico' },
+  { label: 'Malla Curricular', path: '/malla', icon: 'ti-hierarchy-3', group: 'Académico' },
+  { label: 'Expediente', path: '/expediente', icon: 'ti-file-certificate', group: 'Académico' },
+  { label: 'Graduación', path: '/graduacion-admin', icon: 'ti-graduation-cap', group: 'Académico' },
+  { label: 'Equivalencias', path: '/equivalencias-admin', icon: 'ti-shuffle', group: 'Académico' },
+
+  { label: 'Pasantías', path: '/pasantias-admin', icon: 'ti-briefcase', group: 'Recursos' },
+  { label: 'Reportes', path: '/reportes', icon: 'ti-report', group: 'Recursos' },
+  { label: 'Estadísticas', path: '/estadisticas', icon: 'ti-chart-bar', group: 'Recursos' },
+
+  { label: 'Finanzas', path: '/finanzas', icon: 'ti-coin', group: 'Trámites' },
+  { label: 'Trámites', path: '/tramites', icon: 'ti-file-description', group: 'Trámites' },
+
+  { label: 'Ajustes Globales', path: '/ajustes-globales', icon: 'ti-settings' },
 ]
 
 const bottomNavByRole: Record<string, MenuItem[]> = {
@@ -64,7 +137,7 @@ const bottomNavByRole: Record<string, MenuItem[]> = {
     { label: 'Inicio', path: '/dashboard', icon: 'ti-layout-dashboard' },
     { label: 'Cursos', path: '/programa', icon: 'ti-school' },
     { label: 'QR', path: '/asistencia/scan', icon: 'ti-qrcode' },
-    { label: 'Calificaciones', path: '/puntajes', icon: 'ti-certificate' },
+    { label: 'Calendario', path: '/calendario', icon: 'ti-calendar-event' },
     { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
   ],
   profesor: [
@@ -102,6 +175,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false)
   const [appsOpen, setAppsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [proximos, setProximos] = useState<EventoNotif[]>([])
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const notifRef = useRef<HTMLDivElement>(null)
@@ -206,7 +280,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           gap: 12px; padding: 0 22px;
           background: #0e1015; border-bottom: 1px solid var(--border-subtle);
         }
-        .topbar-search { display: flex; }
         .layout-bottomnav { display: none; }
         .topbar-menu-btn { display: none; }
 
@@ -226,11 +299,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         }
         .side-item i { font-size: 16px; flex-shrink: 0; }
 
+        .side-group-label {
+          font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+          letter-spacing: 0.08em; color: var(--text-muted);
+          padding: 14px 12px 6px; text-transform: uppercase;
+        }
+
+        .gni-anim { animation: gni-breathe 3s ease-in-out infinite; transform-origin: center; }
+        .gni-anim .gni-arcs { animation: gni-flow 2.4s ease-in-out infinite; transform-origin: center; }
+        @keyframes gni-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+        @keyframes gni-flow { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+
         @media (max-width: 768px) {
           .layout-root { display: block !important; }
           .layout-main { padding: 0 !important; width: 100% !important; max-width: 100vw !important; height: 100% !important; }
           .layout-main main { padding: 16px 12px 84px !important; width: 100% !important; box-sizing: border-box; }
-          .topbar-search { display: none; }
           .topbar-menu-btn { display: flex !important; }
           .sidebar-header { padding: 16px 12px 12px; }
           .sidebar-logo { width: 140px; }
@@ -254,6 +337,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             justify-content: space-around; align-items: stretch;
             padding-bottom: env(safe-area-inset-bottom);
           }
+          .layout-bottomnav-qr {
+            width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+            color: #fff; border: 4px solid #0e1015; cursor: pointer;
+            transform: translateY(-16px); box-shadow: 0 6px 18px var(--accent-hover);
+          }
+          .layout-bottomnav-qr i { font-size: 22px; }
         }
       `}</style>
 
@@ -288,16 +379,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Nav */}
           <div className="nav-scroll" style={{ flex: 1, padding: '4px 12px', overflowY: 'auto' }}>
-            {menuItems.map(item => {
-              const active = location.pathname === item.path
-              return (
-                <button key={item.path} className={`side-item${active ? ' active' : ''}`}
-                  onClick={() => { navigate(item.path); setMobileOpen(false) }}>
-                  <i className={`ti ${item.icon}`} aria-hidden="true" />
-                  <span>{item.label}</span>
-                </button>
-              )
-            })}
+            {(() => {
+              let lastGroup: string | undefined
+              return menuItems.map(item => {
+                const active = location.pathname === item.path
+                const showHeader = item.group !== undefined && item.group !== lastGroup
+                lastGroup = item.group
+                const CustomIcon = iconOverride[item.path]
+                return (
+                  <div key={item.path}>
+                    {showHeader && (
+                      <div className="side-group-label">{item.group}</div>
+                    )}
+                    <button className={`side-item${active ? ' active' : ''}`}
+                      onClick={() => { navigate(item.path); setMobileOpen(false) }}>
+                      {CustomIcon ? <CustomIcon /> : <i className={`ti ${item.icon}`} aria-hidden="true" />}
+                      <span>{item.label}</span>
+                    </button>
+                  </div>
+                )
+              })
+            })()}
           </div>
 
           {/* Footer */}
@@ -308,7 +410,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 Centro de Ayuda
               </button>
             )}
-            <button onClick={logout}
+            <button onClick={() => setShowLogoutConfirm(true)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                 padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -333,11 +435,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 style={{ padding: '6px 8px', borderRadius: 8, alignItems: 'center' }} aria-label="Abrir menú">
                 <i className="ti ti-menu-2" style={{ fontSize: 17 }} />
               </button>
-              <div className="topbar-search" style={{ position: 'relative', width: 'min(300px, 40vw)' }}>
-                <i className="ti ti-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--text-muted)' }} />
-                <input className="input-uca" placeholder="Buscar recursos..."
-                  style={{ padding: '8px 12px 8px 34px', fontSize: 13, background: 'var(--bg-surface)', borderRadius: 999 }} />
-              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div ref={notifRef} style={{ position: 'relative' }}>
@@ -374,19 +471,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <div className="card card-elevated" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 240, padding: 14, zIndex: 300 }}>
                     <div className="mono-label" style={{ marginBottom: 10 }}>Acceso rápido</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                      {menuItems.map(item => (
-                        <button key={item.path} onClick={() => { navigate(item.path); setAppsOpen(false) }}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 4px', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                          onMouseEnter={ev => { ev.currentTarget.style.color = 'var(--accent-bright)'; ev.currentTarget.style.borderColor = 'var(--accent-hover)' }}
-                          onMouseLeave={ev => { ev.currentTarget.style.color = 'var(--text-secondary)'; ev.currentTarget.style.borderColor = 'var(--border-subtle)' }}>
-                          <i className={`ti ${item.icon}`} style={{ fontSize: 18 }} />
-                          <span style={{ fontSize: 9, fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
-                        </button>
-                      ))}
+                      {menuItems.map(item => {
+                        const CustomIcon = iconOverride[item.path]
+                        return (
+                          <button key={item.path} onClick={() => { navigate(item.path); setAppsOpen(false) }}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 4px', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                            onMouseEnter={ev => { ev.currentTarget.style.color = 'var(--accent-bright)'; ev.currentTarget.style.borderColor = 'var(--accent-hover)' }}
+                            onMouseLeave={ev => { ev.currentTarget.style.color = 'var(--text-secondary)'; ev.currentTarget.style.borderColor = 'var(--border-subtle)' }}>
+                            {CustomIcon ? <CustomIcon size={18} /> : <i className={`ti ${item.icon}`} style={{ fontSize: 18 }} />}
+                            <span style={{ fontSize: 9, fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
               </div>
+
+              <button className="btn-ghost" onClick={() => setHelpOpen(true)} aria-label="Ayuda"
+                style={{ padding:'7px 9px', borderRadius:10, background:'transparent', border:'none' }}>
+                <i className="ti ti-help" style={{ fontSize:17 }} />
+              </button>
 
               <button onClick={() => navigate('/perfil')} aria-label="Perfil"
                 className={fotoUrl ? '' : 'avatar-initials'}
@@ -405,6 +510,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <nav className="layout-bottomnav">
           {bottomNav.map(item => {
             const active = location.pathname === item.path
+            if (item.icon === 'ti-qrcode') {
+              return (
+                <button key={item.path} onClick={() => navigate(item.path)}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                  <span className="layout-bottomnav-qr"><i className={`ti ${item.icon}`} /></span>
+                </button>
+              )
+            }
             return (
               <button key={item.path} onClick={() => navigate(item.path)}
                 style={{
@@ -421,33 +534,102 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
 
-      {/* Modal Centro de Ayuda — global, invocable via emitHelp() */}
-      {helpOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          onClick={() => setHelpOpen(false)}>
-          <div className="card card-elevated" style={{ width: '100%', maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800 }}>Centro de Ayuda</h3>
-              <button onClick={() => setHelpOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
-            </div>
-            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Universidad Católica — Unidad Pedagógica de Caacupé
+      {/* Modal confirmación cerrar sesión */}
+      {showLogoutConfirm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', backdropFilter:'blur(3px)', zIndex:500, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+          onClick={() => setShowLogoutConfirm(false)}>
+          <div className="card" style={{ maxWidth:340, textAlign:'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:36, marginBottom:12 }}><i className="ti ti-logout" style={{ color:'var(--danger)' }} /></div>
+            <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>Cerrar sesión</h3>
+            <p style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:20, lineHeight:1.4 }}>
+              ¿Estás seguro de que querés cerrar la sesión?
             </p>
-            <a href="https://wa.me/595512435838" target="_blank" rel="noopener noreferrer" className="btn-primary"
-              style={{ width: '100%', background: '#25D366', marginBottom: 10, textDecoration: 'none' }}>
-              <i className="ti ti-brand-whatsapp" /> Contactar por WhatsApp
-            </a>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                <i className="ti ti-phone" style={{ color: 'var(--accent-bright)' }} />
-                <a href="tel:+59521243583" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>0511 24 35 83</a>
+            <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+              <button className="btn-ghost" onClick={() => setShowLogoutConfirm(false)} style={{ padding:'10px 22px', fontSize:12.5 }}>
+                Cancelar
+              </button>
+              <button className="btn-primary" onClick={logout} style={{ background:'var(--danger)', padding:'10px 22px', fontSize:12.5 }}>
+                <i className="ti ti-logout" /> Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Centro de Ayuda — rediseñado con FAQ + accesos rápidos */}
+      {helpOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', backdropFilter:'blur(4px)', zIndex:400, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+          onClick={() => setHelpOpen(false)}>
+          <div className="card" style={{ width:'100%', maxWidth:520, padding:0, overflow:'hidden' }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'18px 22px', borderBottom:'1px solid var(--border-subtle)' }}>
+              <h3 style={{ fontSize:17, fontWeight:800, display:'flex', alignItems:'center', gap:8 }}>
+                <i className="ti ti-help" style={{ color:'var(--accent-bright)' }} /> Centro de Ayuda
+              </h3>
+              <button onClick={() => setHelpOpen(false)} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:4 }}>
+                <i className="ti ti-x" style={{ fontSize:18 }} />
+              </button>
+            </div>
+
+            <div style={{ padding:'18px 22px' }}>
+              <p style={{ fontSize:12.5, color:'var(--text-secondary)', marginBottom:16 }}>
+                Universidad Católica — Unidad Pedagógica de Caacupé
+              </p>
+
+              {/* Acciones rápidas */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10, marginBottom:18 }}>
+                <button onClick={() => { window.open('https://wa.me/595512435838', '_blank') }}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1px solid rgba(37,211,102,.2)', background:'rgba(37,211,102,.08)', cursor:'pointer', color:'var(--text-primary)', fontFamily:'inherit', fontSize:12.5, fontWeight:600, textAlign:'left' }}>
+                  <i className="ti ti-brand-whatsapp" style={{ fontSize:20, color:'#25D366' }} />
+                  <span>WhatsApp<br />Soporte directo</span>
+                </button>
+                <button onClick={() => { window.location.href = 'mailto:soporte@uca.edu.py' }}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1px solid var(--accent-hover)', background:'var(--accent-subtle)', cursor:'pointer', color:'var(--text-primary)', fontFamily:'inherit', fontSize:12.5, fontWeight:600, textAlign:'left' }}>
+                  <i className="ti ti-mail" style={{ fontSize:20, color:'var(--accent-bright)' }} />
+                  <span>Correo<br />soporte@uca.edu.py</span>
+                </button>
+                <button onClick={() => { setHelpOpen(false); navigate('/perfil') }}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1px solid var(--border-subtle)', background:'var(--bg-elevated)', cursor:'pointer', color:'var(--text-primary)', fontFamily:'inherit', fontSize:12.5, fontWeight:600, textAlign:'left' }}>
+                  <i className="ti ti-user" style={{ fontSize:20, color:'var(--text-secondary)' }} />
+                  <span>Mi Perfil<br />Datos personales</span>
+                </button>
+                <button onClick={() => { window.open('https://wa.me/595512435838?text=Necesito%20ayuda%20con%20el%20sistema%20académico', '_blank') }}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1px solid var(--warning-subtle)', background:'rgba(245,158,11,.08)', cursor:'pointer', color:'var(--text-primary)', fontFamily:'inherit', fontSize:12.5, fontWeight:600, textAlign:'left' }}>
+                  <i className="ti ti-bug" style={{ fontSize:20, color:'var(--warning)' }} />
+                  <span>Reportar<br />un problema</span>
+                </button>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                <i className="ti ti-mail" style={{ color: 'var(--accent-bright)' }} />
-                <a href="mailto:soporte@uca.edu.py" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>soporte@uca.edu.py</a>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                <i className="ti ti-clock" /> Lun–Vie 07:00–20:00
+
+              {/* FAQ */}
+              <details style={{ marginBottom:8 }}>
+                <summary style={{ cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--text-primary)', padding:'8px 0', listStyle:'none', display:'flex', alignItems:'center', gap:8 }}>
+                  <i className="ti ti-question-mark" style={{ fontSize:14, color:'var(--accent-bright)' }} /> Preguntas frecuentes
+                  <i className="ti ti-chevron-down" style={{ marginLeft:'auto', fontSize:14, color:'var(--text-muted)', transition:'transform .2s' }} />
+                </summary>
+                <div style={{ padding:'4px 0 8px 22px', display:'flex', flexDirection:'column', gap:10 }}>
+                  {[
+                    { q:'¿Cómo me inscribo a materias?', a:'Desde el menú Inscripciones podés inscribirte a las materias disponibles del período actual.' },
+                    { q:'¿Dónde veo mis notas?', a:'Tus calificaciones están disponibles en el módulo Calificaciones del menú principal.' },
+                    { q:'¿Cómo recupero mi contraseña?', a:'Usá la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.' },
+                    { q:'¿Qué hago si no cargo un pago?', a:'Comunicate con administración por WhatsApp o correo electrónico.' },
+                  ].map((faq, i) => (
+                    <div key={i}>
+                      <div style={{ fontSize:12.5, fontWeight:600, color:'var(--text-primary)', marginBottom:2 }}>{faq.q}</div>
+                      <div style={{ fontSize:12, color:'var(--text-secondary)', lineHeight:1.4 }}>{faq.a}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+
+              {/* Contacto directo */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10, paddingTop:14, borderTop:'1px solid var(--border-subtle)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5 }}>
+                  <i className="ti ti-phone" style={{ color:'var(--accent-bright)' }} />
+                  <a href="tel:+59521243583" style={{ color:'var(--text-primary)', textDecoration:'none' }}>0511 24 35 83</a>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5, color:'var(--text-secondary)' }}>
+                  <i className="ti ti-clock" /> Lun–Vie 07:00–20:00
+                </div>
               </div>
             </div>
           </div>

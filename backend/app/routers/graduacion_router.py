@@ -48,6 +48,8 @@ def _enriquecer_proceso(proceso: ProcesoGraduacion, db: Session) -> ProcesoGradu
         .filter(ProcesoGraduacion.id == proceso.id)
         .first()
     )
+    if completo is None:
+        return proceso
     completo.alumno_nombre = completo.alumno.nombre if completo.alumno else None
     completo.tutor_nombre = completo.tutor.nombre if completo.tutor else None
     return completo

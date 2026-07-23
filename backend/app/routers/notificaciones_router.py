@@ -15,8 +15,18 @@ from sqlalchemy.orm import Session
 from app import database
 from app.dependencias import get_current_user, require_role
 from app.models.financiero import SuscripcionPush
+from app.services.notificaciones_push import enviar_notificaciones_masivo, get_vapid_keys
 
 router = APIRouter(prefix="/notificaciones", tags=["notificaciones"])
+
+
+@router.get(
+    "/vapid-public-key",
+    summary="Obtener clave pública VAPID",
+)
+def get_vapid_public_key():
+    public_key, _, _ = get_vapid_keys()
+    return {"public_key": public_key}
 
 
 @router.post(
@@ -80,7 +90,7 @@ def unsubscribe(
 
 @router.post(
     "/test",
-    summary="Enviar notificación de prueba",
+    summary="Enviar notificación de prueba real",
 )
 def test_notification(
     db: Session = Depends(database.get_db),
@@ -89,7 +99,18 @@ def test_notification(
     subs = db.query(SuscripcionPush).filter(
         SuscripcionPush.user_id == current_user.user_id,
     ).all()
+    if not subs:
+        raise HTTPException(400, "No tenés suscripciones push activas. Activá las notificaciones desde tu perfil.")
+
+    exitosos, fallidos = enviar_notificaciones_masivo(
+        subscriptions=subs,
+        titulo="🔔 Prueba de Notificación",
+        cuerpo="¡Funciona! Recibiste esta notificación porque activaste las notificaciones push.",
+        url="",
+    )
     return {
-        "mensaje": f"Notificación simulada",
-        "destinatarios": len(subs),
+        "mensaje": "Notificación enviada",
+        "exitosos": exitosos,
+        "fallidos": fallidos,
+        "total": len(subs),
     }

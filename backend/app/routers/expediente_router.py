@@ -1,9 +1,10 @@
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.expediente import calcular_ppa, calcular_regularidad
-from app.services.puntajes_utils import PESOS, calcular_promedio_final
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/expediente", tags=["expediente"])
 
@@ -52,8 +53,10 @@ def cerrar_materia(
         )
         .all()
     )
-    notas = {p.tipo: float(p.valor) for p in puntajes if p.tipo in PESOS}
-    nota_final = calcular_promedio_final(notas)
+    tipos_validos = {"parcial1", "parcial2", "practico", "final1", "final2", "final3"}
+    notas: dict[str, float | None] = {p.tipo: float(p.valor) for p in puntajes if p.tipo in tipos_validos}
+    pesos = get_pesos(db, oferta.materia_id)
+    nota_final = calcular_promedio_final(notas, pesos)
     if nota_final is None:
         raise HTTPException(
             status_code=422, detail="El alumno no tiene notas cargadas para esta oferta"
@@ -70,7 +73,7 @@ def cerrar_materia(
         .first()
     )
     if existente:
-        existente.nota_final = nota_final
+        existente.nota_final = Decimal(str(nota_final))
         existente.creditos = pensum_materia.creditos
         existente.condicion = condicion
         existente.cerrado_por = current_user.user_id
@@ -79,7 +82,7 @@ def cerrar_materia(
         registro = models.expediente_materia.ExpedienteMateria(
             alumno_id=data.alumno_id,
             oferta_materia_id=data.oferta_materia_id,
-            nota_final=nota_final,
+            nota_final=Decimal(str(nota_final)),
             creditos=pensum_materia.creditos,
             condicion=condicion,
             cerrado_por=current_user.user_id,

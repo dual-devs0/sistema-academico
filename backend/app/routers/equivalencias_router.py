@@ -9,7 +9,7 @@ GET   /equivalencias/alumno/{id}
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app import database
 from app.dependencias import get_current_user, require_role
@@ -29,6 +29,41 @@ from app.services.equivalencia import (
 )
 
 router = APIRouter(prefix="/equivalencias", tags=["equivalencias"])
+
+
+@router.get(
+    "/solicitudes",
+    response_model=List[SolicitudEquivalenciaOut],
+    summary="Admin lista todas las solicitudes (filtro opcional ?estado=)",
+)
+def listar_todas_solicitudes(
+    estado: Optional[str] = None,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(require_role("admin")),
+):
+    from app.models.equivalencia import SolicitudEquivalencia
+    from sqlalchemy.orm import joinedload
+    q = db.query(SolicitudEquivalencia).options(joinedload(SolicitudEquivalencia.alumno))
+    if estado:
+        q = q.filter(SolicitudEquivalencia.estado == estado)
+    solicitudes = q.order_by(SolicitudEquivalencia.id.desc()).all()
+    for s in solicitudes:
+        s.alumno_nombre = s.alumno.nombre if s.alumno else None
+    return solicitudes
+
+
+@router.get(
+    "/materias",
+    response_model=List[dict],
+    summary="Lista de materias disponibles para equivalencia",
+)
+def listar_materias(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.materia import Materia
+    materias = db.query(Materia).order_by(Materia.nombre).all()
+    return [{"id": m.id, "nombre": m.nombre, "codigo": m.codigo or ""} for m in materias]
 
 
 @router.post(

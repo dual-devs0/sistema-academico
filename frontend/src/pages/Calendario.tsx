@@ -6,11 +6,14 @@ const POLL_MS = 30000
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-type TipoEvento = 'parcial' | 'final' | 'feriado' | 'asueto' | 'entrega' | 'actividad'
-type Evento = { id?: number; titulo: string; tipo: TipoEvento; fecha: string; fecha_fin?: string | null; descripcion?: string | null; materia_id?: number | null }
+type TipoEvento = 'parcial' | 'parcial_1' | 'parcial_2' | 'final' | 'feriado' | 'asueto' | 'entrega' | 'actividad'
+type Evento = { id?: number; titulo: string; tipo: TipoEvento; fecha: string; fecha_fin?: string | null; descripcion?: string | null; materia_id?: number | null; hora?: string | null; ubicacion?: string | null }
+type MateriaSimple = { id: number; nombre: string; codigo: string | null; carrera: string | null }
 
 const tipoCfg: Record<TipoEvento, { color: string; bg: string; label: string; badge: string }> = {
   parcial:   { color: '#f87171', bg: 'rgba(239,68,68,0.15)', label: 'Parcial', badge: 'URGENTE' },
+  parcial_1: { color: '#f87171', bg: 'rgba(239,68,68,0.15)', label: 'Parcial 1', badge: 'PARCIAL' },
+  parcial_2: { color: '#fb923c', bg: 'rgba(251,146,60,0.15)', label: 'Parcial 2', badge: 'PARCIAL' },
   final:     { color: '#ef4444', bg: 'rgba(239,68,68,0.20)', label: 'Final', badge: 'URGENTE' },
   entrega:   { color: '#fbbf24', bg: 'rgba(245,158,11,0.15)', label: 'Entrega', badge: 'ENTREGA' },
   feriado:   { color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', label: 'Feriado', badge: 'FERIADO' },
@@ -64,13 +67,14 @@ export default function Calendario() {
   const [selDia, setSelDia] = useState<string | null>(null)
   const [verTodosProximos, setVerTodosProximos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const [draft, setDraft] = useState<Evento>({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '' })
+  const [draft, setDraft] = useState<Evento>({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '', materia_id: undefined, hora: '', ubicacion: '' })
   const [saving, setSaving] = useState(false)
   const [cargandoPdf, setCargandoPdf] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [materias, setMaterias] = useState<MateriaSimple[]>([])
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const firstLoad = useRef(true)
   const role = getCurrentUser()?.role
@@ -122,9 +126,12 @@ export default function Calendario() {
 
   useEffect(() => {
     cargar()
+    if (role === 'profesor') {
+      api.get<MateriaSimple[]>('/profesor/materias').then(setMaterias).catch(() => {})
+    }
     const id = setInterval(() => cargar(), POLL_MS)
     return () => clearInterval(id)
-  }, [cargar])
+  }, [cargar, role])
 
   const y = actual.getFullYear(), m = actual.getMonth()
   const primerDia = (new Date(y, m, 1).getDay() + 6) % 7 // lunes=0
@@ -144,11 +151,17 @@ export default function Calendario() {
   async function guardarEvento() {
     if (!draft.titulo || !draft.fecha) { emitToast('Completá título y fecha', 'warning'); return }
     setSaving(true)
+    const body: Record<string, unknown> = { titulo: draft.titulo, tipo: draft.tipo, fecha: draft.fecha, descripcion: draft.descripcion || null }
+    if (draft.materia_id) body.materia_id = draft.materia_id
+    if (draft.hora) body.hora = draft.hora
+    if (draft.ubicacion) body.ubicacion = draft.ubicacion
+    body.anio = y
+    body.semestre = m < 6 ? 1 : 2
     try {
-      await api.post('/eventos/', { titulo: draft.titulo, tipo: draft.tipo, fecha: draft.fecha, descripcion: draft.descripcion || null })
+      await api.post('/eventos/', body)
       emitToast('Evento agendado')
       setModalOpen(false)
-      setDraft({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '' })
+      setDraft({ titulo: '', tipo: 'actividad', fecha: hoy.toISOString().slice(0, 10), descripcion: '', materia_id: undefined, hora: '', ubicacion: '' })
       cargar()
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al crear evento', 'error')
@@ -230,6 +243,11 @@ export default function Calendario() {
                     <span className="mono-label">{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{e.titulo}</div>
+                  {(e.hora || e.ubicacion) && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                      {e.hora?.slice(0, 5)}{e.hora && e.ubicacion ? ' · ' : ''}{e.ubicacion}
+                    </div>
+                  )}
                   {e.descripcion && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{e.descripcion}</div>}
                 </div>
               )
@@ -251,6 +269,10 @@ export default function Calendario() {
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{e.titulo}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
+                        {e.hora && <span>{e.hora.slice(0, 5)}{e.ubicacion ? ' · ' : ''}</span>}
+                        {e.ubicacion && <span>{e.ubicacion}</span>}
+                      </div>
                       {e.descripcion && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{e.descripcion}</div>}
                     </div>
                     <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
@@ -288,6 +310,11 @@ export default function Calendario() {
                         <span className="mono-label" style={{ fontSize: 9 }}>{e.fecha.slice(8, 10)}/{e.fecha.slice(5, 7)}</span>
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{e.titulo}</div>
+                      {(e.hora || e.ubicacion) && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 1 }}>
+                          {e.hora?.slice(0, 5)}{e.hora && e.ubicacion ? ' · ' : ''}{e.ubicacion}
+                        </div>
+                      )}
                       {e.descripcion && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>{e.descripcion}</div>}
                     </div>
                   )
@@ -305,7 +332,7 @@ export default function Calendario() {
             </button>
           )}
 
-          {(role === 'admin' || role === 'profesor') && (
+          {role === 'admin' && (
             <div className="card" style={{ padding: '14px 16px' }}>
               <div className="mono-label" style={{ marginBottom: 6 }}>Carga automática (PDF)</div>
               <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>
@@ -336,7 +363,10 @@ export default function Calendario() {
               <div>
                 <div className="mono-label" style={{ marginBottom: 6 }}>Tipo</div>
                 <select className="input-uca" value={draft.tipo} onChange={e => setDraft(d => ({ ...d, tipo: e.target.value as TipoEvento }))}>
-                  {Object.entries(tipoCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  {(role === 'profesor'
+                    ? [['parcial_1', 'Parcial 1'], ['parcial_2', 'Parcial 2']]
+                    : Object.entries(tipoCfg).map(([k, v]) => [k, v.label])
+                  ).map(([k, label]) => <option key={k} value={k}>{label as string}</option>)}
                 </select>
               </div>
               <div>
@@ -344,8 +374,27 @@ export default function Calendario() {
                 <input className="input-uca" type="date" value={draft.fecha} onChange={e => setDraft(d => ({ ...d, fecha: e.target.value }))} />
               </div>
             </div>
+            {role === 'profesor' && materias.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Materia</div>
+                <select className="input-uca" value={draft.materia_id ?? ''} onChange={e => setDraft(d => ({ ...d, materia_id: e.target.value ? Number(e.target.value) : undefined }))}>
+                  <option value="">Sin materia</option>
+                  {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}{m.carrera ? ` (${m.carrera})` : ''}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Hora</div>
+                <input className="input-uca" type="time" value={draft.hora ?? ''} onChange={e => setDraft(d => ({ ...d, hora: e.target.value || null }))} />
+              </div>
+              <div>
+                <div className="mono-label" style={{ marginBottom: 6 }}>Ubicación</div>
+                <input className="input-uca" value={draft.ubicacion ?? ''} onChange={e => setDraft(d => ({ ...d, ubicacion: e.target.value }))} placeholder="Aula, salón…" />
+              </div>
+            </div>
             <div className="mono-label" style={{ marginBottom: 6 }}>Descripción</div>
-            <input className="input-uca" value={draft.descripcion ?? ''} onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value }))} style={{ marginBottom: 18 }} placeholder="Aula, materia, detalle…" />
+            <input className="input-uca" value={draft.descripcion ?? ''} onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value }))} style={{ marginBottom: 18 }} placeholder="Detalle adicional…" />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
               <button className="btn-primary" disabled={saving} onClick={guardarEvento}>{saving ? 'Guardando…' : 'Agendar'}</button>

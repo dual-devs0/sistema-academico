@@ -183,8 +183,8 @@ def test_avance_alumno_estados(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_aprobada.id,
-            tipo="final",
-            valor=9.0,
+            tipo="final1",
+            valor=45.0,
         )
     )
     db.add(
@@ -223,8 +223,8 @@ def test_avance_alumno_nota_y_reprobada(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_aprobada.id,
-            tipo="final",
-            valor=9.0,
+            tipo="final1",
+            valor=45.0,
         )
     )
 
@@ -251,8 +251,8 @@ def test_avance_alumno_nota_y_reprobada(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_cerrada.id,
-            tipo="final",
-            valor=3.0,
+            tipo="final1",
+            valor=15.0,
         )
     )
     db.commit()
@@ -289,8 +289,8 @@ def test_creditos_alumno(client, seed, tokens, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_aprobada.id,
-            tipo="final",
-            valor=7.0,
+            tipo="final1",
+            valor=35.0,
         )
     )
     db.commit()
@@ -336,8 +336,8 @@ def test_inscripcion_permitida_con_correlatividad_cumplida(client, seed, tokens,
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_base.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()

@@ -12,15 +12,19 @@ Endpoints:
   GET  /finanzas/alumno/{id}/estado-deuda-inscripcion
 """
 
+import json
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from uuid import uuid4
+
+import stripe
 
 from app import database
 from app.dependencias import get_current_user, require_role
@@ -57,6 +61,11 @@ from app.services.financiero import (
     verificar_deuda_inscripcion,
 )
 from app.services.facturacion_electronica import procesar_facturacion, MAX_INTENTOS
+from app.services.pagos_online import init_stripe, crear_checkout_session, confirmar_pago_webhook
+
+logger = logging.getLogger(__name__)
+
+init_stripe()
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
@@ -176,12 +185,6 @@ def cuotas_alumno(
 ):
     if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
-
-    q = db.query(Cuota).filter(Cuota.alumno_id == alumno_id)
-    if estado:
-        q = q.filter(Cuota.estado == estado)
-    cuotas = q.order_by(Cuota.fecha_vencimiento.asc()).all()
-    return [cuota_to_out(c) for c in cuotas]
 
 
 # ── Pagos ─────────────────────────────────────────────────────────────
@@ -338,16 +341,17 @@ def estado_deuda_inscripcion(
     )
 
 
-# ── Pagos online (stub Bancard) ──────────────────────────────────────
+# ── Pagos online (Stripe Checkout) ──────────────────────────────────
 
 
 @router.post(
     "/pagos/init",
     response_model=PagoOnlineInitResponse,
-    summary="Iniciar pago online (stub)",
+    summary="Iniciar pago online con Stripe Checkout",
 )
 def pago_online_init(
     body: PagoOnlineInitRequest,
+    request: Request,
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role("alumno")),
 ):
@@ -359,30 +363,116 @@ def pago_online_init(
     if cuota.estado == "pagada":
         raise HTTPException(400, "La cuota ya está pagada")
 
+    origen = str(request.base_url).rstrip("/")
+    success_url = body.success_url or f"{origen}/finanzas/pagos/success"
+    cancel_url = body.cancel_url or f"{origen}/finanzas/pagos/cancel"
+
+    monto_a_pagar = cuota.monto - cuota.monto_descuento
+
     transaction_id = str(uuid4())
     pago = PagoOnline(
         cuota_id=cuota.id,
         alumno_id=current_user.user_id,
-        monto=cuota.monto - cuota.monto_descuento,
+        monto=monto_a_pagar,
         transaction_id=transaction_id,
         estado="pendiente",
-        gateway_url=f"https://gateway.stub/bancard/checkout?transaction={transaction_id}",
     )
     db.add(pago)
     db.commit()
     db.refresh(pago)
+
+    try:
+        session = crear_checkout_session(
+            cuota_id=cuota.id,
+            monto=monto_a_pagar,
+            alumno_email=current_user.username,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "pago_online_id": str(pago.id),
+                "transaction_id": transaction_id,
+            },
+        )
+    except stripe.error.StripeError as e:
+        pago.estado = "error"
+        pago.gateway_response = {"error": str(e)}
+        db.commit()
+        raise HTTPException(502, f"Error al comunicar con Stripe: {e}")
+    except RuntimeError as e:
+        pago.estado = "error"
+        pago.gateway_response = {"error": str(e)}
+        db.commit()
+        raise HTTPException(503, f"Stripe no disponible: {e}")
+
+    pago.stripe_session_id = session.id
+    pago.gateway_url = session.url
+    db.commit()
 
     return PagoOnlineInitResponse(
         pago_id=pago.id,  # type: ignore[arg-type]
         transaction_id=pago.transaction_id,  # type: ignore[arg-type]
         redirect_url=pago.gateway_url,  # type: ignore[arg-type]
         monto=pago.monto,  # type: ignore[arg-type]
+        stripe_session_id=pago.stripe_session_id,  # type: ignore[arg-type]
     )
 
 
 @router.post(
+    "/pagos/webhook",
+    summary="Webhook de Stripe — checkout.session.completed",
+)
+async def pago_online_webhook(
+    request: Request,
+    db: Session = Depends(database.get_db),
+):
+    payload = await request.body()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    try:
+        event = confirmar_pago_webhook(payload, sig_header)
+    except (ValueError, stripe.error.SignatureVerificationError) as e:
+        logger.error("Webhook inválido: %s", e)
+        raise HTTPException(400, "Webhook inválido")
+    except Exception as e:
+        logger.error("Error al procesar webhook: %s", e)
+        raise HTTPException(400, "Error al procesar webhook")
+
+    if event.type == "checkout.session.completed":
+        session = event.data.object
+        transaction_id = session.get("metadata", {}).get("transaction_id")
+        if not transaction_id:
+            logger.warning("Webhook sin transaction_id en metadata")
+            return {"status": "ignored"}
+
+        pago = db.query(PagoOnline).filter(
+            PagoOnline.transaction_id == transaction_id
+        ).first()
+        if not pago:
+            logger.warning("Transacción %s no encontrada en webhook", transaction_id)
+            return {"status": "not_found"}
+
+        if pago.estado != "pendiente":
+            logger.info("Pago %s ya procesado (estado=%s)", pago.id, pago.estado)
+            return {"status": "already_processed"}
+
+        pago.estado = "confirmado"
+        pago.confirmado_en = datetime.now(timezone.utc)
+        pago.gateway_response = json.loads(session.to_json()) if hasattr(session, "to_json") else {"session_id": session.get("id")}
+
+        cuota = db.query(Cuota).filter(Cuota.id == pago.cuota_id).first()
+        if cuota:
+            cuota.estado = "pagada"
+
+        db.commit()
+        logger.info("Pago online %s confirmado vía webhook", pago.id)
+        return {"status": "ok"}
+
+    return {"status": "unhandled_event_type", "type": event.type}
+
+
+@router.post(
     "/pagos/confirm",
-    summary="Confirmar/callback del gateway (stub)",
+    summary="Confirmar pago manualmente (solo pruebas, usar webhook en producción)",
 )
 def pago_online_confirm(
     body: PagoOnlineConfirmRequest,
@@ -398,16 +488,16 @@ def pago_online_confirm(
         raise HTTPException(400, "Transacción ya procesada")
 
     if body.estado == "confirmado":
-        pago.estado = "confirmado"  # type: ignore[arg-type]
-        pago.confirmado_en = datetime.now(timezone.utc)  # type: ignore[arg-type]
-        pago.gateway_response = {"status": "confirmado", "timestamp": str(pago.confirmado_en)}  # type: ignore[arg-type]
+        pago.estado = "confirmado"
+        pago.confirmado_en = datetime.now(timezone.utc)
+        pago.gateway_response = {"status": "confirmado", "timestamp": str(pago.confirmado_en)}
 
         cuota = db.query(Cuota).filter(Cuota.id == pago.cuota_id).first()
         if cuota:
-            cuota.estado = "pagada"  # type: ignore[arg-type]
+            cuota.estado = "pagada"
     else:
-        pago.estado = "rechazado"  # type: ignore[arg-type]
-        pago.gateway_response = {"status": "rechazado"}  # type: ignore[arg-type]
+        pago.estado = "rechazado"
+        pago.gateway_response = {"status": "rechazado"}
 
     db.commit()
     return {"mensaje": f"Pago {body.estado}", "transaction_id": pago.transaction_id}

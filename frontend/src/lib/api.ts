@@ -54,6 +54,19 @@ export function emitAvatarUpdated(url: string) {
 }
 
 // ---------------------------------------------------------------------------
+// CSRF: recuperar el token de la cookie (no-httpOnly) si en memoria no hay
+// ---------------------------------------------------------------------------
+
+function _readCsrfFromCookie(): string | null {
+  // La cookie "csrf_token" se setea en login/refresh con httponly=False
+  return document.cookie.split('; ').find(r => r.startsWith('csrf_token='))?.split('=')[1] ?? null
+}
+
+function _getCsrfToken(): string | null {
+  return _csrfToken || _readCsrfFromCookie()
+}
+
+// ---------------------------------------------------------------------------
 // Refresh silencioso
 // ---------------------------------------------------------------------------
 
@@ -64,10 +77,11 @@ async function tryRefresh(): Promise<boolean> {
   if (_refreshing) return _refreshing
   _refreshing = (async () => {
     try {
+      const csrf = _getCsrfToken()
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
-        headers: _csrfToken ? { 'X-CSRF-Token': _csrfToken } : {},
+        headers: csrf ? { 'X-CSRF-Token': csrf } : {},
       })
       if (!res.ok) return false
       const data = await res.json()

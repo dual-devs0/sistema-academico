@@ -27,6 +27,7 @@ from . import examenes_router as examenes
 from . import notificaciones_router as notificaciones
 from . import notas_router as notas
 from . import admin_router as admin
+from . import settings_router as settings
 
 __all__ = [
     "users",
@@ -56,5 +57,6 @@ __all__ = [
     "notificaciones",
     "notas",
     "admin",
+    "settings",
     "test",
 ]

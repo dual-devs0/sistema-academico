@@ -20,6 +20,7 @@ from app.dependencias import get_current_user, require_role
 from app.models.tramites import Solicitud, TipoTramite
 from sqlalchemy import func
 
+from typing import cast
 from app.schemas.tramites import (
     SolicitudCreate,
     SolicitudOut,
@@ -37,6 +38,7 @@ ESTADOS_RESOLUCION_VALIDOS = ("resuelta", "rechazada")
 def _enrich(solicitud: Solicitud) -> SolicitudOut:
     """Serializa una Solicitud con nombre real de alumno y tipo (requiere
     alumno/tipo_tramite ya cargados, vía joinedload o lazy-load puntual)."""
+    assert solicitud.fecha_solicitud is not None
     return SolicitudOut(
         id=solicitud.id,
         alumno_id=solicitud.alumno_id,
@@ -197,11 +199,11 @@ def stats_tramites(
     db: Session = Depends(database.get_db),
     current_user=Depends(require_role("admin")),
 ):
-    counts = dict(
+    counts: dict[str, int] = {estado: cnt for estado, cnt in
         db.query(Solicitud.estado, func.count(Solicitud.id))
         .group_by(Solicitud.estado)
         .all()
-    )
+    }
     return TramitesStatsOut(
         total=sum(counts.values()),
         pendientes=counts.get("pendiente", 0),

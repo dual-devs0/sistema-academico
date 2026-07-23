@@ -272,6 +272,7 @@ def crear_solicitud(alumno_id: int, tipo_tramite_id: int, db: Session) -> Solici
         db.add(solicitud)
         db.flush()
 
+        assert alumno is not None
         pdf_bytes = generador(alumno, db)
         key = subir_archivo(pdf_bytes, f"{tipo.nombre}.pdf", prefix="tramite")
         solicitud.estado = "resuelta"

@@ -91,8 +91,8 @@ def listar_hilos(
                 descripcion=h.descripcion,
                 creado_por=h.creado_por,
                 nombre_creador=creador.nombre or creador.username if creador else None,
-                fijado=h.fijado,
-                cerrado=h.cerrado,
+                fijado=bool(h.fijado),
+                cerrado=bool(h.cerrado),
                 created_at=h.created_at,
                 mensajes=[],
             )
@@ -128,8 +128,8 @@ def obtener_hilo(
         descripcion=hilo.descripcion,
         creado_por=hilo.creado_por,
         nombre_creador=creador.nombre or creador.username if creador else None,
-        fijado=hilo.fijado,
-        cerrado=hilo.cerrado,
+        fijado=bool(hilo.fijado),
+        cerrado=bool(hilo.cerrado),
         created_at=hilo.created_at,
         mensajes=[],
     )
@@ -330,6 +330,7 @@ def editar_mensaje(
             status_code=403, detail="Solo podés editar tus propios mensajes"
         )
     ahora = datetime.now(timezone.utc)
+    assert msg.created_at is not None
     creado = (
         msg.created_at
         if msg.created_at.tzinfo

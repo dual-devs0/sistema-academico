@@ -5,6 +5,7 @@ import re
 from datetime import date, timedelta
 from typing import Optional
 
+from typing import cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
@@ -51,12 +52,12 @@ Devuelve SOLO un JSON array con objetos con los campos:
 No incluyas markdown ni texto adicional, solo el JSON array.
 """
 
-    pdf_blob = types.Blob(mime_type="application/pdf", data=pdf_bytes)
+    pdf_blob: "types.Blob" = types.Blob(mime_type="application/pdf", data=pdf_bytes)
     response = client.models.generate_content(
         model="gemini-2.0-flash",
-        contents=[prompt, pdf_blob],
+        contents=cast(list, [prompt, pdf_blob]),
     )
-    text = response.text.strip()
+    text = (response.text or "").strip()
 
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
@@ -268,7 +269,7 @@ def cargar_pdf(
 
     return schemas.evento.CargaPdfResponse(
         procesados=len(creados),
-        eventos=creados,
+        eventos=[schemas.evento.EventoOut.model_validate(ev) for ev in creados],
         errores=errores,
     )
 
@@ -303,14 +304,10 @@ def eventos_mes(
 
         from sqlalchemy import or_
 
-        query = query.filter(
-            or_(
-                models.evento.EventoCalendario.materia_id.is_(None),
-                models.evento.EventoCalendario.materia_id.in_(materia_ids)
-                if materia_ids
-                else False,
-            )
-        )
+        filters = [models.evento.EventoCalendario.materia_id.is_(None)]
+        if materia_ids:
+            filters.append(models.evento.EventoCalendario.materia_id.in_(materia_ids))
+        query = query.filter(or_(*filters))
 
     return query.order_by(models.evento.EventoCalendario.fecha).all()
 
@@ -343,14 +340,10 @@ def eventos_dia(
         materia_ids = {i.oferta.materia_id for i in inscripciones if i.oferta}
         from sqlalchemy import or_
 
-        query = query.filter(
-            or_(
-                models.evento.EventoCalendario.materia_id.is_(None),
-                models.evento.EventoCalendario.materia_id.in_(materia_ids)
-                if materia_ids
-                else False,
-            )
-        )
+        filters = [models.evento.EventoCalendario.materia_id.is_(None)]
+        if materia_ids:
+            filters.append(models.evento.EventoCalendario.materia_id.in_(materia_ids))
+        query = query.filter(or_(*filters))
 
     eventos = query.order_by(models.evento.EventoCalendario.tipo).all()
-    return schemas.evento.EventoDiaOut(fecha=fecha, eventos=eventos)
+    return schemas.evento.EventoDiaOut(fecha=fecha, eventos=[schemas.evento.EventoOut.model_validate(ev) for ev in eventos])

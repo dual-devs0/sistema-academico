@@ -12,13 +12,15 @@ from sqlalchemy.orm import Session
 
 from app import database, models
 from app.dependencias import get_current_user
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/notas", tags=["notas"])
 
 
-PESOS = {"parcial1": 0.25, "parcial2": 0.25, "practico": 0.20, "final": 0.30}
-LABEL = {"parcial1": "Parcial 1", "parcial2": "Parcial 2", "practico": "Trabajo Práctico", "final": "Final"}
-PUNTAJE_POR_TIPO = {"parcial1": 100, "parcial2": 100, "practico": 60, "final": 100, "final1": 50, "final2": 50, "final3": 50}
+LABEL = {
+    "parcial1": "Parcial 1", "parcial2": "Parcial 2", "practico": "Trabajo Práctico",
+    "final1": "Final (1ª oport.)", "final2": "Final (2ª oport.)", "final3": "Final (3ª oport.)",
+}
 
 
 def _oferta_activa_por_materia(db: Session, materia_id: int):
@@ -104,29 +106,27 @@ def materia_detalle(
 
     asistencia_pct = round((presentes / total_clases) * 100, 1) if total_clases > 0 else None
 
-    # Construir desglose
+    pesos = get_pesos(db, materia_id)
+
+    # Construir desglose (puntos obtenidos vs. máximo real configurado para la materia)
     tipos_existentes = {p.tipo: p for p in puntajes}
-    # Orden: parcial1, parcial2, practico, final (y variantes final1..final3)
-    orden_tipos = ["parcial1", "parcial2", "practico", "final", "final1", "final2", "final3"]
+    orden_tipos = ["parcial1", "parcial2", "practico", "final1", "final2", "final3"]
     desglose = []
 
     for tipo in orden_tipos:
         label = LABEL.get(tipo, tipo.replace("_", " ").title())
-        peso = PESOS.get(tipo, 0)
+        max_pts = pesos["final"] if tipo.startswith("final") else pesos.get(tipo, 0)
 
         if tipo in tipos_existentes:
             p = tipos_existentes[tipo]
             nota_val = float(p.valor) if p.valor is not None else None
-            max_pts = PUNTAJE_POR_TIPO.get(tipo, 100)
-            logrado = round(nota_val * (max_pts / 10)) if nota_val is not None else None
-
             desglose.append({
                 "tipo": tipo,
                 "label": label,
-                "peso": peso,
+                "peso": max_pts,
                 "nota": nota_val,
                 "puntajeActividad": max_pts,
-                "puntajeLogrado": logrado,
+                "puntajeLogrado": nota_val,
                 "fecha": None,
                 "hora": None,
                 "profesor": profesor_nombre,
@@ -135,27 +135,18 @@ def materia_detalle(
             desglose.append({
                 "tipo": tipo,
                 "label": label,
-                "peso": peso,
+                "peso": max_pts,
                 "nota": None,
-                "puntajeActividad": PUNTAJE_POR_TIPO.get(tipo, None),
+                "puntajeActividad": max_pts,
                 "puntajeLogrado": None,
                 "fecha": None,
                 "hora": None,
                 "profesor": None,
             })
 
-    # Calcular promedio
-    notas_con_valor = {p.tipo: float(p.valor) for p in puntajes if p.valor is not None}
-    promedio = None
-    if notas_con_valor:
-        existentes = {k: v for k, v in notas_con_valor.items() if k in PESOS}
-        if existentes:
-            peso_total = sum(PESOS[k] for k in existentes)
-            if peso_total > 0:
-                promedio = round(
-                    sum(PESOS[k] * v for k, v in existentes.items()) / peso_total,
-                    2,
-                )
+    # Calcular promedio (0-10) con los pesos reales de la materia
+    notas_con_valor: dict[str, float | None] = {p.tipo: float(p.valor) for p in puntajes if p.valor is not None}
+    promedio = calcular_promedio_final(notas_con_valor, pesos)
 
     return {
         "materiaId": materia.id,

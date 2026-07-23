@@ -52,6 +52,28 @@ def listar_empresas(
 
 
 @router.get(
+    "/profesores",
+    response_model=list[dict],
+    summary="Lista de profesores disponibles como tutores académicos",
+)
+def listar_profesores(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.user import User
+    profesores = (
+        db.query(User.id, User.nombre, User.email)
+        .filter(User.role == "profesor")
+        .order_by(User.nombre)
+        .all()
+    )
+    return [
+        {"id": p.id, "nombre": p.nombre or f"Prof. #{p.id}", "email": p.email}
+        for p in profesores
+    ]
+
+
+@router.get(
     "/solicitudes",
     response_model=list[PasantiaOut],
     summary="Admin: todas las pasantías (filtro opcional ?estado=) · Alumno: propias",

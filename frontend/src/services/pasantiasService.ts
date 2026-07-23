@@ -23,6 +23,14 @@ export interface Pasantia {
   horas_requeridas: number
   horas_completadas: number
   estado: 'pendiente' | 'en_curso' | 'completada' | 'rechazada'
+  motivo_rechazo?: string | null
+  created_at?: string | null
+}
+
+export interface ProfesorItem {
+  id: number
+  nombre: string
+  email: string | null
 }
 
 export interface InformePasantia {
@@ -34,6 +42,8 @@ export interface InformePasantia {
 }
 
 export const getEmpresas = () => api.get<EmpresaReceptora[]>('/pasantias/empresas')
+
+export const getProfesores = () => api.get<ProfesorItem[]>('/pasantias/profesores')
 
 export const getMisPasantias = (estado?: string) =>
   api.get<Pasantia[]>(`/pasantias/solicitudes${estado ? `?estado=${estado}` : ''}`)

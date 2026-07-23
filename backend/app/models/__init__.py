@@ -24,6 +24,8 @@ from . import graduacion
 from . import equivalencia
 from . import examen
 from . import tramites
+from . import global_settings
+from . import peso_evaluacion
 
 __all__ = [
     "user",
@@ -52,5 +54,7 @@ __all__ = [
     "equivalencia",
     "examen",
     "tramites",
+    "global_settings",
+    "peso_evaluacion",
 ]
 

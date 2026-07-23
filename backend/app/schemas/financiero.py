@@ -283,6 +283,8 @@ class RendicionRow(BaseModel):
 
 class PagoOnlineInitRequest(BaseModel):
     cuota_id: int
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
 
 
 class PagoOnlineInitResponse(BaseModel):
@@ -290,6 +292,7 @@ class PagoOnlineInitResponse(BaseModel):
     transaction_id: str
     redirect_url: str
     monto: Decimal
+    stripe_session_id: Optional[str] = None
 
 
 class PagoOnlineConfirmRequest(BaseModel):
@@ -302,6 +305,7 @@ class PagoOnlineOut(BaseModel):
     cuota_id: int
     monto: Decimal
     transaction_id: Optional[str]
+    stripe_session_id: Optional[str]
     estado: str
     creado_en: Optional[datetime]
 

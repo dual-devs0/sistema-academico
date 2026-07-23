@@ -1,6 +1,362 @@
 # Changelog Técnico — Sistema Académico UCA V2
 
-> Orden cronológico inverso (más reciente primero). Cubre Fase 0, Fase 1, Fase 2, Fase 3, Fase 4, Fase 4B, Fase 5A, Fase 6b y Fase 8 — todas cerradas. (Fase 5B/5C/5D y Fase 6 se implementaron fuera de esta bitácora — ver `ESTADO_FASES.md` para su resumen.)
+> Orden cronológico inverso (más reciente primero). Cubre Fase 0 a Fase 19 — todas cerradas en código; Fase 19 pendiente de commit/push/deploy (ver checklist en `ESTADO_FASES.md`).
+
+---
+
+## Fase 19 — Motor de notas por puntos + Cursos unificado + auditoría real-data/mobile rol alumno (2026-07-23) — COMPLETA (código), PENDIENTE de commit/push/deploy
+
+### Resumen
+
+Dos partes: (A) cambio real al motor de calificación (0-10 → puntos configurables por materia, decidido explícitamente por el usuario) y fusión de Asistencia+Calificaciones dentro de Cursos; (B) auditoría módulo por módulo del rol alumno buscando datos fake/desincronizados y problemas de mobile, que destapó **6 bugs reales** (no cosméticos) además del trabajo visual pedido.
+
+### 19A — Motor de notas 0-100
+
+- Tabla nueva `pesos_evaluacion` (migración `caf9713210dd`): pesos configurables por materia, default `parcial1=20, parcial2=20, practico=10, final=50` (suma 100). Sin fila = usa el default, no hace falta sembrar todas las materias.
+- Migración de datos en la misma revisión: `puntajes.tipo='final'→'final1'`, reescala `valor` histórico (×2 parciales, ×1 práctico, ×5 final) para preservar el promedio 0-10 real de cada alumno tras el cambio de escala.
+- `tipo` extendido a `final1|final2|final3` — el final efectivo es el máximo de las 3 oportunidades no nulas.
+- `calcular_promedio_final(notas, pesos)` centralizado en `puntajes_utils.py`, reemplaza ~7 reimplementaciones manuales del cálculo dispersas en `boleta_router.py`, `alumno_router.py`, `reportes_router.py`, `services/pensum.py` (×4), `notas_router.py` — de paso corregidos 3 bugs reales de `AVG()` crudo mezclando puntajes de escalas distintas (20pts y 50pts promediados como si fueran comparables).
+- **Por qué no rompió PPA/boleta/regularidad:** con pesos sumando 100, `promedio_0_10 = puntos_obtenidos/10` sigue siendo matemáticamente un float 0-10 válido — todo consumidor externo (`calcular_ppa`, boleta PDF, `calcular_regularidad`) sigue recibiendo el mismo contrato sin tocar su propio código.
+- Frontend: `Puntajes.tsx` (profesor) gana panel "Configurar Puntaje" + selector de oportunidad (1ª/2ª/3ª) para el final.
+
+### 19B — Cursos unificado (alumno)
+
+- `Programa.tsx` gana tabs Temario/Asistencia/Calificaciones. Asistencia: cards circulares por materia con selector de período real (`GET /alumno/mis-periodos`, `GET /alumno/mis-materias?anio&semestre`, nuevos endpoints). Click en una card abre vista de detalle **full-swap** (mismo patrón que `ExpedienteAdmin.tsx` al seleccionar un alumno — no un modal), con desglose completo de notas + bitácora de sesiones de esa materia.
+- Sidebar alumno: entradas "Asistencia" y "Calificaciones" eliminadas (contenido vive en Cursos). Bottom-nav mobile: "Calificaciones" (ruta ya fusionada, muerta) → "Calendario" (ruta real).
+
+### 19C — Auditoría real-data + mobile, rol alumno (bugs reales encontrados)
+
+| Módulo | Bug real | Causa | Fix |
+|---|---|---|---|
+| `finanzas_router.py` (Pagar Online) | `AttributeError: 'Cuota' object has no attribute 'monto_a_pagar'` → 500 en cada intento de pago | `monto_a_pagar` es un campo calculado del *schema* de respuesta, no existe en el modelo ORM `Cuota` | `cuota.monto - cuota.monto_descuento` |
+| `alumno_router.py::dashboard` | El sistema entero mostraba "Sin adeudos"/Gs. 0 para **cualquier** alumno con cuotas, siempre | Mismo bug (`c.monto_a_pagar`) pero enmascarado por `except Exception: pass` silencioso — nunca se veía el traceback. Bonus: comparaba `c.estado=='vencido'` contra el valor real del constraint, `'vencida'` | `c.monto - c.monto_descuento` + `estado=='vencida'` |
+| `BecasAlumno.tsx` | Spinner "Cargando becas disponibles…" infinito | `firstLoad.current = false` corría síncrono, antes de que el `.finally()` de la promesa async se resolviera — `setLoadingCat(false)` nunca se ejecutaba con el ref ya en `false` | `Promise.allSettled` + `setLoadingCat(false)` incondicional en `.finally()` |
+| `BecasAlumno.tsx` (tabs Postulaciones/Mis Becas) | Mismo síntoma de spinner infinito cuando el alumno no tenía postulaciones (caso más común) | Rama `postulaciones.length===0 ? spinner : postulaciones.length===0 ? vacío : lista` — segunda condición idéntica a la primera, inalcanzable | Primera condición cambiada a `loadingCat` |
+| `Boleta.tsx` (alumno) | Desglose de notas roto (schema viejo `final` único), período "Otoño/Primavera" fake, sello digital con QR de píxeles random no verificable | Página nunca migrada al motor de puntos nuevo (19A); período nunca conectado a datos reales de inscripción | Desglose usa `/alumno/mis-notas` real; período usa `oferta.periodo` real (no currícula); sello reemplazado por código HMAC-SHA256 real + QR real, nuevos endpoints `GET /boleta/{id}/sello` y `GET /boleta/verificar/{codigo}` |
+| `Inscripciones.tsx` (alumno) | Créditos sumados siempre con constante ×4 sin importar la materia real; cupo lleno no bloqueaba selección | Cálculo hardcodeado en vez de usar `m.creditos`/`m.cupos` reales ya devueltos por el backend | Créditos y bloqueo de cupo real; código de materia real (`m.codigo`) en vez de `MAT-XXX` fabricado |
+| `SolicitudesTramites.tsx` (alumno) | Mensaje "Trámites próximamente disponibles" se mostraba también cuando el fetch fallaba por error real de red/servidor, indistinguible de catálogo vacío legítimo | `loadError` y "catálogo vacío" compartían el mismo render | Separados: banner de error real vs estado vacío real |
+| `Perfil.tsx` (alumno) | Promedio General mezclaba notas de escalas distintas (parcial 20pts + final 50pts) en un `AVG` plano sin pesos | Nunca migrado al motor de puntos (19A) | Usa `/alumno/mis-notas` real (mismo cálculo que Boleta/Cursos/Malla) |
+| `AdminLogin.tsx` | Colores inconsistentes (variables `--cyan-*` mezcladas con un teal viejo `rgba(0,180,216,…)` residual de un rediseño anterior, gradiente de "control total" hardcodeado a un tono que no coincidía con `--cyan-bright`) | Refactor de color incompleto en sesión previa | Unificado todo a 4 variables reales |
+| `AdminLogin.tsx` (mobile) | Raya horizontal suelta + logo pegado al texto del hero en viewport ≤960px | `.panel-deco { border-bottom }` quedaba visible al superponerse con `.panel-form { margin-top:-60px }`, que arrastraba también el logo (`.form-header`) hacia arriba | `border-bottom` eliminado; el `margin-top:-60px` (efecto de card flotante) se movió solo a `.form-content`, `.form-header` con padding propio |
+| `Dashboard.tsx` (alumno+profesor) | Tabla "Calificaciones por Materia" (7 columnas) y "Cursos Activos" (4 columnas, sin wrapper de `overflow-x`) ilegibles/desbordadas en mobile | Sin versión responsive, solo `overflow-x:auto` (o ni eso) | Cards apiladas por materia debajo de 680px, tabla intacta en desktop. Mismo fix aplicado al Desglose de Materias de `Boleta.tsx` |
+
+Malla y Expediente ya tenían backend 100% real de sesiones previas — solo les faltaba tiempo real (poll 30s + botón Actualizar + banner de error visible, antes `.catch(()=>{})` silencioso). Pasantías ya tenía backend real pero solo mostraba la última solicitud (`.find()`) — se agregó historial completo con `motivo_rechazo` visible y se ocultó el form de nueva solicitud si ya hay una activa.
+
+### Pendiente explícito
+
+- **Pago online no probado end-to-end** — `STRIPE_SECRET_KEY` sigue en `sk_test_placeholder`, pendiente de que el usuario genere una clave real de Stripe (instrucciones ya entregadas).
+- Rediseño visual tipo card+hero+violeta del login alumno/profesor (template pegado por el usuario en el chat) — pausado a pedido explícito del usuario, no se tocó.
+- Ver checklist completo de pre-producción al final de `ESTADO_FASES.md` (commits/push, secretos de `.env`, elección de hosting — nada de esto es código, es lo que falta para el primer deploy real).
+
+### Tests
+
+Backend: 273/273 ✅ (sin regresiones sobre el motor de notas nuevo). Frontend: `npm run build` 919 módulos, 0 errores.
+
+---
+
+## Fase 17 — Ajustes Globales (Admin) con auditoría (2026-07-22) — COMPLETA
+
+### Resumen
+
+Módulo completo de configuración global del sistema para administradores. Antes: el menú "Ajustes Globales" apuntaba a `/perfil` (misma página de perfil personal que todos los roles). Ahora: página dedicada `/ajustes-globales` con 20 settings agrupados en 4 categorías, auditoría de cambios, export/import.
+
+### Backend
+
+**Modelos nuevos:**
+- `GlobalSetting` (`global_settings`): tabla clave-valor con tipos (string/number/boolean/date), categoría, descripción, editable flag, timestamps
+- `SettingAuditLog` (`setting_audit_log`): historial completo de cambios con old_value, new_value, changed_by, reason
+
+**Migración:** `c8f8d13b8612` — `add_global_settings_module` (aplicada en neondb)
+
+**Auto-seed:** 20 settings por defecto con valores iniciales en 4 categorías:
+- Académico (7): período actual, fechas inscripción, PPA mínimo, % asistencia, intentos máx, créditos mínimos
+- Financiero (4): días tolerancia mora, interés mensual, costo crédito, periodicidad cobro
+- Sistema (5): email contacto, dominio institucional, max archivo size, modo mantenimiento
+- Notificaciones (4): email/push activo, % alerta asistencia, días recordatorio
+
+**Endpoints nuevos (admin-only):**
+
+| Método | Ruta | Propósito |
+|--------|------|-----------|
+| GET | `/admin/settings` | Listar settings (opcional `?categoria=`) |
+| GET | `/admin/settings/{key}` | Obtener un setting |
+| PUT | `/admin/settings/{key}` | Actualizar + registrar auditoría |
+| GET | `/admin/settings/audit/list` | Historial de cambios paginado con nombre del usuario |
+| GET | `/admin/settings/export/all` | Exportar todos los settings como JSON |
+| POST | `/admin/settings/import` | Importar settings desde JSON (con auditoría) |
+
+### Frontend
+
+**Nueva página `AjustesGlobales.tsx`:**
+- 5 tabs: Académico, Financiero, Sistema, Notificaciones, Auditoría
+- Cada setting renderizado con control según tipo (text, number, toggle booleano, date)
+- Edición inline con botón "Guardar" que aparece al modificar un valor
+- Indicador de última actualización por setting
+- Polling automático cada 30s
+- Tab de Auditoría: tabla con historial completo (setting, old→new, usuario, fecha, motivo)
+- Botones Exportar/Importar con modal JSON
+
+**Routing + menú:**
+- Ruta `/ajustes-globales` registrada para admin en App.tsx
+- Menú admin "Ajustes Globales" ahora apunta a `/ajustes-globales` (antes `/perfil`)
+
+### Tests
+- Backend settings: 8 tests nuevos ✅ (seed, CRUD, auth, audit, export, import)
+- Backend suite existente: sin regresiones
+- Frontend build: 0 errores tsc
+
+---
+
+## Fase 16C — Fix CSRF refresh + Pasantías Admin refinado (2026-07-22) — COMPLETA
+
+### 1. Fix: sesión perdida al refrescar página (CSRF)
+
+**Problema:** El token CSRF se almacenaba solo en memoria (`_csrfToken` en `api.ts`). Al refrescar la página:
+- `_csrfToken` se perdía
+- `tryRefresh()` llamaba `POST /auth/refresh` sin header `X-CSRF-Token`
+- Backend requiere validación CSRF (cookie `csrf_token` vs header) para cookie flow → 403
+- Sesión se perdía completamente al hacer F5
+
+**Solución:** Nueva función `_readCsrfFromCookie()` que lee el token CSRF de la cookie (no es httpOnly, JS puede leerla). `_getCsrfToken()` intenta memoria primero, cae a cookie si no hay. El refresh silencioso funciona incluso después de F5.
+
+### 2. Pasantías Admin — datos reales + UX mejorada
+
+**Problemas encontrados:**
+- `PasantiaOut` no exponía `motivo_rechazo` (existía en el modelo desde migración `m6m6m6m6m6m6`, pero el schema lo ignoraba)
+- No existía columna `fecha_solicitud`/`created_at` en la tabla — la columna "Fecha solicitud" siempre mostraba "—"
+- Modal de aprobación requería tipear manualmente el ID del tutor
+
+**Cambios backend:**
+- `Pasantia` model: columna `created_at` agregada (DateTime with timezone, default=utcnow)
+- Migración `c0e2c42a4b9d` — `add_created_at_to_pasantias` (aplicada en `neondb`)
+- `PasantiaOut` schema: expone `created_at` y `motivo_rechazo`
+- Nuevo endpoint `GET /pasantias/profesores` — lista profesores disponibles como tutores (id, nombre, email)
+
+**Cambios frontend:**
+- `pasantiasService.ts`: interfaz `Pasantia` actualizada con `created_at`, `motivo_rechazo`; nuevo tipo `ProfesorItem`; nueva función `getProfesores()`
+- `PasantiasAdmin.tsx`:
+  - Modal de aprobación: input numérico reemplazado por `<select>` con lista real de profesores
+  - Columna "Fecha solicitud" muestra `created_at` real
+  - `motivo_rechazo` visible en detalle cuando existe
+  - Polling cada 30s mantiene datos en tiempo real
+
+### Tests
+- Backend pasantías: 15/15 ✅
+- Frontend: 19/19 ✅
+- Mypy: 0 errores (4 archivos del módulo limpios)
+
+---
+
+## Fase 16D — Equivalencias Admin refinado (2026-07-22) — COMPLETA
+
+### 1. Modelo + migración
+
+**Problema:** `SolicitudEquivalencia` no tenía columna `created_at`. El frontend mostraba "—" en la columna "Fecha" y no se podía ordenar por antigüedad.
+
+**Cambios:**
+- `SolicitudEquivalencia` model: columna `created_at = Column(DateTime(timezone=True), server_default=func.now())`
+- Migración `a22743f21549` — `add_created_at_to_solicitudes_equivalencia` (aplicada en `neondb`)
+- Schema `SolicitudEquivalenciaOut`: expone `created_at`
+- Schema `EquivalenciaMateriaResolver`: incluye `motivo`
+
+### 2. Nuevos endpoints
+
+| Endpoint | Rol | Propósito |
+|----------|-----|-----------|
+| `GET /equivalencias/solicitudes` | admin | Lista TODAS las solicitudes con filtro opcional `?estado=` |
+| `GET /equivalencias/materias` | admin | Lista materias disponibles para dropdowns en modales |
+
+Antes: no existía forma de listar solicitudes como admin — solo se podía consultar por alumno individual (`GET /equivalencias/alumno/{id}`).
+
+### 3. Frontend — EquivalenciasAdmin.tsx reescrito
+
+**Problemas originales:**
+- Pantalla vacía hasta buscar alumno manualmente — sin vista general de solicitudes
+- Modal resolver: campo numérico para `materia_id` (había que saber el ID de memoria)
+- Modal examen: campo numérico para `materia_id`
+- Sin columna de fecha real
+
+**Cambios:**
+- `equivalenciasService.ts`: nuevas funciones `getTodasSolicitudes()`, `getMateriasEquivalencia()`; nuevo tipo `MateriaItem` (id, nombre, codigo)
+- `EquivalenciasAdmin.tsx`:
+  - Carga **todas** las solicitudes al montar (sin búsqueda manual)
+  - 3 tabs: Pendientes / Resueltas / Todas
+  - Columna "Fecha" con `created_at` real formateado
+  - Modal Resolver: `<select>` con materias reales en lugar de input numérico
+  - Modal Examen de Suficiencia: `<select>` con materias reales + date picker
+  - Polling automático cada 30s
+  - Indicador de última actualización con spinner
+
+### Tests
+- Backend equivalencias: 7/7 ✅
+- Frontend: 19/19 ✅
+- Mypy: 0 errores en módulo equivalencias ✅
+
+---
+
+## Fase 16B — Mypy 0 errores + Pagos Online real (Stripe) + Notificaciones Push reales (pywebpush) (2026-07-22) — COMPLETA
+
+**Origen:** Finalización de los 3 items activos que quedaban de Fase 16: mypy (53 errores reales en servicios/routers), Pagos Online (reemplazar stub por Stripe real), Notificaciones Push (reemplazar stub por pywebpush + service worker).
+
+### 1. Mypy 53 → 0 errores (15 archivos)
+
+Los modelos ya estaban migrados a `Mapped[]` de sesiones anteriores. Los 53 errores restantes estaban en servicios y routers:
+
+| Categoría | Count | Files | Fix |
+|-----------|-------|-------|-----|
+| `bool | None` → `bool` en Pydantic | 14 | `x or False` |
+| `int | None` → `int` dict key | 4 | `assert` guard |
+| Missing type annotations (`dict[...]`) | 4 | | Annotation added |
+| `str` → `NameEmail` (fastapi-mail) | 4 | `email_utils.py`, `facturacion_electronica.py` | `NameEmail(email=s)` wrapper |
+| `datetime | None` → `datetime` | 4 | `tramites_router.py`, `foro_router.py` | `assert` / `or datetime.min` |
+| `list[X]` vs `list[Y]` variance | 3 | `eventos_router.py` | `cast()` |
+| `dict[str, float]` vs `dict[str, float | None]` | 1 | `expediente_router.py` | Fix type annotation |
+| `Incompatible types in assignment` | 4 | `financiero.py`, `asistencias_router.py`, `expediente_router.py` | Fix variable types |
+| `or_()` filter bool | 4 | `reportes_router.py`, `eventos_router.py` | Use `.is_(True)` |
+| Generator `object` vs `bool` | 5 | `reportes_router.py` | Fix yields |
+| Misc (list vs Query, list[dict] vs list[PendienteOut]) | 6 | misc | Fix types |
+
+**Resultado:** `mypy app --ignore-missing-imports` → 0 errors (105 source files checked).
+
+### 2. Pagos Online — Stripe real (reemplaza gateway.stub)
+
+**Antes:** `gateway.stub` (dominio falso), sin SDK real, sin webhook.
+
+**Ahora:**
+- `stripe>=15.0` agregado a `requirements.txt` e instalado en venv
+- Variables de entorno: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `backend/app/services/pagos_online.py` — nuevo servicio con `init_stripe()`, `crear_checkout_session()` (convierte montos Numeric(12,2) a centavos ×100), `confirmar_pago_webhook()` (verifica firma HMAC)
+- `finanzas_router.py`:
+  - `POST /finanzas/pagos/init` — crea Stripe Checkout Session real, almacena `stripe_session_id` + `gateway_url` (URL de checkout)
+  - `POST /finanzas/pagos/webhook` — nuevo endpoint para eventos `checkout.session.completed` con verificación de firma
+  - `POST /finanzas/pagos/confirm` — mantenido como endpoint manual de testing
+- Modelo `PagoOnline` extendido con columna `stripe_session_id` (migración `61880be1d112`)
+- Frontend `MisCuotas.tsx`: redirige a Stripe Checkout URL, maneja `?stripe=success`/`?stripe=cancel`
+- `finanzasService.ts`: `initPagoOnline` acepta `success_url`/`cancel_url` opcionales
+
+**Flujo:** Usuario hace clic en "Pagar Online" → backend crea Stripe Checkout Session → frontend redirige → Stripe cobra → webhook `checkout.session.completed` → backend marca PagoOnline como `confirmado` + cuota como `pagada`.
+
+### 3. Notificaciones Push — pywebpush real (reemplaza stub)
+
+**Antes:** Suscripción real guardada en DB, `POST /notificaciones/test` solo contaba subscribers y devolvía respuesta fake.
+
+**Ahora:**
+- `pywebpush>=1.14` agregado a `requirements.txt` e instalado en venv
+- Variables de entorno: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`
+- `backend/app/services/notificaciones_push.py` — nuevo servicio con:
+  - `get_vapid_keys()` — lee de env, auto-genera si no existen (las guarda en env para persistencia)
+  - `enviar_notificacion(subscription, titulo, cuerpo, url)` — envía push real con pywebpush
+  - `enviar_notificaciones_masivo(subscriptions, ...)` — batch con manejo de errores por suscripción
+- `notificaciones_router.py`:
+  - `GET /notificaciones/vapid-public-key` — expone la VAPID public key para el frontend
+  - `POST /notificaciones/test` — envía push real a todos los suscriptores, devuelve `{exitosos, fallidos, total}`
+- `frontend/public/sw.js` — service worker nuevo con:
+  - `push` event → muestra notificación con título/cuerpo/icono
+  - `notificationclick` → enfoca/abre URL de la notificación
+- `frontend/src/pages/Perfil.tsx`:
+  - Reemplazado mensaje "próximamente" por `NotificacionesPush` componente
+  - `Notification.requestPermission()` + `navigator.serviceWorker.register('/sw.js')`
+  - Suscripción vía `POST /notificaciones/subscribe` con la key VAPID pública
+  - Botón toggle Activar/Desactivar, estados: no-soportado, denegado, inactivo, activo
+
+### Tests
+
+- **Mypy:** 0 errors ✅
+- **Frontend (vitest):** 19/19 ✅
+- **Python compile:** limpio (pagos_online.py, notificaciones_push.py, finanzas_router.py, notificaciones_router.py)
+
+### Archivos tocados (nuevos)
+
+- `backend/app/services/pagos_online.py` — nuevo (Stripe checkout + webhook)
+- `backend/app/services/notificaciones_push.py` — nuevo (pywebpush + VAPID)
+- `backend/alembic/versions/61880be1d112_add_stripe_session_id.py` — nuevo
+- `frontend/public/sw.js` — nuevo (service worker)
+
+### Archivos tocados (modificados)
+
+- `backend/requirements.txt` — +`stripe>=15.0`, +`pywebpush>=1.14`
+- `backend/.env`, `.env.example`, `.env.test` — +`STRIPE_*`, +`VAPID_*`
+- `backend/app/models/financiero.py` — +`stripe_session_id`
+- `backend/app/routers/finanzas_router.py` — Stripe real + webhook endpoint
+- `backend/app/routers/notificaciones_router.py` — push real
+- `backend/app/schemas/financiero.py` — +`stripe_session_id` en schemas
+- `frontend/src/pages/MisCuotas.tsx` — redirige a Stripe
+- `frontend/src/services/finanzasService.ts` — +success/cancel URL params
+- `frontend/src/pages/Perfil.tsx` — notificaciones push reales
+
+### Archivos tocados (mypy fixes)
+
+15 archivos con correcciones de tipado (ver tabla en §1 arriba).
+
+---
+
+## Fase 16 — Auditoría crítica post-fixes + integridad referencial + CI/CD (2026-07-22) — COMPLETA
+
+**Origen:** Cherry-pick de commits `08564f6` y `10022fc` con 7 fixes de backend/frontend. Auditoría integral de todo el proyecto para confirmar estado post-fixes y corregir hallazgos pendientes.
+
+### Commits cherry-picked — 7 fixes verificados
+
+| Fix | Prioridad | Archivo | Estado |
+|-----|-----------|---------|--------|
+| 1 — Bloquear `activo`/`fecha_ingreso`/`cedula`/`cv` en PATCH no-admin | ALTO | `users_router.py:236-238` | ✅ |
+| 2 — `_requiere_profesor()` permite admin además de profesor | MEDIO | `profesor_router.py:14-18` | ✅ |
+| 3 — `require_role('admin')` estandarizado (0 inline checks) | MEDIO | `materia_router.py`, `users_router.py` | ✅ |
+| 4 — No enviar contraseña en texto plano por email | BAJO | `email_utils.py`, `auth_router.py` | ✅ |
+| 5 — `joinedload` en mis_notas/mi_asistencia (N+1) | ALTO | `alumno_router.py:109,154` | ✅ |
+| 6 — `contains_eager` en boleta PDF (N+1) | MEDIO | `boleta_router.py:368` | ✅ |
+| 7 — `.items` extraído de respuesta paginada en Boleta.tsx | Frontend | `Boleta.tsx:65,83` | ✅ |
+
+### Hallazgos de auditoría
+
+**✅ sessionStorage.getItem('token') — FALSO POSITIVO.** No hay componentes que lean el token de storage. El token vive en memoria (`_accessToken` en `api.ts`). sessionStorage solo almacena flags auxiliares. Todos los accesos manejan null.
+
+**🔴 Integridad referencial — CORREGIDO.** Solo 1 cascade existía (`Examen.inscripciones`). Se agregaron `ondelete="CASCADE"`/`ondelete="SET NULL"` a 30+ ForeignKeys en 12 modelos, más `cascade="all, delete-orphan"` en 18 relaciones padre→hijo. Migración Alembic generada (`b42cc57fda33`). Modelos tocados: `refresh_token`, `financiero`, `examen`, `inscripcion`, `pasantia`, `graduacion`, `tramites`, `equivalencia`, `users`, `recordatorio_docente`, `apunte`, `evento_calendario`.
+
+**🟡 Pagos Online — STUB confirmado.** `gateway.stub` (dominio falso). Sin SDK real. Sin cambios.
+
+**🟡 Notificaciones Push — STUB confirmado.** Suscripción real, envío es stub. Sin cambios.
+
+**🔴 CI/CD — CREADO.** Nuevo pipeline GitHub Actions (`.github/workflows/ci.yml`) con jobs paralelos:
+- **Backend:** Python 3.12, PostgreSQL 16 (service container), `alembic upgrade head`, `pytest` (sin postgres_compat).
+- **Frontend:** Node 20, `npm ci`, `npm run test:run`, `npm run build`.
+
+**🟡 Seed scripts — CORREGIDO.**
+- `seed.py`: `Base.metadata.create_all()` reemplazado por verificación con `inspect()` — exige `alembic upgrade head` primero.
+- `seed_restante.py`: variable `count` reusada (bug de línea 89) corregida separando `count_asist` / `count_cuotas`.
+
+**🔴 Mypy — ~267 errores.** Deuda técnica documentada en `mypy.ini` (estilo SQLAlchemy 1.x `Column()` vs `Mapped[]`). Sin cambios.
+
+**🟡 Tests frontend — CORREGIDO.** 6 tests fallaban por conteos desactualizados (se eliminaron Foro/Centro de Ayuda del menú) + mock `[]` causaba crash en AdminDash. Arreglado: `Layout.test.tsx` (admin 16, alumno 17, prof 9), `Dashboard.test.tsx` (mock retorna `AdminDashboardData` válido). 19/19 ✅.
+
+**🟢 CSRF — ADECUADO.** Double-Submit Cookie en `/auth/refresh`. Bearer token protege el resto. `secrets.compare_digest()` usado. Tests existentes.
+
+### Pyrefly errors corregidos
+
+| Archivo | Error | Fix |
+|---------|-------|-----|
+| `admin_router.py:111-112` | `NoneType` no tiene `total`/`pres` | `asis_row if asis_row else 0` |
+| `admin_router.py:137,165` | Variables no inicializadas fuera de `if` | Inicializadas como `set()`/`{}` al inicio |
+| `eventos_router.py:59` | `response.text` puede ser None | `(response.text or "").strip()` |
+| `finanzas_router.py:185-189` | Código muerto tras `return` | Eliminado |
+| `graduacion_router.py:51-52` | `completo` puede ser None | Guard `if completo is None: return proceso` |
+
+### Tests
+
+- **Frontend:** 19/19 ✅ (antes 13/19, 6 fallaban)
+- **Backend:** 38/38 ✅ (test_basic, test_auth, test_refresh_tokens, test_users)
+- **Migración Alembic:** `b42cc57fda33` — feat: agregar ondelete cascada/setnull a FKs
+
+### Archivos tocados (resumen)
+
+**Modelos (12):** `refresh_token.py`, `financiero.py`, `examen.py`, `inscripcion.py`, `pasantia.py`, `graduacion.py`, `tramites.py`, `equivalencia.py`, `users.py`, `recordatorio_docente.py`, `apunte.py`, `evento_calendario.py`
+
+**Routers corregidos (4):** `admin_router.py`, `eventos_router.py`, `finanzas_router.py`, `graduacion_router.py`
+
+**Frontend corregido (3):** `Dashboard.tsx` (optional chain), `Layout.test.tsx` (conteos), `Dashboard.test.tsx` (mock)
+
+**Seed scripts (2):** `seed.py` (sin create_all), `seed_restante.py` (count_asist/count_cuotas)
+
+**Nuevos:** `.github/workflows/ci.yml`, `alembic/versions/b42cc57fda33_*.py`
 
 ---
 

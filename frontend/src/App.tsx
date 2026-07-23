@@ -32,6 +32,7 @@ import EquivalenciasAlumno from './pages/EquivalenciasAlumno'
 import PasantiasAdmin from './pages/PasantiasAdmin'
 import EquivalenciasAdmin from './pages/EquivalenciasAdmin'
 import BecasAlumno from './pages/BecasAlumno'
+import AjustesGlobales from './pages/AjustesGlobales'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -44,7 +45,7 @@ const rolesPermitidos: Record<string, string[]> = {
   '/perfil':    ['admin', 'profesor', 'alumno'],
   '/calendario':['admin', 'profesor', 'alumno'],
   '/biblioteca':['admin', 'profesor', 'alumno'],
-  '/boleta':    ['admin', 'profesor', 'alumno'],
+  '/boleta':    ['admin', 'alumno'],
   '/estadisticas':   ['admin', 'profesor'],
   '/inscripciones':      ['admin', 'alumno'],
   '/mis-materias':        ['profesor'],
@@ -58,6 +59,7 @@ const rolesPermitidos: Record<string, string[]> = {
   '/graduacion-admin':   ['admin'],
   '/pasantias-admin':    ['admin'],
   '/equivalencias-admin':['admin'],
+  '/ajustes-globales':   ['admin'],
   '/mi-graduacion':      ['alumno'],
   '/mis-equivalencias':  ['alumno'],
   '/asistencia/scan':    ['alumno'],
@@ -125,6 +127,7 @@ function App() {
         <Route path="/mis-equivalencias" element={<Layout><RutaProtegida path="/mis-equivalencias"><EquivalenciasAlumno /></RutaProtegida></Layout>} />
         <Route path="/pasantias-admin" element={<Layout><RutaProtegida path="/pasantias-admin"><PasantiasAdmin /></RutaProtegida></Layout>} />
         <Route path="/equivalencias-admin" element={<Layout><RutaProtegida path="/equivalencias-admin"><EquivalenciasAdmin /></RutaProtegida></Layout>} />
+        <Route path="/ajustes-globales" element={<Layout><RutaProtegida path="/ajustes-globales"><AjustesGlobales /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><RutaProtegida path="/asistencia/scan"><AsistenciaScan /></RutaProtegida></Layout>} />
         <Route path="/mis-becas" element={<Layout><RutaProtegida path="/mis-becas"><BecasAlumno /></RutaProtegida></Layout>} />
         <Route path="*" element={<NotFound />} />

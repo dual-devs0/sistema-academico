@@ -2,7 +2,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from datetime import date
 
-TipoEvento = Literal["parcial", "final", "feriado", "asueto", "entrega", "actividad"]
+TipoEvento = Literal["parcial", "parcial_1", "parcial_2", "final", "feriado", "asueto", "entrega", "actividad"]
 
 
 class EventoBase(BaseModel):

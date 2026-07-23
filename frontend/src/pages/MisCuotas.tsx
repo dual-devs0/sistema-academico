@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
-import { getCurrentUser } from '../lib/api'
+import { useState, useEffect, useCallback } from 'react'
+import { getCurrentUser, emitToast } from '../lib/api'
 import { getCuotasAlumno, getBecasActivas, initPagoOnline, formatGs, type Cuota, type BecaActiva } from '../services/finanzasService'
+
+const POLL_MS = 30000
 
 const css = `
   .mc-header { display:flex; align-items:center; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
@@ -81,19 +83,48 @@ export default function MisCuotas() {
   const [cuotas, setCuotas] = useState<Cuota[]>([])
   const [becas, setBecas] = useState<BecaActiva[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [filtro, setFiltro] = useState<EstadoFilter>('todos')
   const [pagandoId, setPagandoId] = useState<number | null>(null)
+  const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
-  useEffect(() => {
+  const cargarCuotas = useCallback((manual = false) => {
     if (!alumnoId) return
-    Promise.all([
+    if (manual) setRefreshing(true)
+    Promise.allSettled([
       getCuotasAlumno(alumnoId),
       getBecasActivas(alumnoId),
     ]).then(([c, b]) => {
-      setCuotas(c)
-      setBecas(b)
-    }).catch(() => {}).finally(() => setLoading(false))
+      const fails: string[] = []
+      if (c.status === 'fulfilled') setCuotas(c.value)
+      else fails.push('cuotas')
+      if (b.status === 'fulfilled') setBecas(b.value)
+      else fails.push('becas')
+      setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
+      setLastUpdate(new Date())
+    }).finally(() => { setLoading(false); setRefreshing(false) })
   }, [alumnoId])
+
+  useEffect(() => {
+    cargarCuotas()
+    const id = setInterval(() => cargarCuotas(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargarCuotas])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const stripeStatus = params.get('stripe')
+    if (stripeStatus === 'success') {
+      setStatusMsg('Pago realizado con éxito. La cuota se actualizará en breve.')
+      cargarCuotas()
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (stripeStatus === 'cancel') {
+      setStatusMsg('Pago cancelado. Puedes intentar nuevamente cuando quieras.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [cargarCuotas])
 
   const cuotasFiltradas = filtro === 'todos' ? cuotas : cuotas.filter(c => c.estado === filtro)
 
@@ -119,20 +150,48 @@ export default function MisCuotas() {
     <>
       <style>{css}</style>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '28px 16px' }}>
-        <div className="mc-header">
-          <div className="mc-title">💳 Mis Cuotas</div>
-          <div className="mc-filters">
-            {(['todos', 'pendiente', 'vencida', 'pagada'] as EstadoFilter[]).map(f => (
-              <button
-                key={f}
-                className={`mc-filter-btn${filtro === f ? ' active' : ''}`}
-                onClick={() => setFiltro(f)}
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
+        <div className="mc-header" style={{ justifyContent: 'space-between' }}>
+          <div className="mc-title"><i className="ti ti-credit-card" style={{ marginRight: 8, color: 'var(--accent-bright)' }} /> Mis Cuotas</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {lastUpdate && (
+              <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
+            )}
+            <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargarCuotas(true)}>
+              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+            </button>
           </div>
         </div>
+
+        <div className="mc-filters" style={{ marginBottom: 18 }}>
+          {(['todos', 'pendiente', 'vencida', 'pagada'] as EstadoFilter[]).map(f => (
+            <button
+              key={f}
+              className={`mc-filter-btn${filtro === f ? ' active' : ''}`}
+              onClick={() => setFiltro(f)}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12.5, color: 'var(--danger)', marginBottom: 16 }}>
+            <i className="ti ti-alert-triangle" /> {error}
+          </div>
+        )}
+
+        {/* Mensaje de estado Stripe */}
+        {statusMsg && (
+          <div style={{
+            padding: '12px 18px', borderRadius: 12, marginBottom: 18,
+            background: statusMsg.includes('éxito') ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
+            border: `1px solid ${statusMsg.includes('éxito') ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`,
+            color: statusMsg.includes('éxito') ? '#10b981' : '#f59e0b',
+            fontWeight: 600, fontSize: 13,
+          }}>
+            {statusMsg}
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="mc-summary">
@@ -167,7 +226,7 @@ export default function MisCuotas() {
                   display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
                 }}
               >
-                <span style={{ fontSize: 18 }}>{b.es_externa ? '🏦' : '🎓'}</span>
+                <span style={{ fontSize: 18, color: b.es_externa ? '#a78bfa' : '#22d3ee' }}><i className={`ti ${b.es_externa ? 'ti-building-bank' : 'ti-school'}`} /></span>
                 <div>
                   <div style={{ fontWeight: 700, color: b.es_externa ? '#a78bfa' : '#22d3ee', fontSize: 13 }}>
                     {b.beca_nombre} — {b.fuente}
@@ -210,7 +269,7 @@ export default function MisCuotas() {
                     {/* Badge beca con trazabilidad */}
                     {tieneDescuento && cuota.beca_nombre && (
                       <div className={`mc-beca-tag ${cuota.es_beca_externa ? 'externa' : 'institucional'}`}>
-                        {cuota.es_beca_externa ? '🏦' : '🎓'}
+                        <i className={`ti ${cuota.es_beca_externa ? 'ti-building-bank' : 'ti-school'}`} />
                         {cuota.beca_nombre} — {cuota.fuente_beca} ({descuentoPct}% desc.)
                       </div>
                     )}
@@ -237,7 +296,7 @@ export default function MisCuotas() {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            ⬇ Descargar comprobante
+                            <i className="ti ti-download" /> Descargar comprobante
                           </a>
                         ) : (
                           <span className="mc-comprobante-pendiente">
@@ -254,16 +313,21 @@ export default function MisCuotas() {
                           onClick={async () => {
                             setPagandoId(cuota.id)
                             try {
-                              const res = await initPagoOnline(cuota.id)
-                              window.open(res.redirect_url, '_blank')
+                              const returnUrl = `${window.location.origin}/mis-cuotas`
+                              const res = await initPagoOnline(
+                                cuota.id,
+                                `${returnUrl}?stripe=success`,
+                                `${returnUrl}?stripe=cancel`,
+                              )
+                              window.location.href = res.redirect_url
                             } catch {
-                              alert('Error al iniciar pago')
+                              emitToast('Error al iniciar pago', 'error')
                             } finally {
                               setPagandoId(null)
                             }
                           }}
                         >
-                          {pagandoId === cuota.id ? 'Procesando…' : '💳 Pagar Online'}
+                          <i className="ti ti-credit-card" /> {pagandoId === cuota.id ? 'Procesando…' : 'Pagar Online'}
                         </button>
                       </div>
                     )}

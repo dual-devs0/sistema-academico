@@ -79,17 +79,27 @@ function VistaAlumno() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [solicitando, setSolicitando] = useState<number | null>(null)
 
-  const cargar = () => {
-    setLoadError(false)
-    Promise.all([getTiposTramite(), getMisSolicitudes()])
-      .then(([t, s]) => { setTipos(t); setSolicitudes(s) })
-      .catch(() => setLoadError(true))
-      .finally(() => setLoading(false))
+  const cargar = (manual = false) => {
+    if (manual) setRefreshing(true)
+    Promise.allSettled([getTiposTramite(), getMisSolicitudes()])
+      .then(([t, s]) => {
+        if (t.status === 'fulfilled') { setTipos(t.value); setLoadError(false) }
+        else setLoadError(true)
+        if (s.status === 'fulfilled') setSolicitudes(s.value)
+        setLastUpdate(new Date())
+      })
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [])
 
   const solicitar = async (tipoId: number) => {
     setSolicitando(tipoId)
@@ -124,20 +134,23 @@ function VistaAlumno() {
     )
   }
 
-  if (loadError) {
-    return (
-      <div className="tr-section">
-        <div className="tr-empty">
-          <div className="tr-empty-icon"><i className="ti ti-file-off" /></div>
-          <div className="tr-empty-title">Trámites próximamente disponibles</div>
-          <div>Estamos preparando el catálogo de solicitudes académicas.</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <>
+      <div className="tr-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginBottom: 4 }}>
+        {lastUpdate && (
+          <span className="tr-tipo-desc" style={{ fontFamily: 'var(--font-mono)' }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
+        )}
+        <button className="tr-btn secondary" style={{ padding: '6px 10px' }} onClick={() => cargar(true)} disabled={refreshing}>
+          <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+        </button>
+      </div>
+
+      {loadError && (
+        <div className="tr-section" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12.5, color: 'var(--danger)' }}>
+          <i className="ti ti-alert-triangle" /> No se pudo cargar el catálogo de trámites. Mostrando último dato disponible.
+        </div>
+      )}
+
       <div className="tr-section">
         <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>
           Trámites disponibles
@@ -171,7 +184,10 @@ function VistaAlumno() {
           Mis solicitudes
         </h3>
         {solicitudes.length === 0 ? (
-          <div className="tr-empty">No tenés solicitudes todavía.</div>
+          <div className="tr-empty">
+            <div className="tr-empty-icon"><i className="ti ti-inbox" /></div>
+            No tenés solicitudes todavía.
+          </div>
         ) : (
           solicitudes.map(s => (
             <div key={s.id} className="tr-card">
