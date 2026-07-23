@@ -72,7 +72,7 @@ function NotificacionesPush() {
     setEstado(sub ? 'activo' : 'inactivo')
   }, [])
 
-  useEffect(() => { sincronizar() }, [sincronizar])
+  useEffect(() => { const load = () => sincronizar(); load() }, [sincronizar])
 
   async function activar() {
     if (!vapidKey) { emitToast('Error al obtener clave de notificaciones', 'error'); return }
@@ -92,7 +92,7 @@ function NotificacionesPush() {
       })
       setEstado('activo')
       emitToast('Notificaciones push activadas')
-    } catch (e) {
+    } catch {
       emitToast('Error al activar notificaciones', 'error')
     } finally { setRegistrando(false) }
   }
@@ -226,7 +226,8 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
   }, [role, userId])
 
   useEffect(() => {
-    cargarStats()
+    const load = () => cargarStats()
+    load()
     const id = setInterval(() => cargarStats(), POLL_MS)
     return () => clearInterval(id)
   }, [cargarStats])

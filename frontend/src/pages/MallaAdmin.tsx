@@ -72,7 +72,7 @@ export default function MallaAdmin() {
       setCarreras(cs)
       if (cs.length && carreraId === null) setCarreraId(cs[0].id)
     }).catch(() => {})
-  }, [])
+  }, [carreraId])
 
   const cargar = useCallback(() => {
     if (carreraId === null) return
@@ -86,7 +86,7 @@ export default function MallaAdmin() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [carreraId])
-  useEffect(cargar, [cargar])
+  useEffect(() => { const load = () => cargar(); load() }, [cargar])
 
   const nombrePorMateria = useMemo(() => {
     const map = new Map<number, string>()

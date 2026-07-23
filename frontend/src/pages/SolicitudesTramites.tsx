@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import {
   getTiposTramite, crearSolicitud, getMisSolicitudes, getDescargaUrl, resolverSolicitud,
@@ -96,7 +96,8 @@ function VistaAlumno() {
   }
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(), POLL_MS)
     return () => clearInterval(id)
   }, [])
@@ -249,7 +250,7 @@ function VistaAdmin() {
     return () => clearTimeout(t)
   }, [busqueda])
 
-  function cargar(silent?: boolean) {
+  const cargar = useCallback((silent?: boolean) => {
     if (!silent) setLoading(true)
     return Promise.all([
       getTiposTramite(),
@@ -263,15 +264,14 @@ function VistaAdmin() {
       .then(([t, s, st]) => { setTipos(t); setSolicitudes(s); setStats(st); setLastUpdate(new Date()) })
       .catch(() => emitToast('Error cargando solicitudes', 'error'))
       .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { cargar() }, [filtroEstado, filtroTipo, busquedaDebounced])
+  }, [filtroEstado, filtroTipo, busquedaDebounced])
 
   useEffect(() => {
+    const load = () => cargar()
+    load()
     const timer = setInterval(() => cargar(true), POLL_MS)
     return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado, filtroTipo, busquedaDebounced])
+  }, [filtroEstado, filtroTipo, busquedaDebounced, cargar])
 
   async function handleRefresh() {
     setRefreshing(true)

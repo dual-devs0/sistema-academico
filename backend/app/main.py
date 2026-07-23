@@ -8,7 +8,11 @@ load_dotenv()  # carga .env antes de que cualquier módulo lea os.getenv
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
+from slowapi import _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from app.rate_limiter import limiter  # noqa: E402
 from app.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
+from app.middleware.csrf import CSRFMiddleware  # noqa: E402
 from app.jobs.reintento_facturacion import ciclo_reintentos  # noqa: E402
 from app.routers import (  # noqa: E402
     users,
@@ -80,11 +84,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 origins = [
     o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 ]
 print(f"CORS origins: {origins}")
 
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,

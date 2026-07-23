@@ -1,6 +1,7 @@
 """Tests for security fixes and access control."""
 
-from datetime import date, time
+from datetime import date, time, datetime, timedelta
+from unittest.mock import patch
 
 from app.models.puntaje import Puntaje
 from app.models.horario import Horario
@@ -417,6 +418,149 @@ def test_password_reset_rate_limit(client, seed):
             json={"username_or_email": "admin_test"},
         )
     assert res.status_code == 429
+
+
+# ===================== PASSWORD RESET FLOW (ISSUE-2) =====================
+
+
+def test_password_reset_recuperar_contrasena_exitoso(client, db, seed, tokens):
+    # Clear the rate limiter to avoid conflict with test_password_reset_rate_limit
+    from app.routers.auth_router import _password_reset_attempts
+    _password_reset_attempts.clear()
+    with patch("app.routers.auth_router.send_reset_link_email_bg") as mock:
+        res = client.post(
+            "/auth/recuperar-contrasena",
+            json={"username_or_email": "admin_test"},
+        )
+    assert res.status_code == 200
+    assert res.json()["detail"] == (
+        "Si el usuario existe, recibirás un email con instrucciones."
+    )
+    mock.assert_called_once()
+
+
+def test_password_reset_exitoso(client, db, seed):
+    import hashlib
+    from app.models.password_reset_token import PasswordResetToken
+
+    raw_token = "test-reset-token-abc"
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    token_obj = PasswordResetToken(
+        usuario_id=seed["admin"].id,
+        token_hash=token_hash,
+        expires_at=datetime.utcnow() + timedelta(hours=1),
+        used=False,
+    )
+    db.add(token_obj)
+    db.commit()
+
+    res = client.post(
+        "/auth/reset-password",
+        json={"token": raw_token, "new_password": "NewPass123!"},
+    )
+    assert res.status_code == 200
+
+    # Verify password changed
+    res = client.post(
+        "/auth/login",
+        json={"username": "admin_test", "password": "NewPass123!"},
+    )
+    assert res.status_code == 200
+    assert "access_token" in res.json()
+
+
+def test_password_reset_token_invalido(client, db):
+    res = client.post(
+        "/auth/reset-password",
+        json={"token": "token-no-existe", "new_password": "NewPass123!"},
+    )
+    assert res.status_code == 400
+
+
+def test_password_reset_token_expirado(client, db, seed):
+    import hashlib
+    from app.models.password_reset_token import PasswordResetToken
+
+    raw_token = "expired-token-xyz"
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    token_obj = PasswordResetToken(
+        usuario_id=seed["admin"].id,
+        token_hash=token_hash,
+        expires_at=datetime.utcnow() - timedelta(hours=1),
+        used=False,
+    )
+    db.add(token_obj)
+    db.commit()
+
+    res = client.post(
+        "/auth/reset-password",
+        json={"token": raw_token, "new_password": "NewPass123!"},
+    )
+    assert res.status_code == 400
+
+
+# ===================== CSRF GLOBAL (ISSUE-3) =====================
+
+
+def test_csrf_middleware_exenta_paths(client, tokens):
+    """Login (exempt path) should work without CSRF header."""
+    res = client.post(
+        "/auth/login",
+        json={"username": "admin_test", "password": "admin123"},
+    )
+    assert res.status_code == 200
+
+
+def test_logout_funciona_con_csrf_valido(client, db, seed):
+    """Login → logout with CSRF should work."""
+    login_res = client.post(
+        "/auth/login",
+        json={"username": "admin_test", "password": "admin123"},
+    )
+    assert login_res.status_code == 200
+    data = login_res.json()
+    res = client.post(
+        "/auth/logout",
+        headers={
+            "Authorization": f"Bearer {data['access_token']}",
+            "X-CSRF-Token": data["csrf_token"],
+        },
+    )
+    assert res.status_code == 200
+
+
+# ===================== TOKEN BLACKLIST (ISSUE-11) =====================
+
+
+def test_logout_revoca_access_token(client, db, seed, tokens):
+    """After logout, the same access token should be rejected."""
+    import os
+
+    login_res = client.post(
+        "/auth/login",
+        json={"username": "admin_test", "password": "admin123"},
+    )
+    assert login_res.status_code == 200
+    access_token = login_res.json()["access_token"]
+    csrf = login_res.json()["csrf_token"]
+
+    # Enable CSRF temporarily for this test so logout validates CSRF
+    os.environ["RATE_LIMIT_ENABLED"] = "true"
+    try:
+        res = client.post(
+            "/auth/logout",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "X-CSRF-Token": csrf,
+            },
+        )
+        assert res.status_code == 200
+    finally:
+        os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+    # Using the same revoked token on a protected endpoint should fail
+    res = client.get("/materias/", headers={"Authorization": f"Bearer {access_token}"})
+    assert res.status_code == 401
 
 
 # ===================== SOLICITUD DE REGISTRO (activación de cuenta) =====================

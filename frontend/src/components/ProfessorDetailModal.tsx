@@ -21,9 +21,10 @@ export default function ProfessorDetailModal({ userId, onClose, onUpdated }: Pro
   const [form, setForm] = useState({ nombre: '', email: '', fecha_ingreso: '', cv: '', activo: true })
 
   useEffect(() => {
-    setLoading(true)
-    Promise.all([obtenerUsuario(userId), obtenerMateriasProfesor(userId)])
-      .then(([u, m]) => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [u, m] = await Promise.all([obtenerUsuario(userId), obtenerMateriasProfesor(userId)])
         setUser(u)
         setMaterias(m)
         setForm({
@@ -33,9 +34,13 @@ export default function ProfessorDetailModal({ userId, onClose, onUpdated }: Pro
           cv: u.cv || '',
           activo: u.activo ?? true,
         })
-      })
-      .catch(() => emitToast('Error al cargar datos del profesor', 'error'))
-      .finally(() => setLoading(false))
+      } catch {
+        emitToast('Error al cargar datos del profesor', 'error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [userId])
 
   async function handleSave() {

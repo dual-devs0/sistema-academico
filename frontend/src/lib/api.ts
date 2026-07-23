@@ -54,7 +54,7 @@ export function emitAvatarUpdated(url: string) {
 }
 
 // ---------------------------------------------------------------------------
-// CSRF: recuperar el token de la cookie (no-httpOnly) si en memoria no hay
+// CSRF: recuperar el token de la cookie (no-httpOnly) si en memoria no hay
 // ---------------------------------------------------------------------------
 
 function _readCsrfFromCookie(): string | null {
@@ -103,14 +103,18 @@ async function tryRefresh(): Promise<boolean> {
 
 async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
   const token = getAccessToken()
+  const method = options?.method || 'GET'
+  const csrf = method !== 'GET' && method !== 'HEAD' ? _getCsrfToken() : null
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+    ...(options?.headers as Record<string, string> | undefined),
+  }
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     credentials: 'include',  // necesario para enviar la cookie de refresh
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
+    headers,
   })
 
   if (res.status === 401 && !isRetry) {
@@ -171,12 +175,15 @@ async function requestBlob(path: string, options?: RequestInit, isRetry = false)
 
 async function requestFormData<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
   const token = getAccessToken()
+  const csrf = _getCsrfToken()
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+  }
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers,
     body: formData,
   })
 

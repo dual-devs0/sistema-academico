@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env.test")
 
+import os  # noqa: E402
+
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
@@ -61,6 +65,15 @@ def client(db):
         yield db
 
     app.dependency_overrides[get_db] = override_get_db
+
+    # Also point blacklist checks to the test DB
+    from app import dependencias as deps
+
+    def override_blacklist_db():
+        return db
+
+    deps.get_blacklist_db = override_blacklist_db
+
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

@@ -216,7 +216,8 @@ export default function Estadisticas() {
   }, [esAdmin])
 
   useEffect(() => {
-    load()
+    const run = () => load()
+    run()
     const id = setInterval(() => load(), POLL_MS)
     return () => clearInterval(id)
   }, [load])

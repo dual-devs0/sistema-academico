@@ -5,7 +5,7 @@ import Layout from '../components/Layout'
 
 // Mock de useRole para controlar el rol
 let _mockRole: string | null = null
-let _mockUsername = 'testuser'
+const _mockUsername = 'testuser'
 
 vi.mock('../hooks/useRole', () => ({
   getRole: () => _mockRole,

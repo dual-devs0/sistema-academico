@@ -94,6 +94,62 @@ def test_password_reset_email_queues_task_when_credentials_present():
 
 
 # ---------------------------------------------------------------------------
+# send_reset_link_email_bg
+# ---------------------------------------------------------------------------
+
+
+def test_reset_link_email_mocked_when_no_credentials(capsys):
+    from app.email_utils import send_reset_link_email_bg
+
+    bg = BackgroundTasks()
+    with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
+        send_reset_link_email_bg(bg, "test@example.com", "Juan", "tokendeprueba123")
+
+    captured = capsys.readouterr()
+    assert "Mock" in captured.out
+    assert "tokendeprueba123" in captured.out
+    assert len(bg.tasks) == 0
+
+
+def test_reset_link_email_queues_task_when_credentials_present():
+    from app.email_utils import send_reset_link_email_bg
+
+    bg = BackgroundTasks()
+    with patch.dict("os.environ", {"MAIL_PASSWORD": "real_app_password"}, clear=False):
+        send_reset_link_email_bg(bg, "test@example.com", "Juan", "tokendeprueba456")
+
+    assert len(bg.tasks) == 1
+
+
+# ---------------------------------------------------------------------------
+# send_welcome_email_bg
+# ---------------------------------------------------------------------------
+
+
+def test_welcome_email_mocked_when_no_credentials(capsys):
+    from app.email_utils import send_welcome_email_bg
+
+    bg = BackgroundTasks()
+    with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
+        send_welcome_email_bg(bg, "test@example.com", "Juan")
+
+    captured = capsys.readouterr()
+    assert "Mock" in captured.out
+    assert "Juan" in captured.out
+    assert len(bg.tasks) == 0
+
+
+def test_welcome_email_queues_task_when_credentials_present():
+    from app.email_utils import send_welcome_email_bg
+
+    bg = BackgroundTasks()
+    with patch.dict("os.environ", {"MAIL_PASSWORD": "real_app_password"}, clear=False):
+        send_welcome_email_bg(bg, "test@example.com", "Juan")
+
+    assert len(bg.tasks) == 1
+
+
+# ---------------------------------------------------------------------------
 # send_new_grade_email_bg
 # ---------------------------------------------------------------------------
 

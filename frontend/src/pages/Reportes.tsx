@@ -94,8 +94,8 @@ function buildReportePdfHtml(
   const fecha = new Date().toLocaleDateString('es-PY',{day:'2-digit',month:'long',year:'numeric'})
   const generadoStr = generadoAt.toLocaleString('es-PY',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
 
-  let head = ''
-  let filas = ''
+  let head: string
+  let filas: string
   if (tipo === 'asistencia') {
     head = `<th>Carrera</th><th class="c">Alumnos</th><th class="c">Asistencia</th><th class="c">Aprobados</th><th class="c">En riesgo</th>`
     filas = carrerasData.map(c=>`<tr>
@@ -427,7 +427,8 @@ export default function Reportes() {
   }, [])
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(), POLL_MS)
     return () => clearInterval(id)
   }, [cargar])

@@ -954,8 +954,11 @@ export default function Dashboard() {
   }, [user])
 
   useEffect(() => {
-    if (!user || user.role !== 'alumno') return
-    cargarAlumno()
+    const load = () => {
+      if (!user || user.role !== 'alumno') return
+      cargarAlumno()
+    }
+    load()
     const id = setInterval(() => cargarAlumno(), POLL_MS_ALUMNO)
     return () => clearInterval(id)
   }, [user, cargarAlumno])
@@ -977,8 +980,11 @@ export default function Dashboard() {
   }, [user])
 
   useEffect(() => {
-    if (!user || user.role !== 'profesor') return
-    cargarProfesor()
+    const load = () => {
+      if (!user || user.role !== 'profesor') return
+      cargarProfesor()
+    }
+    load()
     const id = setInterval(() => cargarProfesor(), POLL_MS_ALUMNO)
     return () => clearInterval(id)
   }, [user, cargarProfesor])

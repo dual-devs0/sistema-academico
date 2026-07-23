@@ -171,7 +171,8 @@ export default function PasantiasAdmin() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const load = () => fetchData()
+    load()
     const id = setInterval(() => fetchData(), POLL_MS)
     return () => clearInterval(id)
   }, [fetchData])

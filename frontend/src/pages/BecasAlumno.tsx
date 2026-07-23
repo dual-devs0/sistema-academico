@@ -64,7 +64,8 @@ export default function BecasAlumno() {
   }, [userId])
 
   useEffect(() => {
-    cargarTodo()
+    const load = () => cargarTodo()
+    load()
     const id = setInterval(() => cargarTodo(), POLL_MS)
     return () => clearInterval(id)
   }, [cargarTodo])

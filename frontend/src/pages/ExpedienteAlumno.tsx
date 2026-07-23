@@ -66,7 +66,8 @@ export default function ExpedienteAlumno() {
   }, [alumnoId])
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(), POLL_MS)
     return () => clearInterval(id)
   }, [cargar])

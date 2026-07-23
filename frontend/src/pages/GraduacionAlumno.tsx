@@ -27,7 +27,8 @@ export default function GraduacionAlumno() {
   }, [user?.user_id])
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(true), POLL_MS)
     return () => clearInterval(id)
   }, [cargar])
