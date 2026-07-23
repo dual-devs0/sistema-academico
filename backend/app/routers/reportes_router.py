@@ -1,12 +1,17 @@
 import csv, io
-from typing import Optional, cast
+from typing import Any, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
-from app.services.puntajes_utils import PESOS, calcular_promedio_final
+from collections import namedtuple
+from app.services.puntajes_utils import (
+    calcular_promedio_final, get_pesos, promedios_por_alumno, TIPOS_VALIDOS, PESO_DEFAULT_FLOAT,
+)
+
+_PuntajeAgg = namedtuple("_PuntajeAgg", ["prom", "cnt"])
 
 router = APIRouter(prefix="/reportes", tags=["reportes"])
 
@@ -30,7 +35,7 @@ def resumen(
     }
     return {
         "total_alumnos": counts.get("alumno", 0),
-        "total_becados": db.query(U).filter(U.es_becado).count(),
+        "total_becados": db.query(U).filter(U.es_becado.is_(True)).count(),
         "total_materias": db.query(models.materia.Materia).count(),
         "total_profesores": counts.get("profesor", 0),
     }
@@ -83,13 +88,11 @@ def por_carrera(
         pres_a = (asist_stats.presentes if asist_stats else 0) or 0
         asist_pct = round((pres_a / total_a * 100) if total_a > 0 else 0.0, 1)
 
-        # Puntajes: aggregate per user to find "en_riesgo" (avg < 6)
-        punt_rows = db.query(
-            P.user_id, func.avg(P.valor).label("prom")
-        ).filter(P.user_id.in_(a_ids)).group_by(P.user_id).all()
-        total_punt = len(punt_rows)
-        aprobados = sum(1 for r in punt_rows if (r.prom or 0) >= 6)
-        en_riesgo = sum(1 for r in punt_rows if (r.prom or 0) < 6)
+        # Puntajes: promedio real por alumno (ponderado por pesos de cada materia) para "en_riesgo"
+        proms_alumno = promedios_por_alumno(db, a_ids)
+        total_punt = len(proms_alumno)
+        aprobados = sum(1 for v in proms_alumno.values() if v >= 6)
+        en_riesgo = sum(1 for v in proms_alumno.values() if v < 6)
         aprob_pct = round((aprobados / total_punt * 100) if total_punt > 0 else 0.0, 1)
 
         result.append({
@@ -119,20 +122,31 @@ def dashboard(
     materia_ids = [m.id for m in materias]
     mat_id_nombre = {m.id: m.nombre for m in materias}
     mat_id_oferta = {}
-    for row in db.query(O.materia_id, O.id).filter(O.materia_id.in_(materia_ids), O.activa).all():
-        mat_id_oferta[row[0]] = row[1]
+    for r in db.query(O.materia_id, O.id).filter(O.materia_id.in_(materia_ids), O.activa.is_(True)).all():
+        mat_id_oferta[r[0]] = r[1]
 
-    # ─── 2) Per-materia stats (batch: one query for all materias) ───
+    # ─── 2) Per-materia stats (batch: una sola query de puntajes para todas las ofertas) ───
     oferta_ids = list(mat_id_oferta.values())
-    # (user_id, oferta_id) → avg, count
-    punt_agg = {}
-    if oferta_ids:
-        for r in db.query(P.user_id, P.oferta_materia_id, func.avg(P.valor).label("prom"), func.count(P.id).label("cnt"))\
-            .filter(P.oferta_materia_id.in_(oferta_ids))\
-            .group_by(P.user_id, P.oferta_materia_id).all():
-            punt_agg.setdefault(r.oferta_materia_id, []).append(r)
-
     oferta_id_materia = {v: k for k, v in mat_id_oferta.items()}
+    pesos_por_materia_dash = {mid: get_pesos(db, mid) for mid in mat_id_oferta.keys()}
+    # (user_id, oferta_id) → notas por tipo
+    notas_por_alumno_oferta: dict[tuple[int, int], dict[str, float | None]] = {}
+    if oferta_ids:
+        for p in db.query(P).filter(
+            P.oferta_materia_id.in_(oferta_ids), P.tipo.in_(TIPOS_VALIDOS)
+        ).all():
+            key = (p.user_id, p.oferta_materia_id)
+            d = notas_por_alumno_oferta.setdefault(key, {t: None for t in TIPOS_VALIDOS})
+            d[p.tipo] = float(p.valor)
+
+    punt_agg: dict[int, list] = {}
+    for (uid, oid), notas in notas_por_alumno_oferta.items():
+        mid = oferta_id_materia.get(oid)
+        prom = calcular_promedio_final(notas, pesos_por_materia_dash.get(mid, PESO_DEFAULT_FLOAT))
+        if prom is None:
+            continue
+        cnt = sum(1 for v in notas.values() if v is not None)
+        punt_agg.setdefault(oid, []).append(_PuntajeAgg(prom=prom, cnt=cnt))
 
     # Build materia stats (same logic as estadisticas_materia but in batch)
     materia_stats = []
@@ -177,17 +191,17 @@ def dashboard(
     # ─── 3) Attendance % per materia (single aggregate query) ───
     asis_por_materia: dict[int, float] = {}
     if oferta_ids:
-        for r in db.query(
+        for asis_row in db.query(
             A.oferta_materia_id,
             func.count(A.id).label("total"),
             func.sum(case((A.presente, 1), else_=0)).label("pres"),
         ).filter(A.oferta_materia_id.in_(oferta_ids))\
          .group_by(A.oferta_materia_id).all():
-            oid = r.oferta_materia_id
+            oid = asis_row.oferta_materia_id
             mid = oferta_id_materia.get(oid)
             if mid:
-                total = r.total or 0
-                pres = r.pres or 0
+                total = asis_row.total or 0
+                pres = asis_row.pres or 0
                 asis_por_materia[mid] = round((pres / total * 100) if total > 0 else 0, 1)
 
     asistencia_materias = []
@@ -199,16 +213,16 @@ def dashboard(
         })
 
     # ─── 4) Global KPIs ───
-    total_alumnos_en_materias = sum(s["total_alumnos"] for s in materia_stats)
-    total_notas_global = sum(s["total_notas"] for s in materia_stats)
-    suma_ponderada = sum(s["promedio_grupo"] * s["total_notas"] for s in materia_stats)
-    total_aprobados = sum(s["aprobados"] for s in materia_stats)
-    total_en_riesgo = sum(s["en_riesgo"] for s in materia_stats)
+    total_alumnos_en_materias = sum(cast(int, s["total_alumnos"]) for s in materia_stats)
+    total_notas_global = sum(cast(int, s["total_notas"]) for s in materia_stats)
+    suma_ponderada = sum(cast(float, s["promedio_grupo"]) * cast(int, s["total_notas"]) for s in materia_stats)
+    total_aprobados = sum(cast(int, s["aprobados"]) for s in materia_stats)
+    total_en_riesgo = sum(cast(int, s["en_riesgo"]) for s in materia_stats)
 
     # Attendance % global
-    asis_global = {"total": 0, "pres": 0}
+    asis_global: dict[str, int] = {"total": 0, "pres": 0}
     if oferta_ids:
-        row = db.query(
+        row: Any = db.query(
             func.count(A.id).label("total"),
             func.sum(case((A.presente, 1), else_=0)).label("pres"),
         ).filter(A.oferta_materia_id.in_(oferta_ids)).first()
@@ -229,30 +243,25 @@ def dashboard(
     # Get students enrolled in active materias
     alumno_ids = set()
     if oferta_ids:
-        for r in db.query(I.alumno_id).filter(I.oferta_materia_id.in_(oferta_ids)).distinct().all():
-            alumno_ids.add(r[0])
+        for ir in db.query(I.alumno_id).filter(I.oferta_materia_id.in_(oferta_ids)).distinct().all():
+            alumno_ids.add(ir[0])
 
     alertas = []
     if alumno_ids:
         # Attendance per student
         asis_por_alumno = {}
-        for r in db.query(
+        for asis2 in db.query(
             A.user_id,
             func.count(A.id).label("total"),
             func.sum(case((A.presente, 1), else_=0)).label("pres"),
         ).filter(A.user_id.in_(list(alumno_ids)), A.oferta_materia_id.in_(oferta_ids))\
          .group_by(A.user_id).all():
-            total = r.total or 0
-            pres = r.pres or 0
-            asis_por_alumno[r.user_id] = {"total": total, "pres": pres}
+            total = asis2.total or 0
+            pres = asis2.pres or 0
+            asis_por_alumno[asis2.user_id] = {"total": total, "pres": pres}
 
-        # Average per student across all active materias
-        prom_por_alumno: dict[int, float | None] = {}
-        if oferta_ids:
-            for r in db.query(P.user_id, func.avg(P.valor).label("prom"))\
-                .filter(P.user_id.in_(list(alumno_ids)), P.oferta_materia_id.in_(oferta_ids))\
-                .group_by(P.user_id).all():
-                prom_por_alumno[r.user_id] = round(float(r.prom), 1) if r.prom else None
+        # Promedio real por alumno (promedio de sus promedios por materia, ya ponderados)
+        prom_por_alumno: dict[int, float | None] = promedios_por_alumno(db, list(alumno_ids))
 
         # Build alerts
         raw = []
@@ -274,12 +283,12 @@ def dashboard(
         top5 = raw[:5]
         if top5:
             names = {uid: name for uid, name in db.query(U.id, U.nombre).filter(U.id.in_([r["user_id"] for r in top5])).all()}
-            for r in top5:
+            for item in top5:
                 alertas.append({
-                    "user_id": r["user_id"],
-                    "nombre": names.get(r["user_id"], f"Alumno #{r['user_id']}"),
-                    "inasistencia_pct": r["inasistencia_pct"],
-                    "promedio": r["promedio"],
+                    "user_id": item["user_id"],
+                    "nombre": names.get(item["user_id"], f"Alumno #{item['user_id']}"),
+                    "inasistencia_pct": item["inasistencia_pct"],
+                    "promedio": item["promedio"],
                 })
 
     return {
@@ -299,7 +308,7 @@ def becados(
 ):
     return (
         db.query(models.user.User)
-        .filter(models.user.User.es_becado)
+        .filter(models.user.User.es_becado.is_(True))
         .offset(skip).limit(limit)
         .all()
     )
@@ -333,7 +342,7 @@ def asistencia_por_materia(
     mat_ids = [m.id for m in materias]
     ofertas = {mid: oid for mid, oid in
         db.query(O.materia_id, O.id)
-        .filter(O.materia_id.in_(mat_ids), O.activa)
+        .filter(O.materia_id.in_(mat_ids), O.activa.is_(True))
         .all()
     }
     oferta_ids = list(ofertas.values())
@@ -430,7 +439,7 @@ def exportar_trayecto_academico_rue_es(
 
     # Pre-cache puntajes per (user_id, oferta_materia_id)
     oferta_ids = list({i.oferta_materia_id for i in inscripciones})
-    punt_map = {}
+    punt_map: dict[tuple[int, int], list] = {}
     if alumno_ids and oferta_ids:
         for p in (
             db.query(models.puntaje.Puntaje)
@@ -475,8 +484,10 @@ def exportar_trayecto_academico_rue_es(
         if not alumno or not oferta or not oferta.materia:
             continue
 
-        notas: dict[str, float | None] = {str(p.tipo): float(str(p.valor)) for p in punt_map.get((cast(int, alumno.id), cast(int, oferta.id)), []) if str(p.tipo) in PESOS}
-        promedio = calcular_promedio_final({k: notas.get(k) for k in PESOS})
+        tipos_validos = {"parcial1", "parcial2", "practico", "final1", "final2", "final3"}
+        notas: dict[str, float | None] = {str(p.tipo): float(str(p.valor)) for p in punt_map.get((cast(int, alumno.id), cast(int, oferta.id)), []) if str(p.tipo) in tipos_validos}
+        pesos = get_pesos(db, oferta.materia_id)
+        promedio = calcular_promedio_final({k: notas.get(k) for k in tipos_validos}, pesos)
         if promedio is None:
             estado = "CURSANDO"
         elif promedio >= 6:

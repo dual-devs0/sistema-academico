@@ -56,8 +56,8 @@ def test_prerrequisito_aprobada_con_nota_suficiente(seed, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_base.id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.commit()
@@ -78,8 +78,8 @@ def test_prerrequisito_aprobada_con_nota_insuficiente(seed, db):
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=oferta_base.id,
-            tipo="final",
-            valor=4.0,
+            tipo="final1",
+            valor=20.0,
         )
     )
     db.commit()

@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -6,7 +7,83 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.storage import subir_archivo, obtener_url_firmada, eliminar_archivo
 
+BLOQUEADAS = [
+    "xxx", "porn", "porno", "cp ", "onlyfans", "citas", "sexo",
+    "casino", "apuestas", "gambling", "estafa", "spam",
+    "gana dinero", "trabaja desde casa", "hazte rico",
+    "contenido no académico", "video musical", "reggaeton",
+    "narcotráfico", "drogas", "arma", "violencia extrema",
+]
+
+EXT_POR_TIPO: dict[str, list[str]] = {
+    "pdf": [".pdf"],
+    "documento": [".doc", ".docx", ".txt", ".rtf", ".odt"],
+    "video": [".mp4", ".mov", ".avi", ".mkv", ".webm"],
+    "imagen": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+    "link": [],
+    "otro": [],
+}
+
 router = APIRouter(prefix="/apuntes", tags=["apuntes"])
+
+
+def validar_contenido(
+    titulo: str,
+    descripcion: str | None,
+    tags: str | None,
+    tipo_contenido: str,
+    materia_id: int,
+    db: Session,
+) -> dict:
+    advertencias: list[str] = []
+
+    texto = f"{titulo} {descripcion or ''} {tags or ''}".lower()
+    texto_normalizado = re.sub(r"[^\w\s]", " ", texto)
+    palabras_texto = set(texto_normalizado.split())
+
+    if len(titulo.strip()) < 5:
+        advertencias.append("El título debe tener al menos 5 caracteres.")
+
+    for palabra in BLOQUEADAS:
+        if palabra in texto:
+            advertencias.append("Contenido no permitido detectado en el título, descripción o tags.")
+            break
+
+    if tipo_contenido == "video":
+        advertencias.append(
+            "Los videos requieren revisión adicional. Asegurate de que sea material académico."
+        )
+
+    materia = (
+        db.query(models.materia.Materia)
+        .filter(models.materia.Materia.id == materia_id)
+        .first()
+    )
+    if materia:
+        clave_materia = re.sub(r"[^\w\s]", " ", materia.nombre.lower())
+        palabras_clave = set(clave_materia.split()) - {
+            "i", "ii", "iii", "de", "la", "el", "los", "las", "del", "y", "e", "o", "a", "en", "un", "una"
+        }
+
+        # Palabras académicas generales que indican contenido válido
+        academicas = {
+            "resumen", "guía", "apunte", "ejercicio", "tarea", "trabajo",
+            "práctica", "parcial", "final", "examen", "evaluación", "tp",
+            "laboratorio", "investigación", "monografía", "tesis", "ensayo",
+            "informe", "presentación", "diapositiva", "clase", "teoría",
+            "fórmula", "ecuación", "problema", "solución", "repaso",
+        }
+
+        tiene_palabra_clave = bool(palabras_clave & palabras_texto)
+        tiene_academica = bool(academicas & palabras_texto)
+
+        if not tiene_palabra_clave and not tiene_academica:
+            advertencias.append(
+                f"El contenido no parece relacionado con «{materia.nombre}». "
+                "Revisá que el título y la descripción sean pertinentes."
+            )
+
+    return {"valido": len(advertencias) == 0, "advertencias": advertencias}
 
 
 @router.post("/", response_model=schemas.apunte.ApunteOut)
@@ -51,6 +128,18 @@ def list_apuntes(
             )
         )
     return query.offset(skip).limit(limit).all()
+
+
+@router.post("/validar", response_model=schemas.apunte.ValidarResponse)
+def validate_apunte(
+    req: schemas.apunte.ValidarRequest,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    return validar_contenido(
+        req.titulo, req.descripcion, req.tags,
+        req.tipo_contenido, req.materia_id, db,
+    )
 
 
 @router.get("/{apunte_id}", response_model=schemas.apunte.ApunteOut)

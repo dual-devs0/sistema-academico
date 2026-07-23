@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { emitToast } from '../lib/api'
 import { api } from '../lib/api'
-import type { SolicitudEquivalencia } from '../services/equivalenciasService'
+import { getTodasSolicitudes, getMateriasEquivalencia, type SolicitudEquivalencia, type MateriaItem } from '../services/equivalenciasService'
 
 type Tab = 'pendientes' | 'resueltas' | 'todas'
 
@@ -24,8 +24,16 @@ const css = `
   .eqa-input {
     padding:8px 12px; border-radius:10px; font-size:13px;
     background:var(--bg-base); border:1px solid var(--border-subtle);
-    color:var(--text-primary); width:100%;
+    color:var(--text-primary); width:100%; box-sizing:border-box;
   }
+  .eqa-input:focus { outline:none; border-color:var(--accent-bright); }
+  .eqa-select {
+    padding:8px 12px; border-radius:10px; font-size:13px;
+    background:var(--bg-base); border:1px solid var(--border-subtle);
+    color:var(--text-primary); width:100%; box-sizing:border-box; cursor:pointer;
+  }
+  .eqa-select:focus { outline:none; border-color:var(--accent-bright); }
+  .eqa-select option { background:var(--bg-elevated); color:var(--text-primary); }
   .eqa-btn {
     padding:9px 18px; border-radius:10px; font-size:13px; font-weight:700;
     border:none; cursor:pointer; background:var(--accent-bright); color:#fff; transition:opacity .18s;
@@ -60,15 +68,19 @@ const css = `
   .eqa-err { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
 `
 
+function formatDate(d: string | null | undefined): string {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('es-PY')
+}
+
 export default function EquivalenciasAdmin() {
-  const [alumnoId, setAlumnoId] = useState('')
   const [solicitudes, setSolicitudes] = useState<SolicitudEquivalencia[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<Tab>('todas')
-  const buscadoIdRef = useRef('')
+  const [tab, setTab] = useState<Tab>('pendientes')
+  const [materias, setMaterias] = useState<MateriaItem[]>([])
 
   const [detalle, setDetalle] = useState<SolicitudEquivalencia | null>(null)
 
@@ -78,34 +90,43 @@ export default function EquivalenciasAdmin() {
   const [motivo, setMotivo] = useState('')
 
   const [examen, setExamen] = useState<SolicitudEquivalencia | null>(null)
-  const [examAlumnoId, setExamAlumnoId] = useState('')
   const [examMateriaId, setExamMateriaId] = useState('')
   const [examFecha, setExamFecha] = useState('')
 
   const [saving, setSaving] = useState(false)
 
-  const buscar = useCallback((manual = false) => {
-    const id = buscadoIdRef.current
-    if (!id) return
-    if (manual) setRefreshing(true)
-    else setLoading(true)
-    api.get<SolicitudEquivalencia[]>(`/equivalencias/alumno/${Number(id)}`)
-      .then(res => { setSolicitudes(res); setError(''); setLastUpdate(new Date()) })
-      .catch(() => setError('No se pudieron cargar las equivalencias. Mostrando el último dato disponible.'))
-      .finally(() => { setLoading(false); setRefreshing(false) })
+  const loadMaterias = useCallback(async () => {
+    try {
+      const lista = await getMateriasEquivalencia()
+      setMaterias(lista)
+    } catch {
+      // si falla, se deja la lista vacía
+    }
   }, [])
 
-  const handleBuscarClick = () => {
-    if (!alumnoId) { emitToast('Ingresá un ID de alumno', 'error'); return }
-    buscadoIdRef.current = alumnoId
-    buscar()
-  }
+  useEffect(() => { loadMaterias() }, [loadMaterias])
 
-  // Auto-refresh en tiempo real mientras haya un alumno buscado.
+  const fetchData = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true)
+    else setLoading(true)
+    try {
+      const data = await getTodasSolicitudes()
+      setSolicitudes(data)
+      setError('')
+      setLastUpdate(new Date())
+    } catch {
+      setError('No se pudieron cargar las equivalencias. Mostrando el último dato disponible.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
+
   useEffect(() => {
-    const intervalId = setInterval(() => { if (buscadoIdRef.current) buscar(true) }, POLL_MS)
-    return () => clearInterval(intervalId)
-  }, [buscar])
+    fetchData()
+    const id = setInterval(() => fetchData(), POLL_MS)
+    return () => clearInterval(id)
+  }, [fetchData])
 
   const filtradas = solicitudes.filter(s => {
     if (tab === 'pendientes') return s.estado === 'pendiente' || s.estado === 'en_proceso'
@@ -131,7 +152,7 @@ export default function EquivalenciasAdmin() {
       })
       emitToast('Solicitud resuelta', 'success')
       setResolver(null)
-      buscar(true)
+      fetchData()
     } catch (e: unknown) {
       emitToast(e instanceof Error ? e.message : 'Error al resolver', 'error')
     } finally { setSaving(false) }
@@ -139,7 +160,6 @@ export default function EquivalenciasAdmin() {
 
   const abrirExamen = (s: SolicitudEquivalencia) => {
     setExamen(s)
-    setExamAlumnoId(String(s.alumno_id))
     setExamMateriaId('')
     setExamFecha('')
   }
@@ -152,14 +172,13 @@ export default function EquivalenciasAdmin() {
     setSaving(true)
     try {
       await api.post('/equivalencias/examenes-suficiencia', {
-        alumno_id: Number(examAlumnoId),
+        alumno_id: examen.alumno_id,
         materia_id: Number(examMateriaId),
         fecha: examFecha,
-        solicitud_id: examen.id,
       })
       emitToast('Examen registrado', 'success')
       setExamen(null)
-      buscar(true)
+      fetchData()
     } catch (e: unknown) {
       emitToast(e instanceof Error ? e.message : 'Error al registrar examen', 'error')
     } finally { setSaving(false) }
@@ -178,7 +197,7 @@ export default function EquivalenciasAdmin() {
               {lastUpdate.toLocaleTimeString('es-PY')}
             </span>
           )}
-          <button className="eqa-btn ghost" onClick={() => buscar(true)} disabled={refreshing || !buscadoIdRef.current}>
+          <button className="eqa-btn ghost" onClick={() => fetchData(true)} disabled={refreshing}>
             <i className="ti ti-refresh" /> {refreshing ? 'Actualizando…' : 'Actualizar'}
           </button>
         </div>
@@ -188,32 +207,18 @@ export default function EquivalenciasAdmin() {
         <div className="eqa-err"><i className="ti ti-alert-circle" /> {error}</div>
       )}
 
-      <div className="eqa-card">
-        <div className="eqa-label">ID del alumno</div>
-        <div className="eqa-search-row">
-          <div>
-            <input className="eqa-input" type="number" value={alumnoId}
-              onChange={e => setAlumnoId(e.target.value)}
-              placeholder="Ej: 42" />
-          </div>
-          <button className="eqa-btn" onClick={handleBuscarClick} disabled={loading}>
-            <i className="ti ti-search" /> {loading ? 'Buscando…' : 'Buscar'}
-          </button>
-        </div>
-      </div>
-
       <div className="eqa-tabs">
         {(['pendientes', 'resueltas', 'todas'] as Tab[]).map(t => (
           <button key={t} className={`eqa-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'pendientes' ? 'Pendientes' : t === 'resueltas' ? 'Resueltas' : 'Todas'}
           </button>
         ))}
       </div>
 
-      {filtradas.length === 0 ? (
-        <div className="eqa-card eqa-empty">
-          {buscadoIdRef.current ? 'No hay solicitudes para este alumno.' : 'Buscá un alumno para ver sus solicitudes.'}
-        </div>
+      {loading ? (
+        <div className="eqa-card eqa-empty">Cargando solicitudes…</div>
+      ) : filtradas.length === 0 ? (
+        <div className="eqa-card eqa-empty">No hay solicitudes de equivalencia en esta categoría.</div>
       ) : (
         <div className="eqa-card" style={{ padding: 0, overflow: 'hidden' }}>
           <table className="eqa-table">
@@ -222,6 +227,7 @@ export default function EquivalenciasAdmin() {
                 <th>Alumno</th>
                 <th>Tipo</th>
                 <th>Universidad Origen</th>
+                <th>Fecha</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -235,6 +241,7 @@ export default function EquivalenciasAdmin() {
                   </td>
                   <td style={{ textTransform: 'capitalize' }}>{s.tipo}</td>
                   <td>{s.universidad_origen || '—'}</td>
+                  <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text-secondary)' }}>{formatDate(s.created_at)}</td>
                   <td><span className={`eqa-badge ${s.estado}`}>{s.estado.replace('_', ' ')}</span></td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -269,6 +276,7 @@ export default function EquivalenciasAdmin() {
               <div><strong>Alumno:</strong> {detalle.alumno_nombre || `Alumno #${detalle.alumno_id}`} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>(ID {detalle.alumno_id})</span></div>
               <div><strong>Tipo:</strong> {detalle.tipo}</div>
               <div><strong>Universidad origen:</strong> {detalle.universidad_origen || '—'}</div>
+              <div><strong>Fecha solicitud:</strong> {formatDate(detalle.created_at)}</div>
               <div><strong>Estado:</strong> <span className={`eqa-badge ${detalle.estado}`}>{detalle.estado.replace('_', ' ')}</span></div>
             </div>
           </div>
@@ -284,17 +292,21 @@ export default function EquivalenciasAdmin() {
               <button onClick={() => setResolver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
             </div>
             <div className="eqa-label">Resolución</div>
-            <select className="eqa-input" value={resolucion} onChange={e => setResolucion(e.target.value)}>
+            <select className="eqa-select" value={resolucion} onChange={e => setResolucion(e.target.value)}>
               <option value="aprobada">Aprobada</option>
               <option value="rechazada">Rechazada</option>
             </select>
-            <div className="eqa-label">Materia destino ID</div>
-            <input className="eqa-input" type="number" value={materiaDestinoId}
-              onChange={e => setMateriaDestinoId(e.target.value)} placeholder="Ej: 15" />
+            <div className="eqa-label">Materia destino</div>
+            <select className="eqa-select" value={materiaDestinoId} onChange={e => setMateriaDestinoId(e.target.value)}>
+              <option value="">Seleccioná una materia…</option>
+              {materias.map(m => (
+                <option key={m.id} value={m.id}>{m.codigo ? `[${m.codigo}] ` : ''}{m.nombre}</option>
+              ))}
+            </select>
             <div className="eqa-label">Motivo</div>
             <textarea className="eqa-input" value={motivo}
               onChange={e => setMotivo(e.target.value)} placeholder="Motivo (opcional)"
-              rows={3} style={{ resize: 'vertical' }} />
+              rows={3} style={{ resize: 'vertical', fontFamily: 'inherit' }} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
               <button className="eqa-btn ghost" onClick={() => setResolver(null)}>Cancelar</button>
               <button className="eqa-btn" disabled={saving} onClick={handleResolver}>
@@ -313,12 +325,13 @@ export default function EquivalenciasAdmin() {
               <h3 style={{ fontSize: 16, fontWeight: 800 }}>Examen de suficiencia</h3>
               <button onClick={() => setExamen(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
             </div>
-            <div className="eqa-label">Alumno ID</div>
-            <input className="eqa-input" type="number" value={examAlumnoId}
-              onChange={e => setExamAlumnoId(e.target.value)} />
-            <div className="eqa-label">Materia ID</div>
-            <input className="eqa-input" type="number" value={examMateriaId}
-              onChange={e => setExamMateriaId(e.target.value)} placeholder="Ej: 15" />
+            <div className="eqa-label">Materia</div>
+            <select className="eqa-select" value={examMateriaId} onChange={e => setExamMateriaId(e.target.value)}>
+              <option value="">Seleccioná una materia…</option>
+              {materias.map(m => (
+                <option key={m.id} value={m.id}>{m.codigo ? `[${m.codigo}] ` : ''}{m.nombre}</option>
+              ))}
+            </select>
             <div className="eqa-label">Fecha</div>
             <input className="eqa-input" type="date" value={examFecha}
               onChange={e => setExamFecha(e.target.value)} />

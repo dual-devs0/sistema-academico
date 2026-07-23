@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getUserId } from '../hooks/useRole'
 import { obtenerAvanceAlumno, obtenerCreditosAlumno, type AvanceMateriaOut, type CreditosAlumnoOut } from '../services/pensumService'
+
+const POLL_MS = 30000
 
 const estadoBadge: Record<string, { bg: string; color: string; label: string }> = {
   aprobada:  { bg: 'var(--success-subtle)', color: 'var(--success)', label: 'Aprobada' },
@@ -41,16 +43,33 @@ export default function MallaAlumno() {
   const [avance, setAvance] = useState<AvanceMateriaOut[]>([])
   const [creditos, setCreditos] = useState<CreditosAlumnoOut | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [tooltipAbierto, setTooltipAbierto] = useState<number | null>(null)
   const [colapsados, setColapsados] = useState<Set<number>>(new Set())
 
-  useEffect(() => {
+  const cargar = useCallback((manual = false) => {
     if (alumnoId === null) return
-    Promise.all([obtenerAvanceAlumno(alumnoId), obtenerCreditosAlumno(alumnoId)])
-      .then(([a, c]) => { setAvance(a); setCreditos(c) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    if (manual) setRefreshing(true)
+    Promise.allSettled([obtenerAvanceAlumno(alumnoId), obtenerCreditosAlumno(alumnoId)])
+      .then(([a, c]) => {
+        const fails: string[] = []
+        if (a.status === 'fulfilled') setAvance(a.value)
+        else fails.push('malla curricular')
+        if (c.status === 'fulfilled') setCreditos(c.value)
+        else fails.push('créditos')
+        setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
+        setLastUpdate(new Date())
+      })
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }, [alumnoId])
+
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const semestres = useMemo(() => {
     const grupos = new Map<number, AvanceMateriaOut[]>()
@@ -75,8 +94,26 @@ export default function MallaAlumno() {
     <>
       <style>{css}</style>
 
-      <h1 className="page-title">Mi Progreso Académico</h1>
-      <p className="page-subtitle" style={{ marginBottom: 18 }}>Estado de tu malla curricular y créditos acumulados.</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 className="page-title">Mi Progreso Académico</h1>
+          <p className="page-subtitle" style={{ marginBottom: 18 }}>Estado de tu malla curricular y créditos acumulados.</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {lastUpdate && (
+            <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
+          )}
+          <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}>
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12.5, color: 'var(--danger)', marginBottom: 16 }}>
+          <i className="ti ti-alert-triangle" /> {error}
+        </div>
+      )}
 
       {creditos && (
         <div className="card" style={{ marginBottom: 24, padding: '18px 22px' }}>

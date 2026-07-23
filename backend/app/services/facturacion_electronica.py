@@ -18,7 +18,7 @@ import os
 from datetime import datetime, timezone
 
 import httpx
-from fastapi_mail import MessageSchema, MessageType
+from fastapi_mail import MessageSchema, MessageType, NameEmail
 
 from app.database import SessionLocal
 from app.email_utils import _send_with_retry, _credentials_configured
@@ -82,7 +82,7 @@ async def _notificar_comprobante_emitido(alumno: User, url_pdf: str) -> None:
         return
     message = MessageSchema(
         subject="UCA - Comprobante de pago disponible",
-        recipients=[alumno.email],
+        recipients=[NameEmail(name="", email=alumno.email)],
         body=(
             f"<h3>Hola {alumno.nombre},</h3>"
             f"<p>Tu comprobante de pago ya está disponible.</p>"

@@ -39,7 +39,7 @@ class Examen(Base):
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default="programado"
     )  # programado | en_curso | finalizado | cancelado
-    profesor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    profesor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

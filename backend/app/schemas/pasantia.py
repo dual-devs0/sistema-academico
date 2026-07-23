@@ -44,10 +44,12 @@ class PasantiaOut(BaseModel):
     tutor_academico_id: Optional[int]
     tutor_nombre: Optional[str] = None
     fecha_inicio: date
-    fecha_fin: Optional[date]
+    fecha_fin: Optional[date] = None
     horas_requeridas: int
     horas_completadas: int
     estado: str
+    motivo_rechazo: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

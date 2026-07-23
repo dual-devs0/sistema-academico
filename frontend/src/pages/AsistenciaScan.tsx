@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
 
 type Estado = 'idle' | 'verificando' | 'exito' | 'duplicado' | 'expirado' | 'no_autorizado' | 'error'
-type ResultData = { materia: string; fecha: string; alumno: string }
+type ResultData = { materia_nombre: string; fecha: string; hora_registro: string; presentes: number; ausentes: number }
 type MateriaAsist = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
 
 const css = `
@@ -22,6 +22,25 @@ const css = `
   @keyframes scanline { 0%,100%{ transform:translateY(-70px) } 50%{ transform:translateY(70px) } }
   .scan-line { position:absolute; left:15%; right:15%; height:2px; background:linear-gradient(90deg,transparent,#22d3ee,transparent); animation:scanline 2.4s ease-in-out infinite; }
   .ring-mat { position:relative; width:46px; height:46px; flex-shrink:0; }
+
+  /* Layout mobile-first: en celular todo apilado (comportamiento ya correcto).
+     En escritorio (>=1024px) el escáner se centra en una columna angosta
+     con las instrucciones al lado, en vez de estirarse a lo ancho de la pantalla. */
+  .scan-page { max-width: 560px; margin: 0 auto; }
+  .scan-cols { display: flex; flex-direction: column; gap: 24px; }
+  .scan-tip {
+    display: none; margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+    background: var(--bg-input); border: 1px solid var(--border-subtle);
+    font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+  }
+  @media(min-width: 1024px) {
+    .scan-page { max-width: 900px; }
+    .scan-cols { flex-direction: row; align-items: flex-start; gap: 36px; }
+    .scan-col-left { flex: 0 0 360px; }
+    .scan-col-right { flex: 1; min-width: 0; }
+    .scan-visor { height: 340px; }
+    .scan-tip { display: block; }
+  }
 `
 
 function RingPct({ pct }: { pct: number }) {
@@ -66,14 +85,15 @@ export default function AsistenciaScan() {
     }
     const prom = currentUser.role !== 'alumno'
       ? Promise.reject(new Error('no_autorizado'))
-      : api.post<ResultData>('/asistencias/scan', { token })
+      : api.post<ResultData>('/asistencias/qr/verificar', { qr_token: token })
     prom
       .then(res => { setResult(res); setEstado('exito') })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : ''
         if (msg.includes('no_autorizado')) setEstado('no_autorizado')
+        else if (msg.includes('ya está registrada')) setEstado('duplicado')
         else if (msg.includes('expirado') || msg.includes('inválido')) setEstado('expirado')
-        else if (msg.includes('ya registraste')) setEstado('duplicado')
+        else if (msg.includes('No estás inscripto')) { setEstado('error'); setErrorMsg(msg) }
         else { setEstado('error'); setErrorMsg(msg || 'Error al conectar con el servidor') }
       })
   }, [token, navigate])
@@ -140,11 +160,14 @@ const BD = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).Barc
             <h2 style={{ fontSize: 18, fontWeight: 800, margin: '10px 0 4px' }}>¡Asistencia registrada!</h2>
             <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>Tu presencia quedó confirmada</p>
             <div style={{ textAlign: 'left', background: 'var(--bg-input)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-              {[['Materia', result.materia], ['Fecha', result.fecha], ['Alumno', result.alumno]].map(([l, v]) => (
+              {[['Materia', result.materia_nombre], ['Fecha', result.fecha], ['Hora', result.hora_registro], ['Alumno', nombre]].map(([l, v]) => (
                 <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
                   <span className="mono-label">{l}</span><b>{v}</b>
                 </div>
               ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
+                <span className="mono-label">Presentes hoy</span><b>{result.presentes}/{result.presentes + result.ausentes}</b>
+              </div>
             </div>
             <button className="btn-primary" style={{ width: '100%' }} onClick={() => navigate('/asistencia')}>Ver mis asistencias</button>
           </>)}
@@ -175,48 +198,62 @@ const BD = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).Barc
     )
   }
 
-  /* ── Pantalla scanner (sin token) ── */
+  /* ── Pantalla scanner (sin token) ──
+     Mobile: todo apilado (comportamiento ya correcto, sin tocar).
+     Desktop (>=1024px): columna del escáner a la izquierda con instrucciones,
+     "Mis Materias" a la derecha — en vez de una sola columna angosta estirada. */
   return (
     <>
       <style>{css}</style>
-      <div style={{ maxWidth: 560, margin: '0 auto' }}>
+      <div className="scan-page">
         <h1 className="page-title" style={{ marginBottom: 2 }}>Hola, {nombre}</h1>
         <p className="page-subtitle" style={{ marginBottom: 16 }}>Escanea el código QR de la clase.</p>
 
-        <div className="scan-visor">
-          {camara && <video ref={videoRef} muted playsInline />}
-          <span className="scan-corner tl" /><span className="scan-corner tr" />
-          <span className="scan-corner bl" /><span className="scan-corner br" />
-          {camara ? <span className="scan-line" /> : (
-            <i className="ti ti-scan" style={{ fontSize: 40, color: 'var(--accent-bright)', opacity: 0.7 }} />
-          )}
-        </div>
-
-        {errorMsg && <p style={{ fontSize: 12, color: 'var(--warning)', marginTop: 10 }}>{errorMsg}</p>}
-
-        <button className="btn-primary" style={{ width: '100%', marginTop: 14, padding: 13, fontSize: 14, borderRadius: 14 }}
-          onClick={camara ? pararCamara : activarCamara}>
-          <i className={`ti ${camara ? 'ti-camera-off' : 'ti-camera'}`} /> {camara ? 'Detener Cámara' : 'Activar Cámara'}
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '26px 0 12px' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800 }}>Mis Materias</h2>
-          <span className="mono-label" style={{ color: 'var(--accent-bright)' }}>Ciclo {String(new Date().getMonth() < 6 ? 1 : 2).padStart(2, '0')}-{new Date().getFullYear()}</span>
-        </div>
-
-        {materias.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin registros de asistencia aún.</div>
-        ) : materias.map(mt => (
-          <div key={mt.materia_id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', marginBottom: 10 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14.5, fontWeight: 800 }}>{mt.materia_nombre}</div>
-              <div className="mono-label" style={{ fontSize: 9.5, marginTop: 3 }}>
-                <i className="ti ti-clock" /> {mt.presentes}/{mt.total_clases} clases presentes
-              </div>
+        <div className="scan-cols">
+          <div className="scan-col-left">
+            <div className="scan-visor">
+              {camara && <video ref={videoRef} muted playsInline />}
+              <span className="scan-corner tl" /><span className="scan-corner tr" />
+              <span className="scan-corner bl" /><span className="scan-corner br" />
+              {camara ? <span className="scan-line" /> : (
+                <i className="ti ti-scan" style={{ fontSize: 40, color: 'var(--accent-bright)', opacity: 0.7 }} />
+              )}
             </div>
-            <RingPct pct={mt.porcentaje} />
+
+            {errorMsg && <p style={{ fontSize: 12, color: 'var(--warning)', marginTop: 10 }}>{errorMsg}</p>}
+
+            <button className="btn-primary" style={{ width: '100%', marginTop: 14, padding: 13, fontSize: 14, borderRadius: 14 }}
+              onClick={camara ? pararCamara : activarCamara}>
+              <i className={`ti ${camara ? 'ti-camera-off' : 'ti-camera'}`} /> {camara ? 'Detener Cámara' : 'Activar Cámara'}
+            </button>
+
+            <div className="scan-tip">
+              <i className="ti ti-info-circle" style={{ color: 'var(--accent-bright)', marginRight: 6 }} />
+              Apuntá la cámara de tu computadora hacia el código QR que proyecta tu profesor. También podés escanearlo con la cámara del celular.
+            </div>
           </div>
-        ))}
+
+          <div className="scan-col-right">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '26px 0 12px' }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800 }}>Mis Materias</h2>
+              <span className="mono-label" style={{ color: 'var(--accent-bright)' }}>Ciclo {String(new Date().getMonth() < 6 ? 1 : 2).padStart(2, '0')}-{new Date().getFullYear()}</span>
+            </div>
+
+            {materias.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin registros de asistencia aún.</div>
+            ) : materias.map(mt => (
+              <div key={mt.materia_id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', marginBottom: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800 }}>{mt.materia_nombre}</div>
+                  <div className="mono-label" style={{ fontSize: 9.5, marginTop: 3 }}>
+                    <i className="ti ti-clock" /> {mt.presentes}/{mt.total_clases} clases presentes
+                  </div>
+                </div>
+                <RingPct pct={mt.porcentaje} />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </>
   )

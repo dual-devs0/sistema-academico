@@ -1,15 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
+import { obtenerCreditosAlumno, type CreditosAlumnoOut } from '../services/pensumService'
 
 /* ═══ Compartido ════════════════════════════════════════════════ */
 
 const css = `
   .exp-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; }
   .exp-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
-  .ciclo-bars { display:flex; gap:14px; align-items:flex-end; overflow-x:auto; padding:10px 4px 4px; }
-  .ciclo-bar { flex:1; min-width:88px; text-align:center; cursor:default; }
-  .ciclo-rect { border-radius:12px; background:var(--accent-muted); transition:all .2s; margin-bottom:8px; }
-  .ciclo-bar.actual .ciclo-rect { background:var(--accent); box-shadow:0 6px 24px var(--accent-hover); }
   .mat-card { background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius); padding:16px 18px; }
   .mat-card.warn { border-color:rgba(245,158,11,.35); }
   .desglose-row { display:flex; justify-content:space-between; font-size:12px; padding:5px 0; color:var(--text-secondary); }
@@ -19,19 +16,20 @@ const css = `
   .pro-filtro { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); }
   .pro-filtro span.dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
   .nota-input {
-    width:60px; padding:6px 8px; text-align:center;
+    width:56px; padding:6px 6px; text-align:center;
     background:var(--bg-input); border:1px solid var(--border-light);
     border-radius:8px; color:var(--text-primary); font-size:13px; font-weight:700;
     font-family:var(--font-mono); outline:none; transition:border-color .15s;
   }
   .nota-input:focus { border-color:var(--accent); }
   .nota-input:disabled { opacity:.4; cursor:not-allowed; }
-  .prom-float {
-    position:fixed; bottom:26px; right:26px; z-index:50;
-    background:var(--bg-elevated); border:1px solid var(--accent-hover);
-    border-radius:14px; padding:12px 18px; display:flex; align-items:center; gap:12px;
-    box-shadow:0 12px 32px rgba(0,0,0,.5);
+  .oport-chip { display:flex; gap:2px; justify-content:center; margin-bottom:4px; }
+  .oport-btn {
+    width:16px; height:16px; border-radius:4px; border:1px solid var(--border-subtle);
+    background:var(--bg-surface); color:var(--text-muted); font-size:9px; font-weight:700;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
   }
+  .oport-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .pagi { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; flex-wrap:wrap; gap:8px; }
   .pagi-btn {
     min-width:30px; height:30px; border-radius:8px; border:1px solid var(--border-subtle);
@@ -40,7 +38,10 @@ const css = `
   }
   .pagi-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .pagi-btn:disabled { opacity:.4; cursor:not-allowed; }
-  @media(max-width:900px){ .exp-stats { grid-template-columns:1fr; } }
+  .pesos-panel { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:14px 18px; border-bottom:1px solid var(--border-subtle); background:var(--bg-input); }
+  .pesos-field label { display:block; font-size:10px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.04em; }
+  .pesos-field input { width:100%; padding:7px 8px; border-radius:8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-primary); font-family:var(--font-mono); font-size:13px; }
+  @media(max-width:900px){ .exp-stats { grid-template-columns:1fr; } .pesos-panel { grid-template-columns:repeat(2,1fr); } }
   .stat-card {
     background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius);
     padding:14px 20px; min-width:120px; border-left:4px solid var(--accent);
@@ -50,8 +51,28 @@ const css = `
   @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 `
 
-type Puntaje = { id: number; user_id: number; materia_id: number; tipo: string; valor: number }
+type Pesos = { parcial1: number; parcial2: number; practico: number; final: number }
+const PESOS_DEFAULT: Pesos = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
+
+type NotaMateria = {
+  materia_id: number
+  materia_nombre: string
+  parcial1: number | null
+  parcial2: number | null
+  practico: number | null
+  final1: number | null
+  final2: number | null
+  final3: number | null
+  promedio: number | null
+  pesos: Pesos
+}
+
 type MateriaApi = { id: number; nombre: string; profesor_nombre?: string | null; profesor_id?: number | null }
+
+function finalEfectivo(m: { final1: number | null; final2: number | null; final3: number | null }): number | null {
+  const vals = [m.final1, m.final2, m.final3].filter((v): v is number => v !== null)
+  return vals.length ? Math.max(...vals) : null
+}
 
 function notaColor(n: number | null): string {
   if (n === null) return 'var(--text-muted)'
@@ -70,50 +91,27 @@ function estadoDe(p: number | null): { label: string; bg: string; color: string 
 
 /* ═══ ALUMNO — Expediente Académico ═════════════════════════════ */
 
-type MateriaExp = {
-  nombre: string; codigo: string; profesor: string
-  p1: number | null; p2: number | null; tp: number | null; final: number | null
-}
-
-const ciclos = [
-  { nombre: 'Ciclo I-22', altura: 46 }, { nombre: 'Ciclo II-22', altura: 60 },
-  { nombre: 'Ciclo I-23', altura: 68 }, { nombre: 'Ciclo II-23', altura: 84, actual: true },
-  { nombre: 'Ciclo I-24', altura: 30, futuro: true },
-]
-
-function promDe(m: MateriaExp): number | null {
-  const ns = [m.p1, m.p2, m.tp, m.final].filter((n): n is number => n !== null)
-  if (!ns.length) return null
-  return Math.round((ns.reduce((a, b) => a + b, 0) / ns.length) * 10) / 10
-}
-
 function AlumnoView({ userId }: { userId: number }) {
-  const [materias, setMaterias] = useState<MateriaExp[]>([])
+  const [materias, setMaterias] = useState<NotaMateria[]>([])
+  const [creditos, setCreditos] = useState<CreditosAlumnoOut | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
-      api.get<MateriaApi[]>('/materias/').catch(() => [] as MateriaApi[]),
-      api.get<Puntaje[]>(`/puntajes/?user_id=${userId}`).catch(() => [] as Puntaje[]),
-    ]).then(([mats, pts]) => {
-      const rows: MateriaExp[] = mats.map(m => {
-        const de = (tipo: string) => pts.find(p => p.materia_id === m.id && p.tipo === tipo)?.valor ?? null
-        return {
-          nombre: m.nombre,
-          codigo: `MAT-${String(m.id).padStart(3, '0')}`,
-          profesor: m.profesor_nombre || '—',
-          p1: de('parcial1'), p2: de('parcial2'), tp: de('practico'), final: de('final'),
-        }
-      }).filter(m => m.p1 !== null || m.p2 !== null || m.tp !== null || m.final !== null)
-      setMaterias(rows)
+      api.get<NotaMateria[]>('/alumno/mis-notas').catch(() => [] as NotaMateria[]),
+      obtenerCreditosAlumno(userId).catch(() => null),
+    ]).then(([notas, cred]) => {
+      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || finalEfectivo(m) !== null))
+      setCreditos(cred)
     }).finally(() => setLoading(false))
   }, [userId])
 
-  const proms = materias.map(promDe).filter((p): p is number => p !== null)
+  const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
   const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
-  const aprobadas = materias.filter(m => (promDe(m) ?? 0) >= 6).length
+  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
   const pctAprob = materias.length ? Math.round((aprobadas / materias.length) * 100) : 0
   const ringC = 2 * Math.PI * 34
+  const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
 
   return (
     <>
@@ -121,11 +119,8 @@ function AlumnoView({ userId }: { userId: number }) {
         <div>
           <div className="mono-label" style={{ color: 'var(--accent-bright)', marginBottom: 4 }}>Expediente Académico</div>
           <h1 className="page-title">Mis Calificaciones</h1>
-          <p className="page-subtitle">Semestre {new Date().getMonth() < 6 ? 1 : 2} · {new Date().getFullYear()} • Actualizado recientemente</p>
+          <p className="page-subtitle">Semestre {new Date().getMonth() < 6 ? 1 : 2} · {new Date().getFullYear()}</p>
         </div>
-        <button className="btn-primary" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
-          <i className="ti ti-download" /> Reporte Académico
-        </button>
       </div>
 
       {/* Stats */}
@@ -133,16 +128,8 @@ function AlumnoView({ userId }: { userId: number }) {
         <div className="kpi-card">
           <div className="kpi-top">
             <span className="mono-label">Promedio General</span>
-            <span className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)' }}>+0.3 vs ciclo anterior</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <span className="kpi-value" style={{ fontSize: 36 }}>{promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 34 }}>
-              {[12, 16, 14, 20, 26, 34].map((h, i) => (
-                <span key={i} style={{ width: 12, height: h, borderRadius: 4, background: i === 5 ? 'var(--accent)' : 'var(--accent-muted)' }} />
-              ))}
-            </div>
-          </div>
+          <span className="kpi-value" style={{ fontSize: 36 }}>{loading ? '—' : promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
         </div>
         <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
@@ -156,7 +143,6 @@ function AlumnoView({ userId }: { userId: number }) {
           <div>
             <div className="mono-label" style={{ marginBottom: 4 }}>Aprobación</div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>{aprobadas} de {materias.length} Materias</div>
-            {pctAprob >= 80 && <span className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)', marginTop: 6 }}>Sobresaliente</span>}
           </div>
         </div>
         <div className="kpi-card">
@@ -164,22 +150,10 @@ function AlumnoView({ userId }: { userId: number }) {
             <span className="mono-label">Créditos Acumulados</span>
             <i className="ti ti-certificate" style={{ color: 'var(--accent)', fontSize: 15 }} />
           </div>
-          <span className="kpi-value" style={{ fontSize: 34 }}>164<span className="kpi-unit"> / 192</span></span>
-          <div className="progress-track" style={{ marginTop: 12 }}><div className="progress-fill" style={{ width: `${164 / 192 * 100}%` }} /></div>
-        </div>
-      </div>
-
-      {/* Proyección Semestral */}
-      <div className="card" style={{ marginBottom: 22 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Proyección Semestral</h3>
-        <div className="ciclo-bars">
-          {ciclos.map(c => (
-            <div key={c.nombre} className={`ciclo-bar${c.actual ? ' actual' : ''}`} style={{ opacity: c.futuro ? 0.35 : 1 }}>
-              {c.actual && <div className="mono-label" style={{ color: 'var(--accent-bright)', marginBottom: 4 }}>{promGeneral || '8.9'}</div>}
-              <div className="ciclo-rect" style={{ height: c.altura }} />
-              <div className="mono-label" style={{ color: c.actual ? 'var(--text-primary)' : undefined }}>{c.nombre}</div>
-            </div>
-          ))}
+          <span className="kpi-value" style={{ fontSize: 34 }}>
+            {creditos ? creditos.creditos_acumulados : '—'}<span className="kpi-unit"> / {creditos?.creditos_totales ?? '—'}</span>
+          </span>
+          <div className="progress-track" style={{ marginTop: 12 }}><div className="progress-fill" style={{ width: `${pctCreditos}%` }} /></div>
         </div>
       </div>
 
@@ -195,30 +169,26 @@ function AlumnoView({ userId }: { userId: number }) {
       ) : (
         <div className="exp-cards">
           {materias.map(m => {
-            const p = promDe(m)
-            const pendienteP2 = m.p1 !== null && m.p2 === null
+            const p = m.promedio
+            const pesos = m.pesos || PESOS_DEFAULT
+            const fin = finalEfectivo(m)
+            const pendienteP2 = m.parcial1 !== null && m.parcial2 === null
             return (
-              <div key={m.nombre} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
+              <div key={m.materia_id} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.nombre}</div>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: notaColor(p) }}>{p ?? '—'}</span>
                 </div>
-                <div className="mono-label" style={{ marginBottom: 10 }}>{m.codigo} • {m.profesor}</div>
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
-                  <div className="desglose-row"><span>Examen Parcial 1 (30%)</span><b>{m.p1 ?? '—'}</b></div>
+                  <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
                   <div className="desglose-row">
-                    <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Examen Parcial 2 {pendienteP2 && '(Pendiente)'}</span>
-                    <b>{m.p2 ?? '—'}</b>
+                    <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
+                    <b>{m.parcial2 ?? '—'}</b>
                   </div>
-                  <div className="desglose-row"><span>Trabajos Prácticos (40%)</span><b>{m.tp ?? '—'}</b></div>
-                  <div className="desglose-row"><span>Examen Final (30%)</span><b>{m.final ?? '—'}</b></div>
+                  <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
+                  <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{fin ?? '—'}</b></div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="badge" style={{ background: estadoDe(p).bg, color: estadoDe(p).color }}>{estadoDe(p).label}</span>
-                  <button style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
-                    Ver Feedback →
-                  </button>
-                </div>
+                <span className="badge" style={{ background: estadoDe(p).bg, color: estadoDe(p).color }}>{estadoDe(p).label}</span>
               </div>
             )
           })}
@@ -235,15 +205,24 @@ type AlumnoRow = {
   alumno_id: number
   nombre: string
   username: string
-  ids: { parcial1: number; parcial2: number; tp: number; final: number }
-  vals: { parcial1: string; parcial2: string; tp: string; final: string }
+  ids: { parcial1: number; parcial2: number; tp: number; final1: number; final2: number; final3: number }
+  vals: { parcial1: string; parcial2: string; tp: string; final1: string; final2: string; final3: string }
+  oportunidadActiva: 1 | 2 | 3
   saving: boolean
 }
 
-function proCalcProm(v: AlumnoRow['vals']): number | null {
-  const ns = [v.parcial1, v.parcial2, v.tp, v.final].map(s => parseFloat(s)).filter(n => !isNaN(n))
-  if (!ns.length) return null
-  return Math.round((ns.reduce((a, b) => a + b, 0) / ns.length) * 10) / 10
+function calcPromedio(vals: AlumnoRow['vals'], pesos: Pesos): number | null {
+  const fins = [vals.final1, vals.final2, vals.final3].map(s => parseFloat(s)).filter(n => !isNaN(n))
+  const finalEf = fins.length ? Math.max(...fins) : null
+  const partes: { v: number; max: number }[] = []
+  const p1 = parseFloat(vals.parcial1); if (!isNaN(p1)) partes.push({ v: p1, max: pesos.parcial1 })
+  const p2 = parseFloat(vals.parcial2); if (!isNaN(p2)) partes.push({ v: p2, max: pesos.parcial2 })
+  const tp = parseFloat(vals.tp); if (!isNaN(tp)) partes.push({ v: tp, max: pesos.practico })
+  if (finalEf !== null) partes.push({ v: finalEf, max: pesos.final })
+  if (!partes.length) return null
+  const maxTotal = partes.reduce((a, x) => a + x.max, 0)
+  const puntos = partes.reduce((a, x) => a + x.v, 0)
+  return maxTotal > 0 ? Math.round(puntos / maxTotal * 10 * 100) / 100 : null
 }
 
 const PAGE_SIZE = 8
@@ -252,31 +231,48 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
   const [materias, setMaterias] = useState<MateriaSimple[]>([])
   const [selectedMateria, setSelectedMateria] = useState<MateriaSimple | null>(null)
   const [alumnos, setAlumnos] = useState<AlumnoRow[]>([])
+  const [pesos, setPesos] = useState<Pesos>(PESOS_DEFAULT)
+  const [pesosEdit, setPesosEdit] = useState<Pesos | null>(null)
+  const [savingPesos, setSavingPesos] = useState(false)
   const [loadingMaterias, setLoadingMaterias] = useState(true)
   const [loadingAlumnos, setLoadingAlumnos] = useState(false)
   const [page, setPage] = useState(1)
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null)
+  const [dirtyCount, setDirtyCount] = useState(0)
+  const [savingAll, setSavingAll] = useState(false)
+  const originalRef = useRef<string>('')
 
   const fetchAlumnos = useCallback(async (materia: MateriaSimple) => {
     setLoadingAlumnos(true)
     setPage(1)
+    setDirtyCount(0)
     try {
-      const [alumnosData, puntajesData] = await Promise.all([
+      const [alumnosData, puntajesData, pesosData] = await Promise.all([
         api.get<{ alumno_id: number; nombre: string; username: string }[]>(`/inscripciones/materia/${materia.id}`).catch(() => []),
-        api.get<Puntaje[]>(`/puntajes/?materia_id=${materia.id}`).catch(() => []),
+        api.get<{ id: number; user_id: number; tipo: string; valor: number }[]>(`/puntajes/?materia_id=${materia.id}`).catch(() => []),
+        api.get<{ parcial1_max: number; parcial2_max: number; practico_max: number; final_max: number }>(`/puntajes/pesos/${materia.id}`).catch(() => null),
       ])
+      const pesosResueltos: Pesos = pesosData
+        ? { parcial1: pesosData.parcial1_max, parcial2: pesosData.parcial2_max, practico: pesosData.practico_max, final: pesosData.final_max }
+        : PESOS_DEFAULT
+      setPesos(pesosResueltos)
       const rows: AlumnoRow[] = alumnosData.map(a => {
         const pts = puntajesData.filter(p => p.user_id === a.alumno_id)
         const find = (tipo: string) => pts.find(p => p.tipo === tipo)
         const fid = (tipo: string) => find(tipo)?.id ?? 0
         const fval = (tipo: string) => { const v = find(tipo)?.valor; return v !== undefined ? String(v) : '' }
+        const oportunidadActiva: 1 | 2 | 3 = fval('final1') ? 1 : fval('final2') ? 2 : fval('final3') ? 3 : 1
         return {
           alumno_id: a.alumno_id, nombre: a.nombre, username: a.username,
-          ids: { parcial1: fid('parcial1'), parcial2: fid('parcial2'), tp: fid('practico'), final: fid('final') },
-          vals: { parcial1: fval('parcial1'), parcial2: fval('parcial2'), tp: fval('practico'), final: fval('final') },
+          ids: { parcial1: fid('parcial1'), parcial2: fid('parcial2'), tp: fid('practico'), final1: fid('final1'), final2: fid('final2'), final3: fid('final3') },
+          vals: { parcial1: fval('parcial1'), parcial2: fval('parcial2'), tp: fval('practico'), final1: fval('final1'), final2: fval('final2'), final3: fval('final3') },
+          oportunidadActiva,
           saving: false,
         }
       })
+      originalRef.current = JSON.stringify(rows.map(r => r.vals))
       setAlumnos(rows)
+      setLastUpdate(new Date().toLocaleTimeString())
     } finally { setLoadingAlumnos(false) }
   }, [])
 
@@ -293,52 +289,108 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
       .finally(() => setLoadingMaterias(false))
   }, [profesorId, fetchAlumnos])
 
+  const valsSnapshot = useMemo(() => JSON.stringify(alumnos.map(r => r.vals)), [alumnos])
+  useEffect(() => {
+    if (originalRef.current && valsSnapshot !== originalRef.current) {
+      const current = JSON.parse(valsSnapshot) as AlumnoRow['vals'][]
+      const orig = JSON.parse(originalRef.current) as AlumnoRow['vals'][]
+      let dirty = 0
+      for (let i = 0; i < current.length; i++) {
+        const c = current[i]; const o = orig[i]
+        if (c.parcial1 !== o.parcial1 || c.parcial2 !== o.parcial2 || c.tp !== o.tp ||
+            c.final1 !== o.final1 || c.final2 !== o.final2 || c.final3 !== o.final3) dirty++
+      }
+      setDirtyCount(dirty)
+    } else {
+      setDirtyCount(0)
+    }
+  }, [valsSnapshot])
 
-
-  function updateVal(alumno_id: number, campo: keyof AlumnoRow['vals'], value: string) {
-    if (value !== '' && !/^\d{0,2}(\.\d{0,1})?$/.test(value)) return
+  function updateVal(alumno_id: number, campo: 'parcial1' | 'parcial2' | 'tp' | 'final', value: string) {
+    if (value !== '' && !/^\d{0,3}(\.\d{0,1})?$/.test(value)) return
     const num = parseFloat(value)
-    if (value !== '' && !isNaN(num) && (num < 0 || num > 10)) return
-    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, vals: { ...a.vals, [campo]: value } } : a))
+    const max = campo === 'final' ? pesos.final : campo === 'tp' ? pesos.practico : campo === 'parcial1' ? pesos.parcial1 : pesos.parcial2
+    if (value !== '' && !isNaN(num) && (num < 0 || num > max)) return
+    setAlumnos(prev => prev.map(a => {
+      if (a.alumno_id !== alumno_id) return a
+      if (campo === 'final') {
+        const key = `final${a.oportunidadActiva}` as 'final1' | 'final2' | 'final3'
+        return { ...a, vals: { ...a.vals, [key]: value } }
+      }
+      return { ...a, vals: { ...a.vals, [campo]: value } }
+    }))
   }
 
-  async function saveRow(alumno_id: number) {
-    const row = alumnos.find(a => a.alumno_id === alumno_id)
-    if (!row || !selectedMateria) return
-    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, saving: true } : a))
+  function setOportunidad(alumno_id: number, op: 1 | 2 | 3) {
+    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, oportunidadActiva: op } : a))
+  }
+
+  async function saveAll() {
+    if (!selectedMateria) return
+    setSavingAll(true)
+    let successCount = 0; let errorCount = 0
     const tiposMap: { campo: keyof AlumnoRow['vals']; tipo: string }[] = [
       { campo: 'parcial1', tipo: 'parcial1' }, { campo: 'parcial2', tipo: 'parcial2' },
-      { campo: 'tp', tipo: 'practico' }, { campo: 'final', tipo: 'final' },
+      { campo: 'tp', tipo: 'practico' },
+      { campo: 'final1', tipo: 'final1' }, { campo: 'final2', tipo: 'final2' }, { campo: 'final3', tipo: 'final3' },
     ]
-    let newIds = { ...row.ids }
-    try {
+    for (const row of alumnos) {
       for (const { campo, tipo } of tiposMap) {
         const valStr = row.vals[campo]
         if (valStr === '') continue
         const valor = parseFloat(valStr)
         if (isNaN(valor)) continue
-        const existingId = row.ids[campo]
-        if (existingId) {
-          await api.put(`/puntajes/${existingId}`, { user_id: alumno_id, materia_id: selectedMateria.id, tipo, valor })
-        } else {
-          const created = await api.post<{ id: number }>('/puntajes/', { user_id: alumno_id, materia_id: selectedMateria.id, tipo, valor })
-          newIds = { ...newIds, [campo]: created.id }
-        }
+        try {
+          if (row.ids[campo]) {
+            await api.put(`/puntajes/${row.ids[campo]}`, { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo, valor })
+          } else {
+            const created = await api.post<{ id: number }>('/puntajes/', { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo, valor })
+            setAlumnos(prev => prev.map(a => a.alumno_id === row.alumno_id
+              ? { ...a, ids: { ...a.ids, [campo]: created.id } } : a))
+          }
+          successCount++
+        } catch { errorCount++ }
       }
-      setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, ids: newIds, saving: false } : a))
-      emitToast('Notas guardadas correctamente')
-    } catch {
-      emitToast('Error al guardar notas', 'error')
-      setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, saving: false } : a))
     }
+    originalRef.current = JSON.stringify(alumnos.map(r => r.vals))
+    setDirtyCount(0)
+    setSavingAll(false)
+    setLastUpdate(new Date().toLocaleTimeString())
+    if (errorCount > 0) {
+      emitToast(`Guardado parcial: ${successCount} ok, ${errorCount} errores`, 'warning')
+    } else {
+      emitToast(`Todas las notas guardadas (${successCount} registros)`)
+    }
+  }
+
+  async function guardarPesos() {
+    if (!selectedMateria || !pesosEdit) return
+    const suma = pesosEdit.parcial1 + pesosEdit.parcial2 + pesosEdit.practico + pesosEdit.final
+    if (Math.round(suma * 100) / 100 !== 100) {
+      emitToast(`Los pesos deben sumar 100 (suma actual: ${suma})`, 'error')
+      return
+    }
+    setSavingPesos(true)
+    try {
+      await api.put(`/puntajes/pesos/${selectedMateria.id}`, {
+        parcial1_max: pesosEdit.parcial1, parcial2_max: pesosEdit.parcial2,
+        practico_max: pesosEdit.practico, final_max: pesosEdit.final,
+      })
+      setPesos(pesosEdit)
+      setPesosEdit(null)
+      emitToast('Puntaje de la materia actualizado')
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al guardar pesos', 'error')
+    } finally { setSavingPesos(false) }
   }
 
   function exportCSV() {
     const rows = [
-      ['Legajo', 'Estudiante', 'Parcial 1', 'Parcial 2', 'Trabajos', 'Final', 'Estado'],
+      ['Legajo', 'Estudiante', 'Parcial 1', 'Parcial 2', 'Trabajos', 'Final', 'Promedio', 'Estado'],
       ...alumnos.map(a => {
-        const p = proCalcProm(a.vals)
-        return [`#${a.alumno_id}`, a.nombre, a.vals.parcial1 || '-', a.vals.parcial2 || '-', a.vals.tp || '-', a.vals.final || '-', estadoDe(p).label]
+        const p = calcPromedio(a.vals, pesos)
+        const fin = [a.vals.final1, a.vals.final2, a.vals.final3].map(v => parseFloat(v)).filter(n => !isNaN(n))
+        return [`#${a.alumno_id}`, a.nombre, a.vals.parcial1 || '-', a.vals.parcial2 || '-', a.vals.tp || '-', fin.length ? String(Math.max(...fin)) : '-', p !== null ? p.toFixed(2) : '-', estadoDe(p).label]
       }),
     ]
     const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -350,11 +402,9 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     emitToast('CSV exportado')
   }
 
-  const proms = alumnos.map(a => proCalcProm(a.vals)).filter((p): p is number => p !== null)
-  const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 10) / 10 : 0
-  const nAprob = alumnos.filter(a => { const p = proCalcProm(a.vals); return p !== null && p >= 6 && p < 9 }).length
-  const nReprob = alumnos.filter(a => { const p = proCalcProm(a.vals); return p !== null && p < 6 }).length
-  const nPromo = alumnos.filter(a => { const p = proCalcProm(a.vals); return p !== null && p >= 9 }).length
+  const nAprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 6 && p < 9 }).length
+  const nReprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p < 6 }).length
+  const nPromo = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 9 }).length
   const totalPages = Math.max(1, Math.ceil(alumnos.length / PAGE_SIZE))
   const pageRows = alumnos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -365,9 +415,18 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
           <h1 className="page-title">Gestión de Calificaciones</h1>
           <p className="page-subtitle">Ciclo Lectivo: {new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Cuatrimestre {new Date().getFullYear()}</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn-ghost" onClick={exportCSV}><i className="ti ti-file-spreadsheet" /> Exportar CSV</button>
-          <button className="btn-primary"><i className="ti ti-file-type-pdf" /> Generar Acta PDF</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastUpdate && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <i className="ti ti-refresh" /> {lastUpdate}
+            </span>
+          )}
+          {selectedMateria && (
+            <button className="btn-ghost" onClick={() => setPesosEdit(pesosEdit ? null : { ...pesos })}>
+              <i className="ti ti-adjustments" /> Pesos
+            </button>
+          )}
+          <button className="btn-ghost" onClick={exportCSV}><i className="ti ti-file-spreadsheet" /> CSV</button>
         </div>
       </div>
 
@@ -382,17 +441,53 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
         <>
           <div className="pro-tabs">
             {materias.map(m => (
-              <button key={m.id} className={`pill-tab${selectedMateria?.id === m.id ? ' active' : ''}`} onClick={() => { setSelectedMateria(m); fetchAlumnos(m) }}>
+              <button key={m.id} className={`pill-tab${selectedMateria?.id === m.id ? ' active' : ''}`} onClick={() => { setSelectedMateria(m); setPesosEdit(null); fetchAlumnos(m) }}>
                 {m.nombre}
               </button>
             ))}
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {pesosEdit && (
+              <div className="pesos-panel">
+                <div className="pesos-field">
+                  <label>Parcial 1 (pts)</label>
+                  <input type="number" min={0} value={pesosEdit.parcial1} onChange={e => setPesosEdit({ ...pesosEdit, parcial1: Number(e.target.value) })} />
+                </div>
+                <div className="pesos-field">
+                  <label>Parcial 2 (pts)</label>
+                  <input type="number" min={0} value={pesosEdit.parcial2} onChange={e => setPesosEdit({ ...pesosEdit, parcial2: Number(e.target.value) })} />
+                </div>
+                <div className="pesos-field">
+                  <label>Trabajo Práctico (pts)</label>
+                  <input type="number" min={0} value={pesosEdit.practico} onChange={e => setPesosEdit({ ...pesosEdit, practico: Number(e.target.value) })} />
+                </div>
+                <div className="pesos-field">
+                  <label>Final (pts)</label>
+                  <input type="number" min={0} value={pesosEdit.final} onChange={e => setPesosEdit({ ...pesosEdit, final: Number(e.target.value) })} />
+                </div>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="mono-label" style={{ color: (pesosEdit.parcial1 + pesosEdit.parcial2 + pesosEdit.practico + pesosEdit.final) === 100 ? 'var(--success)' : 'var(--danger)' }}>
+                    Suma: {pesosEdit.parcial1 + pesosEdit.parcial2 + pesosEdit.practico + pesosEdit.final} / 100
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-ghost" onClick={() => setPesosEdit(null)}>Cancelar</button>
+                    <button className="btn-primary" disabled={savingPesos} onClick={guardarPesos}>{savingPesos ? 'Guardando…' : 'Guardar'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="pro-filtros">
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--success)' }} /> {nAprob} Aprobados</span>
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--danger)' }} /> {nReprob} Reprobados</span>
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--info)' }} /> {nPromo} Promocionados</span>
+              <span style={{ flex: 1 }} />
+              <span className="pro-filtro" style={{ fontSize: 10 }}>P1 /{pesos.parcial1} · P2 /{pesos.parcial2} · TP /{pesos.practico} · Final /{pesos.final}</span>
+              {dirtyCount > 0 && (
+                <button className="btn-primary" style={{ padding: '4px 14px', fontSize: 11 }} disabled={savingAll} onClick={saveAll}>
+                  {savingAll ? 'Guardando…' : `Guardar (${dirtyCount})`}
+                </button>
+              )}
             </div>
 
             {loadingAlumnos ? (
@@ -411,13 +506,13 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
                         <th style={{ textAlign: 'center' }}>Trabajos</th>
                         <th style={{ textAlign: 'center' }}>Final</th>
                         <th style={{ textAlign: 'center' }}>Estado</th>
-                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {pageRows.map(a => {
-                        const p = proCalcProm(a.vals)
+                        const p = calcPromedio(a.vals, pesos)
                         const est = estadoDe(p)
+                        const finalKey = `final${a.oportunidadActiva}` as 'final1' | 'final2' | 'final3'
                         return (
                           <tr key={a.alumno_id}>
                             <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--accent-bright)' }}>#{String(a.alumno_id).padStart(5, '0')}</td>
@@ -429,20 +524,34 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
                                 <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre || `@${a.username}`}</span>
                               </div>
                             </td>
-                            {(['parcial1', 'parcial2', 'tp', 'final'] as const).map(campo => (
-                              <td key={campo} style={{ textAlign: 'center' }}>
-                                <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
-                                  value={a.vals[campo]} disabled={a.saving}
-                                  onChange={e => updateVal(a.alumno_id, campo, e.target.value)} />
-                              </td>
-                            ))}
+                            <td style={{ textAlign: 'center' }}>
+                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                value={a.vals.parcial1} disabled={savingAll}
+                                onChange={e => updateVal(a.alumno_id, 'parcial1', e.target.value)} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                value={a.vals.parcial2} disabled={savingAll}
+                                onChange={e => updateVal(a.alumno_id, 'parcial2', e.target.value)} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                value={a.vals.tp} disabled={savingAll}
+                                onChange={e => updateVal(a.alumno_id, 'tp', e.target.value)} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div className="oport-chip">
+                                {([1, 2, 3] as const).map(op => (
+                                  <button key={op} type="button" className={`oport-btn${a.oportunidadActiva === op ? ' active' : ''}`}
+                                    onClick={() => setOportunidad(a.alumno_id, op)}>{op}</button>
+                                ))}
+                              </div>
+                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                value={a.vals[finalKey]} disabled={savingAll}
+                                onChange={e => updateVal(a.alumno_id, 'final', e.target.value)} />
+                            </td>
                             <td style={{ textAlign: 'center' }}>
                               <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <button className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }} disabled={a.saving} onClick={() => saveRow(a.alumno_id)}>
-                                {a.saving ? '…' : <><i className="ti ti-check" /> Guardar</>}
-                              </button>
                             </td>
                           </tr>
                         )
@@ -466,17 +575,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
             )}
           </div>
 
-          {alumnos.length > 0 && (
-            <div className="prom-float">
-              <span style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent-muted)', color: 'var(--accent-bright)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className="ti ti-chart-bar" />
-              </span>
-              <div>
-                <div className="mono-label">Promedio General</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 800 }}>{promGeneral || '—'}</div>
-              </div>
-            </div>
-          )}
+
         </>
       )}
     </>
@@ -486,7 +585,11 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
 /* ═══ ADMIN — Gestión de Calificaciones ═════════════════════════ */
 
 type AlumnoOpt = { id: number; nombre: string; username: string }
-type MateriaAdm = { nombre: string; anio?: number | null; semestre?: number | null; codigo?: string | null; profesor: string; p1: number | null; p2: number | null; tp: number | null; final: number | null }
+type MateriaAdm = {
+  materia_id: number; nombre: string; anio?: number | null; semestre?: number | null; codigo?: string | null; profesor: string
+  parcial1: number | null; parcial2: number | null; practico: number | null; final1: number | null; final2: number | null; final3: number | null
+  promedio: number | null; pesos: Pesos
+}
 type CarreraOpt = { id: number; nombre: string }
 
 const POLL_MS = 30000
@@ -557,18 +660,25 @@ function AdminView() {
   async function selectAlumno(a: AlumnoOpt) {
     setSelected(a); setSearch(''); setDropOpen(false); setLoading(true)
     try {
-      const [mats, pts] = await Promise.all([
-        api.get<(MateriaApi & { anio?: number | null; semestre?: number | null; codigo?: string | null })[]>('/materias/'),
-        api.get<Puntaje[]>(`/puntajes/?user_id=${a.id}`),
-      ])
-      const rows: MateriaAdm[] = mats.map(m => {
-        const de = (tipo: string) => pts.find(p => p.materia_id === m.id && p.tipo === tipo)?.valor ?? null
+      const mats = await api.get<(MateriaApi & { anio?: number | null; semestre?: number | null; codigo?: string | null })[]>('/materias/')
+      const detalles = await Promise.all(
+        mats.map(m =>
+          api.get<{ user_id: number; nombre: string; parcial1: number | null; parcial2: number | null; practico: number | null; final1: number | null; final2: number | null; final3: number | null; promedio_final: number | null }>(
+            `/puntajes/alumno/${a.id}/promedio-final?materia_id=${m.id}`
+          ).catch(() => null)
+        )
+      )
+      const rows: MateriaAdm[] = mats.map((m, i) => {
+        const d = detalles[i]
         return {
-          nombre: m.nombre, codigo: m.codigo, anio: m.anio, semestre: m.semestre,
+          materia_id: m.id, nombre: m.nombre, codigo: m.codigo, anio: m.anio, semestre: m.semestre,
           profesor: m.profesor_nombre || '—',
-          p1: de('parcial1'), p2: de('parcial2'), tp: de('practico'), final: de('final'),
+          parcial1: d?.parcial1 ?? null, parcial2: d?.parcial2 ?? null, practico: d?.practico ?? null,
+          final1: d?.final1 ?? null, final2: d?.final2 ?? null, final3: d?.final3 ?? null,
+          promedio: d?.promedio_final ?? null,
+          pesos: PESOS_DEFAULT,
         }
-      }).filter(m => m.p1 !== null || m.p2 !== null || m.tp !== null || m.final !== null)
+      }).filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || finalEfectivo(m) !== null)
       setMaterias(rows)
       setLastUpdate(new Date())
     } catch { /* ignore */ }
@@ -589,14 +699,9 @@ function AdminView() {
       ).slice(0, 12)
     : []
 
-  const calc = (m: MateriaAdm) => {
-    const ns = [m.p1, m.p2, m.tp, m.final].filter((n): n is number => n !== null)
-    return ns.length ? Math.round(ns.reduce((a, b) => a + b, 0) / ns.length * 10) / 10 : null
-  }
-
-  const proms = materias.map(calc).filter((p): p is number => p !== null)
+  const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
   const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : null
-  const aprobadas = materias.filter(m => (calc(m) ?? 0) >= 6).length
+  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
 
   /* ── Agrupar por año → semestre ──────────────────────────── */
   const grupos = new Map<number, Map<number, MateriaAdm[]>>()
@@ -725,18 +830,6 @@ function AdminView() {
         </div>
       ) : (
         <>
-          {/* ── Pills por año ── */}
-          {anios.length > 1 && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-              {anios.map(([anio]) => (
-                <span key={anio} className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)', fontSize: 11, padding: '5px 14px' }}>
-                  <i className="ti ti-calendar-stats" style={{ marginRight: 4, fontSize: 11 }} />{anio}° Año
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* ── Materias por semestre ── */}
           {anios.map(([anio, semMap]) => (
             <div key={anio} style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-bright)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -750,22 +843,23 @@ function AdminView() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
                     {lista.map(m => {
-                      const p = calc(m)
+                      const p = m.promedio
                       const est = estadoDe(p)
+                      const fin = finalEfectivo(m)
                       return (
-                        <div key={m.nombre} className="card" style={{ padding: '12px 14px' }}>
+                        <div key={m.materia_id} className="card" style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                             <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.3 }}>{m.nombre}</span>
                             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 800, color: notaColor(p), flexShrink: 0, marginLeft: 8 }}>{p ?? '—'}</span>
                           </div>
                           <div className="mono-label" style={{ fontSize: 10, marginBottom: 8 }}>
-                            {m.codigo || `MAT-${String(materias.indexOf(m) + 1).padStart(3, '0')}`} · {m.profesor}
+                            {m.codigo || `MAT-${String(m.materia_id).padStart(3, '0')}`} · {m.profesor}
                           </div>
                           <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6 }}>
-                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Parcial 1</span><b style={{ color: notaColor(m.p1) }}>{m.p1 ?? '—'}</b></div>
-                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Parcial 2</span><b style={{ color: notaColor(m.p2) }}>{m.p2 ?? '—'}</b></div>
-                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Trabajos</span><b style={{ color: notaColor(m.tp) }}>{m.tp ?? '—'}</b></div>
-                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Final</span><b style={{ color: notaColor(m.final) }}>{m.final ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Parcial 1</span><b style={{ color: notaColor(m.parcial1) }}>{m.parcial1 ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Parcial 2</span><b style={{ color: notaColor(m.parcial2) }}>{m.parcial2 ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Trabajos</span><b style={{ color: notaColor(m.practico) }}>{m.practico ?? '—'}</b></div>
+                            <div className="desglose-row" style={{ fontSize: 11 }}><span>Final</span><b style={{ color: notaColor(fin) }}>{fin ?? '—'}</b></div>
                           </div>
                           <div style={{ marginTop: 8 }}>
                             <span className="badge" style={{ background: est.bg, color: est.color, fontSize: 10 }}>{est.label}</span>

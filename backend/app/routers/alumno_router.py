@@ -6,7 +6,7 @@ from app.models import evento_calendario
 from app.dependencias import get_current_user
 from app.security import hash_password
 from app.services.storage import obtener_url_firmada
-from app.services.puntajes_utils import calcular_promedio_final
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/alumno", tags=["alumno"])
 
@@ -63,11 +63,15 @@ def actualizar_mi_perfil(
 
 @router.get("/mis-materias")
 def mis_materias(
+    anio: int | None = None,
+    semestre: int | None = None,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    """Materias inscriptas del alumno. Sin filtro: solo ofertas activas (período actual).
+    Con anio/semestre: cualquier período histórico (para ver semestres anteriores)."""
     uid = current_user.user_id
-    inscripciones = (
+    query = (
         db.query(models.inscripcion.Inscripcion)
         .options(
             joinedload(models.inscripcion.Inscripcion.oferta)
@@ -76,16 +80,25 @@ def mis_materias(
             .joinedload(models.oferta_materia.OfertaMateria.profesor),
         )
         .filter(models.inscripcion.Inscripcion.alumno_id == uid)
-        .all()
     )
+    inscripciones = query.all()
+    filtro_periodo = anio is not None or semestre is not None
+
     seen = set()
     result = []
     for ins in inscripciones:
         oferta = ins.oferta
-        if not oferta or not oferta.activa:
+        if not oferta:
             continue
         m = oferta.materia
         if not m or m.id in seen:
+            continue
+        if filtro_periodo:
+            if anio is not None and m.anio != anio:
+                continue
+            if semestre is not None and m.semestre != semestre:
+                continue
+        elif not oferta.activa:
             continue
         seen.add(m.id)
         result.append({
@@ -94,8 +107,34 @@ def mis_materias(
             "profesor": oferta.profesor.nombre if oferta.profesor else None,
             "anio": m.anio,
             "semestre": m.semestre,
+            "oferta_periodo": oferta.periodo,
         })
     return result
+
+
+@router.get("/mis-periodos")
+def mis_periodos(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Lista de (anio, semestre) distintos en los que el alumno tiene inscripciones."""
+    uid = current_user.user_id
+    filas = (
+        db.query(models.materia.Materia.anio, models.materia.Materia.semestre)
+        .join(
+            models.oferta_materia.OfertaMateria,
+            models.oferta_materia.OfertaMateria.materia_id == models.materia.Materia.id,
+        )
+        .join(
+            models.inscripcion.Inscripcion,
+            models.inscripcion.Inscripcion.oferta_materia_id == models.oferta_materia.OfertaMateria.id,
+        )
+        .filter(models.inscripcion.Inscripcion.alumno_id == uid)
+        .distinct()
+        .all()
+    )
+    periodos = sorted({(a, s) for a, s in filas if a is not None and s is not None}, reverse=True)
+    return [{"anio": a, "semestre": s} for a, s in periodos]
 
 
 @router.get("/mis-notas")
@@ -125,20 +164,18 @@ def mis_notas(
                 "parcial1": None,
                 "parcial2": None,
                 "practico": None,
-                "final": None,
+                "final1": None,
+                "final2": None,
+                "final3": None,
             }
-        por_materia[mid][p.tipo] = float(p.valor)
+        if p.tipo in por_materia[mid]:
+            por_materia[mid][p.tipo] = float(p.valor)
 
     result = []
     for mid, data in por_materia.items():
-        scores = {
-            "parcial1": data.get("parcial1"),
-            "parcial2": data.get("parcial2"),
-            "practico": data.get("practico"),
-            "final": data.get("final"),
-        }
-        prom = calcular_promedio_final(scores)
-        result.append({**data, "promedio": prom})
+        pesos = get_pesos(db, mid)
+        prom = calcular_promedio_final(data, pesos)
+        result.append({**data, "promedio": prom, "pesos": pesos})
 
     return result
 
@@ -253,6 +290,7 @@ def dashboard(
             "tipo": e.tipo,
             "fecha": e.fecha.isoformat() if e.fecha else None,
             "fecha_fin": e.fecha_fin.isoformat() if e.fecha_fin else None,
+            "hora": e.hora,
             "materia_id": e.materia_id,
             "carrera_id": e.carrera_id,
             "descripcion": e.descripcion,
@@ -275,6 +313,7 @@ def dashboard(
             "tipo": proximo.tipo,
             "fecha": proximo.fecha.isoformat() if proximo.fecha else None,
             "fecha_fin": proximo.fecha_fin.isoformat() if proximo.fecha_fin else None,
+            "hora": proximo.hora,
             "materia_id": proximo.materia_id,
             "carrera_id": proximo.carrera_id,
             "descripcion": proximo.descripcion,
@@ -299,10 +338,10 @@ def dashboard(
         if cuotas:
             cuenta_hay_cuotas = True
             for c in cuotas:
-                monto = float(c.monto_a_pagar) if c.monto_a_pagar else 0
+                monto = float(c.monto - c.monto_descuento)
                 if c.estado == "pagada":
                     cuenta_pagado += monto
-                elif c.estado == "vencido":
+                elif c.estado == "vencida":
                     cuenta_saldo_vencido += monto
                 elif c.estado == "pendiente":
                     cuenta_saldo_pendiente += monto

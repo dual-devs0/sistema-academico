@@ -278,7 +278,7 @@ def crear_oferta(
         materia_id=nueva.materia_id,
         profesor_id=nueva.profesor_id,
         periodo=nueva.periodo,
-        activa=nueva.activa,
+        activa=bool(nueva.activa),
         materia_nombre=materia.nombre,
         profesor_nombre=profesor.nombre or profesor.username,
     )

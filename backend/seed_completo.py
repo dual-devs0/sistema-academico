@@ -351,12 +351,13 @@ print(
 # 6. PUNTAJES
 # ─────────────────────────────────────────
 admin_user = users_map["admin@uca.edu.py"]
+# Escala de puntos (default parcial1/parcial2 max=20, practico max=10 — ver PesoEvaluacion)
 notas_por_alumno = {
-    "12345678": {"parcial1": 7.5, "parcial2": 8.0, "practico": 9.0},
-    "23456789": {"parcial1": 9.0, "parcial2": 9.5, "practico": 10.0},
-    "34567890": {"parcial1": 5.5, "parcial2": 6.0, "practico": 7.0},
-    "45678901": {"parcial1": 8.5, "parcial2": 8.0, "practico": 9.5},
-    "56789012": {"parcial1": 6.0, "parcial2": 7.5, "practico": 8.0},
+    "12345678": {"parcial1": 15.0, "parcial2": 16.0, "practico": 9.0},
+    "23456789": {"parcial1": 18.0, "parcial2": 19.0, "practico": 10.0},
+    "34567890": {"parcial1": 11.0, "parcial2": 12.0, "practico": 7.0},
+    "45678901": {"parcial1": 17.0, "parcial2": 16.0, "practico": 9.5},
+    "56789012": {"parcial1": 12.0, "parcial2": 15.0, "practico": 8.0},
 }
 for username in alumnos_keys:
     alumno = users_map[username]

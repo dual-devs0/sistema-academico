@@ -1,14 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, emitToast } from '../lib/api'
 import {
-  aprobarPasantia, finalizarPasantia,
-  type Pasantia,
+  aprobarPasantia, finalizarPasantia, getProfesores,
+  type Pasantia, type ProfesorItem,
 } from '../services/pasantiasService'
-
-interface PasantiaSolicitud extends Pasantia {
-  fecha_solicitud: string
-  motivo_rechazo?: string
-}
 
 const POLL_MS = 30000
 
@@ -94,6 +89,14 @@ const css = `
     color:var(--text-primary); width:100%; margin-bottom:12px; box-sizing:border-box;
   }
   .ps-input:focus { outline:none; border-color:var(--accent-bright); }
+  .ps-select {
+    padding:8px 12px; border-radius:10px; font-size:13px;
+    background:var(--bg-base); border:1px solid var(--border-subtle);
+    color:var(--text-primary); width:100%; margin-bottom:12px; box-sizing:border-box;
+    cursor:pointer;
+  }
+  .ps-select:focus { outline:none; border-color:var(--accent-bright); }
+  .ps-select option { background:var(--bg-elevated); color:var(--text-primary); }
   .ps-textarea {
     padding:8px 12px; border-radius:10px; font-size:13px;
     background:var(--bg-base); border:1px solid var(--border-subtle);
@@ -126,17 +129,23 @@ function estadoLabel(e: string) {
   return (TAB_LABELS as Record<string, string>)[e] ?? e.charAt(0).toUpperCase() + e.slice(1)
 }
 
+function formatDate(d: string | null | undefined): string {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('es-PY')
+}
+
 export default function PasantiasAdmin() {
-  const [pasantias, setPasantias] = useState<PasantiaSolicitud[]>([])
+  const [pasantias, setPasantias] = useState<Pasantia[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('pendiente')
-  const [selected, setSelected] = useState<PasantiaSolicitud | null>(null)
+  const [selected, setSelected] = useState<Pasantia | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [showApprove, setShowApprove] = useState(false)
   const [showReject, setShowReject] = useState(false)
+  const [profesores, setProfesores] = useState<ProfesorItem[]>([])
   const [tutorId, setTutorId] = useState('')
   const [motivo, setMotivo] = useState('')
   const [processing, setProcessing] = useState(false)
@@ -147,7 +156,7 @@ export default function PasantiasAdmin() {
     if (manual) setRefreshing(true)
     if (firstLoad.current) setLoading(true)
     try {
-      const data = await api.get<PasantiaSolicitud[]>('/pasantias/solicitudes')
+      const data = await api.get<Pasantia[]>('/pasantias/solicitudes')
       setPasantias(data)
       setError('')
       setLastUpdate(new Date())
@@ -169,19 +178,26 @@ export default function PasantiasAdmin() {
 
   const filtered = pasantias.filter(p => tab === 'todas' || p.estado === tab)
 
-  const openDetail = (p: PasantiaSolicitud) => {
+  const openDetail = (p: Pasantia) => {
     setSelected(p)
     setShowDetail(true)
   }
 
-  const openApproveModal = (p: PasantiaSolicitud) => {
+  const openApproveModal = async (p: Pasantia) => {
     setSelected(p)
     setTutorId('')
     setShowDetail(false)
     setShowApprove(true)
+    try {
+      const lista = await getProfesores()
+      setProfesores(lista)
+    } catch {
+      setProfesores([])
+      emitToast('No se pudieron cargar los profesores', 'error')
+    }
   }
 
-  const openRejectModal = (p: PasantiaSolicitud) => {
+  const openRejectModal = (p: Pasantia) => {
     setSelected(p)
     setMotivo('')
     setShowDetail(false)
@@ -189,7 +205,7 @@ export default function PasantiasAdmin() {
   }
 
   const handleAprobar = async () => {
-    if (!selected || !tutorId) { emitToast('Ingresá el ID del tutor académico', 'warning'); return }
+    if (!selected || !tutorId) { emitToast('Seleccioná un tutor académico', 'warning'); return }
     setProcessing(true)
     try {
       await aprobarPasantia(selected.id, Number(tutorId))
@@ -293,7 +309,7 @@ export default function PasantiasAdmin() {
                 <tr key={p.id}>
                   <td>{p.alumno_nombre ?? `#${p.alumno_id}`}</td>
                   <td>{p.empresa_nombre ?? `#${p.empresa_id}`}</td>
-                  <td>{p.fecha_solicitud ? new Date(p.fecha_solicitud).toLocaleDateString('es-PY') : '—'}</td>
+                  <td>{formatDate(p.created_at)}</td>
                   <td><span className={`ps-badge ${p.estado}`}>{estadoLabel(p.estado)}</span></td>
                   <td>
                     <div className="ps-actions">
@@ -329,21 +345,15 @@ export default function PasantiasAdmin() {
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Fecha solicitud</span>
-                <span className="ps-detail-value">
-                  {selected.fecha_solicitud ? new Date(selected.fecha_solicitud).toLocaleDateString('es-PY') : '—'}
-                </span>
+                <span className="ps-detail-value">{formatDate(selected.created_at)}</span>
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Fecha inicio</span>
-                <span className="ps-detail-value">
-                  {selected.fecha_inicio ? new Date(selected.fecha_inicio).toLocaleDateString('es-PY') : '—'}
-                </span>
+                <span className="ps-detail-value">{formatDate(selected.fecha_inicio)}</span>
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Fecha fin</span>
-                <span className="ps-detail-value">
-                  {selected.fecha_fin ? new Date(selected.fecha_fin).toLocaleDateString('es-PY') : '—'}
-                </span>
+                <span className="ps-detail-value">{formatDate(selected.fecha_fin)}</span>
               </div>
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Horas requeridas</span>
@@ -353,10 +363,12 @@ export default function PasantiasAdmin() {
                 <span className="ps-detail-label">Horas completadas</span>
                 <span className="ps-detail-value">{selected.horas_completadas}</span>
               </div>
-              <div className="ps-detail-row">
-                <span className="ps-detail-label">Tutor académico</span>
-                <span className="ps-detail-value">{selected.tutor_nombre ?? (selected.tutor_academico_id ? `#${selected.tutor_academico_id}` : '—')}</span>
-              </div>
+              {selected.tutor_nombre && (
+                <div className="ps-detail-row">
+                  <span className="ps-detail-label">Tutor académico</span>
+                  <span className="ps-detail-value">{selected.tutor_nombre}</span>
+                </div>
+              )}
               <div className="ps-detail-row">
                 <span className="ps-detail-label">Estado</span>
                 <span className="ps-detail-value">
@@ -398,12 +410,25 @@ export default function PasantiasAdmin() {
         <div className="ps-modal-overlay" onClick={() => setShowApprove(false)}>
           <div className="ps-modal" onClick={e => e.stopPropagation()}>
             <div className="ps-modal-title">Aprobar pasantía #{selected.id}</div>
-            <label className="ps-label">ID del tutor académico</label>
-            <input
-              className="ps-input" type="number" value={tutorId}
-              onChange={e => setTutorId(e.target.value)}
-              placeholder="Ej: 5"
-            />
+            <label className="ps-label">Tutor académico</label>
+            {profesores.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                No hay profesores disponibles. Creá usuarios con rol profesor primero.
+              </p>
+            ) : (
+              <select
+                className="ps-select"
+                value={tutorId}
+                onChange={e => setTutorId(e.target.value)}
+              >
+                <option value="">Seleccioná un profesor…</option>
+                {profesores.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} {p.email ? `(${p.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
             <div className="ps-modal-actions">
               <button className="ps-btn secondary" onClick={() => setShowApprove(false)} disabled={processing}>Cancelar</button>
               <button className="ps-btn primary" onClick={handleAprobar} disabled={processing || !tutorId}>

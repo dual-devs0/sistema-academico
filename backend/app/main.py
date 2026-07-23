@@ -39,6 +39,7 @@ from app.routers import (  # noqa: E402
     notificaciones,
     notas,
     admin,
+    settings,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -122,6 +123,7 @@ app.include_router(examenes.router)
 app.include_router(notificaciones.router)
 app.include_router(notas.router)
 app.include_router(admin.router)
+app.include_router(settings.router)
 app.include_router(test_router.router)
 
 

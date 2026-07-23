@@ -65,10 +65,10 @@ def notas_seed(db):
 
     # Puntajes (notas) del alumno en esta oferta
     for pd in [
-        {"tipo": "parcial1", "valor": 7.5},
-        {"tipo": "parcial2", "valor": 8.0},
+        {"tipo": "parcial1", "valor": 15.0},
+        {"tipo": "parcial2", "valor": 16.0},
         {"tipo": "practico", "valor": 9.0},
-        {"tipo": "final", "valor": 6.5},
+        {"tipo": "final1", "valor": 32.5},
     ]:
         db.add(Puntaje(
             user_id=alumno.id,
@@ -132,8 +132,8 @@ class TestMateriaDetalle:
         assert data["profesor"] == "Profesor Notas Test"
         assert data["semestre"] == 1
 
-        # Promedio ponderado: (7.5*0.25 + 8.0*0.25 + 9.0*0.20 + 6.5*0.30) / 1.0 = 7.62
-        assert data["promedio"] == 7.62
+        # Puntos: (15+16+9+32.5) sobre 100 max (20+20+10+50) reescalado a /10 = 7.25
+        assert data["promedio"] == 7.25
 
         # Asistencia: 3/4 = 75%
         assert data["asistenciaPct"] == 75.0
@@ -141,14 +141,14 @@ class TestMateriaDetalle:
         assert data["presentes"] == 3
 
         desglose = {d["tipo"]: d for d in data["desglose"]}
-        assert desglose["parcial1"]["nota"] == 7.5
-        assert desglose["parcial2"]["nota"] == 8.0
+        assert desglose["parcial1"]["nota"] == 15.0
+        assert desglose["parcial2"]["nota"] == 16.0
         assert desglose["practico"]["nota"] == 9.0
-        assert desglose["final"]["nota"] == 6.5
-        assert desglose["final1"]["nota"] is None  # no registrado
-        assert desglose["parcial1"]["peso"] == 0.25
-        assert desglose["final"]["peso"] == 0.30
-        assert desglose["parcial1"]["puntajeActividad"] == 100
+        assert desglose["final1"]["nota"] == 32.5
+        assert desglose["final2"]["nota"] is None  # no registrado
+        assert desglose["parcial1"]["peso"] == 20
+        assert desglose["final1"]["peso"] == 50
+        assert desglose["parcial1"]["puntajeActividad"] == 20
 
     def test_profesor_tambien_accede(self, client, notas_seed):
         token_prof = create_access_token({

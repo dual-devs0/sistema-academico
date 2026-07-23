@@ -5,11 +5,78 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_alumno, es_profesor_de_materia
-from app.services.puntajes_utils import PESOS, calcular_promedio_final
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos
 # AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
 from app.routers.asistencias_router import _oferta_activa_id
 
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
+
+
+@router.get("/pesos/{materia_id}", response_model=schemas.puntaje.PesoEvaluacionOut)
+def obtener_pesos_materia(
+    materia_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Puntaje máximo configurado por tipo para una materia (default 20/20/10/50 si no hay fila)."""
+    pesos = get_pesos(db, materia_id)
+    fila = db.query(models.peso_evaluacion.PesoEvaluacion).filter(
+        models.peso_evaluacion.PesoEvaluacion.materia_id == materia_id
+    ).first()
+    return schemas.puntaje.PesoEvaluacionOut(
+        materia_id=materia_id,
+        parcial1_max=pesos["parcial1"],
+        parcial2_max=pesos["parcial2"],
+        practico_max=pesos["practico"],
+        final_max=pesos["final"],
+        updated_by=fila.updated_by if fila else None,
+        updated_at=fila.updated_at if fila else None,
+    )
+
+
+@router.put("/pesos/{materia_id}", response_model=schemas.puntaje.PesoEvaluacionOut)
+def actualizar_pesos_materia(
+    materia_id: int,
+    body: schemas.puntaje.PesoEvaluacionUpdate,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Admin o profesor titular de la materia configura el puntaje máximo por tipo (debe sumar 100)."""
+    if current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    materia = db.query(models.materia.Materia).filter(models.materia.Materia.id == materia_id).first()
+    if not materia:
+        raise HTTPException(status_code=404, detail="Materia no encontrada")
+    if current_user.role == "profesor" and not es_profesor_de_materia(db, materia_id, current_user.user_id):
+        raise HTTPException(status_code=403, detail="No sos el profesor titular de esta materia")
+
+    fila = db.query(models.peso_evaluacion.PesoEvaluacion).filter(
+        models.peso_evaluacion.PesoEvaluacion.materia_id == materia_id
+    ).first()
+    if not fila:
+        fila = models.peso_evaluacion.PesoEvaluacion(materia_id=materia_id)
+        db.add(fila)
+    fila.parcial1_max = body.parcial1_max
+    fila.parcial2_max = body.parcial2_max
+    fila.practico_max = body.practico_max
+    fila.final_max = body.final_max
+    fila.updated_by = current_user.user_id
+    db.commit()
+    db.refresh(fila)
+    return schemas.puntaje.PesoEvaluacionOut(
+        materia_id=materia_id,
+        parcial1_max=float(fila.parcial1_max),
+        parcial2_max=float(fila.parcial2_max),
+        practico_max=float(fila.practico_max),
+        final_max=float(fila.final_max),
+        updated_by=fila.updated_by,
+        updated_at=fila.updated_at,
+    )
+
+
+def _max_para_tipo(pesos: dict[str, float], tipo: str) -> float:
+    clave = "final" if tipo.startswith("final") else tipo
+    return pesos.get(clave, 100)
 
 
 def _get_puntajes_por_materia(db: Session, materia_id: int):
@@ -62,6 +129,13 @@ def create_puntaje(
     if oferta_id is None:
         raise HTTPException(
             status_code=404, detail="No hay oferta activa para esta materia"
+        )
+    pesos = get_pesos(db, puntaje.materia_id)
+    maximo = _max_para_tipo(pesos, puntaje.tipo)
+    if puntaje.valor > maximo:
+        raise HTTPException(
+            status_code=422,
+            detail=f"El valor máximo para '{puntaje.tipo}' en esta materia es {maximo}",
         )
     # Check for duplicate grade type
     existing = (
@@ -200,6 +274,13 @@ def update_puntaje(
                 status_code=404, detail="No hay oferta activa para esta materia"
             )
         setattr(existing, 'oferta_materia_id', nuevo_oferta_id)
+    pesos = get_pesos(db, nueva_materia_id)
+    maximo = _max_para_tipo(pesos, data["tipo"])
+    if data["valor"] > maximo:
+        raise HTTPException(
+            status_code=422,
+            detail=f"El valor máximo para '{data['tipo']}' en esta materia es {maximo}",
+        )
     for key, value in data.items():
         setattr(existing, key, value)
     existing.editado_por = user.id
@@ -278,6 +359,7 @@ def puntajes_por_materia(
             )
 
     rows = _get_puntajes_por_materia(db, materia_id)
+    pesos = get_pesos(db, materia_id)
     alumno_map: dict[int, dict] = {}
     for p, nombre, username in rows:
         if p.user_id not in alumno_map:
@@ -287,13 +369,16 @@ def puntajes_por_materia(
                 "parcial1": None,
                 "parcial2": None,
                 "practico": None,
-                "final": None,
+                "final1": None,
+                "final2": None,
+                "final3": None,
             }
-        alumno_map[p.user_id][p.tipo] = float(p.valor)
+        if p.tipo in alumno_map[p.user_id]:
+            alumno_map[p.user_id][p.tipo] = float(p.valor)
 
     result = []
     for uid, data in alumno_map.items():
-        prom = calcular_promedio_final(data)
+        prom = calcular_promedio_final(data, pesos)
         result.append(
             schemas.puntaje.PromedioFinalOut(user_id=uid, **data, promedio_final=prom)
         )
@@ -322,14 +407,19 @@ def promedio_final_alumno(
         query = query.filter(models.puntaje.Puntaje.oferta_materia_id == oferta_id)
     puntajes = query.all()
 
-    notas: dict[str, float | None] = {"parcial1": None, "parcial2": None, "practico": None, "final": None}
+    notas: dict[str, float | None] = {
+        "parcial1": None, "parcial2": None, "practico": None,
+        "final1": None, "final2": None, "final3": None,
+    }
     for p in puntajes:
-        notas[str(p.tipo)] = float(str(p.valor))
+        if str(p.tipo) in notas:
+            notas[str(p.tipo)] = float(str(p.valor))
 
     alumno = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     nombre_val: str | None = getattr(alumno, 'nombre', None) if alumno else None
     nombre: str = nombre_val if nombre_val else ""
-    prom = calcular_promedio_final(notas)
+    pesos = get_pesos(db, materia_id)
+    prom = calcular_promedio_final(notas, pesos)
 
     return schemas.puntaje.PromedioFinalOut(
         user_id=user_id, nombre=nombre, **notas, promedio_final=prom
@@ -355,12 +445,17 @@ def exportar_materia(
         raise HTTPException(status_code=404, detail="Materia no encontrada")
 
     rows = _get_puntajes_por_materia(db, materia_id)
+    pesos = get_pesos(db, materia_id)
     alumno_map: dict[int, dict] = {}
     for p, nombre, username in rows:
         if p.user_id not in alumno_map:
-            alumno_map[p.user_id] = {"nombre": nombre, "username": username,
-                                     "parcial1": None, "parcial2": None, "practico": None, "final": None}
-        alumno_map[p.user_id][p.tipo] = float(p.valor)
+            alumno_map[p.user_id] = {
+                "nombre": nombre, "username": username,
+                "parcial1": None, "parcial2": None, "practico": None,
+                "final1": None, "final2": None, "final3": None,
+            }
+        if p.tipo in alumno_map[p.user_id]:
+            alumno_map[p.user_id][p.tipo] = float(p.valor)
 
     asistencia_oferta_id = _oferta_activa_id(db, materia_id)
     uids = list(alumno_map.keys())
@@ -382,7 +477,7 @@ def exportar_materia(
 
     alumnos_out = []
     for uid, data in alumno_map.items():
-        prom = calcular_promedio_final(data)
+        prom = calcular_promedio_final(data, pesos)
         tot, pres = asist_map.get(uid, (0, 0))
         asist_pct = round((pres / tot) * 100, 1) if tot > 0 else None
         alumnos_out.append(schemas.puntaje.AlumnoExportRow(user_id=uid, **data, promedio=prom, asistencia_pct=asist_pct))
@@ -401,27 +496,36 @@ def estadisticas_materia(
     if current_user.role == "profesor" and not es_profesor_de_materia(db, materia_id, current_user.user_id):
         raise HTTPException(status_code=403, detail="No sos el profesor titular de esta materia")
 
-    from sqlalchemy import func as f
     P = models.puntaje.Puntaje
     oferta_id = _oferta_activa_id(db, materia_id)
     if not oferta_id:
         return {"materia_id": materia_id, "total_alumnos": 0, "promedio_grupo": 0,
                 "distribucion": {}, "aprobados": 0, "en_riesgo": 0}
 
-    # Single query: per-student average
-    agg = (
-        db.query(P.user_id, f.avg(P.valor).label("prom"), f.count(P.id).label("cnt"))
-        .filter(P.oferta_materia_id == oferta_id)
-        .group_by(P.user_id)
-        .all()
-    )
-    if not agg:
+    filas = db.query(P).filter(P.oferta_materia_id == oferta_id).all()
+    if not filas:
         return {"materia_id": materia_id, "total_alumnos": 0, "promedio_grupo": 0,
                 "distribucion": {}, "aprobados": 0, "en_riesgo": 0}
 
-    promedios = [float(r.prom) for r in agg]
-    total_alumnos = len(agg)
-    total_notas = sum(r.cnt for r in agg)
+    pesos = get_pesos(db, materia_id)
+    por_alumno: dict[int, dict] = {}
+    for p in filas:
+        d = por_alumno.setdefault(p.user_id, {
+            "parcial1": None, "parcial2": None, "practico": None,
+            "final1": None, "final2": None, "final3": None,
+        })
+        if p.tipo in d:
+            d[p.tipo] = float(p.valor)
+
+    promedios = [
+        prom for prom in (calcular_promedio_final(d, pesos) for d in por_alumno.values())
+        if prom is not None
+    ]
+    if not promedios:
+        return {"materia_id": materia_id, "total_alumnos": 0, "promedio_grupo": 0,
+                "distribucion": {}, "aprobados": 0, "en_riesgo": 0}
+    total_alumnos = len(promedios)
+    total_notas = len(filas)
 
     distribucion = {
         "0-3": sum(1 for v in promedios if v < 3),

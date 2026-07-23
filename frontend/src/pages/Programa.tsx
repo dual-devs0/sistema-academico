@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
@@ -48,7 +49,7 @@ const css = `
   .main-grid { display:grid; grid-template-columns:248px 1fr; gap:16px; align-items:start; }
 
   /* Panel izquierdo */
-  .left-panel { display:flex; flex-direction:column; gap:10px; position:sticky; top:76px; }
+  .left-panel { display:flex; flex-direction:column; gap:10px; position:sticky; top:76px; max-height:calc(100vh - 90px); overflow-y:auto; scrollbar-width:thin; }
   .panel-lbl { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; font-weight:700; margin-bottom:4px; }
   .mat-item { border-radius:12px; padding:12px 12px 12px 14px; cursor:pointer; border:1px solid #2a3040; transition:all .15s; background:var(--bg-surface); position:relative; overflow:hidden; margin-bottom:6px; }
   .mat-item:hover { border-color:var(--border-light); }
@@ -429,6 +430,7 @@ const cssProg = `
 type ProgramaUnit = { titulo: string; descripcion: string; semana: number }
 
 function ProfesorProgramaView() {
+  const navigate = useNavigate()
   const user  = getCurrentUser()
   const uid   = Number(user?.user_id)
 
@@ -507,7 +509,12 @@ function ProfesorProgramaView() {
       {toast && <div className="pp-toast">{toast}</div>}
       <div className="pp-root">
         <header className="pp-topbar">
-          <h1>Programa de clases</h1>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <button className="btn-ghost" style={{ padding:'5px 8px', fontSize:11 }} onClick={() => navigate(-1)}>
+              <i className="ti ti-arrow-left" />
+            </button>
+            <h1>Programa de clases</h1>
+          </div>
           <div style={{ fontSize:11, background:'#3b82f615', color:'#3b82f6', border:'1px solid #3b82f630', borderRadius:20, padding:'4px 10px', fontWeight:600 }}>
             Modo Profesor
           </div>
@@ -596,6 +603,7 @@ function ProfesorProgramaView() {
 export default function Programa() {
   const user = getCurrentUser()
   const ROL = user?.role || 'alumno'
+  const [searchParams] = useSearchParams()
 
   const [data,       setData]       = useState<MateriaTemario[]>([])
   const [activa,     setActiva]     = useState('')
@@ -603,7 +611,14 @@ export default function Programa() {
   const [dropOpen,   setDropOpen]   = useState(false)
   const [toast,      setToast]      = useState('')
   const [cargando,   setCargando]   = useState(true)
+  const [tab,        setTab]        = useState<'temario'|'asistencia'|'calificaciones'>('temario')
   const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t === 'calificaciones') setTab('calificaciones')
+    else if (t === 'asistencia') setTab('asistencia')
+  }, [searchParams])
 
   useEffect(() => {
     Promise.all([
@@ -686,7 +701,7 @@ export default function Programa() {
   const completadas = temario?.clases.filter(c => c.completada).length ?? 0
   const progreso = temario?.clases.length ? Math.round((completadas / temario.clases.length) * 100) : 0
 
-  if (cargando) return (
+  if (tab === 'temario' && cargando) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg-base)', color:'var(--text-muted)', fontFamily:'Inter,system-ui,sans-serif', flexDirection:'column', gap:12 }}>
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation:'spin 1s linear infinite' }}>
         <circle cx="12" cy="12" r="10" stroke="#2a3040" strokeWidth="3"/>
@@ -697,20 +712,46 @@ export default function Programa() {
     </div>
   )
 
+  if (tab !== 'temario') {
+    return (
+      <>
+        <style>{css}</style>
+        <div className="tem-root">
+          <header className="topbar">
+            <h1>Cursos</h1>
+          </header>
+          <div className="content">
+            <CursosTabs tab={tab} setTab={setTab} />
+            {tab === 'asistencia' ? <AsistenciaTab userId={Number(user?.user_id ?? 0)} /> : <CalificacionesTab userId={Number(user?.user_id ?? 0)} />}
+          </div>
+        </div>
+      </>
+    )
+  }
+
   if (!temario) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg-base)', color:'var(--text-muted)', fontFamily:'Inter,system-ui,sans-serif', flexDirection:'column', gap:16, textAlign:'center', padding:24 }}>
-      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2a3040" strokeWidth="1.5">
-        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-      </svg>
-      <div>
-        <p style={{ fontSize:16, fontWeight:700, color:'var(--text-secondary)', margin:'0 0 6px' }}>Sin programa disponible</p>
-        <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>
-          {ROL === 'alumno'
-            ? 'Tu profesor todavía no cargó el programa de clases.'
-            : 'No hay programas cargados aún. Creá el programa desde la sección Materias.'}
-        </p>
+    <>
+      <style>{css}</style>
+      <div className="tem-root">
+        <header className="topbar"><h1>Cursos</h1></header>
+        <div className="content">
+          <CursosTabs tab={tab} setTab={setTab} />
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'50vh', color:'var(--text-muted)', flexDirection:'column', gap:16, textAlign:'center', padding:24 }}>
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2a3040" strokeWidth="1.5">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            <div>
+              <p style={{ fontSize:16, fontWeight:700, color:'var(--text-secondary)', margin:'0 0 6px' }}>Sin programa disponible</p>
+              <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>
+                {ROL === 'alumno'
+                  ? 'Tu profesor todavía no cargó el programa de clases.'
+                  : 'No hay programas cargados aún. Creá el programa desde la sección Materias.'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 
   return (
@@ -733,6 +774,8 @@ export default function Programa() {
         </header>
 
         <div className="content">
+
+          <CursosTabs tab={tab} setTab={setTab} />
 
           {/* Dropdown mobile */}
           <div className="mob-drop-wrap" ref={dropRef}>
@@ -894,5 +937,464 @@ export default function Programa() {
         {toast && <div className="toast">✓ {toast}</div>}
       </div>
     </>
+  )
+}
+
+/* ═══ Tabs + Asistencia (cards circulares) + Calificaciones ═══════ */
+
+type TabCursos = 'temario' | 'asistencia' | 'calificaciones'
+
+const tabsCss = `
+  .cur-tabs { display:flex; gap:6px; margin-bottom:18px; }
+  .cur-tab { padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; border:1px solid #2a3040; background:transparent; color:var(--text-secondary); cursor:pointer; transition:all .15s; }
+  .cur-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .asis-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; }
+  .asis-card { background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; padding:18px 14px; text-align:center; cursor:pointer; transition:all .18s; position:relative; overflow:hidden; }
+  .asis-card::before { content:''; position:absolute; inset:0; border-radius:14px; opacity:0; transition:opacity .18s; background:linear-gradient(135deg,var(--accent-muted),transparent 60%); }
+  .asis-card:hover { border-color:var(--accent-hover); transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,.2); }
+  .asis-card:hover::before { opacity:1; }
+  .asis-card > * { position:relative; z-index:1; }
+  .asis-nombre { font-size:13px; font-weight:700; margin-top:10px; line-height:1.35; min-height:36px; }
+  .periodo-select { padding:8px 14px; border-radius:10px; background:var(--bg-surface); border:1px solid #2a3040; color:var(--text-primary); font-size:12.5px; font-weight:600; margin-bottom:16px; cursor:pointer; transition:border-color .15s; }
+  .periodo-select:hover { border-color:var(--accent-hover); }
+  .periodo-select:focus { border-color:var(--accent); outline:none; }
+  .cur-kpi-grid { display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:20px; }
+  @media(min-width:640px){ .cur-kpi-grid { grid-template-columns:repeat(2,1fr); } }
+  @media(min-width:1024px){ .cur-kpi-grid { grid-template-columns:repeat(4,1fr); } }
+  .cur-alerta { background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius); padding:14px 16px; }
+  .cur-two-col { display:grid; grid-template-columns:1fr; gap:18px; align-items:start; margin-top:18px; }
+  @media(min-width:1024px){ .cur-two-col { grid-template-columns:1fr 300px; } }
+  .cur-back-btn { display:inline-flex; align-items:center; gap:6px; margin-bottom:16px; padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600; background:var(--bg-surface); border:1px solid var(--border-subtle); cursor:pointer; color:var(--text-secondary); font-family:inherit; transition:all .15s; }
+  .cur-back-btn:hover { color:var(--text-primary); border-color:var(--accent-hover); }
+  .det-row { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #2a304022; font-size:13px; }
+  .det-row:last-child { border-bottom:none; }
+  .det-section { margin-bottom:18px; }
+  .det-section:last-child { margin-bottom:0; }
+  .det-head { font-size:13px; font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .det-stats { display:flex; gap:16px; flex-wrap:wrap; }
+  .det-stat { background:var(--bg-elevated); border-radius:10px; padding:12px 16px; flex:1; min-width:100px; text-align:center; }
+  .det-stat-val { font-family:var(--font-mono); font-size:22px; font-weight:800; }
+  .det-stat-lbl { font-size:10px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+  .exp-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; }
+  .exp-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+  .mat-card { background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius); padding:16px 18px; }
+  .mat-card.warn { border-color:rgba(245,158,11,.35); }
+  .desglose-row { display:flex; justify-content:space-between; font-size:12px; padding:5px 0; color:var(--text-secondary); }
+  .desglose-row b { color:var(--text-primary); font-family:var(--font-mono); }
+  @media(max-width:900px){ .exp-stats { grid-template-columns:1fr; } }
+`
+
+function donutColor(pct: number): string {
+  if (pct >= 90) return '#22c55e'
+  if (pct >= 75) return 'var(--accent)'
+  if (pct >= 60) return '#f59e0b'
+  return '#ef4444'
+}
+
+function CursosTabs({ tab, setTab }: { tab: TabCursos; setTab: (t: TabCursos) => void }) {
+  return (
+    <>
+      <style>{tabsCss}</style>
+      <div className="cur-tabs">
+        {(['temario', 'asistencia', 'calificaciones'] as const).map(t => (
+          <button key={t} className={`cur-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+            {t === 'temario' ? 'Temario' : t === 'asistencia' ? 'Asistencia' : 'Calificaciones'}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
+type MateriaPeriodo = { id: number; nombre: string; profesor: string | null; anio?: number | null; semestre?: number | null }
+type NotaMateriaCursos = {
+  materia_id: number; materia_nombre: string
+  parcial1: number | null; parcial2: number | null; practico: number | null
+  final1: number | null; final2: number | null; final3: number | null
+  promedio: number | null
+  pesos: { parcial1: number; parcial2: number; practico: number; final: number }
+}
+type AsistenciaMateriaCursos = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
+
+const PESOS_DEFAULT_CURSOS = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
+const LIMITE_ASIST = 80
+
+type SesionCursos = { materia_id: number; materia_nombre: string; fecha: string; presente: boolean }
+
+function estadoNota(p: number | null): { label: string; bg: string; color: string } {
+  if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
+  if (p >= 9) return { label: 'PROMOCIONADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
+  if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
+  return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
+}
+
+function AsistenciaTab({ userId }: { userId: number }) {
+  const [periodos, setPeriodos] = useState<{ anio: number; semestre: number }[]>([])
+  const [periodoSel, setPeriodoSel] = useState<string>('actual')
+  const [materias, setMaterias] = useState<MateriaPeriodo[]>([])
+  const [notas, setNotas] = useState<Record<number, NotaMateriaCursos>>({})
+  const [asistencias, setAsistencias] = useState<Record<number, AsistenciaMateriaCursos>>({})
+  const [sesiones, setSesiones] = useState<SesionCursos[]>([])
+  const [loading, setLoading] = useState(true)
+  const [detalle, setDetalle] = useState<number | null>(null)
+
+  useEffect(() => {
+    api.get<{ anio: number; semestre: number }[]>('/alumno/mis-periodos').then(setPeriodos).catch(() => {})
+    api.get<SesionCursos[]>(`/asistencias/?user_id=${userId}`).then(setSesiones).catch(() => {})
+  }, [userId])
+
+  useEffect(() => {
+    setLoading(true)
+    const qs = periodoSel === 'actual' ? '' : (() => {
+      const [a, s] = periodoSel.split('-')
+      return `?anio=${a}&semestre=${s}`
+    })()
+    Promise.all([
+      api.get<MateriaPeriodo[]>(`/alumno/mis-materias${qs}`).catch(() => []),
+      api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
+      api.get<AsistenciaMateriaCursos[]>('/alumno/mi-asistencia').catch(() => []),
+    ]).then(([mats, notasData, asisData]) => {
+      setMaterias(mats)
+      setNotas(Object.fromEntries(notasData.map(n => [n.materia_id, n])))
+      setAsistencias(Object.fromEntries(asisData.map(a => [a.materia_id, a])))
+    }).finally(() => setLoading(false))
+  }, [periodoSel, userId])
+
+  const totalClases = Object.values(asistencias).reduce((s, m) => s + m.total_clases, 0)
+  const totalPresentes = Object.values(asistencias).reduce((s, m) => s + m.presentes, 0)
+  const promedioTotal = totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : 0
+  const inasistencias = totalClases - totalPresentes
+  const critica = Object.values(asistencias).filter(m => m.porcentaje < LIMITE_ASIST).sort((a, b) => a.porcentaje - b.porcentaje)[0]
+
+  /* ── DETALLE (swap de vista, como Expediente Académico admin) ── */
+  if (detalle !== null) {
+    const m = materias.find(x => x.id === detalle)
+    const notaM = notas[detalle]
+    const asis = asistencias[detalle]
+    const pesos = notaM?.pesos || PESOS_DEFAULT_CURSOS
+    const sesM = sesiones.filter(s => s.materia_id === detalle)
+    const pct = asis?.porcentaje ?? 0
+    const color = donutColor(pct)
+    const c = 2 * Math.PI * 34
+
+    return (
+      <div>
+        <button className="cur-back-btn" onClick={() => setDetalle(null)}>
+          <i className="ti ti-arrow-left" /> Volver a Asistencia
+        </button>
+
+        <div className="card" style={{ marginBottom: 20, padding: 20, background: `linear-gradient(135deg,${color}08,transparent 70%)`, borderColor: `${color}25` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 17 }}>{m?.nombre ?? '—'}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Prof. {m?.profesor || '—'}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+              <div className="det-stat" style={{ background: 'transparent', border: '1px solid var(--border-subtle)', padding: '8px 16px' }}>
+                <div className="det-stat-val" style={{ color }}>{asis ? `${pct}%` : '—'}</div>
+                <div className="det-stat-lbl">Asistencia</div>
+              </div>
+              <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="40" cy="40" r="34" stroke="var(--bg-elevated)" strokeWidth="7" fill="none" />
+                  <circle cx="40" cy="40" r="34" stroke={color} strokeWidth="7" fill="none"
+                    strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
+                </svg>
+                <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color }}>{asis ? `${pct}%` : '—'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
+          <div className="card" style={{ padding: 20 }}>
+            <div className="det-head"><i className="ti ti-certificate" style={{ color: 'var(--accent-bright)' }} /> Calificaciones</div>
+            <div className="det-row"><span>Parcial 1</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.parcial1 ?? '—'} / {pesos.parcial1}</b></div>
+            <div className="det-row"><span>Parcial 2</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.parcial2 ?? '—'} / {pesos.parcial2}</b></div>
+            <div className="det-row"><span>Trabajo Práctico</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.practico ?? '—'} / {pesos.practico}</b></div>
+            <div className="det-row"><span>Final (1ª oport.)</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.final1 ?? '—'} / {pesos.final}</b></div>
+            <div className="det-row"><span>Final (2ª oport.)</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.final2 ?? '—'} / {pesos.final}</b></div>
+            <div className="det-row"><span>Final (3ª oport.)</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.final3 ?? '—'} / {pesos.final}</b></div>
+            <div className="det-row" style={{ marginTop: 6, borderTop: '2px solid var(--border-subtle)', paddingTop: 12 }}>
+              <span style={{ fontWeight: 700 }}>Promedio</span>
+              <b style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--accent-bright)' }}>{notaM?.promedio ?? '—'} / 10</b>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 20 }}>
+            <div className="det-head"><i className="ti ti-clipboard-check" style={{ color: 'var(--accent-bright)' }} /> Asistencia detallada</div>
+            {asis ? (
+              <>
+                <div className="det-stats" style={{ marginBottom: 14 }}>
+                  <div className="det-stat"><div className="det-stat-val" style={{ color: '#22c55e' }}>{asis.presentes}</div><div className="det-stat-lbl">Presentes</div></div>
+                  <div className="det-stat"><div className="det-stat-val" style={{ color: '#ef4444' }}>{asis.total_clases - asis.presentes}</div><div className="det-stat-lbl">Ausentes</div></div>
+                  <div className="det-stat"><div className="det-stat-val">{asis.total_clases}</div><div className="det-stat-lbl">Total</div></div>
+                </div>
+                <div style={{ marginTop: 8, maxHeight: 280, overflowY: 'auto' }}>
+                  {sesM.length === 0 ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>Sin sesiones registradas.</p>
+                  ) : sesM.map((s, i) => (
+                    <div key={i} className="det-row" style={{ padding: '10px 0' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="ti ti-calendar-event" style={{ fontSize: 14, color: 'var(--text-muted)' }} />
+                        {s.fecha}
+                      </span>
+                      <span className="badge" style={{
+                        background: s.presente ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                        color: s.presente ? '#22c55e' : '#ef4444',
+                        border: `1px solid ${s.presente ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                        padding: '4px 12px',
+                      }}>
+                        {s.presente ? '✓ Presente' : '✗ Ausente'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>Sin datos de asistencia.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── LISTA (dashboard + cards circulares) ── */
+  return (
+    <div>
+      {periodos.length > 0 && (
+        <select className="periodo-select" value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
+          <option value="actual">Período actual</option>
+          {periodos.map(p => (
+            <option key={`${p.anio}-${p.semestre}`} value={`${p.anio}-${p.semestre}`}>{p.anio}° Año — {p.semestre}° Semestre</option>
+          ))}
+        </select>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
+      ) : materias.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Sin materias en este período.</div>
+      ) : (
+        <>
+          <div className="cur-kpi-grid">
+            <div className="kpi-card" style={{ borderLeft: `3px solid ${promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444'}` }}>
+              <div className="kpi-top"><span className="mono-label">Promedio Total</span><i className="ti ti-percentage" style={{ color: promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444', fontSize: 15 }} /></div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span className="kpi-value" style={{ fontSize: 26, color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</span>
+              </div>
+              <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill" style={{ width: `${promedioTotal}%`, background: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444' }} /></div>
+            </div>
+            <div className="kpi-card" style={{ borderLeft: '3px solid var(--accent-bright)' }}>
+              <div className="kpi-top"><span className="mono-label">Clases Totales</span><i className="ti ti-calendar-stats" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+              <span className="kpi-value" style={{ fontSize: 26 }}>{totalClases}</span>
+              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Sesiones registradas</div>
+            </div>
+            <div className="kpi-card" style={{ borderLeft: `3px solid ${inasistencias > 3 ? '#ef4444' : '#f59e0b'}` }}>
+              <div className="kpi-top"><span className="mono-label">Inasistencias</span><i className="ti ti-calendar-off" style={{ color: '#ef4444', fontSize: 15 }} /></div>
+              <span className="kpi-value" style={{ fontSize: 26, color: '#ef4444' }}>{inasistencias}</span>
+              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Días no asistidos</div>
+            </div>
+            {critica ? (
+              <div className="cur-alerta" style={{ borderLeft: '3px solid #ef4444' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span className="mono-label" style={{ color: '#ef4444' }}>Alerta Crítica</span>
+                  <i className="ti ti-alert-triangle" style={{ color: '#ef4444' }} />
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Por debajo del {LIMITE_ASIST}% requerido</div>
+                <div className="progress-track" style={{ marginTop: 8, height: 4 }}><div className="progress-fill" style={{ width: `${critica.porcentaje}%`, background: '#ef4444', height: 4 }} /></div>
+              </div>
+            ) : (
+              <div className="kpi-card" style={{ borderLeft: '3px solid #22c55e' }}>
+                <div className="kpi-top"><span className="mono-label">Alertas</span><i className="ti ti-shield-check" style={{ color: '#22c55e', fontSize: 15 }} /></div>
+                <span className="kpi-value" style={{ fontSize: 26, color: '#22c55e' }}>0</span>
+                <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Todo en regla ✓</div>
+              </div>
+            )}
+          </div>
+
+          <div className="asis-grid">
+            {materias.map(m => {
+              const asis = asistencias[m.id]
+              const pct = asis?.porcentaje ?? 0
+              const color = donutColor(pct)
+              const c = 2 * Math.PI * 30
+              return (
+                <div key={m.id} className="asis-card" onClick={() => setDetalle(m.id)}>
+                  <div style={{ position: 'relative', width: 70, height: 70, margin: '0 auto' }}>
+                    <svg width="70" height="70" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="35" cy="35" r="30" stroke="var(--bg-elevated)" strokeWidth="6" fill="none" />
+                      <circle cx="35" cy="35" r="30" stroke={color} strokeWidth="6" fill="none"
+                        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
+                    </svg>
+                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 14, color }}>{asis ? `${pct}%` : '—'}</span>
+                  </div>
+                  <div className="asis-nombre">{m.nombre}</div>
+                  <div className="mono-label" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{asis ? `${asis.presentes}/${asis.total_clases} clases` : 'Sin registros'}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="cur-two-col">
+            <div className="card">
+              <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}><i className="ti ti-list-check" style={{ color: 'var(--accent-bright)' }} /> Cumplimiento por Materia</h3>
+              {Object.keys(asistencias).length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Sin registros de asistencia aún.</p>
+              ) : materias.map(m => {
+                const a = asistencias[m.id]
+                if (!a) return null
+                const ok = a.porcentaje >= LIMITE_ASIST
+                return (
+                  <div key={m.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>{a.materia_nombre}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13, color: ok ? 'var(--accent-bright)' : 'var(--danger)' }}>{a.porcentaje}%</span>
+                    </div>
+                    <div className="progress-track"><div className="progress-fill" style={{ width: `${a.porcentaje}%`, background: ok ? undefined : 'var(--danger)' }} /></div>
+                    <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5 }}>{a.presentes}/{a.total_clases} Sesiones</div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="card">
+                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-calendar" style={{ color: 'var(--accent-bright)' }} /> Periodo Académico</h3>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{periodoSel === 'actual' ? `${new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre ${new Date().getFullYear()}` : (() => { const [a, s] = periodoSel.split('-'); return `${s}° Semestre ${a}` })()}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{periodoSel === 'actual' ? 'Periodo en curso' : 'Periodo anterior'}</div>
+              </div>
+
+              <div className="card">
+                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-alert-triangle" style={{ color: 'var(--danger)' }} /> Resumen de Alertas</h3>
+                {critica ? (
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--danger-subtle)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
+                    <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>Riesgo de pérdida de regularidad. Se requieren asistencias consecutivas para salir de zona crítica.</p>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Sin alertas activas.</p>
+                )}
+              </div>
+
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Bitácora de Sesiones</h3>
+                  <i className="ti ti-code" style={{ color: 'var(--text-muted)' }} />
+                </div>
+                {sesiones.length === 0 ? (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin sesiones registradas.</p>
+                ) : sesiones.slice(-6).reverse().map((s, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--border-subtle)' : 'none', fontSize: 11.5 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{s.materia_nombre}</span>
+                    <span style={{ color: s.presente ? 'var(--success)' : 'var(--danger)', fontWeight: 700, flexShrink: 0 }}>{s.presente ? 'Presente' : 'Ausente'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function CalificacionesTab({ userId }: { userId: number }) {
+  const [materias, setMaterias] = useState<NotaMateriaCursos[]>([])
+  const [creditos, setCreditos] = useState<{ creditos_acumulados: number; creditos_totales: number | null } | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
+      api.get<{ creditos_acumulados: number; creditos_totales: number | null }>(`/pensum/alumno/${userId}/creditos`).catch(() => null),
+    ]).then(([notas, cred]) => {
+      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || m.final1 !== null || m.final2 !== null || m.final3 !== null))
+      setCreditos(cred)
+    }).finally(() => setLoading(false))
+  }, [userId])
+
+  const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
+  const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
+  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
+  const pctAprob = materias.length ? Math.round((aprobadas / materias.length) * 100) : 0
+  const ringC = 2 * Math.PI * 34
+  const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
+
+  return (
+    <div>
+      <div className="exp-stats" style={{ marginBottom: 22 }}>
+        <div className="kpi-card" style={{ borderLeft: `3px solid ${promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444'}` }}>
+          <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-star" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+          <span className="kpi-value" style={{ fontSize: 36, color: promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444' }}>{promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
+        </div>
+        <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', gap: 18, borderLeft: `3px solid ${pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444'}` }}>
+          <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+            <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="40" cy="40" r="34" stroke="var(--bg-elevated)" strokeWidth="7" fill="none" />
+              <circle cx="40" cy="40" r="34" stroke={pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444'} strokeWidth="7" fill="none"
+                strokeDasharray={ringC} strokeDashoffset={ringC * (1 - pctAprob / 100)} strokeLinecap="round" />
+            </svg>
+            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444' }}>{pctAprob}%</span>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 4 }}>Aprobación</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{aprobadas} de {materias.length} Materias</div>
+          </div>
+        </div>
+        <div className="kpi-card" style={{ borderLeft: `3px solid ${pctCreditos >= 80 ? '#22c55e' : 'var(--accent-bright)'}` }}>
+          <div className="kpi-top">
+            <span className="mono-label">Créditos Acumulados</span>
+            <i className="ti ti-certificate" style={{ color: 'var(--accent)', fontSize: 15 }} />
+          </div>
+          <span className="kpi-value" style={{ fontSize: 34 }}>{creditos ? creditos.creditos_acumulados : '—'}<span className="kpi-unit"> / {creditos?.creditos_totales ?? '—'}</span></span>
+          <div className="progress-track" style={{ marginTop: 12 }}><div className="progress-fill" style={{ width: `${pctCreditos}%`, background: pctCreditos >= 80 ? '#22c55e' : undefined }} /></div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 800 }}>Detalle de Materias</h3>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{materias.length} materias</span>
+      </div>
+      {materias.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 46 }}>
+          <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Aún no tenés calificaciones cargadas.</p>
+        </div>
+      ) : (
+        <div className="exp-cards">
+          {materias.map(m => {
+            const p = m.promedio
+            const pesos = m.pesos || PESOS_DEFAULT_CURSOS
+            const fin = [m.final1, m.final2, m.final3].filter((v): v is number => v !== null)
+            const finalEf = fin.length ? Math.max(...fin) : null
+            const pendienteP2 = m.parcial1 !== null && m.parcial2 === null
+            const est = estadoNota(p)
+            return (
+              <div key={m.materia_id} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>{p ?? '—'}</span>
+                </div>
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
+                  <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
+                  <div className="desglose-row">
+                    <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
+                    <b>{m.parcial2 ?? '—'}</b>
+                  </div>
+                  <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
+                  <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{finalEf ?? '—'}</b></div>
+                </div>
+                <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

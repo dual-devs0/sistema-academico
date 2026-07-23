@@ -56,8 +56,8 @@ def test_trayecto_academico_incluye_inscripcion_y_notas(client, seed, tokens, db
         Puntaje(
             user_id=seed["alumno"].id,
             oferta_materia_id=seed["oferta"].id,
-            tipo="final",
-            valor=8.0,
+            tipo="final1",
+            valor=40.0,
         )
     )
     db.add(

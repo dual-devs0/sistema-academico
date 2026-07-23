@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getUserId } from '../hooks/useRole'
 import {
   obtenerPPA, obtenerExpediente, obtenerRegularidad,
   type PPAOut, type ExpedienteAlumnoOut, type RegularidadOut,
   type ExpedienteMateriaOut as ExpMateria,
 } from '../services/expedienteService'
+
+const POLL_MS = 30000
 
 const condicionBadge: Record<string, { bg: string; color: string }> = {
   aprobada: { bg: 'var(--success-subtle)', color: 'var(--success)' },
@@ -21,7 +23,19 @@ const regBadge: Record<string, { bg: string; color: string; label: string }> = {
 const css = `
   @keyframes shimmer { 0%,100%{opacity:.3} 50%{opacity:.7} }
   .ea-skeleton { background:rgba(255,255,255,0.06); border-radius:var(--radius-md); animation:shimmer 1.5s ease-in-out infinite; }
+  .ea-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px; margin-bottom:24px; }
+  .ea-kpi-card { transition:border-color .15s; }
+  .ea-kpi-card:hover { border-color:var(--accent-hover); }
+  .ea-kpi-icon { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+  .ea-kpi-unit-block { display:block; margin-top:6px; font-size:11.5px; color:var(--text-secondary); font-weight:600; }
 `
+
+function ppaColor(v: number | null | undefined): string {
+  if (v === null || v === undefined) return 'var(--text-muted)'
+  if (v >= 9) return 'var(--accent-bright)'
+  if (v >= 6) return 'var(--success)'
+  return 'var(--danger)'
+}
 
 export default function ExpedienteAlumno() {
   const alumnoId = getUserId()
@@ -29,14 +43,33 @@ export default function ExpedienteAlumno() {
   const [expediente, setExpediente] = useState<ExpedienteAlumnoOut | null>(null)
   const [regularidad, setRegularidad] = useState<RegularidadOut | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+
+  const cargar = useCallback((manual = false) => {
+    if (alumnoId === null) return
+    if (manual) setRefreshing(true)
+    Promise.allSettled([obtenerPPA(alumnoId), obtenerExpediente(alumnoId), obtenerRegularidad(alumnoId)])
+      .then(([p, e, r]) => {
+        const fails: string[] = []
+        if (p.status === 'fulfilled') setPpa(p.value)
+        else fails.push('PPA')
+        if (e.status === 'fulfilled') setExpediente(e.value)
+        else fails.push('expediente')
+        if (r.status === 'fulfilled') setRegularidad(r.value)
+        else fails.push('regularidad')
+        setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
+        setLastUpdate(new Date())
+      })
+      .finally(() => { setLoading(false); setRefreshing(false) })
+  }, [alumnoId])
 
   useEffect(() => {
-    if (alumnoId === null) return
-    Promise.all([obtenerPPA(alumnoId), obtenerExpediente(alumnoId), obtenerRegularidad(alumnoId)])
-      .then(([p, e, r]) => { setPpa(p); setExpediente(e); setRegularidad(r) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [alumnoId])
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const materiasPorPeriodo = useMemo(() => {
     if (!expediente) return new Map<string, ExpMateria[]>()
@@ -62,10 +95,26 @@ export default function ExpedienteAlumno() {
     <>
       <style>{css}</style>
       <div className="w-full">
-        <header style={{ marginBottom: 24 }}>
-          <h1 className="page-title" style={{ fontSize: 28 }}>Mi Expediente</h1>
-          <p className="page-subtitle">Historial oficial de materias cerradas, PPA y estado de regularidad.</p>
+        <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 className="page-title" style={{ fontSize: 28 }}>Mi Expediente</h1>
+            <p className="page-subtitle">Historial oficial de materias cerradas, PPA y estado de regularidad.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {lastUpdate && (
+              <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
+            )}
+            <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}>
+              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+            </button>
+          </div>
         </header>
+
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12.5, color: 'var(--danger)', marginBottom: 16 }}>
+            <i className="ti ti-alert-triangle" /> {error}
+          </div>
+        )}
 
         {loading ? (
           <div style={{ padding: 4 }}>
@@ -77,28 +126,52 @@ export default function ExpedienteAlumno() {
         ) : (
           <>
             {/* KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 24 }}>
-              <div className="kpi-card">
-                <div className="kpi-top"><span className="mono-label">PPA Acumulado</span></div>
-                <span className="kpi-value">{ppa?.ppa?.toFixed(2) ?? '—'}</span>
-                {ppa && <span className="kpi-unit">{ppa.creditos_computados} créd. computados</span>}
+            <div className="ea-kpi-grid">
+              <div className="card ea-kpi-card">
+                <div className="kpi-top">
+                  <span className="mono-label">PPA Acumulado</span>
+                  <span className="ea-kpi-icon" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
+                    <i className="ti ti-chart-bar" />
+                  </span>
+                </div>
+                <span className="kpi-value" style={{ color: ppaColor(ppa?.ppa) }}>{ppa?.ppa?.toFixed(2) ?? '—'}</span>
+                <span className="ea-kpi-unit-block">{ppa ? `${ppa.creditos_computados} créd. computados` : 'Sin materias aprobadas aún'}</span>
               </div>
+
               {rBadge && (
-                <div className="kpi-card">
-                  <div className="kpi-top"><span className="mono-label">Regularidad</span></div>
+                <div className="card ea-kpi-card">
+                  <div className="kpi-top">
+                    <span className="mono-label">Regularidad</span>
+                    <span className="ea-kpi-icon" style={{ background: rBadge.bg, color: rBadge.color }}>
+                      <i className="ti ti-shield-check" />
+                    </span>
+                  </div>
                   <span className="badge" style={{ background: rBadge.bg, color: rBadge.color, fontSize: 13, fontWeight: 700 }}>{rBadge.label}</span>
-                  {regularidad?.motivo && <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>{regularidad.motivo}</div>}
+                  {regularidad?.motivo && <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.5 }}>{regularidad.motivo}</div>}
                 </div>
               )}
+
               {stats && (
                 <>
-                  <div className="kpi-card">
-                    <div className="kpi-top"><span className="mono-label">Materias cursadas</span></div>
+                  <div className="card ea-kpi-card">
+                    <div className="kpi-top">
+                      <span className="mono-label">Materias cursadas</span>
+                      <span className="ea-kpi-icon" style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }}>
+                        <i className="ti ti-list-check" />
+                      </span>
+                    </div>
                     <span className="kpi-value">{stats.total}</span>
-                    <span className="kpi-unit">{stats.aprobadas} aprob. · {stats.reprobadas} reprob.</span>
+                    <span className="ea-kpi-unit-block">
+                      <span style={{ color: 'var(--success)' }}>{stats.aprobadas} aprob.</span> · <span style={{ color: 'var(--danger)' }}>{stats.reprobadas} reprob.</span>
+                    </span>
                   </div>
-                  <div className="kpi-card">
-                    <div className="kpi-top"><span className="mono-label">Créditos acumulados</span></div>
+                  <div className="card ea-kpi-card">
+                    <div className="kpi-top">
+                      <span className="mono-label">Créditos acumulados</span>
+                      <span className="ea-kpi-icon" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
+                        <i className="ti ti-certificate" />
+                      </span>
+                    </div>
                     <span className="kpi-value">{stats.creditos}</span>
                   </div>
                 </>

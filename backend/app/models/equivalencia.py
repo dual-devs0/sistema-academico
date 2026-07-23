@@ -2,12 +2,13 @@
 Modelos SQLAlchemy — Fase 5D: Equivalencias y suficiencia.
 """
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Optional
 from sqlalchemy import (
     Integer,
     String,
     Date,
+    DateTime,
     ForeignKey,
     CheckConstraint,
 )
@@ -23,6 +24,9 @@ class SolicitudEquivalencia(Base):
     tipo: Mapped[str] = mapped_column(String(30), nullable=False)
     universidad_origen: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -36,7 +40,7 @@ class SolicitudEquivalencia(Base):
     )
 
     alumno = relationship("User", foreign_keys=[alumno_id])
-    materias = relationship("EquivalenciaMateria", back_populates="solicitud")
+    materias = relationship("EquivalenciaMateria", back_populates="solicitud", cascade="all, delete-orphan")
 
 
 class EquivalenciaMateria(Base):
@@ -44,7 +48,7 @@ class EquivalenciaMateria(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     solicitud_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("solicitudes_equivalencia.id"), nullable=False
+        Integer, ForeignKey("solicitudes_equivalencia.id", ondelete="CASCADE"), nullable=False
     )
     materia_origen_nombre: Mapped[str] = mapped_column(String(200), nullable=False)
     materia_destino_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("materias.id"), nullable=True)

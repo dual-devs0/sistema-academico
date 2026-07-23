@@ -1,6 +1,6 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import func, case
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
@@ -16,6 +16,261 @@ def _requiere_profesor(current_user: CurrentUser):
         raise HTTPException(
             status_code=403, detail="Solo administradores o profesores pueden acceder a este recurso"
         )
+
+
+@router.get("/dashboard")
+def profesor_dashboard(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    _requiere_profesor(current_user)
+    uid = current_user.user_id
+
+    O = models.oferta_materia.OfertaMateria
+    M = models.materia.Materia
+    I = models.inscripcion.Inscripcion
+    P = models.puntaje.Puntaje
+    A = models.asistencia.Asistencia
+    H = models.horario.Horario
+    C = models.carrera.Carrera
+    U = models.user.User
+
+    ofertas = (
+        db.query(O).options(joinedload(O.materia).joinedload(M.carrera))
+        .filter(O.profesor_id == uid, O.activa == True)
+        .all()
+    )
+    oferta_ids = [o.id for o in ofertas]
+    materia_ids = [o.materia_id for o in ofertas]
+
+    resumen = {
+        "materias_activas": len(ofertas),
+        "total_alumnos": 0,
+        "promedio_general": None,
+        "porcentaje_aprobacion": None,
+        "asistencia_promedio": None,
+    }
+
+    if not oferta_ids:
+        return {"resumen": resumen, "materias": [], "agenda_hoy": [], "alertas": []}
+
+    # Alumnos únicos
+    alumno_ids_raw = [
+        r[0] for r in db.query(I.alumno_id)
+        .filter(I.oferta_materia_id.in_(oferta_ids), I.alumno_id.isnot(None))
+        .distinct().all()
+    ]
+    resumen["total_alumnos"] = len(alumno_ids_raw)
+
+    # Promedio general
+    punt_rows = (
+        db.query(P.oferta_materia_id, func.avg(P.valor).label("prom"), func.count(P.id).label("cnt"))
+        .filter(P.oferta_materia_id.in_(oferta_ids))
+        .group_by(P.oferta_materia_id)
+        .all()
+    )
+    total_notas = sum(r.cnt for r in punt_rows)
+    suma_ponderada = sum(float(r.prom) * r.cnt for r in punt_rows if r.prom is not None)
+    if total_notas > 0:
+        resumen["promedio_general"] = round(suma_ponderada / total_notas, 2)
+
+    # % aprobación
+    aprob_count = 0
+    total_est = 0
+    for ofid in oferta_ids:
+        rows = db.query(P.user_id, func.avg(P.valor).label("prom")).filter(
+            P.oferta_materia_id == ofid
+        ).group_by(P.user_id).all()
+        total_est += len(rows)
+        aprob_count += sum(1 for r in rows if r.prom is not None and r.prom >= 6)
+    if total_est > 0:
+        resumen["porcentaje_aprobacion"] = round(aprob_count / total_est * 100, 1)
+
+    # Asistencia promedio
+    asis_row = (
+        db.query(
+            func.count(A.id).label("total"),
+            func.sum(case((A.presente, 1), else_=0)).label("pres"),
+        )
+        .filter(A.oferta_materia_id.in_(oferta_ids))
+        .first()
+    )
+    total_a = asis_row.total if asis_row else 0
+    pres_a = asis_row.pres if asis_row else 0
+    if total_a > 0:
+        resumen["asistencia_promedio"] = round(pres_a / total_a * 100, 1)
+
+    # Materias con detalle
+    alumno_por_oferta: dict[int, int] = {}
+    for ofid, cnt in (
+        db.query(I.oferta_materia_id, func.count(I.id))
+        .filter(I.oferta_materia_id.in_(oferta_ids))
+        .group_by(I.oferta_materia_id)
+        .all()
+    ):
+        if ofid is not None:
+            alumno_por_oferta[ofid] = cnt
+
+    prom_por_oferta: dict[int, float | None] = {}
+    for r in punt_rows:
+        prom_por_oferta[r.oferta_materia_id] = round(float(r.prom), 2) if r.prom is not None else None
+
+    horarios_por_materia: dict[int, list[dict]] = {}
+    for h in db.query(H).filter(H.materia_id.in_(materia_ids)).all():
+        horarios_por_materia.setdefault(h.materia_id, []).append({
+            "dia": h.dia_semana,
+            "hora_inicio": h.hora_inicio.isoformat(),
+            "hora_fin": h.hora_fin.isoformat(),
+            "aula": h.aula,
+        })
+
+    materias_out = []
+    for o in ofertas:
+        materia = o.materia
+        if not materia:
+            continue
+        materias_out.append({
+            "id": materia.id,
+            "oferta_id": o.id,
+            "nombre": materia.nombre,
+            "codigo": materia.codigo,
+            "carrera": materia.carrera.nombre if materia.carrera else None,
+            "periodo": o.periodo,
+            "cantidad_alumnos": alumno_por_oferta.get(o.id, 0),
+            "promedio": prom_por_oferta.get(o.id),
+            "horarios": horarios_por_materia.get(materia.id, []),
+        })
+
+    # Agenda de hoy
+    hoy = date.today()
+    hoy_dt_inicio = datetime.combine(hoy, datetime.min.time())
+    hoy_dt_fin = datetime.combine(hoy, datetime.max.time())
+    agenda_hoy = []
+
+    for h in db.query(H).filter(H.materia_id.in_(materia_ids)).all():
+        if h.dia_semana == hoy.weekday():
+            m_nombre = next((mo["nombre"] for mo in materias_out if mo["id"] == h.materia_id), None)
+            agenda_hoy.append({
+                "tipo": "clase",
+                "hora_inicio": h.hora_inicio.isoformat()[:5],
+                "hora_fin": h.hora_fin.isoformat()[:5],
+                "titulo": m_nombre or f"Materia #{h.materia_id}",
+                "aula": h.aula,
+            })
+
+    eventos_hoy = (
+        db.query(models.evento.EventoCalendario)
+        .filter(
+            models.evento.EventoCalendario.fecha == hoy,
+            models.evento.EventoCalendario.materia_id.in_(materia_ids),
+        )
+        .all()
+    )
+    for e in eventos_hoy:
+        m_nombre = next((mo["nombre"] for mo in materias_out if mo["id"] == e.materia_id), None)
+        agenda_hoy.append({
+            "tipo": "evento",
+            "hora_inicio": e.hora or "—",
+            "hora_fin": None,
+            "titulo": e.titulo,
+            "aula": e.ubicacion or "Campus UCA",
+            "materia": m_nombre,
+        })
+
+    recordatorios_hoy = (
+        db.query(models.recordatorio_docente.RecordatorioDocente)
+        .filter(
+            models.recordatorio_docente.RecordatorioDocente.profesor_id == uid,
+            models.recordatorio_docente.RecordatorioDocente.fecha >= hoy_dt_inicio,
+            models.recordatorio_docente.RecordatorioDocente.fecha <= hoy_dt_fin,
+        )
+        .all()
+    )
+    for r in recordatorios_hoy:
+        agenda_hoy.append({
+            "tipo": "recordatorio",
+            "hora_inicio": r.fecha.strftime("%H:%M") if r.fecha else "—",
+            "hora_fin": None,
+            "titulo": r.titulo,
+            "aula": r.descripcion or "",
+        })
+
+    agenda_hoy.sort(key=lambda x: (x["hora_inicio"] == "—", x["hora_inicio"]))
+
+    # Alertas: alumnos con inasistencia ≥25% o promedio < 6
+    alertas = []
+    if alumno_ids_raw:
+        asis_agg = {}
+        for r in db.query(
+            A.user_id, A.oferta_materia_id,
+            func.count(A.id).label("total"),
+            func.sum(case((A.presente, 1), else_=0)).label("pres"),
+        ).filter(
+            A.user_id.in_(alumno_ids_raw),
+            A.oferta_materia_id.in_(oferta_ids),
+        ).group_by(A.user_id, A.oferta_materia_id).all():
+            key = (r.user_id, r.oferta_materia_id)
+            asis_agg[key] = {"total": r.total or 0, "pres": r.pres or 0}
+
+        punt_agg_uid: dict[int, float] = {}
+        for r in db.query(P.user_id, func.avg(P.valor).label("prom")).filter(
+            P.user_id.in_(alumno_ids_raw),
+            P.oferta_materia_id.in_(oferta_ids),
+        ).group_by(P.user_id).all():
+            if r.prom is not None:
+                punt_agg_uid[r.user_id] = float(r.prom)
+
+        nombre_map: dict[int, str] = {}
+        for u in db.query(U.id, U.nombre).filter(U.id.in_(alumno_ids_raw)).all():
+            nombre_map[u.id] = u.nombre or f"Alumno #{u.id}"
+
+        oferta_nombre_map: dict[int, str] = {o.id: (o.materia.nombre if o.materia else f"Oferta #{o.id}") for o in ofertas}
+
+        for (uid_a, ofid), stats in asis_agg.items():
+            inas_pct = round((1 - stats["pres"] / stats["total"]) * 100) if stats["total"] > 0 else 0
+            prom = punt_agg_uid.get(uid_a)
+            if inas_pct >= 25 or (prom is not None and prom < 6):
+                alertas.append({
+                    "alumno_id": uid_a,
+                    "alumno_nombre": nombre_map.get(uid_a, f"Alumno #{uid_a}"),
+                    "materia_id": ofid,
+                    "materia_nombre": oferta_nombre_map.get(ofid, f"Oferta #{ofid}"),
+                    "inasistencia_pct": inas_pct,
+                })
+
+    return {
+        "resumen": resumen,
+        "materias": materias_out,
+        "agenda_hoy": agenda_hoy,
+        "alertas": alertas,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/materias")
+def mis_materias(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    _requiere_profesor(current_user)
+    O = models.oferta_materia.OfertaMateria
+    M = models.materia.Materia
+    C = models.carrera.Carrera
+    ofertas = (
+        db.query(O)
+        .options(joinedload(O.materia).joinedload(M.carrera))
+        .filter(O.profesor_id == current_user.user_id, O.activa == True)
+        .all()
+    )
+    return [
+        {
+            "id": o.materia.id,
+            "nombre": o.materia.nombre,
+            "codigo": o.materia.codigo,
+            "carrera": o.materia.carrera.nombre if o.materia and o.materia.carrera else None,
+        }
+        for o in ofertas if o.materia
+    ]
 
 
 @router.get("/mi-historico")
@@ -46,12 +301,13 @@ def mi_historico(
     materia_ids = [o.materia_id for o in ofertas]
 
     # Student count per oferta (single query)
-    alumno_counts = dict(
+    alumno_counts: dict[int, int] = {oid: cnt for oid, cnt in
         db.query(I.oferta_materia_id, func.count(I.id))
         .filter(I.oferta_materia_id.in_(oferta_ids))
         .group_by(I.oferta_materia_id)
         .all()
-    )
+        if oid is not None
+    }
 
     # Avg puntaje + pass rate per oferta (single query per student)
     punt_agg = {}

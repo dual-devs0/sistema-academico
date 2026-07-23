@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import hmac
 import io
 from datetime import datetime, timezone
 from collections import defaultdict
@@ -21,14 +24,37 @@ from reportlab.platypus import (
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 from app import models, database
+from app.auth import SECRET_KEY
 from app.dependencias import get_current_user
 from app.services.autorizacion import es_profesor_de_alumno
-from app.services.puntajes_utils import PESOS, calcular_promedio_final
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/boleta", tags=["boleta"])
 
-TIPOS = ["parcial1", "parcial2", "practico", "final"]
+TIPOS = ["parcial1", "parcial2", "practico", "final1", "final2", "final3"]
 HEADERS = ["Materia", "Parcial 1", "Parcial 2", "T.P.", "Final", "Promedio"]
+
+
+def _codigo_verificacion(user_id: int) -> str:
+    """Código corto y determinístico, firmado con SECRET_KEY: cualquiera que lo
+    reciba en un documento (PDF o vista web) puede validarlo contra
+    /boleta/verificar/{codigo} sin necesitar acceso a la cuenta del alumno."""
+    firma = hmac.new(SECRET_KEY.encode(), f"boleta:{user_id}".encode(), hashlib.sha256).hexdigest()[:10].upper()
+    return f"UCA-X{user_id:04d}-{firma}"
+
+
+def _verificar_codigo(codigo: str) -> int | None:
+    """Devuelve el user_id si el código es válido, None si fue alterado/inventado."""
+    try:
+        prefijo, user_id_str, firma = codigo.split("-")
+        if prefijo != "UCA" or not user_id_str.startswith("X"):
+            return None
+        user_id = int(user_id_str[1:])
+    except (ValueError, IndexError):
+        return None
+    if hmac.compare_digest(_codigo_verificacion(user_id), codigo):
+        return user_id
+    return None
 
 
 def _fmt(val) -> str:
@@ -41,7 +67,7 @@ def _fmt(val) -> str:
         return "\u2014"
 
 
-def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> bytes:
+def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list, db: Session) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -136,12 +162,15 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
             "parcial1": None,
             "parcial2": None,
             "practico": None,
-            "final": None,
+            "final1": None,
+            "final2": None,
+            "final3": None,
         }
     )
     for p in puntajes:
         mat_map[p.materia_id]["nombre"] = p.materia_nombre
-        mat_map[p.materia_id][p.tipo] = float(p.valor)
+        if p.tipo in mat_map[p.materia_id]:
+            mat_map[p.materia_id][p.tipo] = float(p.valor)
 
     # Table
     header_row = [
@@ -166,9 +195,14 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
             "parcial1": row["parcial1"],
             "parcial2": row["parcial2"],
             "practico": row["practico"],
-            "final": row["final"],
+            "final1": row["final1"],
+            "final2": row["final2"],
+            "final3": row["final3"],
         }
-        prom = calcular_promedio_final(scores)
+        pesos = get_pesos(db, mid)
+        prom = calcular_promedio_final(scores, pesos)
+        finales_no_nulos = [v for v in (row["final1"], row["final2"], row["final3"]) if v is not None]
+        row["final"] = max(finales_no_nulos) if finales_no_nulos else None
         if prom is not None:
             promedios_generales.append(prom)
 
@@ -324,6 +358,63 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list) -> b
     return buf.read()
 
 
+@router.get("/verificar/{codigo}")
+def verificar_boleta(
+    codigo: str,
+    db: Session = Depends(database.get_db),
+):
+    """Verificación pública de autenticidad: recibe el código impreso/mostrado
+    en la boleta y confirma si corresponde a un alumno real del sistema."""
+    user_id = _verificar_codigo(codigo)
+    if user_id is None:
+        return {"valido": False}
+
+    user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    if not user:
+        return {"valido": False}
+
+    return {
+        "valido": True,
+        "alumno_nombre": user.nombre,
+        "validado_en": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/{user_id}/sello")
+def sello_boleta(
+    user_id: int,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    if (
+        current_user.role not in ("admin", "profesor")
+        and current_user.user_id != user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user.role == "profesor" and not es_profesor_de_alumno(
+        db, current_user.user_id, user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    user = db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    import qrcode
+
+    codigo = _codigo_verificacion(user_id)
+    qr = qrcode.make(codigo)
+    buf = io.BytesIO()
+    qr.save(buf)
+    qr_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    return {
+        "codigo": codigo,
+        "qr_base64": qr_base64,
+        "validado_en": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.get("/{user_id}")
 def get_boleta(
     user_id: int,
@@ -380,7 +471,7 @@ def get_boleta(
 
     flat = [_Row(p, n) for p, n in rows]
 
-    pdf_bytes = _build_pdf(user, carrera_nombre, flat)
+    pdf_bytes = _build_pdf(user, carrera_nombre, flat, db)
 
     return StreamingResponse(
         iter([pdf_bytes]),

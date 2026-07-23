@@ -27,7 +27,7 @@ class ProcesoGraduacion(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="en_proceso")
-    tutor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    tutor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -39,8 +39,8 @@ class ProcesoGraduacion(Base):
 
     alumno = relationship("User", foreign_keys=[alumno_id])
     tutor = relationship("User", foreign_keys=[tutor_id])
-    etapas = relationship("EtapaTesis", back_populates="proceso")
-    verificaciones = relationship("VerificacionSolvencia", back_populates="proceso")
+    etapas = relationship("EtapaTesis", back_populates="proceso", cascade="all, delete-orphan")
+    verificaciones = relationship("VerificacionSolvencia", back_populates="proceso", cascade="all, delete-orphan")
 
 
 class EtapaTesis(Base):

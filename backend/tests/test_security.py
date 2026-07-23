@@ -171,13 +171,14 @@ def test_profesor_can_create_grade_for_own_materia(client, seed, tokens):
 
 
 def test_grade_value_out_of_range_rejected(client, seed, tokens):
+    # parcial1_max default = 20 puntos; 25 excede el máximo configurado para la materia
     res = client.post(
         "/puntajes/",
         json={
             "user_id": seed["alumno"].id,
             "materia_id": seed["materia"].id,
             "tipo": "parcial1",
-            "valor": 15.0,
+            "valor": 25.0,
         },
         headers=auth(tokens["admin"]),
     )

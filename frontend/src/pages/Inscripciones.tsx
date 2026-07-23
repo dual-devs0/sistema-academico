@@ -100,28 +100,50 @@ function AlumnoView({ userId }: { userId: number }) {
   const [seleccion, setSeleccion] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [enviando, setEnviando] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
-  useEffect(() => {
+  const cargar = useCallback((manual = false) => {
+    if (manual) setRefreshing(true)
     api.get<{ carrera_id: number | null }>('/users/me').then(me => {
       const carreraQuery = me.carrera_id ? `?carrera_id=${me.carrera_id}` : ''
-      return Promise.all([
-        api.get<Materia[]>(`/materias/${carreraQuery}`).catch(() => [] as Materia[]),
-        api.get<Inscripcion[]>('/inscripciones/').catch(() => [] as Inscripcion[]),
+      return Promise.allSettled([
+        api.get<Materia[]>(`/materias/${carreraQuery}`),
+        api.get<Inscripcion[]>('/inscripciones/'),
       ])
-    }).then(([mats, ins]) => {
-      setMaterias(mats)
-      setInscriptas(ins.filter(i => i.alumno_id === userId))
-    }).finally(() => setLoading(false))
+    }).then(([matsR, insR]) => {
+      const fails: string[] = []
+      if (matsR.status === 'fulfilled') setMaterias(matsR.value)
+      else fails.push('oferta de materias')
+      if (insR.status === 'fulfilled') setInscriptas(insR.value.filter(i => i.alumno_id === userId))
+      else fails.push('tus inscripciones')
+      setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
+      setLastUpdate(new Date())
+    }).finally(() => { setLoading(false); setRefreshing(false) })
   }, [userId])
+
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const idsInscriptas = new Set(inscriptas.map(i => i.materia_id))
   const disponibles = materias.filter(m => !idsInscriptas.has(m.id))
-  const creditos = seleccion.length * CRED_POR_MATERIA
+  const conCupo = disponibles.filter(m => (m.inscritos ?? 0) < (m.cupos ?? 40)).length
+  const creditos = seleccion.reduce((s, id) => s + (materias.find(m => m.id === id)?.creditos ?? CRED_POR_MATERIA), 0)
 
   function toggle(id: number) {
+    const m = materias.find(x => x.id === id)
     setSeleccion(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id)
-      if (prev.length * CRED_POR_MATERIA >= CRED_MAX) {
+      if (m && (m.inscritos ?? 0) >= (m.cupos ?? 40)) {
+        emitToast('Esa materia no tiene cupos disponibles', 'warning')
+        return prev
+      }
+      const creditosActuales = prev.reduce((s, pid) => s + (materias.find(x => x.id === pid)?.creditos ?? CRED_POR_MATERIA), 0)
+      if (creditosActuales + (m?.creditos ?? CRED_POR_MATERIA) > CRED_MAX) {
         emitToast('Alcanzaste el máximo de créditos', 'warning')
         return prev
       }
@@ -133,27 +155,29 @@ function AlumnoView({ userId }: { userId: number }) {
     if (!seleccion.length) return
     setEnviando(true)
     let ok = 0
+    const idsFallidos: number[] = []
+    const mensajes: string[] = []
     for (const materia_id of seleccion) {
       try {
         await api.post('/inscripciones/', { alumno_id: userId, materia_id })
         ok++
-      } catch { /* sigue con el resto */ }
+      } catch (e) {
+        idsFallidos.push(materia_id)
+        const m = materias.find(x => x.id === materia_id)
+        mensajes.push(`${m?.nombre ?? materia_id}: ${e instanceof Error ? e.message : 'error desconocido'}`)
+      }
     }
     setEnviando(false)
-    if (ok > 0) {
-      emitToast(`${ok} materia${ok > 1 ? 's' : ''} inscripta${ok > 1 ? 's' : ''} correctamente`)
-      const ins = await api.get<Inscripcion[]>('/inscripciones/').catch(() => [] as Inscripcion[])
-      setInscriptas(ins.filter(i => i.alumno_id === userId))
-      setSeleccion([])
-    } else {
-      emitToast('No se pudo completar la inscripción', 'error')
-    }
+    if (ok > 0) emitToast(`${ok} materia${ok > 1 ? 's' : ''} inscripta${ok > 1 ? 's' : ''} correctamente`)
+    if (mensajes.length) emitToast(mensajes.join(' · '), 'error')
+    setSeleccion(idsFallidos)
+    if (ok > 0) cargar()
   }
 
   const cupoDe = (m: Materia) => {
-    const total = m.cupos ?? 38
+    const total = m.cupos ?? 40
     const ocup = m.inscritos ?? 0
-    return { ocup, total, lleno: ocup >= total * 0.8 }
+    return { ocup, total, lleno: ocup >= total }
   }
 
   return (
@@ -163,11 +187,22 @@ function AlumnoView({ userId }: { userId: number }) {
           <h1 className="page-title">Proceso de Inscripción</h1>
           <p className="page-subtitle">Selecciona tus materias para el ciclo lectivo {new Date().getFullYear()}-{new Date().getMonth() < 6 ? 'I' : 'II'}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span className="btn-ghost" style={{ cursor: 'default' }}><i className="ti ti-clock" /> Turno: Mañana</span>
-          <span className="btn-ghost" style={{ cursor: 'default' }}><i className="ti ti-school" /> Con cupos disponibles</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {lastUpdate && (
+            <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
+          )}
+          <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}>
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+          <span className="btn-ghost" style={{ cursor: 'default' }}><i className="ti ti-school" /> {conCupo} con cupo disponible</span>
         </div>
       </div>
+
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12.5, color: 'var(--danger)', marginBottom: 16 }}>
+          <i className="ti ti-alert-triangle" /> {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando oferta…</div>
@@ -201,7 +236,7 @@ function AlumnoView({ userId }: { userId: number }) {
                         <div style={{ fontSize: 15, fontWeight: 800, paddingRight: 8 }}>{m.nombre}</div>
                         <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)', flexShrink: 0 }}>{m.creditos ?? CRED_POR_MATERIA} créditos</span>
                       </div>
-                      <div className="mono-label" style={{ marginBottom: 12 }}>MAT-{String(m.id).padStart(3, '0')}</div>
+                      <div className="mono-label" style={{ marginBottom: 12 }}>{m.codigo || `MAT-${String(m.id).padStart(3, '0')}`}</div>
                       <div className="ins-meta"><i className="ti ti-user" /> {m.profesor_nombre || 'Profesor a asignar'}</div>
                       <div className="ins-meta"><i className="ti ti-calendar" /> {m.horario || 'Horario a confirmar'}</div>
                       <div style={{ marginTop: 10 }}>
@@ -215,8 +250,8 @@ function AlumnoView({ userId }: { userId: number }) {
                           <div className="progress-fill" style={{ width: `${cupo.ocup / cupo.total * 100}%`, background: cupo.lleno ? 'var(--danger)' : undefined }} />
                         </div>
                       </div>
-                      <button className={`ins-sel-btn${sel ? ' sel' : ''}`} onClick={() => toggle(m.id)}>
-                        {sel ? '✓ Seleccionada' : 'Seleccionar Materia'}
+                      <button className={`ins-sel-btn${sel ? ' sel' : ''}`} disabled={!sel && cupo.lleno} onClick={() => toggle(m.id)}>
+                        {sel ? '✓ Seleccionada' : cupo.lleno ? 'Sin cupo' : 'Seleccionar Materia'}
                       </button>
                     </div>
                   )

@@ -4,7 +4,8 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType, NameEmail
+from pydantic import SecretStr
 
 load_dotenv()
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME", "dummy@example.com"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", "dummy"),
+    MAIL_PASSWORD=SecretStr(os.getenv("MAIL_PASSWORD", "dummy")),
     MAIL_FROM=os.getenv("MAIL_FROM", "sistema@uca.edu.py"),
     MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
     MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
@@ -72,7 +73,7 @@ def send_password_reset_email_bg(
     """
     message = MessageSchema(
         subject="UCA - Restablecimiento de contraseña",
-        recipients=[email_to],
+        recipients=[NameEmail(name="", email=email_to)],
         body=html,
         subtype=MessageType.html,
     )
@@ -101,7 +102,7 @@ def send_new_grade_email_bg(
     """
     message = MessageSchema(
         subject=f"UCA - Nueva calificación en {materia_name}",
-        recipients=[email_to],
+        recipients=[NameEmail(name="", email=email_to)],
         body=html,
         subtype=MessageType.html,
     )
@@ -133,7 +134,7 @@ def send_alerta_inasistencia_email_bg(
     """
     message = MessageSchema(
         subject=f"UCA - Alerta de inasistencia crítica en {materia_nombre}",
-        recipients=emails_to,
+        recipients=[NameEmail(name="", email=e) for e in emails_to],
         body=html,
         subtype=MessageType.html,
     )

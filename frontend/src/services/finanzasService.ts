@@ -219,6 +219,7 @@ export interface PagoOnlineInitResponse {
   transaction_id: string
   redirect_url: string
   monto: string
+  stripe_session_id: string | null
 }
 
 export interface PagoOnlineStatus {
@@ -230,8 +231,8 @@ export interface PagoOnlineStatus {
   creado_en: string | null
 }
 
-export const initPagoOnline = (cuota_id: number) =>
-  api.post<PagoOnlineInitResponse>('/finanzas/pagos/init', { cuota_id })
+export const initPagoOnline = (cuota_id: number, success_url?: string, cancel_url?: string) =>
+  api.post<PagoOnlineInitResponse>('/finanzas/pagos/init', { cuota_id, success_url, cancel_url })
 
 export const getPagoOnlineStatus = (pago_id: number) =>
   api.get<PagoOnlineStatus>(`/finanzas/pagos/online/${pago_id}`)

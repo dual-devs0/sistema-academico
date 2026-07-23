@@ -36,20 +36,20 @@ inscs = db.query(Inscripcion).limit(6000).all()
 fechas = [date(2026,3,2)+timedelta(days=i) for i in range(0, 80, 2) if (date(2026,3,2)+timedelta(days=i)).weekday()<5]
 becado_cache = {u.id: u.es_becado for u in db.query(User.id, User.es_becado).filter(User.role=="alumno").all()}
 
-count = 0
+count_asist = 0
 batch = []
 for ins in inscs:
     for f in fechas[:20]:
         batch.append({"user_id": ins.alumno_id, "oferta_materia_id": ins.oferta_materia_id,
                       "fecha": f, "presente": random.random()<0.75,
                       "es_becado": becado_cache.get(ins.alumno_id, False)})
-        count += 1
+        count_asist += 1
     if len(batch) >= BATCH:
         bulk_ignore(Asistencia.__table__, batch); batch = []
-        print(f"  [{time_mod.time()-t0:.0f}s] {count} asistencias...")
+        print(f"  [{time_mod.time()-t0:.0f}s] {count_asist} asistencias...")
 if batch:
     bulk_ignore(Asistencia.__table__, batch)
-print(f"[{time_mod.time()-t0:.0f}s] Asistencias: {count}")
+print(f"[{time_mod.time()-t0:.0f}s] Asistencias: {count_asist}")
 
 # ── CUOTAS (mismos alumnos + conceptos) ──
 print(f"[{time_mod.time()-t0:.0f}s] Cuotas: generando...")
@@ -68,7 +68,7 @@ if not conceptos:
     db.commit()
 
 alumnos = db.query(User).filter(User.role=="alumno").all()
-count = 0
+count_cuotas = 0
 batch = []
 for a in alumnos[:2000]:
     conc = conceptos.get(a.carrera_id)
@@ -77,7 +77,7 @@ for a in alumnos[:2000]:
         batch.append({"alumno_id": a.id, "concepto_id": conc.id, "periodo": f"2026-{mes}",
                       "monto": conc.monto_base, "monto_descuento": 0,
                       "fecha_vencimiento": date(2026,mes,15), "estado": "pendiente", "generado_por": admin.id if admin else 1})
-        count += 1
+        count_cuotas += 1
     if len(batch) >= BATCH*5:
         bulk_ignore(Cuota.__table__, batch); batch = []
 if batch:
@@ -86,5 +86,5 @@ print(f"[{time_mod.time()-t0:.0f}s] Cuotas: {count}")
 
 db.close()
 print(f"\n✅ Seed complementario completado en {time_mod.time()-t0:.0f}s")
-print(f"   Asistencias: {count if 'count' in dir() else 0}")
-print(f"   Cuotas:      {count}")
+print(f"   Asistencias: {count_asist}")
+print(f"   Cuotas:      {count_cuotas}")

@@ -3,7 +3,7 @@ Schemas Pydantic — Fase 5D: Equivalencias y suficiencia.
 """
 
 from __future__ import annotations
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class SolicitudEquivalenciaOut(BaseModel):
     tipo: str
     universidad_origen: Optional[str]
     estado: str
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -27,6 +28,7 @@ class SolicitudEquivalenciaOut(BaseModel):
 class EquivalenciaMateriaResolver(BaseModel):
     resolucion: str
     materia_destino_id: Optional[int] = None
+    motivo: Optional[str] = None
 
 
 class EquivalenciaMateriaOut(BaseModel):

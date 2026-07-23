@@ -384,7 +384,7 @@ def export_rendicion_excel(
         )
         if periodo:
             montos_q = montos_q.filter(Cuota.periodo == periodo)
-        montos_becados = dict(montos_q.group_by(Cuota.beca_aplicada_id).all())
+        montos_becados = {r[0]: r[1] for r in montos_q.group_by(Cuota.beca_aplicada_id).all() if r[0] is not None}
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -406,8 +406,8 @@ def export_rendicion_excel(
     ]
     header_fill = PatternFill("solid", fgColor="1E40AF")
     header_font = Font(bold=True, color="FFFFFF")
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=h)
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center")
@@ -432,9 +432,9 @@ def export_rendicion_excel(
     for col in ws.columns:
         max_len = max((len(str(c.value or "")) for c in col), default=10)
         # AUDIT-FIX: col[0] puede ser MergedCell que no tiene column_letter
-        col_idx: int | None = getattr(col[0], 'column', None)
-        if col_idx is not None:
-            col_letter = get_column_letter(col_idx)
+        cell_col_idx: int | None = getattr(col[0], 'column', None)
+        if cell_col_idx is not None:
+            col_letter = get_column_letter(cell_col_idx)
             ws.column_dimensions[col_letter].width = min(max_len + 4, 40)
 
     buf = io.BytesIO()

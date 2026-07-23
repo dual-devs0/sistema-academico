@@ -34,6 +34,24 @@ const css = `
   .as-badge-becado   { background: #fbbf2415; color: #fbbf24; }
 `
 
+/* Diseño Web Adaptable — mobile-first, exclusivo del rol profesor (NO admin) */
+const cssProfesorResponsive = `
+  .ap-wrap { padding:16px 16px 60px; }
+  @media(min-width:768px){ .ap-wrap { padding:22px 26px 60px; } }
+  @media(min-width:1024px){ .ap-wrap { padding:28px 36px 60px; } }
+
+  .ap-kpi-grid { display:grid; grid-template-columns:1fr; gap:12px; }
+  @media(min-width:640px){ .ap-kpi-grid { grid-template-columns:repeat(3,1fr); } }
+
+  .ap-rt-grid { display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:18px; }
+  @media(min-width:900px){ .ap-rt-grid { grid-template-columns:minmax(280px,1fr) 1.2fr; } }
+
+  .ap-chip { display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; border:1px solid var(--border-subtle); background:var(--bg-input); cursor:pointer; transition:all .15s; flex-shrink:0; }
+  .ap-chip:hover { border-color:var(--accent); background:var(--accent-muted); }
+  .ap-chip.active { border-color:var(--accent-bright); background:var(--accent-muted); }
+  .ap-chip-strip { display:flex; gap:8px; flex-wrap:wrap; }
+`
+
 export default function Asistencia() {
   const user = getCurrentUser()
   const rol = user?.role || ''
@@ -63,6 +81,25 @@ const cssAlumno = `
   }
   .aa-fab-qr:hover { transform:scale(1.05); }
   @media(max-width:768px){ .aa-fab-qr { bottom:80px; } }
+
+  /* Diseño Web Adaptable — mobile-first (solo alumno) */
+  .aa-kpi-grid { display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:20px; }
+  @media(min-width:640px){ .aa-kpi-grid { grid-template-columns:repeat(2,1fr); } }
+  @media(min-width:1024px){ .aa-kpi-grid { grid-template-columns:repeat(4,1fr); } }
+
+  .aa-main-grid { display:grid; grid-template-columns:1fr; gap:18px; align-items:start; }
+  @media(min-width:1024px){ .aa-main-grid { grid-template-columns:1fr 300px; } }
+
+  .aa-err-banner {
+    display:flex; align-items:center; gap:8px; background:rgba(239,68,68,0.10);
+    border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius);
+    padding:10px 14px; font-size:12.5px; color:var(--danger); margin-bottom:16px;
+  }
+  .aa-refresh-btn { display:flex; align-items:center; gap:6px; }
+  .aa-refresh-btn svg.spin { animation:aa-spin 1s linear infinite; }
+  @keyframes aa-spin { to { transform:rotate(360deg); } }
+  .aa-mat-row { padding:12px 14px; border:1px solid var(--border-subtle); border-radius:10px; margin-bottom:0; transition:border-color .15s,transform .1s,box-shadow .15s; cursor:default; background:var(--bg-surface); }
+  .aa-mat-row:hover { border-color:var(--accent-hover); transform:translateX(2px); box-shadow:0 4px 14px rgba(0,0,0,.15); }
 `
 
 interface AsistenciaApiRow {
@@ -72,6 +109,8 @@ interface AsistenciaApiRow {
   presente: boolean
 }
 
+const AA_POLL_MS = 30000
+
 function AlumnoView() {
   const navigate = useNavigate()
   const uid = Number(getCurrentUser()?.user_id || 0)
@@ -79,28 +118,45 @@ function AlumnoView() {
   const [sesiones, setSesiones] = useState<SesionRow[]>([])
   const [carreraNombre, setCarreraNombre] = useState('')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const firstLoad = useRef(true)
   const LIMITE = 80
 
-  useEffect(() => {
-    Promise.all([
-      api.get<MateriaAsistRow[]>('/alumno/mi-asistencia').catch(() => [] as MateriaAsistRow[]),
-      api.get<AsistenciaApiRow[]>(`/asistencias/?user_id=${uid}`).catch(() => [] as AsistenciaApiRow[]),
-      api.get<{ carrera_id: number | null }>('/users/me').catch(() => null),
-      api.get<{ id: number; nombre: string }[]>('/carreras/').catch(() => [] as { id: number; nombre: string }[]),
+  const cargar = useCallback((manual = false) => {
+    if (manual) setRefreshing(true)
+    Promise.allSettled([
+      api.get<MateriaAsistRow[]>('/alumno/mi-asistencia'),
+      api.get<AsistenciaApiRow[]>(`/asistencias/?user_id=${uid}`),
+      api.get<{ carrera_id: number | null }>('/users/me'),
+      api.get<{ id: number; nombre: string }[]>('/carreras/'),
     ]).then(([porMat, asis, me, carreras]) => {
-      setPorMateria(porMat)
-      setSesiones(
-        asis.slice(-12).reverse().map((a: AsistenciaApiRow) => ({
-          materia_id: a.materia_id, materia_nombre: a.materia_nombre || `Materia #${a.materia_id}`,
-          fecha: a.fecha, presente: a.presente,
-        }))
-      )
-      if (me?.carrera_id) {
-        const c = carreras.find(c => c.id === me.carrera_id)
+      const fails: string[] = []
+      if (porMat.status === 'fulfilled') setPorMateria(porMat.value)
+      else fails.push('resumen por materia')
+      if (asis.status === 'fulfilled') {
+        setSesiones(
+          asis.value.slice(-12).reverse().map((a: AsistenciaApiRow) => ({
+            materia_id: a.materia_id, materia_nombre: a.materia_nombre || `Materia #${a.materia_id}`,
+            fecha: a.fecha, presente: a.presente,
+          }))
+        )
+      } else fails.push('bitácora de sesiones')
+      if (me.status === 'fulfilled' && me.value?.carrera_id && carreras.status === 'fulfilled') {
+        const c = carreras.value.find(c => c.id === me.value!.carrera_id)
         if (c) setCarreraNombre(c.nombre)
       }
-    }).finally(() => setLoading(false))
+      setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
+      setLastUpdate(new Date())
+    }).finally(() => { setLoading(false); setRefreshing(false); firstLoad.current = false })
   }, [uid])
+
+  useEffect(() => {
+    cargar()
+    const id = setInterval(() => cargar(), AA_POLL_MS)
+    return () => clearInterval(id)
+  }, [cargar])
 
   const totalClases = porMateria.reduce((s, m) => s + m.total_clases, 0)
   const totalPresentes = porMateria.reduce((s, m) => s + m.presentes, 0)
@@ -119,126 +175,198 @@ function AlumnoView() {
             {carreraNombre || 'Visualiza tu registro de asistencia por materia y semestre.'} Mantén un seguimiento preciso para cumplir con los requisitos académicos.
           </p>
         </div>
-        <span className="badge" style={{
-          background: totalClases === 0 ? 'var(--bg-elevated)' : promedioTotal >= LIMITE ? 'var(--success-subtle)' : 'var(--danger-subtle)',
-          color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? 'var(--success)' : 'var(--danger)',
-        }}>
-          <i className="ti ti-shield-check" /> Estado: {totalClases === 0 ? 'Sin datos aún' : promedioTotal >= LIMITE ? 'Alumno Regular' : 'En Riesgo'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {lastUpdate && (
+            <span className="mono-label" style={{ fontSize: 10.5 }}>
+              Actualizado {lastUpdate.toLocaleTimeString('es-PY')}
+            </span>
+          )}
+          <button type="button" className="btn-ghost aa-refresh-btn" disabled={refreshing} onClick={() => cargar(true)}>
+            <svg className={refreshing ? 'spin' : ''} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="23 4 23 10 17 10" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+            </svg>
+            {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+          <span className="badge" style={{
+            background: totalClases === 0 ? 'var(--bg-elevated)' : promedioTotal >= LIMITE ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+            color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444',
+            border: `1px solid ${totalClases === 0 ? 'var(--border-subtle)' : promedioTotal >= LIMITE ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+            padding: '5px 14px', fontSize: 11.5,
+          }}>
+            <i className={`ti ${totalClases === 0 ? 'ti-minus' : promedioTotal >= LIMITE ? 'ti-shield-check' : 'ti-alert-triangle'}`} /> Estado: {totalClases === 0 ? 'Sin datos aún' : promedioTotal >= LIMITE ? 'Alumno Regular' : 'En Riesgo'}
+          </span>
+        </div>
       </div>
+
+      {error && (
+        <div className="aa-err-banner">
+          <i className="ti ti-alert-triangle" /> {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando asistencia…</div>
       ) : (
         <>
           {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
-            <div className="kpi-card">
-              <div className="mono-label" style={{ marginBottom: 8 }}>Promedio Total</div>
+          <div className="aa-kpi-grid">
+            <div className="kpi-card" style={{ borderLeft: `3px solid ${totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444'}` }}>
+              <div className="kpi-top"><span className="mono-label">Promedio Total</span><i className="ti ti-percentage" style={{ color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444', fontSize: 15 }} /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="kpi-value" style={{ fontSize: 26, color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? 'var(--accent-bright)' : 'var(--danger)' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</span>
-                <i className="ti ti-trending-up" style={{ color: 'var(--success)', fontSize: 15 }} />
+                <span className="kpi-value" style={{ fontSize: 26, color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</span>
               </div>
               <div className="progress-track" style={{ marginTop: 8 }}>
-                <div className="progress-fill" style={{ width: `${promedioTotal}%`, background: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? undefined : 'var(--danger)' }} />
+                <div className="progress-fill" style={{ width: `${promedioTotal}%`, background: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444' }} />
               </div>
             </div>
-            <div className="kpi-card">
-              <div className="mono-label" style={{ marginBottom: 8 }}>Clases Totales</div>
+            <div className="kpi-card" style={{ borderLeft: '3px solid var(--accent-bright)' }}>
+              <div className="kpi-top"><span className="mono-label">Clases Totales</span><i className="ti ti-calendar-stats" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
               <span className="kpi-value" style={{ fontSize: 26 }}>{totalClases}</span>
               <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Sesiones registradas</div>
             </div>
-            <div className="kpi-card">
-              <div className="mono-label" style={{ marginBottom: 8 }}>Inasistencias</div>
-              <span className="kpi-value" style={{ fontSize: 26, color: 'var(--danger)' }}>{inasistencias}</span>
+            <div className="kpi-card" style={{ borderLeft: `3px solid ${inasistencias > 3 ? '#ef4444' : '#f59e0b'}` }}>
+              <div className="kpi-top"><span className="mono-label">Inasistencias</span><i className="ti ti-calendar-off" style={{ color: '#ef4444', fontSize: 15 }} /></div>
+              <span className="kpi-value" style={{ fontSize: 26, color: '#ef4444' }}>{inasistencias}</span>
               <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Días no asistidos</div>
             </div>
             {critica ? (
-              <div className="aa-alerta">
+              <div className="aa-alerta" style={{ borderLeft: '3px solid #ef4444' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span className="mono-label" style={{ color: 'var(--danger)' }}>Alerta Crítica</span>
-                  <i className="ti ti-alert-triangle" style={{ color: 'var(--danger)' }} />
+                  <span className="mono-label" style={{ color: '#ef4444' }}>Alerta Crítica</span>
+                  <i className="ti ti-alert-triangle" style={{ color: '#ef4444' }} />
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>A {Math.max(0, Math.ceil((LIMITE - critica.porcentaje) / 100 * critica.total_clases))} faltas del límite permitido ({LIMITE}% req.)</div>
+                <div className="progress-track" style={{ marginTop: 8, height: 4 }}><div className="progress-fill" style={{ width: `${critica.porcentaje}%`, background: '#ef4444', height: 4 }} /></div>
               </div>
             ) : (
-              <div className="kpi-card">
-                <div className="mono-label" style={{ marginBottom: 8 }}>Alertas</div>
-                <span className="kpi-value" style={{ fontSize: 26, color: 'var(--success)' }}>0</span>
-                <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Todo en regla</div>
+              <div className="kpi-card" style={{ borderLeft: '3px solid #22c55e' }}>
+                <div className="kpi-top"><span className="mono-label">Alertas</span><i className="ti ti-shield-check" style={{ color: '#22c55e', fontSize: 15 }} /></div>
+                <span className="kpi-value" style={{ fontSize: 26, color: '#22c55e' }}>0</span>
+                <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Todo en regla ✓</div>
               </div>
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 18, alignItems: 'start' }}>
+          <div className="aa-main-grid">
             <div>
               {/* Cumplimiento por materia */}
               <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}><i className="ti ti-list-check" style={{ color: 'var(--accent-bright)' }} /> Cumplimiento por Materia</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 800 }}><i className="ti ti-list-check" style={{ color: 'var(--accent-bright)' }} /> Cumplimiento por Materia</h3>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>{porMateria.length} materias</span>
+                </div>
                 {porMateria.length === 0 ? (
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Sin registros de asistencia aún.</p>
-                ) : porMateria.map(m => {
-                  const ok = m.porcentaje >= LIMITE
-                  return (
-                    <div key={m.materia_id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.materia_nombre}</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13, color: ok ? 'var(--accent-bright)' : 'var(--danger)' }}>{m.porcentaje}%</span>
-                      </div>
-                      <div className="progress-track">
-                        <div className="progress-fill" style={{ width: `${m.porcentaje}%`, background: ok ? undefined : 'var(--danger)' }} />
-                      </div>
-                      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5 }}>{m.presentes}/{m.total_clases} Sesiones</div>
-                    </div>
-                  )
-                })}
-                <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 10.5, color: 'var(--text-secondary)' }}>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', marginRight: 5 }} />Asistencia actual</span>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)', marginRight: 5 }} />Límite crítico ({LIMITE}%)</span>
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: 24 }}>Sin registros de asistencia aún.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {porMateria.map(m => {
+                      const pct = m.porcentaje
+                      const ok = pct >= LIMITE
+                      const color = pct >= 90 ? '#22c55e' : pct >= 75 ? 'var(--accent-bright)' : pct >= 60 ? '#f59e0b' : '#ef4444'
+                      const c = 2 * Math.PI * 18
+                      return (
+                        <div key={m.materia_id} className="aa-mat-row">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
+                              <svg width="48" height="48" style={{ transform: 'rotate(-90deg)' }}>
+                                <circle cx="24" cy="24" r="18" stroke="var(--bg-elevated)" strokeWidth="4" fill="none" />
+                                <circle cx="24" cy="24" r="18" stroke={color} strokeWidth="4" fill="none"
+                                  strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
+                              </svg>
+                              <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 10, color }}>{pct}%</span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.materia_nombre}</span>
+                                <span className="badge" style={{
+                                  background: ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                                  color: ok ? '#22c55e' : '#ef4444',
+                                  border: `1px solid ${ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                  padding: '2px 10px', fontSize: 10, whiteSpace: 'nowrap',
+                                }}>
+                                  <i className={`ti ${ok ? 'ti-shield-check' : 'ti-alert-triangle'}`} style={{ fontSize: 10, marginRight: 3 }} />
+                                  {ok ? 'Regular' : 'En riesgo'}
+                                </span>
+                              </div>
+                              <div className="progress-track" style={{ marginTop: 6, height: 5 }}>
+                                <div className="progress-fill" style={{ width: `${pct}%`, background: color, height: 5 }} />
+                              </div>
+                              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>{m.presentes}/{m.total_clases} Sesiones</div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 10.5, color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', marginRight: 5 }} />Óptimo (≥90%)</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-bright)', marginRight: 5 }} />Bueno (≥75%)</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', marginRight: 5 }} />Mínimo (≥60%)</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#ef4444', marginRight: 5 }} />Crítico (&lt;60%)</span>
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Filtros de consulta */}
-              <div className="card">
-                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-filter" style={{ color: 'var(--accent-bright)' }} /> Filtros de Consulta</h3>
-                <div className="mono-label" style={{ marginBottom: 6 }}>Periodo Académico</div>
-                <select className="input-uca">
-                  <option>{new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre {new Date().getFullYear()}</option>
-                </select>
+              <div className="card" style={{ borderLeft: '3px solid var(--accent-bright)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <i className="ti ti-calendar" style={{ color: 'var(--accent-bright)', fontSize: 16 }} />
+                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Periodo Académico</h3>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre {new Date().getFullYear()}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                  Periodo académico en curso
+                </div>
               </div>
 
-              {/* Resumen de alertas */}
-              <div className="card">
-                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-alert-triangle" style={{ color: 'var(--danger)' }} /> Resumen de Alertas</h3>
+              <div className="card" style={{ borderLeft: `3px solid ${critica ? '#ef4444' : '#22c55e'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <i className="ti ti-alert-triangle" style={{ color: critica ? '#ef4444' : '#22c55e', fontSize: 16 }} />
+                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Resumen de Alertas</h3>
+                </div>
                 {critica ? (
-                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--danger-subtle)' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
-                    <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#ef4444' }}>{critica.materia_nombre}</div>
+                    <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
                       Riesgo de pérdida de regularidad. Se requieren asistencias consecutivas para salir de zona crítica.
                     </p>
                   </div>
                 ) : (
-                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Sin alertas activas.</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+                    <i className="ti ti-shield-check" style={{ color: '#22c55e', fontSize: 18 }} />
+                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0 }}>Sin alertas activas. Todo en orden.</p>
+                  </div>
                 )}
               </div>
 
-              {/* Bitácora de sesiones */}
               <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Bitácora de Sesiones</h3>
-                  <i className="ti ti-code" style={{ color: 'var(--text-muted)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="ti ti-history" style={{ color: 'var(--accent-bright)', fontSize: 16 }} />
+                    <h3 style={{ fontSize: 14, fontWeight: 800 }}>Bitácora de Sesiones</h3>
+                  </div>
+                  <span className="badge" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontSize: 10 }}>{sesiones.length} últimas</span>
                 </div>
                 {sesiones.length === 0 ? (
                   <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin sesiones registradas.</p>
-                ) : sesiones.slice(0, 6).map((s, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--border-subtle)' : 'none', fontSize: 11.5 }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{s.materia_nombre}</span>
-                    <span style={{ color: s.presente ? 'var(--success)' : 'var(--danger)', fontWeight: 700, flexShrink: 0 }}>{s.presente ? 'Presente' : 'Ausente'}</span>
+                ) : (
+                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {sesiones.slice(0, 8).map((s, i) => (
+                      <div key={i} className="det-row" style={{ padding: '8px 0', borderBottom: i < 7 ? '1px solid rgba(42,48,64,0.2)' : 'none', fontSize: 11.5 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: s.presente ? '#22c55e' : '#ef4444' }} />
+                          {s.materia_nombre}
+                        </span>
+                        <span style={{ color: s.presente ? '#22c55e' : '#ef4444', fontWeight: 700, flexShrink: 0, fontSize: 11 }}>
+                          {s.presente ? 'Presente' : 'Ausente'}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -263,7 +391,7 @@ function ProfesorView() {
   const [loading, setLoading]   = useState(true)
   const [qrMatId, setQrMatId]   = useState<number | null>(null)
   const [fecha, setFecha]       = useState(() => new Date().toISOString().slice(0, 10))
-  const [fechaLabel, setFechaL] = useState(() => {
+  const [, setFechaL] = useState(() => {
     const d = new Date()
     return d.toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   })
@@ -274,6 +402,10 @@ function ProfesorView() {
   // Motivo modal for absent
   const [motivoModal, setMotivoModal] = useState<AlumnoAsist | null>(null)
   const [motivoText, setMotivoText]   = useState('')
+  // Batch edit mode
+  const [modoEdicion, setModoEdicion] = useState(false)
+  // Staged changes per student { [id]: boolean | null } (null = sin registro)
+  const [staged, setStaged] = useState<Record<number, boolean | null>>({})
   // Polling ref
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -400,68 +532,63 @@ function ProfesorView() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ padding: '28px 36px 60px' }}>
-        <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div className="page-title" style={{ fontSize: 24, fontWeight: 800 }}>Control de Asistencia</div>
-            <div className="page-subtitle">
-              {selMat
-                ? <>Materia: <span style={{ color: 'var(--accent-bright)', fontWeight: 700 }}>{selMat.nombre}</span></>
-                : 'Gestioná la asistencia de tus cursos por carrera y materia'}
-            </div>
+      <style>{cssProfesorResponsive}</style>
+      <div className="ap-wrap">
+        {/* Header compacto con breadcrumb inline */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700 }}>
+            <span>Control de Asistencia</span>
+            {selCarr && view !== 'carreras' && (
+              <>
+                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>▸</span>
+                {view === 'materias' ? (
+                  <span style={{ color: 'var(--accent-bright)', fontSize: 13 }}>{selCarr.nombre}</span>
+                ) : (
+                  <button onClick={() => { setView('materias'); setSelMat(null) }} style={{ background:'none', border:'none', color:'var(--text-secondary)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>
+                    {selCarr.nombre}
+                  </button>
+                )}
+              </>
+            )}
+            {selMat && view === 'alumnos' && (
+              <>
+                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>▸</span>
+                <span style={{ color: 'var(--accent-bright)', fontSize: 13 }}>{selMat.nombre}</span>
+              </>
+            )}
           </div>
-          {view === 'alumnos' && (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-ghost"><i className="ti ti-download" /> Exportar Reporte</button>
-              <button className="btn-primary" onClick={() => setQrMatId(selMat!.id)}><i className="ti ti-hand-finger" /> Pase Manual</button>
-            </div>
-          )}
-        </div>
-
-        {/* Breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 13 }}>
-          {view !== 'carreras' && (
-            <button type="button" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'} onClick={() => { setView('carreras'); setSelCarr(null); setSelMat(null) }}>
-              Carreras
-            </button>
-          )}
-          {selCarr && view !== 'carreras' && <span style={{ color: 'var(--border-subtle)' }}>/</span>}
-          {selCarr && view !== 'carreras' && (
-            view === 'materias'
-              ? <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{selCarr.nombre}</span>
-              : <button type="button" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'} onClick={() => { setView('materias'); setSelMat(null) }}>{selCarr.nombre}</button>
-          )}
-          {selMat && view === 'alumnos' && <span style={{ color: 'var(--border-subtle)' }}>/</span>}
-          {selMat && view === 'alumnos' && <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{selMat.nombre}</span>}
+          {view === 'alumnos' && <div />}
         </div>
 
         {view === 'carreras' && (
-          loading ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>Cargando carreras…</div>
-          : carreras.length === 0 ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}><div style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.3 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No tenés carreras asignadas</div>
-          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>{carreras.map(c => (
-              <div key={c.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 18, cursor: 'pointer', transition: 'border-color 0.15s, background-color 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-muted)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-input)' }} onClick={() => selectCarrera(c)}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{c.nombre}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Carrera</div>
-              </div>
-            ))}</div>
+          loading ? <div style={{ textAlign:'center', padding:'32px 20px', color:'var(--text-muted)', fontSize:13 }}>Cargando carreras…</div>
+          : carreras.length === 0
+            ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-muted)', fontSize:13 }}>No tenés carreras asignadas</div>
+            : <div className="ap-chip-strip">{carreras.map(c => (
+                <div key={c.id} className="ap-chip" onClick={() => selectCarrera(c)}>
+                  <i className="ti ti-building-community" style={{ fontSize:14, color:'var(--accent-bright)' }} />
+                  <span style={{ fontWeight:600 }}>{c.nombre}</span>
+                </div>
+              ))}</div>
         )}
 
         {view === 'materias' && (
-          loading ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>Cargando materias…</div>
-          : materias.length === 0 ? <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}><div style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.3 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>No hay materias en esta carrera</div>
-          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>{materias.map(m => (
-              <div key={m.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 18, cursor: 'pointer', transition: 'border-color 0.15s, background-color 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-muted)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-input)' }} onClick={() => selectMateria(m)}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{m.nombre}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{m.codigo}</div>
-              </div>
-            ))}</div>
+          loading ? <div style={{ textAlign:'center', padding:'32px 20px', color:'var(--text-muted)', fontSize:13 }}>Cargando materias…</div>
+          : materias.length === 0
+            ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-muted)', fontSize:13 }}>No hay materias en esta carrera</div>
+            : <div className="ap-chip-strip">{materias.map(m => (
+                <div key={m.id} className="ap-chip" onClick={() => selectMateria(m)}>
+                  <i className="ti ti-book-2" style={{ fontSize:14, color:'var(--accent-bright)' }} />
+                  <span style={{ fontWeight:600 }}>{m.nombre}</span>
+                  {m.codigo && <span className="mono-label" style={{ fontSize:10, color:'var(--text-muted)' }}>{m.codigo}</span>}
+                </div>
+              ))}</div>
         )}
 
         {view === 'alumnos' && (
           <>
             {/* Grid: QR en tiempo real + KPIs/Historial */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) 1.2fr', gap: 16, marginBottom: 18 }} >
-              <style>{`@media(max-width:900px){ .as-rt-grid { grid-template-columns:1fr !important; } }`}</style>
+            <div className="ap-rt-grid">
 
               {/* Panel REGISTRO EN TIEMPO REAL */}
               <div className="card" style={{ textAlign: 'center' }}>
@@ -532,7 +659,7 @@ function ProfesorView() {
 
               {/* KPIs + Historial Mensual */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                <div className="ap-kpi-grid">
                   <div className="kpi-card">
                     <div className="mono-label" style={{ marginBottom: 6 }}>Asistencia Hoy</div>
                     <span className="kpi-value" style={{ fontSize: 22 }}>{total > 0 ? Math.round(presentes / total * 100) : 0}%</span>
@@ -547,33 +674,64 @@ function ProfesorView() {
                   </div>
                 </div>
                 <div className="card" style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 800 }}>Historial Mensual</h3>
-                    <span className="mono-label">{new Date(fecha + 'T12:00:00').toLocaleDateString('es-PY', { month: 'long', year: 'numeric' })}</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <button onClick={() => {
+                        const d = new Date(fecha + 'T12:00:00')
+                        d.setMonth(d.getMonth() - 1)
+                        const y = d.getFullYear(), m = d.getMonth() + 1
+                        cambiarFecha(`${y}-${String(m).padStart(2,'0')}-01`)
+                      }} style={{ background:'none', border:'none', color:'var(--text-secondary)', cursor:'pointer', padding:2, display:'flex' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                      <span className="mono-label" style={{ minWidth:90, textAlign:'center' }}>{new Date(fecha + 'T12:00:00').toLocaleDateString('es-PY', { month: 'long', year: 'numeric' })}</span>
+                      <button onClick={() => {
+                        const d = new Date(fecha + 'T12:00:00')
+                        d.setMonth(d.getMonth() + 1)
+                        const y = d.getFullYear(), m = d.getMonth() + 1
+                        cambiarFecha(`${y}-${String(m).padStart(2,'0')}-01`)
+                      }} style={{ background:'none', border:'none', color:'var(--text-secondary)', cursor:'pointer', padding:2, display:'flex' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
-                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <div key={i} className="mono-label" style={{ textAlign: 'center' }}>{d}</div>)}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+                      <div key={i} style={{ textAlign:'center', fontSize:9, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', padding:'3px 0', letterSpacing:'.03em' }}>{d}</div>
+                    ))}
                     {(() => {
                       const base = new Date(fecha + 'T12:00:00')
                       const y = base.getFullYear(), mo = base.getMonth()
                       const first = (new Date(y, mo, 1).getDay() + 6) % 7
                       const dias = new Date(y, mo + 1, 0).getDate()
+                      const hoyNum = new Date().getDate()
+                      const hoyMes = new Date().getMonth()
+                      const hoyAno = new Date().getFullYear()
                       const cells = []
                       for (let i = 0; i < first; i++) cells.push(<span key={`e${i}`} />)
                       for (let d = 1; d <= dias; d++) {
                         const esSel = d === base.getDate()
-                        const esClase = new Date(y, mo, d).getDay() % 6 !== 0 && d % 2 === 1
+                        const esHoy = d === hoyNum && mo === hoyMes && y === hoyAno
+                        const esFinDe = new Date(y, mo, d).getDay() === 0 || new Date(y, mo, d).getDay() === 6
+                        const tieneDatos = alumnos.length > 0 && d === base.getDate()
+                        const pctDia = tieneDatos && alumnos.length > 0 ? Math.round(alumnos.filter(a => a.presente === true).length / alumnos.length * 100) : null
                         cells.push(
-                          <button key={d} onClick={() => cambiarFecha(`${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`)}
+                          <button key={d} onClick={() => cambiarFecha(`${y}-${String(mo + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)}
                             style={{
-                              aspectRatio: '1', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              fontFamily: 'var(--font-mono)', fontSize: 11,
-                              background: esSel ? 'var(--accent)' : 'transparent',
-                              color: esSel ? '#fff' : 'var(--text-secondary)',
-                              position: 'relative',
-                            }}>
+                              aspectRatio:'1', borderRadius:7, cursor:'pointer', position:'relative',
+                              fontFamily:'var(--font-mono)', fontSize:10, fontWeight: esSel || esHoy ? 700 : 400,
+                              border: esSel ? '1.5px solid var(--accent-bright)' : esHoy ? '1.5px solid var(--accent)' : '1px solid transparent',
+                              background: esSel ? 'var(--accent)' : esHoy ? 'var(--accent-muted)' : 'transparent',
+                              color: esSel ? '#fff' : esFinDe ? 'var(--text-muted)' : esHoy ? 'var(--accent-bright)' : 'var(--text-secondary)',
+                              transition:'all .12s',
+                            }}
+                            onMouseEnter={e => { if (!esSel && !esHoy) { e.currentTarget.style.background = 'var(--accent-muted)'; e.currentTarget.style.borderColor = 'var(--border-light)' } }}
+                            onMouseLeave={e => { if (!esSel && !esHoy) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' } }}>
                             {d}
-                            {esClase && !esSel && <span style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)' }} />}
+                            {pctDia !== null && pctDia >= 50 && (
+                              <span style={{ position:'absolute', bottom:2, left:'50%', transform:'translateX(-50%)', width:4, height:4, borderRadius:'50%', background: pctDia >= 80 ? '#22c55e' : pctDia >= 50 ? '#f59e0b' : '#ef4444' }} />
+                            )}
                           </button>
                         )
                       }
@@ -583,34 +741,25 @@ function ProfesorView() {
                 </div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="date" value={fecha} onChange={e => cambiarFecha(e.target.value)}
-                  style={{ height: 34, padding: '0 12px', borderRadius: 8, border: '1px solid #2a3040', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit' }} />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fechaLabel}</span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{presentes}/{total} presentes</span>
-                {/* QR timer badge — visible without modal */}
+                <button className="btn-ghost" style={{ padding:'4px 8px', fontSize:11 }} onClick={() => { setView('materias'); setSelMat(null) }}>
+                  <i className="ti ti-arrow-left" />
+                </button>
+                <input type="date" value={fecha} onChange={e => cambiarFecha(e.target.value)}
+                  style={{ height: 30, padding: '0 10px', borderRadius: 7, border: '1px solid #2a3040', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 12, fontFamily: 'inherit' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {qrActive && (
-                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-surface)', border:`1px solid ${qrClr}30`, borderRadius:8, padding:'5px 10px' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={qrClr} strokeWidth="2">
+                  <div style={{ display:'flex', alignItems:'center', gap:4, background:'var(--bg-surface)', border:`1px solid ${qrClr}30`, borderRadius:6, padding:'3px 8px' }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={qrClr} strokeWidth="2">
                       <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                     </svg>
-                    <span style={{ fontFamily:'monospace', fontSize:13, fontWeight:700, color:qrClr }}>
+                    <span style={{ fontFamily:'monospace', fontSize:12, fontWeight:700, color:qrClr }}>
                       {String(qrMin).padStart(2,'0')}:{String(qrS).padStart(2,'0')}
                     </span>
-                    <button className="as-btn as-btn-primary" style={{ padding:'4px 10px', fontSize:11 }} onClick={() => setQrMatId(selMat!.id)}>
-                      Ver QR
-                    </button>
                   </div>
                 )}
-                <button className="as-btn as-btn-primary" onClick={() => setQrMatId(selMat!.id)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/>
-                  </svg>
-                  {qrActive ? 'Nuevo QR' : 'Generar QR'}
-                </button>
               </div>
             </div>
 
@@ -620,47 +769,91 @@ function ProfesorView() {
               <thead><tr>
                 <th>N°</th>
                 <th>Alumno</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th>Asistencia</th>
               </tr></thead>
               <tbody>
                 {alumnos.map((a, i) => (
                   <tr key={a.id}>
-                    <td style={{ color: 'var(--text-muted)', width:40 }}>{i + 1}</td>
+                    <td style={{ color:'var(--text-muted)', width:32, fontSize:11 }}>{i + 1}</td>
                     <td>
-                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                        {a.nombre}
-                        {a.es_becado && <span className="as-badge as-badge-becado">Becado</span>}
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:13 }}>{a.nombre}</span>
+                        {a.es_becado && <span className="as-badge as-badge-becado" style={{ fontSize:9, padding:'1px 6px' }}>B</span>}
                       </div>
                       {a.presente === false && a.motivo && (
-                        <div style={{ fontSize:11, color:'#f59e0b', marginTop:3 }}>
-                          Motivo: {a.motivo}
-                        </div>
+                        <div style={{ fontSize:10, color:'#f59e0b', marginTop:1 }}>{a.motivo}</div>
                       )}
                     </td>
                     <td>
-                      {a.presente === true  && <span className="as-badge as-badge-presente">Presente</span>}
-                      {a.presente === false && <span className="as-badge as-badge-ausente">Ausente</span>}
-                      {a.presente === null  && <span className="as-badge as-badge-ausente" style={{ opacity:0.4 }}>Sin registro</span>}
-                    </td>
-                    <td>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <button
-                          onClick={() => marcarPresente(a)}
-                          disabled={a.presente === true}
-                          style={{ padding:'5px 10px', borderRadius:7, border:'1px solid #22c55e40', background: a.presente===true ? '#22c55e18':'transparent', color:'#22c55e', fontSize:11, fontWeight:700, fontFamily:'inherit', cursor: a.presente===true ? 'default':'pointer', opacity: a.presente===true ? 0.5 : 1, transition:'all .15s' }}
-                        >✓ Presente</button>
-                        <button
-                          onClick={() => { setMotivoModal(a); setMotivoText('') }}
-                          disabled={a.presente === false}
-                          style={{ padding:'5px 10px', borderRadius:7, border:'1px solid #ef444440', background: a.presente===false ? '#ef444418':'transparent', color:'#ef4444', fontSize:11, fontWeight:700, fontFamily:'inherit', cursor: a.presente===false ? 'default':'pointer', opacity: a.presente===false ? 0.5 : 1, transition:'all .15s' }}
-                        >✗ Ausente</button>
-                      </div>
+                      {modoEdicion ? (
+                        <div style={{ display:'flex', gap:4 }}>
+                          <button onClick={() => setStaged(s => ({ ...s, [a.id]: true }))}
+                            className={`as-btn ${staged[a.id] === true ? 'as-btn-primary' : ''}`}
+                            style={{ padding:'2px 8px', fontSize:10, borderColor: staged[a.id] === true ? 'var(--accent)' : '#22c55e30', background: staged[a.id] === true ? 'var(--accent)' : 'transparent', color: staged[a.id] === true ? '#fff' : '#22c55e' }}>
+                            Presente
+                          </button>
+                          <button onClick={() => {
+                            setStaged(s => ({ ...s, [a.id]: null }))
+                          }}
+                            className={`as-btn ${staged[a.id] === null ? 'as-btn-primary' : ''}`}
+                            style={{ padding:'2px 8px', fontSize:10, borderColor: staged[a.id] === null ? 'var(--text-muted)' : 'var(--border-subtle)', background: staged[a.id] === null ? 'var(--bg-hover)' : 'transparent', color: 'var(--text-muted)' }}>
+                            —
+                          </button>
+                          <button onClick={() => {
+                            setStaged(s => ({ ...s, [a.id]: false }))
+                            setMotivoModal(a); setMotivoText('')
+                          }}
+                            className={`as-btn ${staged[a.id] === false ? 'as-btn-primary' : ''}`}
+                            style={{ padding:'2px 8px', fontSize:10, borderColor: staged[a.id] === false ? '#ef4444' : '#ef444430', background: staged[a.id] === false ? '#ef4444' : 'transparent', color: staged[a.id] === false ? '#fff' : '#ef4444' }}>
+                            Ausente
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          {a.presente === true && <span className="as-badge as-badge-presente" style={{ fontSize:10, padding:'2px 8px' }}>Presente</span>}
+                          {a.presente === false && <span className="as-badge as-badge-ausente" style={{ fontSize:10, padding:'2px 8px' }}>Ausente</span>}
+                          {a.presente === null && <span style={{ fontSize:10, color:'var(--text-muted)' }}>—</span>}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table></div>}
+
+            {alumnos.length > 0 && (
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:10 }}>
+                {modoEdicion ? (
+                  <>
+                    <button className="btn-ghost" onClick={() => { setModoEdicion(false); setStaged({}) }}>
+                      Cancelar
+                    </button>
+                    <button className="btn-primary" onClick={async () => {
+                      for (const [idStr, val] of Object.entries(staged)) {
+                        const a = alumnos.find(x => x.id === Number(idStr))
+                        if (!a || a.presente === val) continue
+                        if (val === true) await marcarPresente(a)
+                        else if (val === null && a.asistencia_id) await api.delete(`/asistencias/${a.asistencia_id}`)
+                      }
+                      setModoEdicion(false)
+                      setStaged({})
+                      refreshAlumnos(selMat!.id, fecha)
+                    }}>
+                      <i className="ti ti-device-floppy" /> Guardar todo
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn-ghost" onClick={() => {
+                    setModoEdicion(true)
+                    const init: Record<number, boolean | null> = {}
+                    alumnos.forEach(a => { init[a.id] = a.presente })
+                    setStaged(init)
+                  }}>
+                    <i className="ti ti-edit" /> Editar
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Mapa de Calor */}
             <div className="card" style={{ marginTop: 18 }}>

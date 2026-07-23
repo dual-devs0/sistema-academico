@@ -192,17 +192,18 @@ def alumnos_por_materia(
     }
     result = []
     for i in inscripciones:
-        alumno = alumnos_map.get(i.alumno_id)
-        if alumno:
-            result.append(
-                {
-                    "inscripcion_id": i.id,
-                    "alumno_id": alumno.id,
-                    "nombre": alumno.nombre or alumno.username,
-                    "username": alumno.username,
-                    "email": alumno.email or alumno.username,
-                }
-            )
+        if i.alumno_id is not None:
+            alumno = alumnos_map.get(i.alumno_id)
+            if alumno:
+                result.append(
+                    {
+                        "inscripcion_id": i.id,
+                        "alumno_id": alumno.id,
+                        "nombre": alumno.nombre or alumno.username,
+                        "username": alumno.username,
+                        "email": alumno.email or alumno.username,
+                    }
+                )
     return result
 
 
@@ -372,14 +373,15 @@ def inscripciones_por_carrera(
                     .all()
                 }
                 for i in inscripciones:
-                    alumno = alumnos_map.get(i.alumno_id)
-                    if alumno:
-                        alumnos.append({
-                            "inscripcion_id": i.id,
-                            "alumno_id": alumno.id,
-                            "nombre": alumno.nombre or alumno.username,
-                            "username": alumno.username,
-                        })
+                    if i.alumno_id is not None:
+                        alumno = alumnos_map.get(i.alumno_id)
+                        if alumno:
+                            alumnos.append({
+                                "inscripcion_id": i.id,
+                                "alumno_id": alumno.id,
+                                "nombre": alumno.nombre or alumno.username,
+                                "username": alumno.username,
+                            })
         result.append({
             "materia_id": m.id,
             "materia_nombre": m.nombre,
