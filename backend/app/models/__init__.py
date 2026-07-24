@@ -26,6 +26,8 @@ from . import examen
 from . import tramites
 from . import global_settings
 from . import peso_evaluacion
+from . import password_reset_token
+from . import token_blacklist
 
 __all__ = [
     "user",
@@ -56,5 +58,7 @@ __all__ = [
     "tramites",
     "global_settings",
     "peso_evaluacion",
+    "password_reset_token",
+    "token_blacklist",
 ]
 

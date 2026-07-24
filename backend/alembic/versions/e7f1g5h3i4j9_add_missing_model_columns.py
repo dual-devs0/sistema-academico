@@ -23,11 +23,11 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     bind = op.get_bind()
     insp = sa.inspect(bind)
-    
+
     # Check which columns already exist
     materias_cols = [c['name'] for c in insp.get_columns('materias')]
     asistencias_cols = [c['name'] for c in insp.get_columns('asistencias')]
-    
+
     # SQLite via create_all() may already have these columns; check before adding
     if 'creditos' not in materias_cols:
         op.add_column(
@@ -53,10 +53,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     insp = sa.inspect(bind)
-    
+
     materias_cols = [c['name'] for c in insp.get_columns('materias')]
     asistencias_cols = [c['name'] for c in insp.get_columns('asistencias')]
-    
+
     if 'secciones' in materias_cols:
         op.drop_column("materias", "secciones")
     if 'horario' in materias_cols:

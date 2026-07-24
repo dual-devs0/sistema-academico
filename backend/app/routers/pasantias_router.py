@@ -60,7 +60,7 @@ def listar_profesores(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    from app.models.user import User
+    from app.models.users import User
     profesores = (
         db.query(User.id, User.nombre, User.email)
         .filter(User.role == "profesor")

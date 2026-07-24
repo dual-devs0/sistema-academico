@@ -1,5 +1,6 @@
-import csv, io
-from typing import Any, Optional, cast
+import csv
+import io
+from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, case

@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import {
   getFuentes, getCatalogoBecas, getPostulaciones, revisarPostulacion,
   getConceptos, crearConcepto, actualizarConcepto, generarCuotas, getCuotasAlumno,
@@ -403,9 +403,9 @@ function TabConceptos() {
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [editMonto, setEditMonto] = useState('')
 
-  const cargar = () => getConceptos(mostrarInactivos).then(setConceptos).catch(() => {})
+  const cargar = useCallback(() => getConceptos(mostrarInactivos).then(setConceptos).catch(() => {}), [mostrarInactivos])
 
-  useEffect(() => { cargar() }, [mostrarInactivos])
+  useEffect(() => { const load = () => cargar(); load() }, [mostrarInactivos, cargar])
 
   const guardar = async () => {
     if (!nombre || !monto) return

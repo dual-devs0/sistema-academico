@@ -3,22 +3,22 @@ import { api } from "./api";
 /**
  * Contrato con el backend (POST /auth/login, /auth/refresh, /auth/logout).
  *
- * Login devuelve `refresh_token` en el body para clientes móviles y setea
- * la cookie HttpOnly para clientes web (auth_router.py:87). Refresh acepta
- * el token por body o por cookie; precedencia body > cookie
- * (auth_router.py:102).
+ * Login setea refresh_token como httpOnly cookie. Mobile usa
+ * `withCredentials: true` para que las cookies se envíen automáticamente.
+ * El CSRF token se recibe del body de login/refresh y se reenvía como header
+ * en las peticiones mutantes.
  */
 
 export interface LoginResponse {
   access_token: string;
   token_type: string;
-  refresh_token?: string;
+  csrf_token?: string;
 }
 
 export interface RefreshResponse {
   access_token: string;
   token_type: string;
-  refresh_token?: string;
+  csrf_token?: string;
 }
 
 export interface LoginPayload {
@@ -32,10 +32,15 @@ export async function loginRequest(payload: LoginPayload): Promise<LoginResponse
 }
 
 export async function refreshRequest(
-  refreshToken: string | null,
+  csrfToken: string | null,
 ): Promise<RefreshResponse> {
-  const body = refreshToken ? { refresh_token: refreshToken } : {};
-  const { data } = await api.post<RefreshResponse>("/auth/refresh", body);
+  const headers: Record<string, string> = {};
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  const { data } = await api.post<RefreshResponse>(
+    "/auth/refresh",
+    {},
+    { headers },
+  );
   return data;
 }
 

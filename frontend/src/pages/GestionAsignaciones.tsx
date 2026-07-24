@@ -99,14 +99,19 @@ export default function GestionAsignaciones() {
         setOpenCareers({ [firstKey]: true })
       }
     } catch { /* ignore */ }
-  }, [])
+  }, [openCareers])
 
   useEffect(() => {
-    setLoading(true)
-    cargarTodo().finally(() => {
-      setLoading(false)
-      setLastUpdate(new Date())
-    })
+    const load = async () => {
+      setLoading(true)
+      try {
+        await cargarTodo()
+      } finally {
+        setLoading(false)
+        setLastUpdate(new Date())
+      }
+    }
+    load()
   }, [cargarTodo])
 
   useEffect(() => {

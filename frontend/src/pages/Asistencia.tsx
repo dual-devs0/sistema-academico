@@ -58,7 +58,7 @@ export default function Asistencia() {
 
   useEffect(() => {
     setDocTitle(rol, user?.username || '')
-  }, [])
+  }, [rol, user?.username])
 
   if (rol === 'alumno') return <AlumnoView />
   if (rol === 'profesor') return <ProfesorView />
@@ -153,7 +153,8 @@ function AlumnoView() {
   }, [uid])
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(), AA_POLL_MS)
     return () => clearInterval(id)
   }, [cargar])

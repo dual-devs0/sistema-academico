@@ -1,3 +1,11 @@
+"""Pagos online vía Stripe Checkout Sessions + verificación de webhooks.
+
+Monto SIEMPRE Decimal (nunca float) hasta el punto de conversión a
+centavos para Stripe — ver crear_checkout_session. Depende de: STRIPE_*
+env vars (placeholder mientras no haya cuenta real configurada). Usado
+por: routers/finanzas_router.py (pago_online_init + webhook endpoint).
+"""
+import json
 import logging
 import os
 from decimal import Decimal
@@ -58,11 +66,17 @@ def crear_checkout_session(
 def confirmar_pago_webhook(
     payload: bytes, sig_header: str
 ) -> stripe.Event:
+    """Verifica la firma del webhook de Stripe (o la salta si no hay
+    STRIPE_WEBHOOK_SECRET real, modo placeholder actual). Sin verificación
+    de firma, cualquiera podría falsificar un evento "pago confirmado"."""
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
     if not endpoint_secret or endpoint_secret == "whsec_placeholder":
         logger.warning("STRIPE_WEBHOOK_SECRET no configurada — saltando verificación")
+        # FIX AUDITORIA_2026-07-24 #5: stripe.util no existe en stripe>=15.0
+        # (AttributeError real en cualquier webhook con secret sin configurar).
+        # json.loads() estándar en vez de stripe.util.json.loads(). Ver CHANGELOG_FIXES.md.
         event = stripe.Event.construct_from(
-            stripe.util.json.loads(payload), stripe.api_key
+            json.loads(payload), stripe.api_key
         )
     else:
         event = stripe.Webhook.construct_event(

@@ -124,7 +124,8 @@ function AlumnoView({ userId }: { userId: number }) {
   }, [userId])
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(), POLL_MS)
     return () => clearInterval(id)
   }, [cargar])
@@ -456,14 +457,18 @@ function AdminView() {
   }
 
   useEffect(() => {
-    Promise.all([
-      api.get<CarreraData[]>('/carreras/').catch(() => [] as CarreraData[]),
-      api.get<UserApi[]>('/users/').catch(() => [] as UserApi[]),
-      fetchGlobalStats(),
-    ]).then(([cars, users]) => {
-      setCarreras(cars)
-      setAlumnos(users.filter(u => u.role === 'alumno'))
-    })
+    const load = async () => {
+      try {
+        const [cars, users] = await Promise.all([
+          api.get<CarreraData[]>('/carreras/').catch(() => [] as CarreraData[]),
+          api.get<UserApi[]>('/users/').catch(() => [] as UserApi[]),
+          fetchGlobalStats(),
+        ])
+        setCarreras(cars)
+        setAlumnos(users.filter(u => u.role === 'alumno'))
+      } catch { /* ignore */ }
+    }
+    load()
   }, [])
 
   /* Refresh global stats periodically */

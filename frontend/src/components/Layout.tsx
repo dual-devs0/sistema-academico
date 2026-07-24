@@ -379,12 +379,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Nav */}
           <div className="nav-scroll" style={{ flex: 1, padding: '4px 12px', overflowY: 'auto' }}>
-            {(() => {
-              let lastGroup: string | undefined
-              return menuItems.map(item => {
+            {menuItems.map((item, idx) => {
                 const active = location.pathname === item.path
-                const showHeader = item.group !== undefined && item.group !== lastGroup
-                lastGroup = item.group
+                const showHeader = item.group !== undefined && (idx === 0 || item.group !== menuItems[idx - 1].group)
                 const CustomIcon = iconOverride[item.path]
                 return (
                   <div key={item.path}>
@@ -398,8 +395,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </button>
                   </div>
                 )
-              })
-            })()}
+              })}
           </div>
 
           {/* Footer */}

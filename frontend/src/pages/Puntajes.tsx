@@ -634,14 +634,18 @@ function AdminView() {
   }
 
   useEffect(() => {
-    Promise.all([
-      api.get<(AlumnoOpt & { role: string })[]>('/users/').then(d => d.filter(u => u.role === 'alumno')).catch(() => []),
-      api.get<CarreraOpt[]>('/carreras/').catch(() => []),
-      fetchGlobalStats(),
-    ]).then(([al, cars]) => {
-      setAlumnos(al)
-      setCarreras(cars)
-    })
+    const load = async () => {
+      try {
+        const [al, cars] = await Promise.all([
+          api.get<(AlumnoOpt & { role: string })[]>('/users/').then(d => d.filter(u => u.role === 'alumno')).catch(() => []),
+          api.get<CarreraOpt[]>('/carreras/').catch(() => []),
+          fetchGlobalStats(),
+        ])
+        setAlumnos(al)
+        setCarreras(cars)
+      } catch { /* ignore */ }
+    }
+    load()
   }, [])
 
   useEffect(() => {

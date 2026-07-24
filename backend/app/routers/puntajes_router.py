@@ -570,4 +570,3 @@ def promedio_puntajes(
     valores = [float(str(p.valor)) for p in puntajes]
     promedio = round(sum(valores) / len(valores), 2)
     return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
-    

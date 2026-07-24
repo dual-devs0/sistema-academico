@@ -20,7 +20,6 @@ from app.dependencias import get_current_user, require_role
 from app.models.tramites import Solicitud, TipoTramite
 from sqlalchemy import func
 
-from typing import cast
 from app.schemas.tramites import (
     SolicitudCreate,
     SolicitudOut,

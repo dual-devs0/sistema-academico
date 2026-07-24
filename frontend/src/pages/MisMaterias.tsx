@@ -642,10 +642,9 @@ export default function MisMaterias() {
                   }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
                       {delDia.length > 0 ? delDia.map((it, idx) => {
-                        let bg = '', tx = '', border = ''
-                        if (it.tipo === 'clase') { bg = '#FAECE7'; tx = '#712B13'; border = '1px solid #F5D6C9' }
-                        else if (it.tipo === 'evento') { bg = '#EAF3DE'; tx = '#27500A'; border = '1px solid #D4E5C0' }
-                        else { bg = '#E6F1FB'; tx = '#0C447C'; border = '1px solid #C8DEEE' }
+                        const bg = it.tipo === 'clase' ? '#FAECE7' : it.tipo === 'evento' ? '#EAF3DE' : '#E6F1FB'
+                        const tx = it.tipo === 'clase' ? '#712B13' : it.tipo === 'evento' ? '#27500A' : '#0C447C'
+                        const border = it.tipo === 'clase' ? '1px solid #F5D6C9' : it.tipo === 'evento' ? '1px solid #D4E5C0' : '1px solid #C8DEEE'
                         const ahora = esClaseAhora(it)
                         return (
                           <div key={idx} style={{

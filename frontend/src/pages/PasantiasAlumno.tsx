@@ -84,7 +84,8 @@ export default function PasantiasAlumno() {
   }, [])
 
   useEffect(() => {
-    cargar()
+    const load = () => cargar()
+    load()
     const id = setInterval(() => cargar(), POLL_MS)
     return () => clearInterval(id)
   }, [cargar])

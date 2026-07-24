@@ -56,6 +56,9 @@ async def _send_with_retry(
                 )
 
 
+RESET_PASSWORD_FRONTEND_URL = os.getenv("RESET_PASSWORD_FRONTEND_URL", "https://sistema.uca.edu.py/reset-password")
+
+
 def send_password_reset_email_bg(
     background_tasks: BackgroundTasks,
     email_to: str,
@@ -73,6 +76,60 @@ def send_password_reset_email_bg(
     """
     message = MessageSchema(
         subject="UCA - Restablecimiento de contraseña",
+        recipients=[NameEmail(name="", email=email_to)],
+        body=html,
+        subtype=MessageType.html,
+    )
+    background_tasks.add_task(_send_with_retry, message)
+
+
+def send_reset_link_email_bg(
+    background_tasks: BackgroundTasks,
+    email_to: str,
+    user_name: str,
+    token: str,
+) -> None:
+    reset_link = f"{RESET_PASSWORD_FRONTEND_URL}?token={token}"
+    if not _credentials_configured():
+        print(f"Mock Email sent to {email_to}: Reset link {reset_link}")
+        return
+
+    html = f"""
+    <h3>Hola {user_name},</h3>
+    <p>Recibimos una solicitud para restablecer tu contraseña en el Sistema Académico UCA.</p>
+    <p>Hacé clic en el siguiente enlace para crear una nueva contraseña:</p>
+    <p><a href="{reset_link}" style="display:inline-block;padding:12px 24px;background:#1a56db;color:white;text-decoration:none;border-radius:6px;font-weight:bold;">Restablecer contraseña</a></p>
+    <p>O copiá este enlace en tu navegador:</p>
+    <p>{reset_link}</p>
+    <p>Este enlace expira en 1 hora.</p>
+    <p>Si no solicitaste este cambio, ignorá este mensaje.</p>
+    """
+    message = MessageSchema(
+        subject="UCA - Restablecimiento de contraseña",
+        recipients=[NameEmail(name="", email=email_to)],
+        body=html,
+        subtype=MessageType.html,
+    )
+    background_tasks.add_task(_send_with_retry, message)
+
+
+def send_welcome_email_bg(
+    background_tasks: BackgroundTasks,
+    email_to: str,
+    user_name: str,
+) -> None:
+    if not _credentials_configured():
+        print(f"Mock Email sent to {email_to}: Welcome {user_name}")
+        return
+
+    html = f"""
+    <h3>Bienvenido/a {user_name},</h3>
+    <p>Tu cuenta en el Sistema Académico UCA ha sido creada.</p>
+    <p>Usá la opción <b>"Recuperar contraseña"</b> en la pantalla de inicio de sesión para establecer tu contraseña.</p>
+    <p>Si tenés dudas, contactá a la administración del sistema.</p>
+    """
+    message = MessageSchema(
+        subject="UCA - Bienvenido al Sistema Académico",
         recipients=[NameEmail(name="", email=email_to)],
         body=html,
         subtype=MessageType.html,

@@ -4,7 +4,6 @@ from typing import Any
 
 from pywebpush import webpush, WebPushException
 from py_vapid import Vapid
-from sqlalchemy.orm import Session
 
 from app.models.financiero import SuscripcionPush
 

@@ -134,7 +134,7 @@ export default function GraduacionAdmin() {
       .finally(() => { setLoadingTabla(false); setRefreshing(false) })
   }, [page, carreraFiltro, busquedaDebounced])
 
-  useEffect(() => { cargarCandidatos() }, [cargarCandidatos])
+  useEffect(() => { const load = () => cargarCandidatos(); load() }, [cargarCandidatos])
 
   useEffect(() => {
     const id = setInterval(() => cargarCandidatos(true), POLL_MS)

@@ -218,7 +218,7 @@ export default function LoginScreen() {
     try {
       const trimmed = username.trim();
       const res = await loginRequest({ username: trimmed, password });
-      setTokens(res.access_token, res.refresh_token);
+      setTokens(res.access_token, res.csrf_token);
       try {
         await SecureStore.setItemAsync(SAVED_CREDENTIALS_KEY, JSON.stringify({ username: trimmed, password }));
       } catch { /* silent */ }
@@ -306,7 +306,7 @@ export default function LoginScreen() {
       setErrorMsg(null);
       try {
         const res = await loginRequest(creds);
-        setTokens(res.access_token, res.refresh_token);
+        setTokens(res.access_token, res.csrf_token);
         let name = creds.username;
         let carrera: string | null = null;
         try {

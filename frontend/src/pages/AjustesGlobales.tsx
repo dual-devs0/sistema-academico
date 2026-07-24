@@ -157,13 +157,15 @@ export default function AjustesGlobales() {
   }, [])
 
   useEffect(() => {
-    fetchSettings()
+    const load = () => fetchSettings()
+    load()
     const id = setInterval(() => fetchSettings(), POLL_MS)
     return () => clearInterval(id)
   }, [fetchSettings])
 
   useEffect(() => {
-    if (tab === 'auditoria') fetchAudit()
+    const load = () => { if (tab === 'auditoria') fetchAudit() }
+    load()
   }, [tab, fetchAudit])
 
   const handleEdit = (key: string, value: string | null) => {

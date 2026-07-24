@@ -5,8 +5,6 @@ from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
-from app.schemas.users_schemas import AlumnoSimpleOut
-from app.services.autorizacion import es_profesor_de_alumno
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 
