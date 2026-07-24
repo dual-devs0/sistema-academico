@@ -1,17 +1,34 @@
 # Plan de Ventas — Sistema de Gestión Académica UCA V2
 ## Enfocado en Universidades del Paraguay
 
+> **Nota de estado (actualizado 2026-07-24):** Este documento fue revisado tras el cierre de la
+> auditoría de seguridad pre-producción (8 hallazgos corregidos, 282 tests pasando). Se marcó
+> explícitamente qué está **confirmado hoy** vs qué es **aspiracional/roadmap**, y se ajustaron
+> los precios de los planes superiores según el tamaño real del mercado universitario paraguayo.
+> Ver también la sección 9, nueva, con lo que falta resolver antes de poder vender formalmente.
+
 ---
 
 ## 1. Resumen del Producto
 
-**UCA V2** es un sistema de gestión académica integral (ERP universitario) construido con tecnología moderna: React 19 + TypeScript + Vite (frontend), FastAPI + SQLAlchemy + PostgreSQL (backend), y app móvil en React Native/Expo.
+**UCA V2** es un sistema de gestión académica integral (ERP universitario) construido con
+tecnología moderna: React 19 + TypeScript + Vite (frontend), FastAPI + SQLAlchemy + PostgreSQL
+(backend), y app móvil en React Native/Expo.
 
-Actualmente en producción en la **Universidad Católica "Nuestra Señora de la Asunción" — Sede Caacupé**, con más de **220 tests automatizados**, 30 módulos funcionales y 9 pantallas móviles.
+**Estado real (no aspiracional):** desarrollado y usado como caso de estudio en la Universidad
+Católica "Nuestra Señora de la Asunción" — Sede Caacupé, con **282 tests automatizados** (backend),
+19 tests frontend, y una auditoría de seguridad pre-producción cerrada con 8 hallazgos corregidos
+(ver `docs/auditorias/AUDITORIA_2026-07-24.md`). **El sistema todavía no está desplegado en
+producción real** — código, tests y CI están verdes, pero falta la infraestructura final (hosting,
+secretos de producción de Stripe/VAPID/guarani.app, dominio). No presentar este sistema como
+"en uso actualmente por alumnos reales" hasta que ese despliegue exista — sería una afirmación
+verificable y falsa que puede costar credibilidad completa en la primera reunión.
 
 ---
 
 ## 2. Módulos y Precios
+
+*Precios de referencia por módulo — ver sección 3 para el criterio de ajuste según tipo de cliente.*
 
 | # | Módulo | Descripción | Precio (USD) |
 |---|--------|-------------|-------------|
@@ -39,23 +56,55 @@ Actualmente en producción en la **Universidad Católica "Nuestra Señora de la 
 
 ---
 
-## 3. Paquetes Recomendados
+## 3. Paquetes Recomendados — ajustados por segmento real
 
-### 🎓 Plan Básico — $8,500
+El mercado universitario paraguayo no es homogéneo: hay una diferencia grande de presupuesto entre
+una sede regional de interior (aranceles de matrícula bajos, ~USD 60-100) y una universidad grande
+de Asunción con mayor matrícula y presupuesto institucional. Los precios de lista de la sección 2 se
+mantienen como referencia interna, pero los paquetes recomendados se ajustan así:
+
+### 🎯 Caso ancla (primera venta) — desde $4,000-5,000
+Plan Básico con 40-50% de descuento de lanzamiento, a cambio de: autorización para usarlos como
+referencia/testimonio verificable, feedback estructurado de uso real, y flexibilidad en el
+cronograma de implementación.
+> **Esto no es un capricho de marketing — es una necesidad real.** Hoy no existe ningún cliente
+> pagando ni un despliegue en producción verificable. El objetivo del primer contrato no es
+> maximizar el precio, es conseguir el primer caso de uso real y citable. Sin esto, cualquier precio
+> de los planes de abajo es difícil de sostener frente a un comprador que pregunte "¿quién más lo
+> usa?".
+
+### 🎓 Plan Básico — $6,000 – $8,500 (ajustado según tamaño de la institución)
 Módulos 1, 2, 3, 4, 5, 6, 7, 9, 17, 19
-> Ideal para universidades que quieren digitalizar lo académico esencial: materias, inscripciones, notas, asistencias y foro.
+> Ideal para universidades chicas o sedes de interior que quieren digitalizar lo académico
+> esencial: materias, inscripciones, notas, asistencias y foro. Rango bajo para sedes regionales,
+> rango alto para privadas medianas de Asunción.
 
-### 🏛️ Plan Profesional — $16,000
+### 🏛️ Plan Profesional — $12,000 – $16,000 (ajustado según tamaño de la institución)
 Plan Básico + 8, 10, 11, 13, 20
-> Agrega expediente académico, módulo financiero, becas, trámites y reportes.
+> Agrega expediente académico, módulo financiero, becas, trámites y reportes. Apunta a
+> universidades privadas medianas ya establecidas, no a sedes de interior con presupuesto ajustado.
 
-### 🏢 Plan Corporativo — $25,000
+### 🏢 Plan Corporativo — cotizar según institución (referencia: $18,000 – $25,000)
 Plan Profesional + 12, 14, 15, 16, 18, 21
-> Sistema completo con facturación electrónica, pasantías, graduación, equivalencias, biblioteca y app móvil.
+> **Aspiracional para el segmento actual del mercado.** Sistema completo con facturación
+> electrónica, pasantías, graduación, equivalencias, biblioteca y app móvil. Solo tiene sentido como
+> precio de lista fijo para universidades grandes con presupuesto de TI consolidado (ej. sede
+> central de una universidad grande de Asunción, o una universidad pública vía proceso de
+> contratación formal). Para el resto del mercado, cotizar por separado tras conocer el presupuesto
+> real de la institución — no ofrecer como paquete cerrado de entrada.
 
-### ✨ Plan Premium (todo incluido) — $30,000
-Todos los 21 módulos
-> Implementación completa, personalización de marca, capacitación, y soporte prioritario por 12 meses.
+### ✨ Plan Premium (todo incluido) — cotizar según institución (referencia: $22,000 – $30,000)
+Todos los 21 módulos.
+> **Aspiracional.** Mismo criterio que el Corporativo — no fijar como precio de catálogo hasta tener
+> al menos 2-3 clientes de referencia reales y validación de que existe demanda a esa escala en el
+> mercado paraguayo actual.
+
+### 💳 Modelo de suscripción mensual — probablemente más realista que pago único
+Dado que instituciones chicas/medianas suelen preferir gasto operativo mensual a una inversión
+grande de una sola vez:
+- Básico: ~$500-700/mes (contrato mínimo 12 meses)
+- Profesional: ~$900-1,300/mes (contrato mínimo 12 meses)
+- Corporativo: cotizar — no fijar mensualidad de catálogo todavía
 
 ---
 
@@ -76,7 +125,7 @@ Todos los 21 módulos
 
 ### 5.1 Universidades Target en Paraguay
 
-**Públicas:**
+**Públicas** — proceso de compra distinto (ver sección 9.3, contratación estatal):
 - Universidad Nacional de Asunción (UNA)
 - Universidad Nacional del Este (UNE)
 - Universidad Nacional de Concepción (UNC)
@@ -86,7 +135,7 @@ Todos los 21 módulos
 - Universidad Nacional de Villarrica (UNV)
 - Universidad Nacional de Canindeyú (UNICAN)
 
-**Privadas:**
+**Privadas** — trato directo, ciclo de venta más corto:
 - Universidad Católica "Nuestra Señora de la Asunción" (UCA) — otras sedes
 - Universidad Americana
 - Universidad Autónoma de Asunción (UAA)
@@ -97,27 +146,37 @@ Todos los 21 módulos
 - Universidad Central del Paraguay (UCP)
 - Universidad Evangélica del Paraguay (UEP)
 
-### 5.2 Argumentos de Venta Clave
+**Recomendación de foco inicial:** priorizar privadas medianas y sedes de interior de universidades
+más grandes — ciclo de venta más corto, decisión más centralizada, y presupuesto más alineado con
+el Plan Básico/Profesional que sí está validado.
 
-1. **✅ Ya funciona en una universidad paraguaya** — No es un concepto, es un sistema probado en la UCA Caacupé
-2. **✅ Código 100% propio** — Sin licencias de terceros (Oracle, SAP, etc.), sin costos ocultos
-3. **✅ Stack moderno** — React + FastAPI, no sistemas legacy difíciles de mantener
-4. **✅ App móvil incluida** — Los alumnos pueden escanear QR, ver notas, horarios desde el celular
-5. **✅ Cumplimiento MEC** — Exportación RUE-ES para el Ministerio de Educación
-6. **✅ Facturación electrónica DNIT** — Integración con guarani.app
-7. **✅ Beca ITAIPU** — Reporte de rendición específico para ITAIPU
-8. **✅ Seguridad** — JWT, CSRF, rate limiting, auditoría de cambios
+### 5.2 Argumentos de Venta Clave — marcados por estado real
+
+| Argumento | Estado |
+|---|---|
+| Código 100% propio, sin licencias de terceros | ✅ Confirmado |
+| Stack moderno (React + FastAPI) | ✅ Confirmado |
+| App móvil incluida | ✅ Confirmado (código), pendiente validar en producción real |
+| Cumplimiento MEC (exportación RUE-ES) | ✅ Confirmado en código — validar con un caso real antes de garantizarlo a un cliente |
+| Facturación electrónica DNIT (guarani.app) | ⚠️ Integrado en código, **nunca probado con credenciales reales de producción** — no garantizar a un cliente hasta hacer esa prueba end-to-end |
+| Reporte de rendición ITAIPU | ✅ Confirmado en código |
+| Seguridad (JWT, CSRF, rate limiting, auditoría) | ✅ Confirmado — auditado el 2026-07-24, 8 hallazgos corregidos |
+| "Ya funciona en una universidad paraguaya" | ❌ **No usar todavía** — no hay despliegue en producción real. Reemplazar por: "desarrollado y validado como caso de estudio en la UCA Caacupé" hasta que exista un despliegue real y autorizado |
 
 ### 5.3 Proceso de Venta
 
 **Paso 1 — Demo personalizada**
-Agenda una reunión con el área de TI y autoridades académicas. Muestra el sistema funcionando en vivo (https://uca.sistema.edu/ — o deploy temporal).
+Agenda una reunión con el área de TI y autoridades académicas. Mostrar el sistema funcionando en
+vivo requiere primero tener un deploy real — ver sección 9.1. No agendar demos en vivo hasta
+resolver esto.
 
 **Paso 2 — Prueba piloto (opcional)**
-Ofrece 1 mes de prueba gratuita con un subdominio propio (universidad.ejemplo.com) y datos de prueba. Sin compromiso.
+Ofrecer 1 mes de prueba gratuita con un subdominio propio (universidad.ejemplo.com) y datos de
+prueba. Sin compromiso. Ideal como mecanismo para conseguir el caso ancla de la sección 3.
 
 **Paso 3 — Propuesta formal**
-Entrega este documento con la cotización personalizada. Incluye:
+Entregar este documento con la cotización personalizada, más el contrato correspondiente (ver
+sección 9.2 — todavía no existe, es un bloqueante). Incluye:
 - Módulos seleccionados
 - Cronograma de implementación (4-12 semanas)
 - Plan de capacitación
@@ -136,24 +195,30 @@ Entrega este documento con la cotización personalizada. Incluye:
 
 ### 5.4 Diferenciación Frente a Competidores
 
-| Característica | UCA V2 | Competidores (SGU, sistemas legacy) |
+| Característica | UCA V2 | Competidores (SIU Guaraní y homólogos, sistemas legacy) |
 |---------------|--------|-------------------------------------|
-| Tecnología | React + FastAPI moderno | PHP/Java viejo, monolítico |
-| App móvil | ✅ Nativa (React Native) | ❌ Webview o inexistente |
-| QR para asistencia | ✅ | ❌ |
-| Facturación electrónica DNIT | ✅ Integrado | ❌ Por separado |
-| Exportación MEC (RUE-ES) | ✅ | ❌ Manual |
-| Código fuente propio | ✅ | ❌ Licencias caras |
-| API REST completa | ✅ | ❌ Sin API |
-| Pruebas automatizadas | ✅ 220+ tests | ❌ |
+| Tecnología | React + FastAPI moderno | Frecuentemente stacks más antiguos, monolíticos |
+| App móvil | ✅ Nativa (React Native) | Variable — algunos ya tienen webview o apps propias |
+| QR para asistencia | ✅ | Variable |
+| Facturación electrónica DNIT | ✅ Integrado (sin probar en real todavía) | Variable |
+| Exportación MEC (RUE-ES) | ✅ | Variable |
+| Código fuente propio | ✅ | Depende del proveedor — algunos sistemas institucionales grandes (SIU Guaraní) tienen soporte y trayectoria de años |
+| API REST completa | ✅ | Variable |
+| Pruebas automatizadas | ✅ 282 tests backend + 19 frontend | Desconocido, no verificable públicamente |
+
+**Nota importante:** no hay competencia paraguaya moderna documentada públicamente con la que
+comparar precio directo — lo cual es a la vez oportunidad (poca alternativa moderna visible) y
+riesgo (universidades públicas grandes ya suelen tener sistemas instalados con años de soporte
+institucional, como variantes de SIU Guaraní; desplazar un sistema instalado es más difícil que
+vender a quien no tiene nada).
 
 ### 5.5 Material de Apoyo para Ventas
 
-- **Landing page demo** — Deploy rápido de una versión demo
-- **Video de 3 min** — Recorrido por las funcionalidades clave
-- **Casos de uso por rol** — Lo que ve admin / profesor / alumno
-- **Brochure PDF** — Una página con módulos y beneficios
-- **Testimonios** — De la UCA Caacupé (si autorizan)
+- **Landing page demo** — pendiente, depende del deploy real (sección 9.1)
+- **Video de 3 min** — pendiente de grabar
+- **Casos de uso por rol** — pendiente, se puede armar ya con capturas del sistema actual
+- **Brochure PDF** — pendiente
+- **Testimonios** — pendiente, depende de autorización real de la UCA Caacupé y de que exista un uso en producción verificable
 
 ---
 
@@ -177,18 +242,62 @@ Entrega este documento con la cotización personalizada. Incluye:
 
 - **Contado**: 10% de descuento sobre el total
 - **Financiado**: 50% al inicio, 25% a los 30 días, 25% a los 60 días
-- **Suscripción mensual**: Plan Básico ~$700/mes, Profesional ~$1,300/mes, Corporativo ~$2,100/mes (contrato mínimo 12 meses)
+- **Suscripción mensual**: ver sección 3 — probablemente el modelo más realista para el mercado
+  paraguayo actual, contrato mínimo 12 meses
 
 ---
 
 ## 8. Contacto
 
-Para coordinar una demo o solicitar más información:
+> ⚠️ **Pendiente de completar antes de enviar este documento a cualquier universidad.** Los datos
+> de abajo son placeholders — reemplazar por contacto real antes de usar este documento
+> externamente.
 
-- **WhatsApp**: [+595 XXX XXX XXX](tel:+595)
-- **Email**: [ventas@tudominio.com](mailto:ventas@tudominio.com)
-- **Sitio web**: tudominio.com
+- **WhatsApp**: [+595 XXX XXX XXX](tel:+595) — *completar*
+- **Email**: [ventas@tudominio.com](mailto:ventas@tudominio.com) — *completar*
+- **Sitio web**: tudominio.com — *completar*
 
 ---
 
-*Documento generado el 18 de julio de 2026. Precios sujetos a cambio sin previo aviso.*
+## 9. Qué falta antes de poder vender formalmente
+
+*Sección nueva — 2026-07-24. Esto no reemplaza asesoría legal ni contable real; es el mapa de qué
+resolver, no los documentos legales en sí. Antes de firmar cualquier contrato real, un abogado
+paraguayo debe revisar los documentos finales — especialmente por el manejo de datos de
+estudiantes (en algunos casos menores de edad) y, si se apunta a universidades públicas, por los
+procesos de contratación estatal.*
+
+### 9.1 Técnico/comercial — bloqueante inmediato
+- Deploy real en producción (hoy el sistema está commiteado y auditado, pero no desplegado)
+- Contacto real (WhatsApp, email, dominio) — ver sección 8
+- Demo en vivo, video, brochure, casos de uso por rol — todo material de apoyo depende del deploy
+
+### 9.2 Legal — bloqueante para firmar cualquier contrato
+- Contrato de licencia de software (SLA, propiedad intelectual, límites de uso, garantías)
+- Contrato/cláusula de tratamiento de datos personales (estudiantes, incluyendo posibles menores)
+- Términos de responsabilidad y limitación de garantía
+- Constitución legal formal de WebPy Studio (SRL o Empresa Individual) para poder facturar y
+  firmar contratos institucionales de forma válida
+
+### 9.3 Proceso de compra según tipo de cliente
+- **Privadas**: trato directo, ciclo de venta más corto — foco recomendado para el caso ancla
+- **Públicas**: sujetas a procesos de contratación estatal (licitaciones, pliegos de bases y
+  condiciones vía la Dirección Nacional de Contrataciones Públicas). Proceso mucho más largo y
+  regulado — no tratar con el mismo enfoque comercial que a una privada
+
+### 9.4 Operativo, post-venta
+- Plan de soporte y SLA real (tiempos de respuesta, canal de contacto, escalamiento)
+- Plan de backup y recuperación de datos documentado
+- Definición clara de quién es dueño de los datos si el cliente deja de pagar o rescinde contrato
+- Facturación fiscal formal en Paraguay para poder cobrar institucionalmente
+
+### 9.5 Validación de mercado — antes de fijar precios finales de los planes superiores
+- Confirmar presupuesto real de TI de 2-3 universidades target concretas, en vez de asumir
+- Conseguir el primer testimonio/caso de uso real y autorizado (ver sección 3, caso ancla)
+- Validar si las universidades target compran por módulo/paquete flexible o exigen todo-o-nada
+  (más común en procesos de licitación pública)
+
+---
+
+*Documento actualizado el 24 de julio de 2026, tras auditoría de seguridad pre-producción.
+Precios sujetos a cambio sin previo aviso y pendientes de validación de mercado real (sección 9.5).*

@@ -231,6 +231,13 @@ cierre de auditoría).
   regresión visual mayor al beneficio.
 - Cobertura de tests mobile incompleta (3 de 9 pantallas).
 
+**Venta formal — todavía no es solo una decisión técnica.** Más allá de la infraestructura de
+hosting, hay gaps legales, comerciales y de validación de mercado (contrato de licencia, tratamiento
+de datos de estudiantes, constitución legal de la empresa, proceso de contratación distinto para
+universidades públicas vs privadas) que hay que resolver antes de poder ofrecer el sistema
+formalmente a una universidad. Mapa completo en
+[`docs/negocio/PLAN_VENTAS_UNIVERSIDADES.md`](../negocio/PLAN_VENTAS_UNIVERSIDADES.md) sección 9.
+
 ## 12. Anexos
 
 Documentos completos referenciados en este documento, por carpeta:
