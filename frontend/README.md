@@ -73,3 +73,7 @@ export default defineConfig([
 ])
 
 ```
+
+---
+
+Ver [README.md](../README.md) raíz del proyecto para stack completo, estado, y documentación general.

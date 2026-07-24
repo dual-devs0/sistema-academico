@@ -126,10 +126,14 @@ sistema-academico/
 │   └── app.json              # Config Expo
 │
 ├── docs/
-│   ├── INSTALACION.md
-│   └── INSTRUCTOR.md         # Este archivo
-│
-└── ESTADO_FASES.md           # Estado de cada fase del plan
+│   ├── web-system/
+│   │   ├── INSTALACION.md
+│   │   ├── INSTRUCTOR.md     # Este archivo
+│   │   └── ESTADO_FASES.md   # Estado de cada fase del plan
+│   ├── app-mobile-system/
+│   ├── auditorias/
+│   ├── documentacion-tecnica/
+│   └── negocio/
 ```
 
 ---

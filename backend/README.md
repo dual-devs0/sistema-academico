@@ -11,3 +11,7 @@ uvicorn app.main:app --reload
 Ejecutar tests básicos:
 ```bash
 pytest tests/test_basic.py -v
+
+---
+
+Ver [README.md](../README.md) raíz del proyecto para stack completo, estado, y documentación general.
