@@ -22,7 +22,7 @@ interface AuthState {
   status: Status;
   login: (payload: LoginPayload) => Promise<void>;
   logout: () => Promise<void>;
-  setTokens: (access: string, refresh?: string) => void;
+  setTokens: (access: string, csrf?: string) => void;
   confirmAuth: () => void;
 }
 
@@ -31,7 +31,7 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const accessRef = useRef<string | null>(null);
-  const refreshRef = useRef<string | null>(null);
+  const csrfRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -42,16 +42,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessRef.current = token;
       },
       refresh: async () => {
-        const res = await refreshRequest(refreshRef.current);
+        const res = await refreshRequest(csrfRef.current);
         accessRef.current = res.access_token;
-        if (res.refresh_token) {
-          refreshRef.current = res.refresh_token;
+        if (res.csrf_token) {
+          csrfRef.current = res.csrf_token;
         }
         return res.access_token;
       },
       onAuthFailed: () => {
         accessRef.current = null;
-        refreshRef.current = null;
+        csrfRef.current = null;
         if (mounted) setStatus("anon");
       },
     });
@@ -69,8 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (payload) => {
         const res = await loginRequest(payload);
         accessRef.current = res.access_token;
-        if (res.refresh_token) {
-          refreshRef.current = res.refresh_token;
+        if (res.csrf_token) {
+          csrfRef.current = res.csrf_token;
         }
         setStatus("auth");
       },
@@ -81,12 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // sesión ya inválida en server
         }
         accessRef.current = null;
-        refreshRef.current = null;
+        csrfRef.current = null;
         setStatus("anon");
       },
-      setTokens: (access, refresh) => {
+      setTokens: (access, csrf) => {
         accessRef.current = access;
-        if (refresh) refreshRef.current = refresh;
+        if (csrf) csrfRef.current = csrf;
       },
       confirmAuth: () => {
         setStatus("auth");

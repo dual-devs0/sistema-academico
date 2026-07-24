@@ -615,9 +615,12 @@ export default function Programa() {
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t === 'calificaciones') setTab('calificaciones')
-    else if (t === 'asistencia') setTab('asistencia')
+    const load = () => {
+      const t = searchParams.get('tab')
+      if (t === 'calificaciones') setTab('calificaciones')
+      else if (t === 'asistencia') setTab('asistencia')
+    }
+    load()
   }, [searchParams])
 
   useEffect(() => {
@@ -1044,20 +1047,26 @@ function AsistenciaTab({ userId }: { userId: number }) {
   }, [userId])
 
   useEffect(() => {
-    setLoading(true)
-    const qs = periodoSel === 'actual' ? '' : (() => {
-      const [a, s] = periodoSel.split('-')
-      return `?anio=${a}&semestre=${s}`
-    })()
-    Promise.all([
-      api.get<MateriaPeriodo[]>(`/alumno/mis-materias${qs}`).catch(() => []),
-      api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
-      api.get<AsistenciaMateriaCursos[]>('/alumno/mi-asistencia').catch(() => []),
-    ]).then(([mats, notasData, asisData]) => {
-      setMaterias(mats)
-      setNotas(Object.fromEntries(notasData.map(n => [n.materia_id, n])))
-      setAsistencias(Object.fromEntries(asisData.map(a => [a.materia_id, a])))
-    }).finally(() => setLoading(false))
+    const load = async () => {
+      setLoading(true)
+      const qs = periodoSel === 'actual' ? '' : (() => {
+        const [a, s] = periodoSel.split('-')
+        return `?anio=${a}&semestre=${s}`
+      })()
+      try {
+        const [mats, notasData, asisData] = await Promise.all([
+          api.get<MateriaPeriodo[]>(`/alumno/mis-materias${qs}`).catch(() => []),
+          api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
+          api.get<AsistenciaMateriaCursos[]>('/alumno/mi-asistencia').catch(() => []),
+        ])
+        setMaterias(mats)
+        setNotas(Object.fromEntries(notasData.map(n => [n.materia_id, n])))
+        setAsistencias(Object.fromEntries(asisData.map(a => [a.materia_id, a])))
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [periodoSel, userId])
 
   const totalClases = Object.values(asistencias).reduce((s, m) => s + m.total_clases, 0)

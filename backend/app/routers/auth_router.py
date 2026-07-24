@@ -1,7 +1,7 @@
 import hashlib
 import os
 import secrets
-import string
+import threading
 from datetime import datetime, timezone, timedelta
 
 from fastapi import (
@@ -22,8 +22,11 @@ from app.auth import (
     create_refresh_token,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
-from app.email_utils import send_password_reset_email_bg
+from app.email_utils import send_reset_link_email_bg, send_welcome_email_bg, send_password_reset_email_bg
 from app.models.refresh_token import RefreshToken
+from app.models.password_reset_token import PasswordResetToken
+from app.models.token_blacklist import TokenBlacklist
+from app.rate_limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -32,6 +35,7 @@ _COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
 _password_reset_attempts: dict[str, list[float]] = {}
 _PASSWORD_RESET_MAX_ATTEMPTS = 3
 _PASSWORD_RESET_WINDOW_SECONDS = 15 * 60
+_password_reset_lock = threading.Lock()
 
 
 def _check_password_reset_rate_limit(key: str):
@@ -39,23 +43,25 @@ def _check_password_reset_rate_limit(key: str):
 
     now = time.time()
     window_start = now - _PASSWORD_RESET_WINDOW_SECONDS
-    if key in _password_reset_attempts:
-        _password_reset_attempts[key] = [
-            t for t in _password_reset_attempts[key] if t > window_start
-        ]
-        if len(_password_reset_attempts[key]) >= _PASSWORD_RESET_MAX_ATTEMPTS:
-            raise HTTPException(
-                status_code=429,
-                detail="Demasiados intentos. Intenta de nuevo en 15 minutos.",
-            )
-        _password_reset_attempts[key].append(now)
-    else:
-        _password_reset_attempts[key] = [now]
+    with _password_reset_lock:
+        if key in _password_reset_attempts:
+            _password_reset_attempts[key] = [
+                t for t in _password_reset_attempts[key] if t > window_start
+            ]
+            if len(_password_reset_attempts[key]) >= _PASSWORD_RESET_MAX_ATTEMPTS:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Demasiados intentos. Intenta de nuevo en 15 minutos.",
+                )
+            _password_reset_attempts[key].append(now)
+        else:
+            _password_reset_attempts[key] = [now]
 
 
 _login_failed_attempts: dict[str, list[float]] = {}
 _LOGIN_MAX_ATTEMPTS = 5
 _LOGIN_WINDOW_SECONDS = 15 * 60
+_login_lock = threading.Lock()
 
 
 def _check_login_rate_limit(key: str):
@@ -67,22 +73,25 @@ def _check_login_rate_limit(key: str):
     now = time.time()
     window_start = now - _LOGIN_WINDOW_SECONDS
     attempts = [t for t in _login_failed_attempts.get(key, []) if t > window_start]
-    _login_failed_attempts[key] = attempts
-    if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
-        raise HTTPException(
-            status_code=429,
-            detail="Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.",
-        )
+    with _login_lock:
+        _login_failed_attempts[key] = attempts
+        if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
+            raise HTTPException(
+                status_code=429,
+                detail="Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.",
+            )
 
 
 def _register_login_failure(key: str):
     import time
 
-    _login_failed_attempts.setdefault(key, []).append(time.time())
+    with _login_lock:
+        _login_failed_attempts.setdefault(key, []).append(time.time())
 
 
 def _clear_login_attempts(key: str):
-    _login_failed_attempts.pop(key, None)
+    with _login_lock:
+        _login_failed_attempts.pop(key, None)
 
 
 def _set_refresh_cookie(response: Response, raw_token: str) -> None:
@@ -157,13 +166,14 @@ def login(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "refresh_token": raw,
         "csrf_token": csrf_token,
     }
 
 
 @router.post("/refresh")
+@limiter.limit("10/minute")
 def refresh(
+    request: Request,
     response: Response,
     body: schemas.user.RefreshRequest | None = None,
     db: Session = Depends(database.get_db),
@@ -223,7 +233,6 @@ def refresh(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "refresh_token": raw,
         "csrf_token": csrf_token,
     }
 
@@ -231,9 +240,11 @@ def refresh(
 @router.post("/logout")
 def logout(
     response: Response,
+    request: Request,
     db: Session = Depends(database.get_db),
     refresh_token: str | None = Cookie(default=None),
 ):
+    # Revocar refresh token
     if refresh_token:
         hashed = hashlib.sha256(refresh_token.encode()).hexdigest()
         rt = db.query(RefreshToken).filter(RefreshToken.token_hash == hashed).first()
@@ -241,13 +252,35 @@ def logout(
             setattr(rt, 'revocado', True)
             db.commit()
 
+    # Revocar access token (jti) si está presente en el header
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            from app.auth import SECRET_KEY, ALGORITHM
+            from jose import jwt
+            payload = jwt.decode(auth_header[7:], SECRET_KEY, algorithms=[ALGORITHM])
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                from datetime import datetime, timezone
+                bl = TokenBlacklist(
+                    jti=jti,
+                    expires_at=datetime.fromtimestamp(exp, tz=timezone.utc),
+                )
+                db.add(bl)
+                db.commit()
+        except Exception:
+            pass
+
     response.delete_cookie(key="refresh_token", path="/")
     response.delete_cookie(key="csrf_token", path="/")
     return {"detail": "Sesión cerrada"}
 
 
 @router.post("/recuperar-contrasena")
+@limiter.limit("3/15minutes")
 def recuperar_contrasena(
+    request: Request,
     req: schemas.user.RecuperarRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
@@ -268,31 +301,78 @@ def recuperar_contrasena(
             status_code=404, detail="No se encontró un usuario con ese dato."
         )
 
-    alphabet = string.ascii_letters + string.digits
-    new_password = "".join(secrets.choice(alphabet) for _ in range(10))
-    setattr(db_user, 'hashed_password', security.hash_password(new_password))
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    reset_token = PasswordResetToken(
+        usuario_id=db_user.id,
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    db.add(reset_token)
     db.commit()
 
     user_name: str = str(db_user.nombre or db_user.username)
     user_email: str | None = str(db_user.email) if db_user.email else None
     if user_email:
-        send_password_reset_email_bg(
-            background_tasks, user_email, user_name
+        send_reset_link_email_bg(
+            background_tasks, user_email, user_name, raw_token
         )
 
     return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}
 
 
+@router.post("/reset-password")
+@limiter.limit("10/minute")
+def reset_password(
+    request: Request,
+    req: schemas.user.ResetPasswordRequest,
+    db: Session = Depends(database.get_db),
+):
+    token_hash = hashlib.sha256(req.token.encode()).hexdigest()
+
+    reset_token = (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.token_hash == token_hash,
+            PasswordResetToken.used == False,  # noqa: E712
+            PasswordResetToken.expires_at > datetime.now(timezone.utc),
+        )
+        .first()
+    )
+
+    if not reset_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Token inválido o expirado. Solicitá un nuevo restablecimiento de contraseña.",
+        )
+
+    db_user = (
+        db.query(models.user.User)
+        .filter(models.user.User.id == reset_token.usuario_id)
+        .first()
+    )
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    setattr(db_user, 'hashed_password', security.hash_password(req.new_password))
+    setattr(reset_token, 'used', True)
+    db.commit()
+
+    return {"detail": "Contraseña actualizada correctamente."}
+
+
 @router.post("/registro")
+@limiter.limit("3/hour")
 def solicitar_registro(
+    request: Request,
     req: schemas.user.RegistroRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
 ):
     """Activación de cuenta pre-creada por un admin: el alumno/profesor
-    confirma cédula + matrícula (username) y recibe una contraseña temporal
-    por email. No crea cuentas nuevas — reusa el mismo flujo que
-    recuperar-contrasena."""
+    confirma cédula + matrícula (username). Se envía un email de bienvenida
+    sin contraseña. El usuario debe usar "Recuperar contraseña" para establecerla."""
     _check_password_reset_rate_limit(req.matricula)
 
     db_user = (
@@ -310,16 +390,11 @@ def solicitar_registro(
             detail="No se encontró una cuenta con esos datos. Contactá a la administración.",
         )
 
-    alphabet = string.ascii_letters + string.digits
-    new_password = "".join(secrets.choice(alphabet) for _ in range(10))
-    setattr(db_user, 'hashed_password', security.hash_password(new_password))
-    db.commit()
-
     user_name: str = str(db_user.nombre or db_user.username)
     user_email: str | None = str(db_user.email) if db_user.email else None
     if user_email:
-        send_password_reset_email_bg(
+        send_welcome_email_bg(
             background_tasks, user_email, user_name
         )
 
-    return {"detail": "Si los datos son correctos, recibirás un email con tus credenciales."}
+    return {"detail": "Si los datos son correctos, recibirás un email con instrucciones."}

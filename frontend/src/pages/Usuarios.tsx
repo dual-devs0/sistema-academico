@@ -74,15 +74,13 @@ function DonutChart({ segments, size = 160 }: {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
   const radius = size * 0.38
   const circ = 2 * Math.PI * radius
-  let offset = 0
   return (
     <div className="donut-ring" style={{ width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
         {segments.map((s, i) => {
           const pct = s.value / total
           const dash = pct * circ
-          const o = offset
-          offset += dash
+          const o = segments.slice(0, i).reduce((sum, ps) => sum + (ps.value / total) * circ, 0)
           return pct > 0 ? (
             <circle key={i} cx={size / 2} cy={size / 2} r={radius}
               fill="none" stroke={s.color} strokeWidth={size * 0.1}
@@ -194,10 +192,16 @@ export default function Usuarios() {
   }, [busqueda])
 
   useEffect(() => {
-    setLoading(true)
-    cargarUsuarios().finally(() => setLoading(false))
-    cargarStats()
-    setLastUpdate(new Date())
+    const load = async () => {
+      setLoading(true)
+      try {
+        await Promise.all([cargarUsuarios(), cargarStats()])
+      } finally {
+        setLoading(false)
+      }
+      setLastUpdate(new Date())
+    }
+    load()
   }, [cargarUsuarios, cargarStats])
 
   useEffect(() => {

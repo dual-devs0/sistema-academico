@@ -108,22 +108,26 @@ export default function MisCuotas() {
   }, [alumnoId])
 
   useEffect(() => {
-    cargarCuotas()
+    const load = () => cargarCuotas()
+    load()
     const id = setInterval(() => cargarCuotas(), POLL_MS)
     return () => clearInterval(id)
   }, [cargarCuotas])
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const stripeStatus = params.get('stripe')
-    if (stripeStatus === 'success') {
-      setStatusMsg('Pago realizado con éxito. La cuota se actualizará en breve.')
-      cargarCuotas()
-      window.history.replaceState({}, '', window.location.pathname)
-    } else if (stripeStatus === 'cancel') {
-      setStatusMsg('Pago cancelado. Puedes intentar nuevamente cuando quieras.')
-      window.history.replaceState({}, '', window.location.pathname)
+    const load = () => {
+      const params = new URLSearchParams(window.location.search)
+      const stripeStatus = params.get('stripe')
+      if (stripeStatus === 'success') {
+        setStatusMsg('Pago realizado con éxito. La cuota se actualizará en breve.')
+        cargarCuotas()
+        window.history.replaceState({}, '', window.location.pathname)
+      } else if (stripeStatus === 'cancel') {
+        setStatusMsg('Pago cancelado. Puedes intentar nuevamente cuando quieras.')
+        window.history.replaceState({}, '', window.location.pathname)
+      }
     }
+    load()
   }, [cargarCuotas])
 
   const cuotasFiltradas = filtro === 'todos' ? cuotas : cuotas.filter(c => c.estado === filtro)

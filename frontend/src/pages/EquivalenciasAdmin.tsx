@@ -104,7 +104,7 @@ export default function EquivalenciasAdmin() {
     }
   }, [])
 
-  useEffect(() => { loadMaterias() }, [loadMaterias])
+  useEffect(() => { const load = () => loadMaterias(); load() }, [loadMaterias])
 
   const fetchData = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true)
@@ -123,7 +123,8 @@ export default function EquivalenciasAdmin() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const load = () => fetchData()
+    load()
     const id = setInterval(() => fetchData(), POLL_MS)
     return () => clearInterval(id)
   }, [fetchData])

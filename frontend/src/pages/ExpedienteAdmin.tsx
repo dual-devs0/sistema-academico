@@ -76,7 +76,7 @@ export default function ExpedienteAdmin() {
       .finally(() => setLoadingLista(false))
   }, [page, busquedaDb, filtroCarrera])
 
-  useEffect(() => { cargarLista() }, [cargarLista])
+  useEffect(() => { const load = () => cargarLista(); load() }, [cargarLista])
 
   const totalPages = Math.max(1, Math.ceil(totalAlumnos / PAGE_SIZE))
 
@@ -86,7 +86,7 @@ export default function ExpedienteAdmin() {
     setOfertaSeleccionada('')
   }
 
-  function cargarDetalle() {
+  const cargarDetalle = useCallback(() => {
     if (!alumno) return
     setLoadingDetalle(true)
     Promise.all([
@@ -105,8 +105,8 @@ export default function ExpedienteAdmin() {
       })
       .catch(() => {})
       .finally(() => setLoadingDetalle(false))
-  }
-  useEffect(cargarDetalle, [alumno])
+  }, [alumno])
+  useEffect(() => { const load = () => cargarDetalle(); load() }, [alumno, cargarDetalle])
 
   async function handleCerrarMateria() {
     if (!alumno || !ofertaSeleccionada) { emitToast('Seleccioná una materia', 'warning'); return }

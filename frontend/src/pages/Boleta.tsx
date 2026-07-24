@@ -74,25 +74,44 @@ export default function Boleta() {
   const [sello, setSello] = useState<{ codigo: string; qr_base64: string; validado_en: string } | null>(null)
 
   useEffect(() => {
-    if (!selId) { setSello(null); return }
-    api.get<{ codigo: string; qr_base64: string; validado_en: string }>(`/boleta/${selId}/sello`).then(setSello).catch(() => setSello(null))
+    const load = async () => {
+      if (!selId) { setSello(null); return }
+      try {
+        const data = await api.get<{ codigo: string; qr_base64: string; validado_en: string }>(`/boleta/${selId}/sello`)
+        setSello(data)
+      } catch {
+        setSello(null)
+      }
+    }
+    load()
   }, [selId])
 
   useEffect(() => {
-    if (!esAlumno) {
-      api.get<{items: AlumnoOpt[]}>('/profesor/lista-alumnos').then(r => setAlumnos(r.items)).catch(e => {
-        console.error('Error al cargar alumnos:', e)
-        emitToast('Error al cargar lista de alumnos', 'error')
-      })
-    } else {
-      api.get<{ anio: number; semestre: number }[]>('/alumno/mis-periodos').then(setPeriodos).catch(() => {})
-      obtenerCreditosAlumno(uid).then(setCreditos).catch(() => {})
-      api.get<{ user?: { nombre: string | null }; cuentaSaldoPendiente?: number; cuentaSaldoVencido?: number }>('/alumno/dashboard').then(d => {
-        setNombreReal(d.user?.nombre ?? '')
-        setCuentaPendiente(d.cuentaSaldoPendiente ?? 0)
-        setCuentaVencida(d.cuentaSaldoVencido ?? 0)
-      }).catch(() => {})
+    const load = async () => {
+      if (!esAlumno) {
+        try {
+          const r = await api.get<{items: AlumnoOpt[]}>('/profesor/lista-alumnos')
+          setAlumnos(r.items)
+        } catch (e) {
+          console.error('Error al cargar alumnos:', e)
+          emitToast('Error al cargar lista de alumnos', 'error')
+        }
+      } else {
+        try {
+          const [per, cred, dash] = await Promise.all([
+            api.get<{ anio: number; semestre: number }[]>('/alumno/mis-periodos'),
+            obtenerCreditosAlumno(uid),
+            api.get<{ user?: { nombre: string | null }; cuentaSaldoPendiente?: number; cuentaSaldoVencido?: number }>('/alumno/dashboard'),
+          ])
+          setPeriodos(per)
+          setCreditos(cred)
+          setNombreReal(dash.user?.nombre ?? '')
+          setCuentaPendiente(dash.cuentaSaldoPendiente ?? 0)
+          setCuentaVencida(dash.cuentaSaldoVencido ?? 0)
+        } catch { /* ignore */ }
+      }
     }
+    load()
   }, [esAlumno, uid])
 
   useEffect(() => {
@@ -164,7 +183,7 @@ export default function Boleta() {
         emitToast('Error al cargar datos de la boleta', 'error')
       }).finally(() => setLoading(false))
     }
-  }, [selId, esAlumno, periodoSel, uid, nombreReal])
+  }, [selId, esAlumno, periodoSel, uid, nombreReal, user?.username])
 
   async function descargarPDF() {
     if (!selId) return

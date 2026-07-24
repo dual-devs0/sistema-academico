@@ -184,7 +184,8 @@ def test_refresh_por_body_no_exige_csrf(client, seed):
     login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
-    raw = login_res.json()["refresh_token"]
+    raw = login_res.cookies.get("refresh_token")
+    assert raw is not None
     client.cookies.clear()
     res = client.post("/auth/refresh", json={"refresh_token": raw})
     assert res.status_code == 200
@@ -240,41 +241,45 @@ def test_refresh_despues_de_logout_retorna_401(client, seed):
 # ---------------------------------------------------------------------------
 
 
-def test_login_devuelve_refresh_token_en_body(client, seed):
+def test_login_no_devuelve_refresh_token_en_body(client, seed):
+    """El refresh_token NO debe estar en el body — solo en la httpOnly cookie."""
     res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
     assert res.status_code == 200
     data = res.json()
-    assert "refresh_token" in data
-    assert isinstance(data["refresh_token"], str)
-    assert len(data["refresh_token"]) > 20  # opaque token con entropía
+    assert "refresh_token" not in data
+    # Debe estar en la cookie httpOnly
+    assert "refresh_token" in res.cookies
+    raw_cookie = res.cookies.get("refresh_token")
+    assert isinstance(raw_cookie, str)
+    assert len(raw_cookie) > 20
 
 
-def test_login_refresh_token_body_coincide_con_cookie(client, seed):
+def test_login_refresh_token_en_cookie(client, seed, db):
     import hashlib
     from app.models.refresh_token import RefreshToken
 
     res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
-    raw_body = res.json()["refresh_token"]
     raw_cookie = res.cookies.get("refresh_token")
-    # El raw del body y el de la cookie deben ser el mismo secreto
-    assert raw_body == raw_cookie
-    # Y su hash debe existir en DB como token activo
-    hashed = hashlib.sha256(raw_body.encode()).hexdigest()
-    # Nota: usamos el mismo client → DB compartida vía fixture
-    # No hace falta ir a DB, alcanza con verificar que refresh por body funciona
-    assert hashed  # placeholder — assertion real en test siguiente
+    assert raw_cookie is not None
+    # Su hash debe existir en DB como token activo
+    hashed = hashlib.sha256(raw_cookie.encode()).hexdigest()
+    assert db.query(RefreshToken).filter(
+        RefreshToken.token_hash == hashed,
+        RefreshToken.revocado == False,  # noqa: E712
+    ).first() is not None
 
 
 def test_refresh_acepta_token_por_body(client, seed):
-    # Login para obtener refresh_token en body
+    # Login para obtener refresh_token de la cookie
     login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
-    raw = login_res.json()["refresh_token"]
+    raw = login_res.cookies.get("refresh_token")
+    assert raw is not None
 
     # Limpiar cookies del client para simular cliente móvil sin cookie jar
     client.cookies.clear()
@@ -283,8 +288,7 @@ def test_refresh_acepta_token_por_body(client, seed):
     assert res.status_code == 200
     data = res.json()
     assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["refresh_token"] != raw  # rotación aplicada
+    assert "refresh_token" not in data  # no se devuelve en body
 
 
 def test_refresh_rechaza_body_invalido(client, seed):
@@ -297,12 +301,13 @@ def test_refresh_rechaza_body_invalido(client, seed):
 def test_refresh_body_tiene_precedencia_sobre_cookie(client, seed, db):
     from app.models.refresh_token import RefreshToken
 
-    # Login → obtiene raw_A en body + cookie
+    # Login → obtiene raw_A en cookie
     login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
-    raw_A = login_res.json()["refresh_token"]
-    # Cookie sigue seteada con raw_A también (mismo valor)
+    raw_A = login_res.cookies.get("refresh_token")
+    assert raw_A is not None
+    # Cookie sigue seteada con raw_A también
 
     # Revocar raw_A directamente en DB
     db.query(RefreshToken).update({"revocado": True})
@@ -322,12 +327,14 @@ def test_refresh_por_body_tambien_rota(client, seed, db):
     login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
-    raw_1 = login_res.json()["refresh_token"]
+    raw_1 = login_res.cookies.get("refresh_token")
+    assert raw_1 is not None
 
     client.cookies.clear()
     r1 = client.post("/auth/refresh", json={"refresh_token": raw_1})
     assert r1.status_code == 200
-    raw_2 = r1.json()["refresh_token"]
+    raw_2 = r1.cookies.get("refresh_token")
+    assert raw_2 is not None
 
     # Token nuevo distinto al viejo
     assert raw_2 != raw_1

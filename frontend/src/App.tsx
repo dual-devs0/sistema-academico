@@ -33,6 +33,7 @@ import PasantiasAdmin from './pages/PasantiasAdmin'
 import EquivalenciasAdmin from './pages/EquivalenciasAdmin'
 import BecasAlumno from './pages/BecasAlumno'
 import AjustesGlobales from './pages/AjustesGlobales'
+import ResetPassword from './pages/ResetPassword'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -100,6 +101,7 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<AcademicoLogin />} />
         <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<Layout><RutaProtegida path="/dashboard"><Dashboard /></RutaProtegida></Layout>} />
         <Route path="/puntajes" element={<Layout><RutaProtegida path="/puntajes"><Puntajes /></RutaProtegida></Layout>} />
         <Route path="/asistencia" element={<Layout><RutaProtegida path="/asistencia"><Asistencia /></RutaProtegida></Layout>} />

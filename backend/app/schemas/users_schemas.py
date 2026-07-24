@@ -35,7 +35,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str
-    refresh_token: str | None = None  # solo para clientes móviles
+    csrf_token: str | None = None
 
 
 class RefreshRequest(BaseModel):
@@ -44,6 +44,11 @@ class RefreshRequest(BaseModel):
 
 class RecuperarRequest(BaseModel):
     username_or_email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6, max_length=100)
 
 
 class RegistroRequest(BaseModel):
