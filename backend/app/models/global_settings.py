@@ -6,6 +6,8 @@ from typing import Optional
 from app.database import Base
 
 
+# Configuración global editable por admin (key/value tipado) + su log de auditoría de cambios
+# (ver clase SettingAuditLog más abajo). Usado por: settings_router.py (AjustesGlobales.tsx).
 class GlobalSetting(Base):
     __tablename__ = "global_settings"
 

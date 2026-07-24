@@ -1,3 +1,7 @@
+"""
+Foro por materia: hilos y mensajes, fijar/cerrar (profesor/admin), edición con ventana
+de 15min, paginación. Depende de: models.foro.
+"""
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session

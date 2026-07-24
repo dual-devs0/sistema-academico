@@ -1,3 +1,4 @@
+// Alumno y Profesor (vista dual por rol). Alumno: consulta su asistencia. Profesor: carga/edita asistencia de su materia, QR + batch. Depende de: /asistencias/*.
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'

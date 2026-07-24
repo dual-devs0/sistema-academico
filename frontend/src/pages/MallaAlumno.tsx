@@ -1,3 +1,4 @@
+// Alumno. Visualización de su avance en la malla curricular (5 estados de color). Depende de: /pensum/avance/*.
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getUserId } from '../hooks/useRole'
 import { obtenerAvanceAlumno, obtenerCreditosAlumno, type AvanceMateriaOut, type CreditosAlumnoOut } from '../services/pensumService'

@@ -1,3 +1,4 @@
+// Alumno. Solicitud de equivalencias de materias cursadas en otra institución. Depende de: /equivalencias/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { crearSolicitudEquivalencia, getEquivalenciasAlumno,

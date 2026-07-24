@@ -1,3 +1,4 @@
+// Admin. CRUD de usuarios, listado paginado server-side, búsqueda. Depende de: /users/*.
 import { useState, useEffect, useCallback } from 'react'
 import { emitToast } from '../lib/api'
 import {

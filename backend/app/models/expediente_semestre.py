@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Snapshot agregado de PPA/créditos/aprobadas-reprobadas por alumno y período.
+# Derivado de expediente_materias, no fuente de verdad — recalculable.
 class ExpedienteSemestre(Base):
     __tablename__ = "expediente_semestres"
 

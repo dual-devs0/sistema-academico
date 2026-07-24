@@ -1,3 +1,9 @@
+"""Storage de archivos (Cloudflare R2 / S3-compatible) — fotos de perfil,
+apuntes, comprobantes, informes de pasantía. Valida extensión/tamaño antes
+de subir. Nunca expone la key cruda al cliente — obtener_url_firmada()
+genera URLs temporales. Usado por: apuntes_router, users_router,
+tramites, pasantias.
+"""
 import os
 import uuid
 from pathlib import Path

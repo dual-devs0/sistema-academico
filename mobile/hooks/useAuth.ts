@@ -1,3 +1,4 @@
+// Hook de autenticación — login/logout/refresh, csrfRef (no refreshRef, ver ISSUE-1 en CHANGELOG_FIXES.md). Consumido por: pantallas autenticadas.
 import {
   createContext,
   createElement,

@@ -6,6 +6,8 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+# Estado de avance de un alumno por materia del pensum (pendiente/cursando/aprobada/reprobada).
+# Depende de: users, pensum_materias. Usado por: services/pensum.py, pensum_router.py (malla visual).
 class AvanceAlumnoPensum(Base):
     __tablename__ = "avance_alumno_pensum"
 

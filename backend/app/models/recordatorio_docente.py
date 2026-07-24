@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+# Recordatorios personales de un profesor (agenda propia, no visible a otros roles).
+# Usado por: profesor_router.py (agenda del portal docente).
 class RecordatorioDocente(Base):
     __tablename__ = "recordatorios_docente"
 

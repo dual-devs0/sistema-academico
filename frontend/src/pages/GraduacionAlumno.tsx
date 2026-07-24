@@ -1,3 +1,4 @@
+// Alumno. Condición de egreso propia (créditos+PPA+pasantía) y estado del proceso de tesis. Depende de: /graduacion/alumno/{id}/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { getCondicionEgreso, type CondicionEgreso } from '../services/graduacionService'

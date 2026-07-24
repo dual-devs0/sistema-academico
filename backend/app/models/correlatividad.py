@@ -9,6 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Prerrequisitos entre materias ('aprobada' o 'cursando'). Base de validar_correlatividades()
+# en services/pensum.py — bloquea inscripción si no se cumplen.
 class Correlatividad(Base):
     __tablename__ = "correlatividades"
 

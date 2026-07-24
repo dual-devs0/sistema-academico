@@ -1,3 +1,8 @@
+"""
+CRUD de usuarios (alta/baja/edición, foto de perfil, cambio de password) + listado
+paginado admin-only. DELETE hace cascade real sobre refresh_tokens (Fase 13, bug real
+corregido — antes dejaba tokens huérfanos).
+"""
 import logging
 from datetime import datetime, timezone
 from fastapi import (

@@ -1,3 +1,4 @@
+// Llamadas a /eventos/*.
 import { api } from "./api";
 
 /**

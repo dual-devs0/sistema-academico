@@ -1,3 +1,4 @@
+// Llamadas a /puntajes/* y /notas/materia/{id}/detalle|asistencia.
 import { api } from "./api";
 
 /**

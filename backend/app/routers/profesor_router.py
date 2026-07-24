@@ -1,3 +1,9 @@
+"""
+Portal docente: cátedras activas, histórico, agenda (eventos+recordatorios), estadísticas
+de sus propios cursos. Todo endpoint valida que la oferta pertenezca al profesor autenticado
+(es_profesor_de_materia) — si esa validación falta, un profesor podría ver/editar datos de
+una materia que no dicta.
+"""
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, case

@@ -1,3 +1,4 @@
+// Login público (alumno/profesor). Auth vía POST /auth/login, setea access token en memoria + refresh/csrf en cookie.
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence, useInView } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router-dom'

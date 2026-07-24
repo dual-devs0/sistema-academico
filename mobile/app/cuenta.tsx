@@ -1,3 +1,4 @@
+// Alumno. Estado de cuenta (cuotas). Depende de: services/cuentaService.ts.
 import { colors } from "../constants/design";
 import { useTheme } from "../hooks/useTheme";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

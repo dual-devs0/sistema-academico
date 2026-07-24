@@ -5,6 +5,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Token de un solo uso para reset de contraseña (hash, no el token crudo; expiry 1h).
+# Parte del fix de seguridad ISSUE-2 — ver CHANGELOG_FIXES.md. Usado por: auth_router.py
+# (recuperar_contrasena / reset_password).
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 

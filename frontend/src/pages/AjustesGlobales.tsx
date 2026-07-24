@@ -1,3 +1,4 @@
+// Admin. Edición de GlobalSetting (5 tabs por categoría) + auditoría de cambios + export/import. Depende de: /admin/settings/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { emitToast } from '../lib/api'
 import {

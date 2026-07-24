@@ -6,6 +6,8 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+# Foro por materia: hilos (ForoHilo) y mensajes (ver clase siguiente). Fijar/cerrar hilos,
+# edición de mensajes con ventana de 15min (Fase 1.2). Usado por: foro_router.py.
 class ForoHilo(Base):
     __tablename__ = "foro_hilos"
 

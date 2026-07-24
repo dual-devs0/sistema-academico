@@ -1,3 +1,4 @@
+// Admin. Reportes exportables (estadísticas, RUE-ES/MEC). Depende de: /reportes/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../lib/api'
 

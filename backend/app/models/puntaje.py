@@ -13,6 +13,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
+# Nota individual por tipo de evaluación (parcial1/parcial2/practico/final1-3), puntos crudos.
+# Fuente del motor de notas — ver services/puntajes_utils.py::calcular_promedio_final.
 class Puntaje(Base):
     __tablename__ = "puntajes"
 

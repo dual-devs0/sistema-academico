@@ -1,3 +1,4 @@
+// Alumno, Profesor y Admin (contenido condicional por rol). Vista principal post-login: KPIs, próximas clases/vencimientos, calificaciones por materia.
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, api } from '../lib/api'

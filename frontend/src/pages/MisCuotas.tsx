@@ -1,3 +1,4 @@
+// Alumno. Cuotas propias, pago online (Stripe), comprobantes de facturación. Depende de: /finanzas/alumno/{id}/cuotas, /finanzas/pagos/*.
 import { useState, useEffect, useCallback } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { getCuotasAlumno, getBecasActivas, initPagoOnline, formatGs, type Cuota, type BecaActiva } from '../services/finanzasService'

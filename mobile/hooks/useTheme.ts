@@ -1,3 +1,4 @@
+// Hook de tema claro/oscuro. Consumido por: toda la app (design tokens).
 import {
   createContext,
   createElement,

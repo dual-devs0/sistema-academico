@@ -4,6 +4,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
+# Instancia de una Materia dictada en un período concreto, con profesor asignado.
+# Separación Materia/OfertaMateria evita duplicar el catálogo por período (ver ARQUITECTURA.md).
 class OfertaMateria(Base):
     __tablename__ = "ofertas_materia"
 

@@ -1,3 +1,8 @@
+"""
+Boleta de calificaciones del alumno (PDF/HTML) con sello digital verificable — código HMAC
++ QR generado server-side (mismo patrón que asistencias_router.py::create_qr_token).
+Depende de: services/puntajes_utils.py (promedio ponderado real, no AVG crudo).
+"""
 import base64
 import hashlib
 import hmac

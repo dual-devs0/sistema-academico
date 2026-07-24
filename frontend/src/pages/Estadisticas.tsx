@@ -1,3 +1,4 @@
+// Profesor y Admin (contenido distinto por rol). Estadísticas agregadas de cursos/carrera. Depende de: /reportes/*.
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,

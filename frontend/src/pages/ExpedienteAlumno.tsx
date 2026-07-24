@@ -1,3 +1,4 @@
+// Alumno. PPA, regularidad y historial académico propio, con polling. Depende de: /expediente/alumno/{id}/*.
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getUserId } from '../hooks/useRole'
 import {

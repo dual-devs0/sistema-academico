@@ -1,3 +1,8 @@
+"""
+Reportes agregados admin-only: estadísticas, dashboard, exportación RUE-ES/MEC (CSV para
+MEC/CONES). Consultas agregadas sobre datos de todos los alumnos — nunca exponer a rol
+alumno/profesor sin filtrar.
+"""
 import csv
 import io
 from typing import Any, cast

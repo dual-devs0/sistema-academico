@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Eventos de calendario académico (parciales, feriados, entregas) globales o por materia.
+# Usado por: eventos_router.py, Dashboard/Calendario frontend y mobile.
 class EventoCalendario(Base):
     __tablename__ = "eventos_calendario"
 

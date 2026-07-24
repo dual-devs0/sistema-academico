@@ -1,3 +1,8 @@
+"""
+Cierre de materias (upsert en expediente_materias), PPA y regularidad por alumno.
+Depende de: services/expediente.py (calcular_ppa/calcular_regularidad) — este router
+es la capa HTTP + permisos, la lógica de cálculo vive en el service.
+"""
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session

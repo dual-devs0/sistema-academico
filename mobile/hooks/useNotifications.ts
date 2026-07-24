@@ -1,3 +1,4 @@
+// Hook de notificaciones in-app (panel flotante). Consumido por: NotificationsSheet.
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../services/api";
 

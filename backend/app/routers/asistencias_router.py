@@ -1,3 +1,8 @@
+"""
+Registro y consulta de asistencia — manual (profesor/admin) y por QR (token HMAC TTL 15min,
+ver create_qr_token). Dispara alerta por email si un alumno cruza 25% de inasistencia (Fase 8).
+Depende de: models.asistencia, email_utils.
+"""
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 

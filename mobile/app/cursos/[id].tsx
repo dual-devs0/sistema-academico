@@ -1,3 +1,4 @@
+// Alumno y Profesor. Detalle de una materia (notas, asistencia). Contiene fallback a DUMMY_MATERIAS —
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
 import { useEffect, useState, useCallback } from "react";

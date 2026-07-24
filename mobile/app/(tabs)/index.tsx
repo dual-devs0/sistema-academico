@@ -1,3 +1,4 @@
+// Alumno y Profesor. Tab Dashboard — KPIs, progreso, próximo evento.
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
 import { useCallback, useEffect, useState } from "react";

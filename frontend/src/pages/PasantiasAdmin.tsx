@@ -1,3 +1,4 @@
+// Admin. Aprobación de solicitudes de pasantía, empresas receptoras, control de horas. Depende de: /pasantias/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, emitToast } from '../lib/api'
 import {

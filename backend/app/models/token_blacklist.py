@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Access tokens (JWT) revocados por jti antes de su expiración natural (logout).
+# Parte del fix ISSUE-11 — ver dependencias.py::get_current_user y CHANGELOG_FIXES.md.
 class TokenBlacklist(Base):
     __tablename__ = "token_blacklist"
 

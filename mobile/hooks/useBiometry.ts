@@ -1,3 +1,4 @@
+// Hook de autenticación biométrica (Face ID/huella) para reautenticar sin password. Consumido por: login.tsx.
 import { useCallback, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import AsyncStorage from "@react-native-async-storage/async-storage";

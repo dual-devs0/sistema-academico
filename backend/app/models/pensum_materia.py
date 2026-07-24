@@ -4,6 +4,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Materia dentro del pensum de una carrera (semestre sugerido, créditos, si es electiva).
+# Usado por: services/pensum.py, malla curricular (MallaAdmin/MallaAlumno).
 class PensumMateria(Base):
     __tablename__ = "pensum_materias"
 

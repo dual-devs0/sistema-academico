@@ -1,3 +1,7 @@
+"""
+Router admin genérico (endpoints sueltos que no ameritan router propio).
+Todo endpoint requiere rol admin. Usado por: frontend admin pages.
+"""
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, case

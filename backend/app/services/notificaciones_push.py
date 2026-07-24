@@ -1,3 +1,7 @@
+"""Notificaciones Web Push (pywebpush + VAPID). Envía a las suscripciones
+guardadas en SuscripcionPush; degrada con gracia si las VAPID keys no están
+configuradas. Usado por: notificaciones_router.py.
+"""
 import logging
 import os
 from typing import Any

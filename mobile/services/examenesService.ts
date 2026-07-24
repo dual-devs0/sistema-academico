@@ -1,3 +1,4 @@
+// Llamadas a /examenes/*.
 import { api } from "./api";
 
 /**

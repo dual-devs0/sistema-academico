@@ -1,3 +1,4 @@
+// Alumno. Exámenes (pantalla 9, en desarrollo — ver RESUMEN_TECNICO_COMPLETO.md).
 import { colors } from "../constants/design";
 import { useTheme } from "../hooks/useTheme";
 import { useCallback, useEffect, useState } from "react";

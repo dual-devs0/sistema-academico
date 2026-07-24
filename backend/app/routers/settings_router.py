@@ -1,3 +1,7 @@
+"""
+Ajustes globales editables por admin (GlobalSetting) + auditoría de cada cambio
+(SettingAuditLog) — export/import para respaldo. Todo cambio queda registrado con quién y cuándo.
+"""
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session

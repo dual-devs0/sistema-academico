@@ -1,3 +1,4 @@
+// Hook genérico — oculta un elemento (tab bar) al scrollear hacia abajo.
 import { createContext, useContext } from "react";
 import {
   useSharedValue,

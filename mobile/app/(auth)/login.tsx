@@ -1,3 +1,4 @@
+// Público. Login (JWT + SecureStore + biometric opcional). Depende de: services/authService.ts.
 import { colors } from "../../constants/design";
 import React, { useEffect, useRef, useState } from "react";
 import {

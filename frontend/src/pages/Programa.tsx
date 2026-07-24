@@ -1,3 +1,4 @@
+// Alumno y Profesor. Cursos unificado: Temario + Asistencia + Calificaciones en tabs (Fase 19B). Depende de: /programas/*, /puntajes/*, /asistencias/*.
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
