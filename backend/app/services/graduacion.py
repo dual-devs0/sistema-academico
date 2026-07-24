@@ -2,6 +2,8 @@
 services/graduacion.py — Fase 5B: Graduación y tesis.
 
 Regla: verificar_condicion_egreso es función pura (solo lectura, sin escritura).
+Depende de: app.services.expediente (calcular_ppa), app.services.pasantia.
+Usado por: routers/graduacion_router.py (endpoints de condición/candidatos/procesos).
 """
 
 from __future__ import annotations
@@ -23,6 +25,10 @@ from app.services.pasantia import pasantia_completada_por_alumno
 PPA_MINIMO_INSTITUCIONAL = 6.0
 
 
+# Verifica créditos + PPA + pasantía completada. Si retorna un falso
+# positivo (cumple=True sin cumplir de verdad), un alumno podría iniciar el
+# proceso de graduación sin estar habilitado — validar cada condición por
+# separado en el dict de retorno, no solo el booleano agregado.
 def verificar_condicion_egreso(alumno_id: int, db: Session) -> dict:
     alumno = db.query(User).filter(User.id == alumno_id).first()
     if not alumno:
