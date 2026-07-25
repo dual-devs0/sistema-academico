@@ -142,6 +142,39 @@ técnico y no son parte de esta auditoría de código.
   (`NameError` real si se corre el script hasta el final); la variable correcta es `count_cuotas`. Script
   de seeding manual, no forma parte de la app servida ni de CI — corregido por ser trivial y de una línea.
 
+### 9. `COOKIE_SECURE` nunca declarada en CI — 6 tests reales rotos en el runner, invisibles en local
+- **Encontrado:** post-cierre de esta auditoría, al resolver el conflicto de merge del PR #81
+  (`push-final` → `main`) y verificar el resultado en CI real. No es uno de los 8 hallazgos
+  originales — se documenta acá con el mismo rigor por ser un hallazgo real de la misma sesión
+  extendida.
+- **Síntoma:** 6 tests fallando en el job `backend` de CI, todos en `test_refresh_tokens.py` y
+  `test_security.py::test_logout_revoca_access_token` — refresh devolvía 401 en vez de 200/403,
+  logout devolvía 403 en vez de 200. **Confirmado que no lo causó el merge**: el mismo job fallaba
+  igual en el commit anterior al merge (`3590583`, cambio puramente de documentación) — verificado
+  con la API de GitHub (`check-runs` por SHA).
+- **Causa raíz:** `backend/.env.test` está en `.gitignore` — nunca estuvo trackeado, nunca llegó al
+  runner de CI. Ese archivo es el único lugar del repo que seteaba `COOKIE_SECURE=false`. Sin él,
+  `auth_router.py`'s `_COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true")` cae al default `true` en
+  CI. Con `Secure=true`, las cookies `refresh_token`/`csrf_token` nunca se reenvían sobre
+  `http://testserver` (el `TestClient` de FastAPI no usa HTTPS) — cualquier test que dependa de una
+  cookie seteada en un request anterior (login → refresh, login → logout) pierde esa cookie en el
+  siguiente request. Explica el patrón exacto: `refresh` sin cookie dispara
+  `if not token: raise 401` *antes* de llegar al chequeo de CSRF (por eso los tests que esperaban
+  403-por-CSRF recibían 401-por-token-ausente), y `logout` (protegido por el `CSRFMiddleware`
+  global) sin cookie CSRF da 403.
+- **Por qué era invisible en desarrollo:** el `.env.test` local (mío y probablemente el de
+  Nicolás, autor del PR #80 con el que se resolvió el conflicto de esta sección) enmascaraba el
+  problema en cada corrida local — nunca se había verificado esta suite contra CI real durante la
+  sesión, solo localmente.
+- **Confirmado con reproducción exacta**, no por descarte: forzando `COOKIE_SECURE=true` localmente
+  se reproducen las 6 fallas con los mismos asserts exactos que el log real de CI (obtenido vía
+  token de Git Credential Manager, `git credential fill`, dado que no había `gh` CLI ni token de
+  entorno disponibles). Forzando `COOKIE_SECURE=false` explícito, las 6 pasan.
+- **Fix:** agregado `COOKIE_SECURE: "false"` al bloque `env:` del job `backend` en
+  `.github/workflows/ci.yml`, mismo patrón que `JWT_SECRET`/`DATABASE_URL`/`PYTHONPATH` ya usan
+  ahí. `COOKIE_SECURE=true` sigue siendo el default correcto para producción real (HTTPS) — el
+  cambio es específico al entorno de test de CI.
+
 ---
 
 ## Verificado en código (confirma lo documentado en CHANGELOG_FIXES.md)

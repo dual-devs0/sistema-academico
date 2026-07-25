@@ -3,6 +3,39 @@
 > Generado automáticamente por la auditoría del 2026-07-23
 > Última modificación: 2026-07-24
 
+## 2026-07-24 — Fix: COOKIE_SECURE nunca declarada en CI (hallazgo #9, ver AUDITORIA_2026-07-24.md)
+
+### Antes (cómo estaba)
+`backend/.env.test` (gitignored, nunca trackeado) era el único lugar que seteaba
+`COOKIE_SECURE=false`. En CI, sin ese archivo, `_COOKIE_SECURE` caía al default `true` — las
+cookies `refresh_token`/`csrf_token` se seteaban con flag `Secure` y nunca se reenviaban sobre
+`http://testserver` (sin TLS). 6 tests fallaban en el job `backend`: `test_refresh_tokens.py`
+completo (refresh sin cookie → 401 en vez de 200/403) y
+`test_security.py::test_logout_revoca_access_token` (logout sin cookie CSRF → 403 en vez de 200).
+Confirmado con la API de GitHub que el mismo job ya fallaba en el commit anterior al merge del PR
+#81 (`3590583`, cambio puramente de documentación) — no lo causó el merge ni la resolución de
+conflictos.
+
+### Después (cómo quedó)
+`COOKIE_SECURE: "false"` explícito en el bloque `env:` del job `backend` de
+`.github/workflows/ci.yml`. `COOKIE_SECURE=true` sigue siendo el default correcto para producción
+real (HTTPS) — el cambio es específico al entorno de test.
+
+### Cambio realizado
+- `.github/workflows/ci.yml` — agregado `COOKIE_SECURE: "false"` junto a `JWT_SECRET`/`DATABASE_URL`/`PYTHONPATH`
+
+### Por qué se hizo
+El `.env.test` local enmascaraba el problema en cada corrida de desarrollo — nunca se había
+verificado esta suite contra CI real durante la sesión de auditoría, solo localmente. Reproducido
+con certeza forzando `COOKIE_SECURE=true` local (mismos 6 asserts exactos que el log real de CI).
+
+### Para qué sirve
+CI real refleja el mismo comportamiento que el entorno local ya tenía — sin depender de un archivo
+no trackeado que solo existe en discos individuales.
+
+### Cambios que debe encontrar un revisor
+- `.github/workflows/ci.yml` — una línea agregada
+
 ## 2026-07-24 — Fix: import roto en GET /pasantias/profesores (hallazgo #8, ver AUDITORIA_2026-07-24.md)
 
 ### Antes (cómo estaba)
