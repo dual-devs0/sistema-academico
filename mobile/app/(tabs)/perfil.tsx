@@ -1,3 +1,4 @@
+// Alumno y Profesor. Tab Perfil — datos personales, tema, ajustes.
 import { colors } from "../../constants/design";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {

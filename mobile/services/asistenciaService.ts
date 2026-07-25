@@ -1,3 +1,4 @@
+// Llamadas a /asistencias/* y /asistencias/qr/verificar.
 import { api } from "./api";
 
 /**

@@ -1,3 +1,4 @@
+// Alumno y Admin (vista dual). Constancias/historiales oficiales, automáticos y manuales. Depende de: /tramites/*.
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import {

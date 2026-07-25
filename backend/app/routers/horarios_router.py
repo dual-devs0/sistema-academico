@@ -1,3 +1,7 @@
+"""
+Horarios de materia (día/hora/aula). Creación valida solapamiento
+(services/pensum.py::verificar_solapamiento_inscripcion) antes de guardar.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional

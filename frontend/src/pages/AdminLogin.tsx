@@ -1,3 +1,4 @@
+// Login público del rol admin (paleta propia, separado del login alumno/profesor). Mismo flujo /auth/login.
 import { useState } from 'react'
 import { motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'

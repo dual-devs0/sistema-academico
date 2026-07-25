@@ -1,3 +1,4 @@
+// Admin. Asignación profesor↔materia por período (ofertas). Depende de: /materias/*.
 import { useState, useEffect, useCallback } from 'react'
 import { emitToast } from '../lib/api'
 import {

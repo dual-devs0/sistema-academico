@@ -1,3 +1,9 @@
+"""
+Portal docente: cátedras activas, histórico, agenda (eventos+recordatorios), estadísticas
+de sus propios cursos. Todo endpoint valida que la oferta pertenezca al profesor autenticado
+(es_profesor_de_materia) — si esa validación falta, un profesor podría ver/editar datos de
+una materia que no dicta.
+"""
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, case
@@ -5,8 +11,6 @@ from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
-from app.schemas.users_schemas import AlumnoSimpleOut
-from app.services.autorizacion import es_profesor_de_alumno
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 

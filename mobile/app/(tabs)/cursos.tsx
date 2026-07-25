@@ -1,3 +1,4 @@
+// Alumno y Profesor. Tab Cursos — lista de materias, entrada a detalle (app/cursos/[id].tsx).
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

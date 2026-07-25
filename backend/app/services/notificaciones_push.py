@@ -1,10 +1,15 @@
+"""Notificaciones Web Push (pywebpush + VAPID). Envía a las suscripciones
+guardadas en SuscripcionPush; degrada con gracia si las VAPID keys no están
+configuradas. Usado por: notificaciones_router.py.
+"""
+import base64
 import logging
 import os
 from typing import Any
 
 from pywebpush import webpush, WebPushException
 from py_vapid import Vapid
-from sqlalchemy.orm import Session
+from cryptography.hazmat.primitives import serialization
 
 from app.models.financiero import SuscripcionPush
 
@@ -12,10 +17,22 @@ logger = logging.getLogger(__name__)
 
 
 def _generar_vapid_keys() -> tuple[str, str]:
+    """Genera un par de claves VAPID como strings base64url (crudo, sin
+    padding) -- el formato que pywebpush.webpush()/Vapid.from_string()
+    esperan como vapid_private_key, y el que el navegador espera como
+    applicationServerKey (VAPID_PUBLIC_KEY). `Vapid().public_key`/`.private_key`
+    en la version instalada de py_vapid son objetos de `cryptography`, no
+    strings -- convertirlos con str()/decode() los deja irreconocibles
+    (bug real, ver AUDITORIA -- confirmado con roundtrip Vapid.from_string()).
+    """
     v = Vapid()
     v.generate_keys()
-    public_key = v.public_key.decode("utf-8") if isinstance(v.public_key, bytes) else v.public_key
-    private_key = v.private_key.decode("utf-8") if isinstance(v.private_key, bytes) else v.private_key
+    priv_raw = v.private_key.private_numbers().private_value.to_bytes(32, "big")
+    private_key = base64.urlsafe_b64encode(priv_raw).decode().rstrip("=")
+    pub_raw = v.public_key.public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+    )
+    public_key = base64.urlsafe_b64encode(pub_raw).decode().rstrip("=")
     return public_key, private_key
 
 

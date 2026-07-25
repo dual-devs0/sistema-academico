@@ -12,6 +12,9 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
+# Registro de asistencia por alumno/oferta/fecha (manual o vía QR).
+# Depende de: users, ofertas_materia. Usado por: asistencias_router.py,
+# services/expediente.py (calcular_regularidad), alertas de inasistencia crítica.
 class Asistencia(Base):
     __tablename__ = "asistencias"
 

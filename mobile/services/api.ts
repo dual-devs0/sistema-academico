@@ -1,3 +1,4 @@
+// Cliente Axios base — interceptor de refresh token (cola de requests, single-flight) + CSRF header. Depende de: hooks/useAuth.ts.
 import axios, {
   AxiosError,
   AxiosHeaders,

@@ -1,3 +1,4 @@
+// Alumno y Profesor. Detalle de asistencia de una materia (tarjetas circulares por sesión).
 import { colors } from "../../../constants/design";
 import { useTheme } from "../../../hooks/useTheme";
 import { useEffect, useState, useCallback, useMemo } from "react";

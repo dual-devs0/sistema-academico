@@ -1,3 +1,4 @@
+// Alumno. Pantalla de escaneo de QR para registrar presente. Depende de: POST /asistencias/qr/verificar.
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'

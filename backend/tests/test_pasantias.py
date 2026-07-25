@@ -64,6 +64,16 @@ class TestEmpresas:
         assert r.status_code == 403
 
 
+class TestListarProfesores:
+    def test_listar_profesores_no_crashea(self, client, tokens, seed):
+        """FIX AUDITORIA_2026-07-24 #8: `from app.models.user import User`
+        (módulo inexistente, real es app.models.users) crasheaba este
+        endpoint con 500 en cualquier llamada real."""
+        r = client.get("/pasantias/profesores", headers={"Authorization": f"Bearer {tokens['admin']}"})
+        assert r.status_code == 200
+        assert any(p["email"] == seed["profesor"].email for p in r.json())
+
+
 class TestSolicitudes:
     def test_alumno_solicita_pasantia(self, client, tokens):
         emp_r = _crear_empresa(client, tokens["admin"])

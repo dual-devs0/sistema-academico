@@ -2,7 +2,9 @@
 Seed masivo para pruebas de carga (~4000 alumnos).
 Uso: python seed_masivo.py
 """
-import sys, random, time as time_mod
+import sys
+import random
+import time as time_mod
 from datetime import date, timedelta, time
 from io import TextIOWrapper
 
@@ -288,9 +290,9 @@ db.close()
 print(f"\n{'='*50}")
 print(f"SEED MASIVO COMPLETADO en {time_mod.time()-t0:.0f}s")
 print(f"{'='*50}")
-print(f"  Director --> director@uca.edu.py / Director1234!")
-print(f"  Profesor  --> prof01@uca.edu.py  / Profesor1234! (prof01..prof20)")
-print(f"  Alumno    --> 30000000            / Alumno1234! (cedula + password comun)")
+print("  Director --> director@uca.edu.py / Director1234!")
+print("  Profesor  --> prof01@uca.edu.py  / Profesor1234! (prof01..prof20)")
+print("  Alumno    --> 30000000            / Alumno1234! (cedula + password comun)")
 print(f"  Alumnos:   {total_alumnos}")
 print(f"  Inscrip.:  {insc_count}")
 print(f"  Puntajes:  {p_count}")

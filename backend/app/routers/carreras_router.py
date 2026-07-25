@@ -1,3 +1,6 @@
+"""
+Catálogo de carreras — lectura simple, requiere solo autenticación (no rol específico).
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app import models, schemas, database

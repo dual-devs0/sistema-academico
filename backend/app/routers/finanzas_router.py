@@ -36,7 +36,6 @@ from app.models.financiero import (
     PagoOnline,
     BecaActiva,
 )
-from app.models.users import User
 from app.schemas.financiero import (
     ConceptoArancelCreate,
     ConceptoArancelUpdate,

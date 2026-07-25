@@ -322,7 +322,6 @@ def test_refresh_body_tiene_precedencia_sobre_cookie(client, seed, db):
 
 
 def test_refresh_por_body_tambien_rota(client, seed, db):
-    from app.models.refresh_token import RefreshToken
 
     login_res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}

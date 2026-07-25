@@ -4,6 +4,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
+# Catálogo de carreras. max_cuotas_mora define el umbral de bloqueo por mora (Fase 4).
+# Usado por: materias, pensum_materias, financiero, reportes RUE-ES.
 class Carrera(Base):
     __tablename__ = "carreras"
 

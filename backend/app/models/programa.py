@@ -4,6 +4,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Programa/temario semanal de una materia (contenido, no confundir con Materia).
+# Usado por: programas_router.py, tab "Temario" de Programa.tsx (Fase 19B).
 class Programa(Base):
     __tablename__ = "programas"
 

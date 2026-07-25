@@ -1,3 +1,9 @@
+"""
+Alta/baja de inscripción a oferta de materia. Punto real de bloqueo por correlatividades
+(services/pensum.py::validar_correlatividades) y por mora (services/financiero.py) —
+si esta capa no llama a esas validaciones antes de insertar, el bloqueo académico/financiero
+se vuelve decorativo (la validación existe pero no se aplica).
+"""
 from typing import Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel

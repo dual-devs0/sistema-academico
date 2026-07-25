@@ -1,3 +1,4 @@
+// Alumno. Catálogo de becas, mis postulaciones, becas activas (3 tabs). Depende de: /becas/*.
 import { useState, useEffect, useCallback } from 'react'
 import { getCurrentUser, emitToast, api } from '../lib/api'
 import {

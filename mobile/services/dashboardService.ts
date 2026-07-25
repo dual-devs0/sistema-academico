@@ -1,3 +1,4 @@
+// Llamadas a endpoints agregados de dashboard (alumno/profesor).
 import { api } from "./api";
 
 /**

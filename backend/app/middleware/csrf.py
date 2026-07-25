@@ -1,3 +1,10 @@
+"""Middleware ASGI de protección CSRF (double-submit cookie).
+
+Qué hace: exige que todo POST/PUT/PATCH/DELETE traiga el header
+X-CSRF-Token igual al valor de la cookie csrf_token (setead en login/refresh
+por auth_router.py). Aplica global, con excepciones en CSRF_EXEMPT_PATHS.
+Depende de: nada (self-contained). Usado por: app/main.py (app.add_middleware).
+"""
 import os
 import secrets
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -20,7 +27,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        if os.getenv("RATE_LIMIT_ENABLED", "true").lower() != "true":
+        # FIX AUDITORIA_2026-07-24 #3: este flag ANTES leía RATE_LIMIT_ENABLED
+        # (copy-paste), lo que apagaba CSRF entero si se desactivaba el rate
+        # limit en producción. Flag propio ahora — ver CHANGELOG_FIXES.md.
+        if os.getenv("CSRF_ENABLED", "true").lower() != "true":
             return await call_next(request)
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             path = request.url.path.rstrip("/") or "/"

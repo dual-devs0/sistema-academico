@@ -1,3 +1,9 @@
+"""
+CRUD de usuarios (alta/baja/edición, foto de perfil, cambio de password) + listado
+paginado admin-only. DELETE hace cascade real sobre refresh_tokens (Fase 13, bug real
+corregido — antes dejaba tokens huérfanos).
+"""
+import logging
 from datetime import datetime, timezone
 from fastapi import (
     APIRouter,
@@ -9,7 +15,7 @@ from fastapi import (
     Query,
 )
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
 from app.security import hash_password
@@ -18,6 +24,7 @@ from app.models.refresh_token import RefreshToken
 from app.services.storage import subir_archivo, obtener_url_firmada
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/stats")
@@ -252,7 +259,7 @@ def update_user(
                 background_tasks, user.email, user.nombre or user.username
             )
         except Exception as e:
-            print("Error sending password reset email:", e)
+            logger.warning("Error sending password reset email: %s", e)
 
     return user
 

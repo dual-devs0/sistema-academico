@@ -1,3 +1,7 @@
+"""
+Calendario académico: eventos globales o por materia (parciales, feriados, entregas).
+Alumno ve global + los de sus materias inscriptas; admin/profesor gestionan.
+"""
 import base64
 import json
 import os

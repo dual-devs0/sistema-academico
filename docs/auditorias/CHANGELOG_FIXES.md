@@ -1,7 +1,129 @@
 # CHANGELOG_FIXES.md
 
 > Generado automáticamente por la auditoría del 2026-07-23
-> Última modificación: 2026-07-23
+> Última modificación: 2026-07-24
+
+## 2026-07-24 — Fix: COOKIE_SECURE nunca declarada en CI (hallazgo #9, ver AUDITORIA_2026-07-24.md)
+
+### Antes (cómo estaba)
+`backend/.env.test` (gitignored, nunca trackeado) era el único lugar que seteaba
+`COOKIE_SECURE=false`. En CI, sin ese archivo, `_COOKIE_SECURE` caía al default `true` — las
+cookies `refresh_token`/`csrf_token` se seteaban con flag `Secure` y nunca se reenviaban sobre
+`http://testserver` (sin TLS). 6 tests fallaban en el job `backend`: `test_refresh_tokens.py`
+completo (refresh sin cookie → 401 en vez de 200/403) y
+`test_security.py::test_logout_revoca_access_token` (logout sin cookie CSRF → 403 en vez de 200).
+Confirmado con la API de GitHub que el mismo job ya fallaba en el commit anterior al merge del PR
+#81 (`3590583`, cambio puramente de documentación) — no lo causó el merge ni la resolución de
+conflictos.
+
+### Después (cómo quedó)
+`COOKIE_SECURE: "false"` explícito en el bloque `env:` del job `backend` de
+`.github/workflows/ci.yml`. `COOKIE_SECURE=true` sigue siendo el default correcto para producción
+real (HTTPS) — el cambio es específico al entorno de test.
+
+### Cambio realizado
+- `.github/workflows/ci.yml` — agregado `COOKIE_SECURE: "false"` junto a `JWT_SECRET`/`DATABASE_URL`/`PYTHONPATH`
+
+### Por qué se hizo
+El `.env.test` local enmascaraba el problema en cada corrida de desarrollo — nunca se había
+verificado esta suite contra CI real durante la sesión de auditoría, solo localmente. Reproducido
+con certeza forzando `COOKIE_SECURE=true` local (mismos 6 asserts exactos que el log real de CI).
+
+### Para qué sirve
+CI real refleja el mismo comportamiento que el entorno local ya tenía — sin depender de un archivo
+no trackeado que solo existe en discos individuales.
+
+### Cambios que debe encontrar un revisor
+- `.github/workflows/ci.yml` — una línea agregada
+
+## 2026-07-24 — Fix: import roto en GET /pasantias/profesores (hallazgo #8, ver AUDITORIA_2026-07-24.md)
+
+### Antes (cómo estaba)
+`listar_profesores()` en `pasantias_router.py:63` hacía `from app.models.user import User` (import lazy,
+dentro de la función). El módulo real es `app.models.users` (plural) — `app.models.user` solo existe
+como atributo-alias en `app/models/__init__.py`, insuficiente para que un import de submódulo directo
+resuelva. Como el import es lazy, el router cargaba y el servidor arrancaba sin problema, pero
+**`GET /pasantias/profesores` devolvía 500** en cualquier llamada real — endpoint que alimenta el
+selector de tutor académico en Pasantías Admin. Sin test que lo cubriera.
+
+### Después (cómo quedó)
+`from app.models.users import User` (módulo correcto). Endpoint responde 200. Agregado test de
+regresión.
+
+### Cambio realizado
+- `backend/app/routers/pasantias_router.py:63` — corregido el import
+- `backend/tests/test_pasantias.py` — nuevo `TestListarProfesores::test_listar_profesores_no_crashea`
+
+### Por qué se hizo
+Encontrado con Pyrefly durante la revisión de comentarios de mantenibilidad (Parte 2 de la auditoría),
+verificado a mano en el intérprete real antes de tocar código (`ModuleNotFoundError` reproducido
+directamente). Nota: Pyrefly también marcó `puntajes_utils.py:38` (`max()` sobre `float | None`) — se
+verificó y es falso positivo (el filtro previo en la comprehension ya garantiza no-None; limitación de
+narrowing del type-checker, no bug de runtime). No se tocó, ver detalle en AUDITORIA_2026-07-24.md #8.
+
+### Para qué sirve
+El selector de tutor académico en Pasantías Admin funciona en vez de crashear.
+
+### Cambios que debe encontrar un revisor
+- `backend/app/routers/pasantias_router.py` — línea 63
+- `backend/tests/test_pasantias.py` — nuevo test
+
+## 2026-07-24 — Fix: Auditoría pre-producción — 7 bugs reales (ver AUDITORIA_2026-07-24.md)
+
+### Antes (cómo estaba)
+- `requeriments.txt` sin pin de `bcrypt` → instala 5.0.0, incompatible con `passlib==1.7.4` → login,
+  registro y reset de contraseña rotos con `ValueError: password cannot be longer than 72 bytes`.
+- `slowapi` usado en `main.py`/`rate_limiter.py` pero nunca declarado en `requeriments.txt` → backend no
+  arranca en un entorno limpio.
+- `CSRFMiddleware.dispatch()` chequeaba `RATE_LIMIT_ENABLED` (copy-paste del flag equivocado) para
+  decidir si aplicar CSRF → desactivar rate limiting en producción desactivaba CSRF también, sin aviso.
+- `/auth/recuperar-contrasena` respondía 404 si el usuario no existía, antes de llegar al mensaje
+  genérico ya preparado en el código → user enumeration.
+- `pagos_online.py` usaba `stripe.util.json.loads()`, módulo inexistente en `stripe>=15.0` → cualquier
+  webhook real con `STRIPE_WEBHOOK_SECRET` sin configurar crasheaba con `AttributeError`.
+- `backend/test_login.py`, script de debug commiteado en la raíz de `backend/` (no en `tests/`), rompía
+  la recolección de pytest completa al no encontrar la DB local.
+- `tests/conftest.py` sobreescribía `get_blacklist_db()` devolviendo la sesión compartida de test
+  directamente; el `db.close()` real de `get_current_user()` en cada request autenticada la cerraba,
+  causando `DetachedInstanceError` en 10 tests que accedían a objetos `seed[...]` después de una request.
+
+### Después (cómo quedó)
+- `bcrypt==4.0.1` pinneado explícitamente.
+- `slowapi` agregado a `requeriments.txt`.
+- CSRF ahora usa su propio flag `CSRF_ENABLED` (default `true`), independiente de `RATE_LIMIT_ENABLED`.
+- `/auth/recuperar-contrasena` responde siempre 200 con el mensaje genérico, exista o no el usuario.
+- `pagos_online.py` usa `json.loads()` de la librería estándar.
+- `test_login.py` eliminado.
+- Override de blacklist en tests envuelve la sesión en un proxy con `close()` no-op.
+
+### Cambio realizado
+- `backend/requeriments.txt` — agregado `slowapi` y `bcrypt==4.0.1`
+- `backend/app/middleware/csrf.py` — flag `CSRF_ENABLED` en vez de `RATE_LIMIT_ENABLED`
+- `backend/app/routers/auth_router.py` — `recuperar_contrasena()` ya no revela existencia de usuario
+- `backend/app/services/pagos_online.py` — `json.loads()` en vez de `stripe.util.json.loads()`
+- `backend/test_login.py` — eliminado (script de debug commiteado por error)
+- `backend/seed_restante.py` — fix de `NameError` (`count` → `count_cuotas`) en script de seeding manual
+- `backend/tests/conftest.py` — proxy no-closing para `get_blacklist_db()`, agregado `CSRF_ENABLED=false`
+- `backend/tests/test_security.py` — usa `CSRF_ENABLED`, agregado test de regresión de user enumeration
+- `backend/alembic/versions/b42cc57fda33_...py` — (fix de un ciclo anterior de esta sesión) removido
+  drop de tabla/índice `temarios` ya inexistentes, ver commit `9d92a44`
+- `.github/workflows/ci.yml` — (fix de un ciclo anterior de esta sesión) `cache-dependency-path` en
+  `setup-python`, ver commit `7a097b8`
+
+### Por qué se hizo
+Auditoría solicitada explícitamente para dejar el sistema en condiciones reales de deploy: verificar que
+lo documentado en fases anteriores coincide con el código real, no solo con los MD. El bug de CSRF/rate
+limit era el más serio — anulaba en silencio una protección de seguridad ya "cerrada" en una fase previa
+bajo una configuración de producción plausible.
+
+### Para qué sirve
+Backend arranca e instala limpio desde cero. Auth funciona con las versiones de dependencias reales que
+se instalarían en Render. CSRF no se puede desactivar accidentalmente. No se puede enumerar cuentas vía
+el flujo de recuperación de contraseña. Webhooks de Stripe no crashean. Suite de tests corre completa y
+confiable (280/280) sin falsos negativos por bugs de fixtures.
+
+### Cambios que debe encontrar un revisor
+Ver tabla de hallazgos completa en `AUDITORIA_2026-07-24.md`.
 
 ## 2026-07-23 — Fix: ESLint 51 problemas + Mobile tsc + CI + JWT jti + Cache (ISSUEs 8-12)
 

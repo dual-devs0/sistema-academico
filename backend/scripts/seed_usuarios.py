@@ -1,9 +1,8 @@
 """Seed mínimo: solo crea los 3 usuarios de prueba en PostgreSQL."""
-import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.database import engine, SessionLocal, Base
+from app.database import SessionLocal
 from app.models.users import User
 from app.security import hash_password
 

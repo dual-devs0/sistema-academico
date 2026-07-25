@@ -1,3 +1,4 @@
+// Alumno y Profesor (vista dual). Alumno: sus calificaciones. Profesor: carga de notas por puntos configurables. Depende de: /puntajes/*.
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
 import { obtenerCreditosAlumno, type CreditosAlumnoOut } from '../services/pensumService'

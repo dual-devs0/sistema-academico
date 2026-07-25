@@ -1,3 +1,7 @@
+"""
+Healthcheck / smoke-test manual (verificar que la API responde y que el JWT valida).
+No es parte de ningún flujo real de negocio.
+"""
 from fastapi import APIRouter, Depends
 from app.dependencias import get_current_user
 

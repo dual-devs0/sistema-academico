@@ -14,6 +14,8 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+# Snapshot cacheado del estado de regularidad de un alumno (activo/en_riesgo/irregular/de_baja).
+# Recalculado por services/expediente.py::calcular_regularidad — no editar a mano.
 class RegularidadAlumno(Base):
     __tablename__ = "regularidad_alumno"
 

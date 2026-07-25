@@ -1,3 +1,8 @@
+"""Chequeos de autorización de dominio (¿este profesor dicta esta materia?
+¿es su alumno?) reusados por varios routers para no duplicar la misma
+query. Si estas funciones dan falso positivo, un profesor podría ver/editar
+datos de una materia o alumno que no le corresponde.
+"""
 from sqlalchemy.orm import Session
 from app.models.oferta_materia import OfertaMateria
 from app.models.inscripcion import Inscripcion

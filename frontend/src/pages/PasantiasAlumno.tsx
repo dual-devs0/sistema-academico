@@ -1,3 +1,4 @@
+// Alumno. Solicitud de pasantía propia, historial completo (incluye rechazadas con motivo), informes. Depende de: /pasantias/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { emitToast } from '../lib/api'
 import { solicitarPasantia, getEmpresas, getMisPasantias,

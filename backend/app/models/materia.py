@@ -4,6 +4,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
+# Catálogo de materias (sin profesor ni período — eso vive en OfertaMateria, ver ese modelo).
+# codigo es backfill (Fase 10B). Usado en casi todos los módulos académicos.
 class Materia(Base):
     __tablename__ = "materias"
 

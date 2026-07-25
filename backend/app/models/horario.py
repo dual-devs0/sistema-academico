@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# Bloques horarios de una materia (día/hora/aula). Usado por: horarios_router.py,
+# services/pensum.py::verificar_solapamiento_inscripcion (bloquea inscripción con choque de horario).
 class Horario(Base):
     __tablename__ = "horarios"
 

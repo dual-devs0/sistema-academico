@@ -4,6 +4,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
+# Inscripción de un alumno a una oferta de materia. Alta bloqueada por correlatividades
+# (services/pensum.py) y por mora (services/financiero.py) salvo beca 100%.
 class Inscripcion(Base):
     __tablename__ = "inscripciones"
 

@@ -1,3 +1,4 @@
+// Alumno y Profesor. Scanner QR para registrar asistencia. Depende de: services/asistenciaService.ts.
 import { colors } from "../constants/design";
 import { useTheme } from "../hooks/useTheme";
 import { useCallback, useEffect, useRef, useState } from "react";

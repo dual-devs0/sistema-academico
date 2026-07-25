@@ -1,3 +1,4 @@
+// Profesor. Cátedras activas/histórico/agenda unificados (Fase 1.4). Depende de: /profesor/*.
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, emitToast } from '../lib/api'

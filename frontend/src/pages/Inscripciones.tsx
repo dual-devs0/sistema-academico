@@ -1,3 +1,4 @@
+// Alumno. Inscripción a ofertas de materia — bloqueo real por correlatividades, cupo y mora aplicado server-side, esta vista solo refleja el resultado. Depende de: /inscripciones/*, /pensum/*.
 import { useState, useEffect, useCallback } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
 

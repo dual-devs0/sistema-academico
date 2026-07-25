@@ -6,6 +6,8 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+# Refresh token hasheado (nunca el crudo) por usuario, rotado en cada uso, revocable.
+# Usado por: auth_router.py (login/refresh/logout).
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 

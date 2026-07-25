@@ -1,5 +1,7 @@
 """Seed complementario: asistencias + cuotas (rápido)."""
-import sys, random, time as time_mod
+import sys
+import random
+import time as time_mod
 from datetime import date, timedelta
 from io import TextIOWrapper
 
@@ -82,7 +84,7 @@ for a in alumnos[:2000]:
         bulk_ignore(Cuota.__table__, batch); batch = []
 if batch:
     bulk_ignore(Cuota.__table__, batch)
-print(f"[{time_mod.time()-t0:.0f}s] Cuotas: {count}")
+print(f"[{time_mod.time()-t0:.0f}s] Cuotas: {count_cuotas}")
 
 db.close()
 print(f"\n✅ Seed complementario completado en {time_mod.time()-t0:.0f}s")

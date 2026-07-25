@@ -1,3 +1,9 @@
+"""
+Motor de notas por puntos: carga de notas (parcial1/2/practico/final1-3), configuración de
+pesos por materia (PUT /puntajes/pesos/{materia_id}, debe sumar 100), estadísticas.
+Depende de: services/puntajes_utils.py — toda la lógica de cálculo vive ahí, este router
+solo valida permisos (profesor titular o admin) y delega.
+"""
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -570,4 +576,3 @@ def promedio_puntajes(
     valores = [float(str(p.valor)) for p in puntajes]
     promedio = round(sum(valores) / len(valores), 2)
     return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
-    

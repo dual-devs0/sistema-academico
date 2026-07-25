@@ -15,6 +15,9 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+# Registro cerrado de una materia cursada por un alumno (nota final, estado, período).
+# Fuente de calcular_ppa/calcular_regularidad (services/expediente.py) — inmutable salvo
+# rectificación explícita vía POST /expediente/cerrar-materia (upsert).
 class ExpedienteMateria(Base):
     __tablename__ = "expediente_materias"
 

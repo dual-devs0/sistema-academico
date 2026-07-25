@@ -1,3 +1,8 @@
+// Deriva rol/usuario del JWT decodeado en memoria (lib/api.ts::getCurrentUser).
+// Depende de: lib/api.ts. Usado por: Layout.tsx (menú por rol) y todas las
+// páginas que ramifican vista alumno/profesor/admin. Si getRole() devuelve
+// null para un usuario válido, el sidebar/rutas protegidas lo tratan como
+// no logueado.
 import { getCurrentUser } from '../lib/api'
 
 export type Role = 'alumno' | 'profesor' | 'admin'

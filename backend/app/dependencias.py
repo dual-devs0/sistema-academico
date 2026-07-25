@@ -1,3 +1,12 @@
+"""Dependencias FastAPI de autenticación/autorización — get_current_user,
+require_role. Decodifica y valida el JWT de cada request, chequea blacklist
+de tokens revocados (logout). Depende de: app.auth (JWT), app.models.token_blacklist.
+Usado por: todos los routers protegidos (Depends(get_current_user)).
+
+Si get_current_user falla silenciosamente en aceptar un token revocado o un
+rol incorrecto, cualquier endpoint protegido queda expuesto — es el punto
+central de auth de todo el sistema.
+"""
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -11,7 +20,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 def get_blacklist_db():
-    """Hook so tests can override which DB to use for blacklist checks."""
+    """Hook so tests can override which DB to use for blacklist checks.
+
+    En producción abre una SessionLocal() dedicada y el caller la cierra
+    (ver get_current_user). tests/conftest.py sobreescribe esto con un
+    proxy no-closing sobre la sesión compartida de test — ver
+    AUDITORIA_2026-07-24.md hallazgo #7 (DetachedInstanceError si se
+    devuelve la sesión de test directamente).
+    """
     from app.database import SessionLocal
     return SessionLocal()
 

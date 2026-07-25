@@ -1,3 +1,11 @@
+"""services/expediente.py — cálculo de PPA (promedio ponderado acumulado)
+y regularidad académica a partir del expediente cerrado (ExpedienteMateria).
+
+Depende de: nada externo (solo modelos ORM). Usado por: services/graduacion.py
+(condición de egreso), routers/expediente_router.py, boleta_router.py.
+Recibe el float 0-10 ya calculado por puntajes_utils.calcular_promedio_final
+al cerrar cada materia — no recalcula puntos, solo agrega/promedia.
+"""
 from sqlalchemy.orm import Session
 from app.models.expediente_materia import ExpedienteMateria
 from app.models.oferta_materia import OfertaMateria

@@ -1,3 +1,8 @@
+"""
+Endpoints self-service del alumno autenticado (dashboard, mis-materias, mis-notas,
+mi-asistencia, mi-perfil) — siempre sobre el propio user_id del token, nunca por ID externo.
+Depende de: services/puntajes_utils.py, services/expediente.py.
+"""
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload

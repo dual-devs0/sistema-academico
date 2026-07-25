@@ -1,3 +1,4 @@
+// Admin. Búsqueda de expediente por alumno, cierre de materia. Depende de: /expediente/*.
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { api, emitToast } from '../lib/api'
 import {

@@ -1,3 +1,4 @@
+// Llamadas a /finanzas/alumno/{id}/cuotas.
 import { api } from "./api";
 import { fetchPerfil } from "./dashboardService";
 

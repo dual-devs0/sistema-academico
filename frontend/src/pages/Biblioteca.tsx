@@ -1,3 +1,4 @@
+// Alumno y Profesor. Apuntes/biblioteca digital por materia, subida y descarga. Depende de: /apuntes/*, services/storage.py (R2).
 import { useState, useEffect, useRef } from 'react'
 import { api, emitToast } from '../lib/api'
 

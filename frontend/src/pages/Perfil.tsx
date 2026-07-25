@@ -1,3 +1,4 @@
+// Alumno, Profesor y Admin (contenido por rol). Datos personales, cambio de password, condición de beca (alumno). Depende de: /users/{id}, /alumno/mis-notas, /alumno/mi-asistencia.
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api, getCurrentUser, getAccessToken, emitToast, emitAvatarUpdated } from '../lib/api'
 import { getBecasActivas, type BecaActiva } from '../services/finanzasService'

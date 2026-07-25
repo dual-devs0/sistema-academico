@@ -1,3 +1,7 @@
+"""
+Programa/temario semanal por materia (contenido del curso, no confundir con Materia).
+Usado por: tab "Temario" de Programa.tsx.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional

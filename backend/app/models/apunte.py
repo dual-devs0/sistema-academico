@@ -6,6 +6,8 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+# Apuntes/biblioteca digital subidos por alumnos, por materia (R2 storage_key).
+# Depende de: users, materias. Usado por: apuntes_router.py.
 class Apunte(Base):
     __tablename__ = "apuntes"
 

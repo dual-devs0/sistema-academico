@@ -1,3 +1,4 @@
+// Público (sin login). Lee ?token= de la URL, formulario de nueva contraseña. Depende de: POST /auth/reset-password (ISSUE-2, ver CHANGELOG_FIXES.md).
 import { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'

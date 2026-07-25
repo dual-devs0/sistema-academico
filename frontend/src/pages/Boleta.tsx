@@ -1,3 +1,4 @@
+// Alumno. Boleta de calificaciones con sello digital verificable (QR+código). Depende de: /boleta/*, promedio ponderado real (no AVG crudo).
 import { useState, useEffect } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
 import { obtenerCreditosAlumno, type CreditosAlumnoOut } from '../services/pensumService'

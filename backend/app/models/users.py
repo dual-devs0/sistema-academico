@@ -5,6 +5,8 @@ from typing import Optional
 from app.database import Base
 
 
+# Usuario del sistema — alumno/profesor/admin en una sola tabla (role: str). Tabla central,
+# referenciada por FK desde casi todos los demás modelos.
 class User(Base):
     __tablename__ = "users"
 

@@ -1,3 +1,4 @@
+// Admin. Cuotas, pagos, comprobantes de facturación electrónica, rendición Excel. Depende de: /finanzas/*. Montos siempre Numeric — nunca redondear en el cliente.
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import {
   getFuentes, getCatalogoBecas, getPostulaciones, revisarPostulacion,

@@ -6,14 +6,12 @@ Endpoints:
   POST /notificaciones/test         — enviar notificación de prueba
 """
 
-from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app import database
-from app.dependencias import get_current_user, require_role
+from app.dependencias import get_current_user
 from app.models.financiero import SuscripcionPush
 from app.services.notificaciones_push import enviar_notificaciones_masivo, get_vapid_keys
 

@@ -7,6 +7,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env.test")
 import os  # noqa: E402
 
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+os.environ.setdefault("CSRF_ENABLED", "false")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -66,11 +67,28 @@ def client(db):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Also point blacklist checks to the test DB
+    # FIX AUDITORIA_2026-07-24 #7: also point blacklist checks to the test
+    # DB. get_current_user() always
+    # calls db.close() on whatever get_blacklist_db() returns (mirrors the
+    # real dedicated SessionLocal() in production) — returning the shared
+    # `db` fixture session directly would close/detach it on every
+    # authenticated request. Wrap it so close() is a no-op instead.
     from app import dependencias as deps
 
+    class _NonClosingSessionProxy:
+        def __init__(self, session):
+            self._session = session
+
+        def __getattr__(self, name):
+            return getattr(self._session, name)
+
+        def close(self):
+            pass
+
+    _blacklist_proxy = _NonClosingSessionProxy(db)
+
     def override_blacklist_db():
-        return db
+        return _blacklist_proxy
 
     deps.get_blacklist_db = override_blacklist_db
 

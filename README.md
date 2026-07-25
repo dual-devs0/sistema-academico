@@ -1,82 +1,81 @@
 # Sistema Académico UCA V2
 
-Sistema de gestión académica integral con backend en FastAPI y frontend en React.
-
----
+Sistema de gestión académica integral para la Universidad Católica (Paraguay) — backend FastAPI,
+frontend web React y app móvil Expo/React Native, para los roles Alumno, Profesor y Admin.
 
 ## Stack
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React 19 + TypeScript + Vite + Tailwind v4 |
-| Backend | FastAPI + SQLAlchemy + Alembic + PostgreSQL |
-| Auth | JWT (access + refresh token httpOnly cookie) |
+| Backend | FastAPI + SQLAlchemy + Alembic + PostgreSQL (Neon) + JWT |
+| Frontend web | React 19 + TypeScript + Vite + Tailwind v4 |
+| Mobile | Expo SDK 57 + React Native + expo-router + NativeWind v4 |
+| Auth | JWT (access en body + refresh en cookie httpOnly) + CSRF double-submit + rate limiting |
 | Storage | Cloudflare R2 (S3-compatible) |
-| Email | SMTP + fastapi-mail |
-| PDF | ReportLab / WeasyPrint |
-| Tests | pytest + httpx (209 tests) |
+| Email | SMTP (Gmail) + fastapi-mail |
+| Pagos | Stripe Checkout Sessions |
+| PDF/QR | ReportLab, WeasyPrint, qrcode |
 
-## Módulos
+## Estado actual
 
-- **Autenticación**: JWT + refresh tokens, roles (admin/profesor/alumno)
-- **Materias y Ofertas**: CRUD con ofertas por período y profesor
-- **Inscripciones**: Validación de correlatividades + bloqueo por mora
-- **Puntajes/Calificaciones**: Notas ponderadas con cálculo de promedio
-- **Asistencias**: Registro diario por QR
-- **Pensum**: Malla curricular, correlatividades, avance del alumno
-- **Expediente**: PPA, estados (activo/irregular/de_baja), historial
-- **Financiero**: Cuotas, pagos inmutables, exportación Excel, bloqueo por mora
-- **Becas**: ITAIPU / institucionales, bypass de mora para beca 100%
-- **Facturación Electrónica**: Integración con guarani.app, reintentos automáticos
-- **Foro**: Hilos, mensajes paginados, fijar/cerrar, edición con ventana 15 min
-- **Trámites**: Solicitudes automáticas y manuales con generación de PDF
-- **Pasantías**: Empresas, solicitudes, informes, control de horas
-- **Graduación**: Procesos, tesis, verificación de egreso (créditos + PPA + pasantía)
-- **Equivalencias**: Solicitudes, resolución por examen o reválida
-- **Portal Docente**: Cátedras activas, histórico, agenda, recordatorios
-- **Reportes**: Estadísticas exportables
+19 fases de desarrollo completas en código (motor de notas por puntos, correlatividades, PPA,
+financiero, becas, facturación electrónica, trámites, graduación, pasantías, equivalencias, portal
+docente, app mobile) más una auditoría de seguridad pre-producción cerrada el 2026-07-24
+(8 hallazgos reales corregidos: bug de arranque por dependencia sin pinnear, CSRF que podía
+desactivarse por accidente, user enumeration en reset de contraseña, y otros — detalle completo en
+[`docs/auditorias/AUDITORIA_2026-07-24.md`](docs/auditorias/AUDITORIA_2026-07-24.md)).
 
-## Inicio rápido
+**No está en producción todavía.** Código, tests y CI están verdes; falta la parte de infraestructura
+(elegir/confirmar hosting, cargar secretos reales de Stripe/VAPID/guarani.app, dominio). Detalle
+completo en [`docs/documentacion-tecnica/DOCUMENTACION_TECNICA_TOTAL.md`](docs/documentacion-tecnica/DOCUMENTACION_TECNICA_TOTAL.md)
+(sección 11 — Estado actual y roadmap).
 
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-cp .env.example .env  # configurar DB y JWT
-alembic upgrade head
-uvicorn app.main:app --reload
+## Instalación / correr local
 
-# Frontend
-cd frontend
-npm install
-npm run dev
+Ver [`docs/web-system/INSTALACION.md`](docs/web-system/INSTALACION.md) para la guía completa
+(backend + frontend + mobile).
+
+## Estructura del repo
+
 ```
+backend/     FastAPI + SQLAlchemy + Alembic (routers, services, models, tests, migraciones)
+frontend/    React 19 + Vite (pages por módulo, componentes, hooks, lib/api)
+mobile/      Expo/React Native (app-router, componentes, servicios)
+docs/        Documentación consolidada (ver índice abajo)
+```
+
+## Documentación
+
+| Carpeta | Contenido |
+|---|---|
+| `docs/web-system/` | `CLAUDE.md` (reglas del proyecto), `COMANDOS.md`, `ESTADO_FASES.md` (fase por fase), `ARQUITECTURA.md`, `API_REFERENCE.md`, `MODELO_DATOS.md`, `INSTALACION.md`, `INSTRUCTOR.md` |
+| `docs/app-mobile-system/` | `CHANGELOG_MOBILE.md`, `PLAN_DESARROLLO_MOBILE.md`, `EXPO_GO_TESTING.md`, `CLAUDE.md` (reglas específicas mobile), `AGENTS.md`, `analisis_app_mobile.md` |
+| `docs/auditorias/` | `AUDITORIA_2026-07-24.md` (auditoría de seguridad), `PLAN_FIXES_AUDITORIA.md`, `CHANGELOG_FIXES.md` (**fuente de verdad de seguridad/fixes recientes**) |
+| `docs/documentacion-tecnica/` | `DOCUMENTACION_TECNICA_TOTAL.md` (documento consolidado, base para el PDF técnico), `RESUMEN_TECNICO_COMPLETO.md` (historial de las 19 fases), `CHANGELOG_TECNICO.md` |
+| `docs/negocio/` | `PLAN_DESARROLLO_UNIVERSIDAD.md`, `PLAN_VENTAS_UNIVERSIDADES.md` |
+
+`backend/README.md` y `frontend/README.md` tienen el arranque técnico rápido de cada subproyecto.
 
 ## Tests
 
 ```bash
-cd backend
-pytest -v              # 209 tests (SQLite)
+# Backend (282 tests)
+cd backend && pytest -v
+
+# Frontend (19 tests + lint + tsc)
+cd frontend && npm run test:run && npm run lint && npx tsc --noEmit
+
+# Mobile (tsc)
+cd mobile && npx tsc --noEmit
 ```
 
-## Estructura
+## Seguridad
 
-```
-backend/
-  app/
-    models/       # SQLAlchemy models
-    schemas/      # Pydantic schemas
-    routers/      # FastAPI endpoints
-    services/     # Business logic
-    auth.py       # JWT
-  alembic/        # Migraciones
-  tests/          # pytest suite
+Ver [`docs/auditorias/CHANGELOG_FIXES.md`](docs/auditorias/CHANGELOG_FIXES.md) para el historial completo
+de fixes de seguridad aplicados (CSRF global, rate limiting, JWT blacklist, reset de contraseña con
+token time-limited, refresh token fuera del response body, y los 8 hallazgos de la auditoría del
+2026-07-24).
 
-frontend/
-  src/
-    pages/        # Vistas por módulo
-    components/   # Componentes compartidos
-    services/     # API client
-    hooks/        # Custom hooks
-    lib/          # Utilidades
-```
+## Autoría
+
+WebPy Studio.

@@ -1,4 +1,13 @@
-"""Utilidades compartidas para cálculo de promedios sobre puntos configurables por materia."""
+"""Utilidades compartidas para cálculo de promedios sobre puntos configurables por materia.
+
+Motor de notas 0-100 por puntos (parcial1/parcial2/práctico + final, mejor
+oportunidad entre final1/2/3), reescalado a /10 para PPA/boleta/regularidad.
+Depende de: models.peso_evaluacion (pesos por materia, default 20/20/10/50
+sumando 100). Usado por: puntajes_router.py, alumno_router.py, boleta_router.py,
+reportes_router.py — cualquier lugar que muestre un promedio de materia.
+Si get_pesos()/calcular_promedio_final() calculan mal, el error se propaga
+directo al PPA y a la boleta oficial del alumno.
+"""
 
 from sqlalchemy.orm import Session
 

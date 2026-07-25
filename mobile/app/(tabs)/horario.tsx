@@ -1,3 +1,4 @@
+// Alumno y Profesor. Tab Horario — calendario semanal de clases.
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
 import { useCallback, useEffect, useMemo, useState } from "react";

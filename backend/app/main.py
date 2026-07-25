@@ -90,7 +90,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 origins = [
     o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 ]
-print(f"CORS origins: {origins}")
+logger.info("CORS origins: %s", origins)
 
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)

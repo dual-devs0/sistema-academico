@@ -439,6 +439,20 @@ def test_password_reset_recuperar_contrasena_exitoso(client, db, seed, tokens):
     mock.assert_called_once()
 
 
+def test_password_reset_usuario_inexistente_no_revela_enumeracion(client, seed):
+    """Usuario inexistente debe recibir la misma respuesta 200 genérica (anti user-enumeration)."""
+    from app.routers.auth_router import _password_reset_attempts
+    _password_reset_attempts.clear()
+    res = client.post(
+        "/auth/recuperar-contrasena",
+        json={"username_or_email": "no_existe_este_usuario"},
+    )
+    assert res.status_code == 200
+    assert res.json()["detail"] == (
+        "Si el usuario existe, recibirás un email con instrucciones."
+    )
+
+
 def test_password_reset_exitoso(client, db, seed):
     import hashlib
     from app.models.password_reset_token import PasswordResetToken
@@ -545,7 +559,7 @@ def test_logout_revoca_access_token(client, db, seed, tokens):
     csrf = login_res.json()["csrf_token"]
 
     # Enable CSRF temporarily for this test so logout validates CSRF
-    os.environ["RATE_LIMIT_ENABLED"] = "true"
+    os.environ["CSRF_ENABLED"] = "true"
     try:
         res = client.post(
             "/auth/logout",
@@ -556,7 +570,7 @@ def test_logout_revoca_access_token(client, db, seed, tokens):
         )
         assert res.status_code == 200
     finally:
-        os.environ["RATE_LIMIT_ENABLED"] = "false"
+        os.environ["CSRF_ENABLED"] = "false"
 
     # Using the same revoked token on a protected endpoint should fail
     res = client.get("/materias/", headers={"Authorization": f"Bearer {access_token}"})

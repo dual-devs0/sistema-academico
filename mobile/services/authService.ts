@@ -1,3 +1,4 @@
+// Llamadas a /auth/* — login/refresh/logout. refreshRequest acepta csrfToken (no refresh_token en el body, ver ISSUE-1).
 import { api } from "./api";
 
 /**

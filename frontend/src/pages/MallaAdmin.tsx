@@ -1,3 +1,4 @@
+// Admin. Edición de la malla curricular por carrera (pensum_materias, correlatividades). Depende de: /pensum/*.
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { api, emitToast } from '../lib/api'
 import {

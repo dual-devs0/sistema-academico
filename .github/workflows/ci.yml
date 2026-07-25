@@ -27,6 +27,7 @@ jobs:
       JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       DATABASE_URL: postgresql://uca:uca123@localhost:5432/uca_test
       PYTHONPATH: ${{ github.workspace }}/backend
+      COOKIE_SECURE: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

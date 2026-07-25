@@ -1,3 +1,11 @@
+"""Servicio de pensum: solapamiento de horarios, estado de avance por
+materia, y validación de correlatividades (bloqueo de inscripción).
+
+Depende de: app.services.puntajes_utils (promedio por materia). Usado por:
+routers/pensum_router.py, routers/inscripciones_router.py (bloqueo real
+al inscribir). Si validar_correlatividades falla silenciosamente (retorna
+válido cuando no debería), un alumno se inscribe sin cumplir prerrequisitos.
+"""
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -252,6 +260,10 @@ def validar_correlatividades(alumno_id: int, materia_id: int, db: Session) -> di
 
     Devuelve {"valido": bool, "pendientes": [{"materia_id", "tipo"}, ...]}
     Evalua TODOS los prerrequisitos, no corta en el primero que falla.
+
+    Si esta validación falla silenciosamente, un alumno podría inscribirse
+    en una materia sin cumplir correlatividades — el caller (inscripciones_router.py)
+    es responsable de bloquear la inscripción cuando "valido" es False.
     """
     prerequisitos = (
         db.query(Correlatividad).filter(Correlatividad.materia_id == materia_id).all()

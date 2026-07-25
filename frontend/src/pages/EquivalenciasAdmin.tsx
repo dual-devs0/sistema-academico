@@ -1,3 +1,4 @@
+// Admin. Resolución de solicitudes de equivalencia (examen de suficiencia o reválida). Depende de: /equivalencias/*.
 import { useState, useEffect, useCallback } from 'react'
 import { emitToast } from '../lib/api'
 import { api } from '../lib/api'

@@ -1,3 +1,4 @@
+// Admin. Candidatos a graduación, procesos, tutores, etapas de tesis. Depende de: /graduacion/*.
 import { useState, useEffect, useCallback } from 'react'
 import { api, emitToast } from '../lib/api'
 import TablaPaginada, { type ColumnaTabla } from '../components/common/TablaPaginada'

@@ -10,7 +10,11 @@ psycopg2-binary
 # Autenticación y seguridad
 python-jose[cryptography]
 passlib[bcrypt]
+# FIX AUDITORIA_2026-07-24 #1: pin obligatorio. passlib 1.7.4 (sin mantenimiento)
+# rompe con bcrypt>=4.1 (ValueError en TODO hash/verify). Ver CHANGELOG_FIXES.md.
+bcrypt==4.0.1
 python-dotenv
+slowapi  # FIX AUDITORIA_2026-07-24 #2: usado en main.py/rate_limiter.py, faltaba declarar
 
 # Manejo de PDFs
 pymupdf

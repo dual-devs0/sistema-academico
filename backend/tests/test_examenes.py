@@ -2,7 +2,6 @@
 
 from datetime import date
 
-import pytest
 
 
 def test_listar_examenes_admin(client, tokens, seed, db):
@@ -114,7 +113,7 @@ def test_examenes_disponibles_filtro_periodo(client, tokens, seed, db):
 
 def test_inscripcion_exitosa(client, tokens, seed, db):
     """POST /examenes/inscripciones — alumno se inscribe."""
-    from app.models.examen import Examen, InscripcionExamen
+    from app.models.examen import Examen
 
     examen = Examen(
         materia_id=seed["materia"].id,

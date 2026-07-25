@@ -1,3 +1,4 @@
+// Alumno, Profesor y Admin. Calendario académico (eventos globales/por materia). Depende de: /eventos/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, emitToast, getCurrentUser } from '../lib/api'
 

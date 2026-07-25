@@ -1,3 +1,4 @@
+// Público. Fallback de ruta no encontrada — sin lógica de negocio.
 import { useNavigate } from 'react-router-dom'
 
 export default function NotFound() {

@@ -1,3 +1,7 @@
+"""
+Apuntes/biblioteca digital: subida (R2), listado por materia, descarga con URL firmada.
+Depende de: services/storage.py. Validación de contenido (tamaño/extensión) en el service.
+"""
 import re
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import or_

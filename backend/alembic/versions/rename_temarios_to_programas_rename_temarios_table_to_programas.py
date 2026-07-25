@@ -22,7 +22,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     bind = op.get_bind()
     insp = sa.inspect(bind)
-    
+
     # Only rename if temarios exists and programas doesn't
     if insp.has_table('temarios') and not insp.has_table('programas'):
         op.rename_table('temarios', 'programas')
@@ -35,7 +35,7 @@ def downgrade() -> None:
     """Downgrade schema."""
     bind = op.get_bind()
     insp = sa.inspect(bind)
-    
+
     if insp.has_table('programas') and not insp.has_table('temarios'):
         # AUDIT-FIX B-1: rename_index no existe en Alembic, usar drop+create
         op.drop_index('ix_programas_id', table_name='temarios', if_exists=True)

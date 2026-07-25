@@ -1,3 +1,16 @@
+"""Router de autenticación: login, refresh, logout, recuperar/reset de
+contraseña, registro (activación de cuenta pre-creada por admin).
+
+Emite JWT de acceso (body) + refresh token httpOnly cookie + csrf_token
+(body, no sensible). Depende de: app.auth (JWT), app.security (hash de
+password), app.rate_limiter, app.middleware.csrf (exento acá vía
+CSRF_EXEMPT_PATHS, valida CSRF manual en /refresh). Usado por: frontend
+lib/api.ts, mobile services/authService.ts.
+
+Contiene 2 de los 7 fixes de AUDITORIA_2026-07-24.md — ver comentarios
+puntuales en cada función (#4 user enumeration, y el JWT blacklist en
+logout ya documentado en dependencias.py).
+"""
 import hashlib
 import os
 import secrets
@@ -22,7 +35,7 @@ from app.auth import (
     create_refresh_token,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
-from app.email_utils import send_reset_link_email_bg, send_welcome_email_bg, send_password_reset_email_bg
+from app.email_utils import send_reset_link_email_bg, send_welcome_email_bg
 from app.models.refresh_token import RefreshToken
 from app.models.password_reset_token import PasswordResetToken
 from app.models.token_blacklist import TokenBlacklist
@@ -170,6 +183,10 @@ def login(
     }
 
 
+# Rota el refresh token en cada uso (revoca el viejo, emite uno nuevo). Doble
+# flujo: cookie httpOnly (requiere CSRF header, ver CSRF_EXEMPT_PATHS) o body
+# explícito (mobile). Si esto falla en aceptar un token revocado, un refresh
+# robado sigue siendo válido indefinidamente.
 @router.post("/refresh")
 @limiter.limit("10/minute")
 def refresh(
@@ -237,6 +254,9 @@ def refresh(
     }
 
 
+# Revoca el refresh token (DB) y agrega el jti del access token vigente a
+# TokenBlacklist (ver dependencias.py::get_current_user) — sin esto, un
+# access token robado antes del logout seguiría siendo válido hasta expirar.
 @router.post("/logout")
 def logout(
     response: Response,
@@ -277,6 +297,10 @@ def logout(
     return {"detail": "Sesión cerrada"}
 
 
+# FIX AUDITORIA_2026-07-24 #4: antes hacía `raise 404` si el usuario no
+# existía, dejando el mensaje genérico de abajo inalcanzable -> permitía
+# enumerar cuentas válidas por status code. Ahora responde 200 siempre,
+# exista o no el usuario. Ver CHANGELOG_FIXES.md.
 @router.post("/recuperar-contrasena")
 @limiter.limit("3/15minutes")
 def recuperar_contrasena(
@@ -296,32 +320,33 @@ def recuperar_contrasena(
         .first()
     )
 
-    if not db_user:
-        raise HTTPException(
-            status_code=404, detail="No se encontró un usuario con ese dato."
+    if db_user:
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        reset_token = PasswordResetToken(
+            usuario_id=db_user.id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
+        db.add(reset_token)
+        db.commit()
 
-    raw_token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        user_name: str = str(db_user.nombre or db_user.username)
+        user_email: str | None = str(db_user.email) if db_user.email else None
+        if user_email:
+            send_reset_link_email_bg(
+                background_tasks, user_email, user_name, raw_token
+            )
 
-    reset_token = PasswordResetToken(
-        usuario_id=db_user.id,
-        token_hash=token_hash,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-    )
-    db.add(reset_token)
-    db.commit()
-
-    user_name: str = str(db_user.nombre or db_user.username)
-    user_email: str | None = str(db_user.email) if db_user.email else None
-    if user_email:
-        send_reset_link_email_bg(
-            background_tasks, user_email, user_name, raw_token
-        )
-
+    # Respuesta genérica siempre — evita user enumeration (existencia de
+    # cuenta no debe ser distinguible por status code ni por contenido).
     return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}
 
 
+# Consume el token de PasswordResetToken (hash + expiry 1h + used) emitido
+# por recuperar_contrasena. Si no valida expiry/used, un link viejo podría
+# reusarse para resetear la contraseña.
 @router.post("/reset-password")
 @limiter.limit("10/minute")
 def reset_password(

@@ -1,3 +1,7 @@
+"""
+Pensum/malla curricular: CRUD de pensum_materias, correlatividades, avance del alumno,
+créditos. Capa HTTP de services/pensum.py — la lógica de validación vive en el service.
+"""
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
