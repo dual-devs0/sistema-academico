@@ -115,7 +115,7 @@ def listar_mis_solicitudes(
         query = query.filter(Solicitud.alumno_id == current_user.user_id)
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
-    solicitudes = query.order_by(Solicitud.fecha_solicitud.desc()).all()
+    solicitudes = query.order_by(Solicitud.fecha_solicitud.desc()).limit(1000).all()
     return [_enrich(s) for s in solicitudes]
 
 

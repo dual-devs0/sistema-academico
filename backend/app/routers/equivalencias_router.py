@@ -46,7 +46,7 @@ def listar_todas_solicitudes(
     q = db.query(SolicitudEquivalencia).options(joinedload(SolicitudEquivalencia.alumno))
     if estado:
         q = q.filter(SolicitudEquivalencia.estado == estado)
-    solicitudes = q.order_by(SolicitudEquivalencia.id.desc()).all()
+    solicitudes = q.order_by(SolicitudEquivalencia.id.desc()).limit(1000).all()
     for s in solicitudes:
         s.alumno_nombre = s.alumno.nombre if s.alumno else None
     return solicitudes
