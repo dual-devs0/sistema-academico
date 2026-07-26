@@ -34,7 +34,7 @@ class SettingAuditLog(Base):
     new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     changed_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), index=True
     )
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

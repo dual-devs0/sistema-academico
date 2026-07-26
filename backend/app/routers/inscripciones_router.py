@@ -7,6 +7,7 @@ se vuelve decorativo (la validación existe pero no se aplica).
 from typing import Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
@@ -211,6 +212,15 @@ def alumnos_por_materia(
                     }
                 )
     return result
+
+
+@router.get("/stats")
+def stats_inscripciones(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    total = db.query(func.count(models.inscripcion.Inscripcion.id)).scalar()
+    return {"total": total or 0}
 
 
 @router.get("/")

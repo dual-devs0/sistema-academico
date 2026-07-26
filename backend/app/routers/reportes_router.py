@@ -66,11 +66,14 @@ def por_carrera(
         .all()
     }
 
-    # 2) Attendance stats per carrera via subquery
-    alumno_ids_por_carrera = {
-        cid: [r[0] for r in db.query(U.id).filter(U.carrera_id == cid, U.role == "alumno").all()]
-        for cid in carrera_ids
-    }
+    # 2) Attendance stats per carrera via subquery (single query, grouped in Python)
+    alumno_ids_por_carrera: dict = {cid: [] for cid in carrera_ids}
+    for cid, uid in (
+        db.query(U.carrera_id, U.id)
+        .filter(U.carrera_id.in_(carrera_ids), U.role == "alumno")
+        .all()
+    ):
+        alumno_ids_por_carrera[cid].append(uid)
 
     # 3) Puntaje stats per carrera using SQL aggregates
     A = models.asistencia.Asistencia

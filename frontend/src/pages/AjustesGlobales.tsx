@@ -76,7 +76,6 @@ const css = `
   .ag-setting-row:last-child { border-bottom:none; }
   .ag-setting-info { flex:1; min-width:0; }
   .ag-setting-label { font-weight:700; font-size:13px; color:var(--text-primary); }
-  .ag-setting-desc { font-size:11px; color:var(--text-secondary); margin-top:2px; }
   .ag-setting-input { width:220px; min-width:140px; flex-shrink:0; }
   .ag-toggle {
     position:relative; display:inline-block; width:44px; height:24px; cursor:pointer;
@@ -105,9 +104,42 @@ const css = `
   .ag-modal { width:100%; max-width:480px; }
   .ag-saved-at { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); }
   .ag-textarea { resize:vertical; font-family:inherit; min-height:60px; }
+  .ag-modal.wide { max-width:640px; }
+  .ag-view-toggle { display:flex; gap:4px; margin-bottom:12px; }
+  .ag-view-toggle button {
+    padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;
+    border:1px solid var(--border-subtle); background:transparent; color:var(--text-secondary);
+  }
+  .ag-view-toggle button.active { background:var(--accent-bright); color:#fff; border-color:var(--accent-bright); }
+  .ag-summary-stat { display:flex; align-items:baseline; gap:8px; margin-bottom:14px; }
+  .ag-summary-stat .num { font-size:28px; font-weight:800; color:var(--text-primary); }
+  .ag-summary-stat .lbl { font-size:12px; color:var(--text-secondary); }
+  .ag-cat-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-subtle); font-size:13px; }
+  .ag-cat-row:last-child { border-bottom:none; }
+  .ag-cat-count { font-weight:700; color:var(--text-primary); background:var(--bg-base); border-radius:8px; padding:2px 10px; font-size:12px; }
+  .ag-diff-list { max-height:320px; overflow-y:auto; }
+  .ag-diff-item { padding:8px 10px; border-radius:10px; margin-bottom:6px; font-size:12px; }
+  .ag-diff-item.changed { background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); }
+  .ag-diff-item.unrecognized { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.25); }
+  .ag-diff-key { font-family:var(--font-mono); font-weight:700; color:var(--text-primary); }
+  .ag-diff-vals { display:flex; align-items:center; gap:6px; margin-top:3px; font-size:11px; }
+  .ag-diff-old { color:var(--text-muted); text-decoration:line-through; }
+  .ag-diff-new { color:#10b981; font-weight:700; }
+  .ag-diff-note { color:#ef4444; font-size:11px; margin-top:2px; }
+  .ag-diff-unchanged-summary { font-size:11px; color:var(--text-muted); padding:6px 2px; cursor:pointer; }
 `
 
 const CATS = ['academico', 'financiero', 'sistema', 'notificaciones', 'auditoria'] as Tab[]
+
+type DiffStatus = 'changed' | 'unchanged' | 'unrecognized'
+
+interface ImportDiffItem {
+  key: string
+  label: string
+  oldValue: string | null
+  newValue: string | null
+  status: DiffStatus
+}
 
 function formatDate(d: string | null | undefined): string {
   if (!d) return '—'
@@ -127,9 +159,17 @@ export default function AjustesGlobales() {
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [showExport, setShowExport] = useState(false)
   const [exportJson, setExportJson] = useState('')
+  const [exportData, setExportData] = useState<SettingsExport | null>(null)
+  const [exportedAt, setExportedAt] = useState<Date | null>(null)
+  const [exportView, setExportView] = useState<'resumen' | 'json'>('resumen')
   const [showImport, setShowImport] = useState(false)
   const [importJson, setImportJson] = useState('')
   const [importing, setImporting] = useState(false)
+  const [preparingPreview, setPreparingPreview] = useState(false)
+  const [showImportPreview, setShowImportPreview] = useState(false)
+  const [previewItems, setPreviewItems] = useState<ImportDiffItem[]>([])
+  const [pendingSettings, setPendingSettings] = useState<GlobalSetting[]>([])
+  const [showUnchanged, setShowUnchanged] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchSettings = useCallback(async (manual = false) => {
@@ -197,19 +237,67 @@ export default function AjustesGlobales() {
   const handleExport = async () => {
     try {
       const data = await exportSettings()
+      setExportData(data)
       setExportJson(JSON.stringify(data, null, 2))
+      setExportedAt(new Date())
+      setExportView('resumen')
       setShowExport(true)
     } catch (e: unknown) {
       emitToast(e instanceof Error ? e.message : 'Error al exportar', 'error')
     }
   }
 
-  const runImport = async (parsed: SettingsExport) => {
+  const closeImportPreview = () => {
+    setShowImportPreview(false)
+    setPreviewItems([])
+    setPendingSettings([])
+    setShowUnchanged(false)
+  }
+
+  const preparePreview = async (parsed: SettingsExport) => {
+    if (!parsed || !Array.isArray(parsed.settings)) {
+      emitToast('El JSON no tiene el formato esperado ({"settings": [...]})', 'error')
+      return
+    }
+    setPreparingPreview(true)
+    try {
+      const current = await getSettings()
+      const currentByKey = new Map(current.map(s => [s.key, s]))
+      const items: ImportDiffItem[] = []
+      const toSend: GlobalSetting[] = []
+      for (const s_in of parsed.settings) {
+        const existing = currentByKey.get(s_in.key)
+        if (!existing) {
+          items.push({ key: s_in.key, label: s_in.key, oldValue: null, newValue: s_in.value, status: 'unrecognized' })
+          continue
+        }
+        toSend.push(s_in)
+        const changed = (existing.value ?? null) !== (s_in.value ?? null)
+        items.push({
+          key: s_in.key,
+          label: existing.descripcion || s_in.key,
+          oldValue: existing.value,
+          newValue: s_in.value,
+          status: changed ? 'changed' : 'unchanged',
+        })
+      }
+      setPreviewItems(items)
+      setPendingSettings(toSend)
+      setShowImport(false)
+      setShowImportPreview(true)
+    } catch (e: unknown) {
+      emitToast(e instanceof Error ? e.message : 'No se pudo preparar la vista previa', 'error')
+    } finally {
+      setPreparingPreview(false)
+    }
+  }
+
+  const confirmImport = async () => {
     setImporting(true)
     try {
-      const result = await importSettings(parsed)
+      const result = await importSettings({ settings: pendingSettings })
       emitToast(`Importados: ${result.imported}, omitidos: ${result.skipped}${result.errors.length ? `, errores: ${result.errors.length}` : ''}`, result.errors.length ? 'warning' : 'success')
-      setShowImport(false)
+      closeImportPreview()
       setImportJson('')
       fetchSettings()
     } catch (e: unknown) {
@@ -224,7 +312,7 @@ export default function AjustesGlobales() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result)) as SettingsExport
-        runImport(parsed)
+        preparePreview(parsed)
       } catch {
         emitToast('El archivo no es un JSON válido', 'error')
       }
@@ -235,7 +323,7 @@ export default function AjustesGlobales() {
   const handleImportPegado = () => {
     try {
       const parsed = JSON.parse(importJson) as SettingsExport
-      runImport(parsed)
+      preparePreview(parsed)
     } catch {
       emitToast('El JSON pegado no es válido', 'error')
     }
@@ -335,9 +423,7 @@ export default function AjustesGlobales() {
           {activeSettings.map(s => (
             <div key={s.key} className="ag-setting-row">
               <div className="ag-setting-info">
-                <div className="ag-setting-label">{s.descripcion || s.key}</div>
-                <div className="ag-setting-key">{s.key}</div>
-                {s.descripcion && <div className="ag-setting-desc">{s.key}</div>}
+                <div className="ag-setting-label" title={s.key}>{s.descripcion || s.key}</div>
               </div>
               <div className="ag-setting-input">
                 {renderInput(s)}
@@ -396,21 +482,49 @@ export default function AjustesGlobales() {
       {/* Export modal */}
       {showExport && (
         <div className="ag-modal-overlay" onClick={() => setShowExport(false)}>
-          <div className="card card-elevated ag-modal" onClick={e => e.stopPropagation()}>
+          <div className="card card-elevated ag-modal wide" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ fontSize: 16, fontWeight: 800 }}>Exportar ajustes</h3>
               <button onClick={() => setShowExport(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
             </div>
-            <textarea className="ag-input ag-textarea" value={exportJson} readOnly rows={12} style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+
+            <div className="ag-view-toggle">
+              <button className={exportView === 'resumen' ? 'active' : ''} onClick={() => setExportView('resumen')}>Resumen</button>
+              <button className={exportView === 'json' ? 'active' : ''} onClick={() => setExportView('json')}>Ver JSON</button>
+            </div>
+
+            {exportView === 'resumen' ? (
+              <div>
+                <div className="ag-summary-stat">
+                  <span className="num">{exportData?.settings.length ?? 0}</span>
+                  <span className="lbl">configuraciones exportadas</span>
+                </div>
+                {CATS.filter(t => t !== 'auditoria').map(t => {
+                  const count = exportData?.settings.filter(s => s.categoria === t).length ?? 0
+                  return (
+                    <div key={t} className="ag-cat-row">
+                      <span><i className={`ti ${ICONOS[t]}`} /> {CATEGORIAS[t]}</span>
+                      <span className="ag-cat-count">{count}</span>
+                    </div>
+                  )
+                })}
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 12 }}>
+                  Exportado: {exportedAt ? formatDate(exportedAt.toISOString()) : '—'}
+                </div>
+              </div>
+            ) : (
+              <textarea className="ag-input ag-textarea" value={exportJson} readOnly rows={12} style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+            )}
+
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-              <button className="ag-btn ghost sm" onClick={() => copyToClipboard(exportJson)}><i className="ti ti-copy" /> Copiar</button>
+              <button className="ag-btn ghost sm" onClick={() => copyToClipboard(exportJson)}><i className="ti ti-copy" /> Copiar JSON</button>
               <button className="ag-btn sm" onClick={() => { const a = document.createElement('a'); a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(exportJson); a.download = 'ajustes_globales.json'; a.click() }}><i className="ti ti-download" /> Descargar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Import modal */}
+      {/* Import modal — paso 1: elegir archivo o pegar JSON */}
       {showImport && (
         <div className="ag-modal-overlay" onClick={() => { setShowImport(false); setImportJson('') }}>
           <div className="card card-elevated ag-modal" onClick={e => e.stopPropagation()}>
@@ -421,17 +535,80 @@ export default function AjustesGlobales() {
             <input ref={fileInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = '' }} />
             <button className="ag-btn ghost" style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}
-              onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              onClick={() => fileInputRef.current?.click()} disabled={preparingPreview}>
               <i className="ti ti-file-upload" /> Elegir archivo .json
             </button>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', margin: '4px 0 10px' }}>— o pegá el JSON —</div>
             <textarea className="ag-input ag-textarea" value={importJson} onChange={e => setImportJson(e.target.value)} placeholder='{"settings": [...]}' rows={8} style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
               <button className="ag-btn ghost sm" onClick={() => { setShowImport(false); setImportJson('') }}>Cancelar</button>
-              <button className="ag-btn sm" disabled={!importJson.trim() || importing} onClick={handleImportPegado}>
-                {importing ? 'Importando…' : 'Importar'}
+              <button className="ag-btn sm" disabled={!importJson.trim() || preparingPreview} onClick={handleImportPegado}>
+                {preparingPreview ? 'Comparando…' : 'Previsualizar'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import modal — paso 2: preview de cambios antes de aplicar */}
+      {showImportPreview && (
+        <div className="ag-modal-overlay" onClick={closeImportPreview}>
+          <div className="card card-elevated ag-modal wide" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800 }}>Vista previa de importación</h3>
+              <button onClick={closeImportPreview} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ti ti-x" /></button>
+            </div>
+
+            {(() => {
+              const changed = previewItems.filter(i => i.status === 'changed')
+              const unchanged = previewItems.filter(i => i.status === 'unchanged')
+              const unrecognized = previewItems.filter(i => i.status === 'unrecognized')
+              return (
+                <div>
+                  <div className="ag-diff-list">
+                    {changed.map(i => (
+                      <div key={i.key} className="ag-diff-item changed">
+                        <div className="ag-diff-key">{i.label}</div>
+                        <div className="ag-diff-vals">
+                          <span className="ag-diff-old">{i.oldValue ?? '—'}</span>
+                          <i className="ti ti-arrow-right" />
+                          <span className="ag-diff-new">{i.newValue ?? '—'}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {unrecognized.map(i => (
+                      <div key={i.key} className="ag-diff-item unrecognized">
+                        <div className="ag-diff-key">{i.key}</div>
+                        <div className="ag-diff-note">No reconocida — se va a ignorar</div>
+                      </div>
+                    ))}
+                    {changed.length === 0 && unrecognized.length === 0 && (
+                      <div className="ag-empty" style={{ padding: 16 }}>No hay cambios para aplicar.</div>
+                    )}
+                  </div>
+
+                  {unchanged.length > 0 && (
+                    <div className="ag-diff-unchanged-summary" onClick={() => setShowUnchanged(v => !v)}>
+                      <i className={`ti ${showUnchanged ? 'ti-chevron-up' : 'ti-chevron-down'}`} /> {unchanged.length} sin cambios
+                      {showUnchanged && (
+                        <div style={{ marginTop: 6 }}>
+                          {unchanged.map(i => (
+                            <div key={i.key} style={{ opacity: 0.6, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px 0' }}>{i.key}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                    <button className="ag-btn ghost sm" onClick={closeImportPreview} disabled={importing}>Cancelar</button>
+                    <button className="ag-btn sm" disabled={changed.length === 0 || importing} onClick={confirmImport}>
+                      {importing ? 'Importando…' : `Confirmar importación de ${changed.length} cambio${changed.length === 1 ? '' : 's'}`}
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ CRUD de materias (catálogo) y creación de ofertas por período. Depende de: mo
 models.oferta_materia — ver separación Materia/OfertaMateria en ARQUITECTURA.md.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
@@ -103,6 +104,68 @@ def create_materia(
     return _enrich(new_materia, db)
 
 
+def _enrich_batch(materias: list, db: Session) -> list:
+    """Misma salida que _enrich(), pero en 4 queries fijas en vez de hasta 4×N."""
+    if not materias:
+        return []
+    materia_ids = [m.id for m in materias]
+    ofertas = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(
+            models.oferta_materia.OfertaMateria.materia_id.in_(materia_ids),
+            models.oferta_materia.OfertaMateria.activa == True,  # noqa: E712
+        )
+        .all()
+    )
+    oferta_por_materia = {o.materia_id: o for o in ofertas}
+
+    profesor_ids = {o.profesor_id for o in ofertas if o.profesor_id}
+    profesores = {
+        u.id: u
+        for u in db.query(models.user.User).filter(models.user.User.id.in_(profesor_ids)).all()
+    } if profesor_ids else {}
+
+    carrera_ids = {m.carrera_id for m in materias if m.carrera_id}
+    carreras = {
+        c.id: c
+        for c in db.query(models.carrera.Carrera).filter(models.carrera.Carrera.id.in_(carrera_ids)).all()
+    } if carrera_ids else {}
+
+    oferta_ids = [o.id for o in ofertas]
+    inscritos_por_oferta: dict = {}
+    if oferta_ids:
+        for oferta_id, cnt in (
+            db.query(models.inscripcion.Inscripcion.oferta_materia_id, func.count())
+            .filter(models.inscripcion.Inscripcion.oferta_materia_id.in_(oferta_ids))
+            .group_by(models.inscripcion.Inscripcion.oferta_materia_id)
+            .all()
+        ):
+            inscritos_por_oferta[oferta_id] = cnt
+
+    result = []
+    for m in materias:
+        oferta = oferta_por_materia.get(m.id)
+        prof = profesores.get(oferta.profesor_id) if oferta else None
+        carrera = carreras.get(m.carrera_id) if m.carrera_id else None
+        result.append({
+            "id": m.id,
+            "nombre": m.nombre,
+            "codigo": m.codigo,
+            "profesor_id": oferta.profesor_id if oferta else None,
+            "carrera_id": m.carrera_id,
+            "anio": m.anio,
+            "semestre": m.semestre,
+            "creditos": m.creditos,
+            "cupos": m.cupos,
+            "horario": m.horario,
+            "secciones": m.secciones,
+            "inscritos": inscritos_por_oferta.get(oferta.id, 0) if oferta else 0,
+            "profesor_nombre": (prof.nombre or prof.username) if prof else None,
+            "carrera_nombre": carrera.nombre if carrera else None,
+        })
+    return result
+
+
 @router.get("/")
 def list_materias(
     profesor_id: Optional[int] = Query(None),
@@ -124,7 +187,7 @@ def list_materias(
     if carrera_id is not None:
         query = query.filter(models.materia.Materia.carrera_id == carrera_id)
     query = query.order_by(models.materia.Materia.id).offset(skip).limit(limit)
-    return [_enrich(m, db) for m in query.all()]
+    return _enrich_batch(query.all(), db)
 
 
 @router.get("/stats")

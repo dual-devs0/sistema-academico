@@ -3,7 +3,7 @@ Ajustes globales editables por admin (GlobalSetting) + auditoría de cada cambio
 (SettingAuditLog) — export/import para respaldo. Todo cambio queda registrado con quién y cuándo.
 """
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app import models, database
 from app.dependencias import get_current_user, require_role
@@ -132,7 +132,7 @@ def update_setting(
 @router.get("/audit/list", response_model=list[SettingAuditLogOut])
 def list_audit_log(
     setting_key: str | None = None,
-    limit: int = 50,
+    limit: int = Query(50, le=200),
     offset: int = 0,
     db: Session = Depends(database.get_db),
     _=Depends(require_role("admin")),

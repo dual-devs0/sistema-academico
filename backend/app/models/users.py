@@ -18,7 +18,7 @@ class User(Base):
     nombre: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     email: Mapped[Optional[str]] = mapped_column(String(200), unique=True, nullable=True)
     cedula: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    carrera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carreras.id", ondelete="SET NULL"), nullable=True)
+    carrera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carreras.id", ondelete="SET NULL"), nullable=True, index=True)
     es_becado: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     foto_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 

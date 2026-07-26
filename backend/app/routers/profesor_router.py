@@ -79,14 +79,14 @@ def profesor_dashboard(
         resumen["promedio_general"] = round(suma_ponderada / total_notas, 2)
 
     # % aprobación
-    aprob_count = 0
-    total_est = 0
-    for ofid in oferta_ids:
-        rows = db.query(P.user_id, func.avg(P.valor).label("prom")).filter(
-            P.oferta_materia_id == ofid
-        ).group_by(P.user_id).all()
-        total_est += len(rows)
-        aprob_count += sum(1 for r in rows if r.prom is not None and r.prom >= 6)
+    prom_rows = (
+        db.query(P.oferta_materia_id, P.user_id, func.avg(P.valor).label("prom"))
+        .filter(P.oferta_materia_id.in_(oferta_ids))
+        .group_by(P.oferta_materia_id, P.user_id)
+        .all()
+    )
+    total_est = len(prom_rows)
+    aprob_count = sum(1 for r in prom_rows if r.prom is not None and r.prom >= 6)
     if total_est > 0:
         resumen["porcentaje_aprobacion"] = round(aprob_count / total_est * 100, 1)
 

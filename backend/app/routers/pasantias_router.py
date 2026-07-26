@@ -97,7 +97,7 @@ def listar_solicitudes(
         q = q.filter(Pasantia.alumno_id == current_user.user_id)
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
-    return q.order_by(Pasantia.fecha_inicio.desc()).all()
+    return q.order_by(Pasantia.fecha_inicio.desc()).limit(1000).all()
 
 
 @router.post(
