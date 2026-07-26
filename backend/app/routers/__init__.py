@@ -28,6 +28,7 @@ from . import notificaciones_router as notificaciones
 from . import notas_router as notas
 from . import admin_router as admin
 from . import settings_router as settings
+from . import foro_router as foro
 
 __all__ = [
     "users",
@@ -59,4 +60,5 @@ __all__ = [
     "admin",
     "settings",
     "test",
+    "foro",
 ]

@@ -65,7 +65,7 @@ def send_password_reset_email_bg(
     user_name: str,
 ) -> None:
     if not _credentials_configured():
-        print(f"Mock Email sent to {email_to}: Password was reset by admin")
+        logger.info("Mock Email sent to %s: Password was reset by admin", email_to)
         return
 
     html = f"""
@@ -91,7 +91,7 @@ def send_reset_link_email_bg(
 ) -> None:
     reset_link = f"{RESET_PASSWORD_FRONTEND_URL}?token={token}"
     if not _credentials_configured():
-        print(f"Mock Email sent to {email_to}: Reset link {reset_link}")
+        logger.info("Mock Email sent to %s: Reset link %s", email_to, reset_link)
         return
 
     html = f"""
@@ -119,7 +119,7 @@ def send_welcome_email_bg(
     user_name: str,
 ) -> None:
     if not _credentials_configured():
-        print(f"Mock Email sent to {email_to}: Welcome {user_name}")
+        logger.info("Mock Email sent to %s: Welcome %s", email_to, user_name)
         return
 
     html = f"""
@@ -146,8 +146,9 @@ def send_new_grade_email_bg(
     valor_nota: float,
 ) -> None:
     if not _credentials_configured():
-        print(
-            f"Mock Email sent to {email_to}: Grade {valor_nota} in {materia_name} ({tipo_nota})"  # noqa: E501
+        logger.info(
+            "Mock Email sent to %s: Grade %s in %s (%s)",
+            email_to, valor_nota, materia_name, tipo_nota,
         )
         return
 
@@ -176,9 +177,9 @@ def send_alerta_inasistencia_email_bg(
     if not emails_to:
         return
     if not _credentials_configured():
-        print(
-            f"Mock Email sent to {emails_to}: Alerta inasistencia {alumno_nombre} "
-            f"en {materia_nombre} ({porcentaje}%)"
+        logger.info(
+            "Mock Email sent to %s: Alerta inasistencia %s en %s (%.1f%%)",
+            emails_to, alumno_nombre, materia_nombre, porcentaje,
         )
         return
 

@@ -1,3 +1,4 @@
+import os
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -16,8 +17,11 @@ SECURITY_HEADERS = {
         "font-src 'self' data: https://cdn.jsdelivr.net; "
         "connect-src 'self' https://cdn.jsdelivr.net"
     ),
-    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 }
+
+_IS_PRODUCTION = os.getenv("ENV", "production") == "production"
+if _IS_PRODUCTION:
+    SECURITY_HEADERS["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

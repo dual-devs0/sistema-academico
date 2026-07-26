@@ -184,6 +184,11 @@ def cuotas_alumno(
 ):
     if current_user.role != "admin" and current_user.user_id != alumno_id:
         raise HTTPException(status_code=403, detail="No autorizado")
+    query = db.query(Cuota).filter(Cuota.alumno_id == alumno_id)
+    if estado:
+        query = query.filter(Cuota.estado == estado)
+    cuotas = query.order_by(Cuota.fecha_vencimiento.desc()).all()
+    return [cuota_to_out(c) for c in cuotas]
 
 
 # ── Pagos ─────────────────────────────────────────────────────────────
