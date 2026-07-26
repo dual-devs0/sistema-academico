@@ -76,7 +76,6 @@ const css = `
   .ag-setting-row:last-child { border-bottom:none; }
   .ag-setting-info { flex:1; min-width:0; }
   .ag-setting-label { font-weight:700; font-size:13px; color:var(--text-primary); }
-  .ag-setting-desc { font-size:11px; color:var(--text-secondary); margin-top:2px; }
   .ag-setting-input { width:220px; min-width:140px; flex-shrink:0; }
   .ag-toggle {
     position:relative; display:inline-block; width:44px; height:24px; cursor:pointer;
@@ -424,9 +423,7 @@ export default function AjustesGlobales() {
           {activeSettings.map(s => (
             <div key={s.key} className="ag-setting-row">
               <div className="ag-setting-info">
-                <div className="ag-setting-label">{s.descripcion || s.key}</div>
-                <div className="ag-setting-key">{s.key}</div>
-                {s.descripcion && <div className="ag-setting-desc">{s.key}</div>}
+                <div className="ag-setting-label" title={s.key}>{s.descripcion || s.key}</div>
               </div>
               <div className="ag-setting-input">
                 {renderInput(s)}
