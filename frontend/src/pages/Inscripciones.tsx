@@ -446,13 +446,13 @@ function AdminView() {
 
   async function fetchGlobalStats() {
     try {
-      const [s, allIns] = await Promise.all([
+      const [s, insStats] = await Promise.all([
         api.get<{ total_materias?: number }>('/materias/stats'),
-        api.get<unknown[]>('/inscripciones/'),
+        api.get<{ total?: number }>('/inscripciones/stats'),
       ])
       setGlobalStats({
         materias: s.total_materias ?? 0,
-        inscriptos: Array.isArray(allIns) ? allIns.length : 0,
+        inscriptos: insStats.total ?? 0,
       })
     } catch { /* ignore */ }
   }
