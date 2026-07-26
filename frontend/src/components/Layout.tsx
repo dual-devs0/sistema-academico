@@ -189,8 +189,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const bottomNav = bottomNavByRole[role ?? 'alumno']
 
   useEffect(() => {
-    document.title = 'Universidad Católica Caacupé'
-  }, [])
+    document.title = role === 'admin' ? 'UCA Caacupé - Administrador' : 'Universidad Católica Caacupé'
+  }, [role])
 
   useEffect(() => {
     const onHelp = () => setHelpOpen(true)
