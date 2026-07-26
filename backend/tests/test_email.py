@@ -71,15 +71,16 @@ async def test_send_with_retry_gives_up_after_max_attempts():
 # ---------------------------------------------------------------------------
 
 
-def test_password_reset_email_mocked_when_no_credentials(capsys):
+def test_password_reset_email_mocked_when_no_credentials(caplog):
+    import logging
+    caplog.set_level(logging.INFO)
     from app.email_utils import send_password_reset_email_bg
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
         send_password_reset_email_bg(bg, "test@example.com", "Juan")
 
-    captured = capsys.readouterr()
-    assert "Mock" in captured.out
+    assert "Mock Email" in caplog.text
     assert len(bg.tasks) == 0  # no se agregó tarea real
 
 
@@ -98,16 +99,17 @@ def test_password_reset_email_queues_task_when_credentials_present():
 # ---------------------------------------------------------------------------
 
 
-def test_reset_link_email_mocked_when_no_credentials(capsys):
+def test_reset_link_email_mocked_when_no_credentials(caplog):
+    import logging
+    caplog.set_level(logging.INFO)
     from app.email_utils import send_reset_link_email_bg
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
         send_reset_link_email_bg(bg, "test@example.com", "Juan", "tokendeprueba123")
 
-    captured = capsys.readouterr()
-    assert "Mock" in captured.out
-    assert "tokendeprueba123" in captured.out
+    assert "Mock Email" in caplog.text
+    assert "tokendeprueba123" in caplog.text
     assert len(bg.tasks) == 0
 
 
@@ -126,16 +128,17 @@ def test_reset_link_email_queues_task_when_credentials_present():
 # ---------------------------------------------------------------------------
 
 
-def test_welcome_email_mocked_when_no_credentials(capsys):
+def test_welcome_email_mocked_when_no_credentials(caplog):
+    import logging
+    caplog.set_level(logging.INFO)
     from app.email_utils import send_welcome_email_bg
 
     bg = BackgroundTasks()
     with patch.dict("os.environ", {"MAIL_PASSWORD": "dummy"}, clear=False):
         send_welcome_email_bg(bg, "test@example.com", "Juan")
 
-    captured = capsys.readouterr()
-    assert "Mock" in captured.out
-    assert "Juan" in captured.out
+    assert "Mock Email" in caplog.text
+    assert "Juan" in caplog.text
     assert len(bg.tasks) == 0
 
 
@@ -154,7 +157,9 @@ def test_welcome_email_queues_task_when_credentials_present():
 # ---------------------------------------------------------------------------
 
 
-def test_grade_email_mocked_when_no_credentials(capsys):
+def test_grade_email_mocked_when_no_credentials(caplog):
+    import logging
+    caplog.set_level(logging.INFO)
     from app.email_utils import send_new_grade_email_bg
 
     bg = BackgroundTasks()
@@ -163,8 +168,7 @@ def test_grade_email_mocked_when_no_credentials(capsys):
             bg, "test@example.com", "Juan", "Matemáticas", "parcial1", 8.5
         )
 
-    captured = capsys.readouterr()
-    assert "Mock" in captured.out
+    assert "Mock Email" in caplog.text
     assert len(bg.tasks) == 0
 
 

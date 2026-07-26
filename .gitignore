@@ -2,7 +2,6 @@
 .env
 .env.local
 .env.production
-.env.test
 
 # Dependencias
 node_modules/
