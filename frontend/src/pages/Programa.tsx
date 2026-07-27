@@ -40,6 +40,15 @@ const css = `
     border-bottom:1px solid #2a3040; background:var(--bg-base);
     position:sticky; top:0; z-index:20; flex-shrink:0;
   }
+  /* main (Layout) tiene su propio padding-top: el contenido scrollable puede
+     "asomarse" por esa franja porque un elemento sticky solo llega hasta el
+     padding-edge del contenedor con scroll, nunca hasta su border-edge. Este
+     pseudo-elemento extiende el fondo opaco del topbar hacia arriba para tapar
+     esa franja sin tocar el layout/alto real de la barra. */
+  .topbar::before {
+    content:''; position:absolute; left:0; right:0; bottom:100%; height:24px;
+    background:var(--bg-base);
+  }
   .topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; }
   .rol-badge {
     display:inline-flex; align-items:center; gap:5px;
