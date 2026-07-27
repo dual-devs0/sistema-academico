@@ -739,6 +739,7 @@ def profesor_alumnos(
     alumnos = (
         db.query(models.user.User)
         .filter(models.user.User.id.in_(alumno_ids))
+        .order_by(models.user.User.nombre)
         .all()
     )
 

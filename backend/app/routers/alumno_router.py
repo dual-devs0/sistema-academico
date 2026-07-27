@@ -114,6 +114,7 @@ def mis_materias(
             "semestre": m.semestre,
             "oferta_periodo": oferta.periodo,
         })
+    result.sort(key=lambda r: r["nombre"])
     return result
 
 
@@ -225,6 +226,7 @@ def mi_asistencia(
             }
         )
 
+    result.sort(key=lambda r: r["materia_nombre"])
     return result
 
 
