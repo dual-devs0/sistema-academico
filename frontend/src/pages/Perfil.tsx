@@ -281,7 +281,7 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
       <div className="card pf-hero" style={{ marginBottom: 20 }}>
         <div style={{ position: 'relative' }}>
           {fotoUrl ? (
-            <img src={fotoUrl} alt={nombre} style={{ width: 96, height: 96, borderRadius: 22, objectFit: 'cover', display: 'block' }} />
+            <img src={fotoUrl} alt={nombre} width={96} height={96} loading="lazy" style={{ width: 96, height: 96, borderRadius: 22, objectFit: 'cover', display: 'block' }} />
           ) : (
             <div className="avatar-initials" style={{ width: 96, height: 96, borderRadius: 22, fontSize: 32 }}>
               {(nombre || '?').slice(0, 2)}
@@ -541,7 +541,7 @@ function PerfilProfesor({ userId }: { userId: number }) {
       <div className="card" style={{ marginBottom: 20, display:'flex', gap:22, alignItems:'center', flexWrap:'wrap' }}>
         <div style={{ position:'relative', flexShrink:0 }}>
           {fotoUrl ? (
-            <img src={fotoUrl} alt={nombre} style={{ width:104, height:104, borderRadius:24, objectFit:'cover', border:'2px solid var(--accent-hover)', display:'block' }} />
+            <img src={fotoUrl} alt={nombre} width={104} height={104} loading="lazy" style={{ width:104, height:104, borderRadius:24, objectFit:'cover', border:'2px solid var(--accent-hover)', display:'block' }} />
           ) : (
             <div className="avatar-initials" style={{ width:104, height:104, borderRadius:24, fontSize:34, border:'2px solid var(--accent-hover)' }}>
               {(nombre || '?').slice(0, 2)}
