@@ -1042,6 +1042,7 @@ function estadoNota(p: number | null): { label: string; bg: string; color: strin
 }
 
 function AsistenciaTab({ userId }: { userId: number }) {
+  const navigate = useNavigate()
   const [periodos, setPeriodos] = useState<{ anio: number; semestre: number }[]>([])
   const [periodoSel, setPeriodoSel] = useState<string>('actual')
   const [materias, setMaterias] = useState<MateriaPeriodo[]>([])
@@ -1182,14 +1183,19 @@ function AsistenciaTab({ userId }: { userId: number }) {
   /* ── LISTA (dashboard + cards circulares) ── */
   return (
     <div>
-      {periodos.length > 0 && (
-        <select className="periodo-select" value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
-          <option value="actual">Período actual</option>
-          {periodos.map(p => (
-            <option key={`${p.anio}-${p.semestre}`} value={`${p.anio}-${p.semestre}`}>{p.anio}° Año — {p.semestre}° Semestre</option>
-          ))}
-        </select>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: periodos.length > 0 ? 0 : 16 }}>
+        {periodos.length > 0 ? (
+          <select className="periodo-select" value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
+            <option value="actual">Período actual</option>
+            {periodos.map(p => (
+              <option key={`${p.anio}-${p.semestre}`} value={`${p.anio}-${p.semestre}`}>{p.anio}° Año — {p.semestre}° Semestre</option>
+            ))}
+          </select>
+        ) : <div />}
+        <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12.5 }} onClick={() => navigate('/asistencia/scan')}>
+          <i className="ti ti-qrcode" /> Escanear QR
+        </button>
+      </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
