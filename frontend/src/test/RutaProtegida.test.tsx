@@ -79,6 +79,46 @@ describe('RutaProtegida', () => {
     })
   })
 
+  it('página restaurada desde bfcache (pageshow persisted) → fuerza reload', async () => {
+    _currentUser = { username: 'admin', role: 'admin', user_id: 1 }
+    sessionStorage.setItem('session_active', '1')
+    const reloadSpy = vi.fn()
+    const originalLocation = window.location
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, reload: reloadSpy },
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/usuarios']}>
+        <Routes>
+          <Route
+            path="/usuarios"
+            element={
+              <RutaProtegida path="/usuarios">
+                <div>contenido admin</div>
+              </RutaProtegida>
+            }
+          />
+          <Route path="/login" element={<div>PAGINA_LOGIN</div>} />
+          <Route path="/dashboard" element={<div>PAGINA_DASHBOARD</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('contenido admin')).toBeInTheDocument()
+    })
+
+    expect(reloadSpy).not.toHaveBeenCalled()
+    const ev = new Event('pageshow')
+    Object.defineProperty(ev, 'persisted', { value: true })
+    window.dispatchEvent(ev)
+
+    expect(reloadSpy).toHaveBeenCalled()
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+  })
+
   it('con auth y rol permitido → renderiza children', async () => {
     _currentUser = { username: 'admin', role: 'admin', user_id: 1 }
     sessionStorage.setItem('session_active', '1')

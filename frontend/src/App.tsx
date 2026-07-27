@@ -85,6 +85,17 @@ export function RutaProtegida({ path, children }: { path: string; children: Reac
     })
   }, [status])
 
+  // Si el navegador restaura esta página protegida desde bfcache (ej. botón
+  // "atrás" tras un logout), recargar fuerza a revalidar auth desde cero en
+  // vez de mostrar el DOM/estado en memoria de la sesión ya cerrada.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) window.location.reload()
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
   const permitidos = rolesPermitidos[path] || []
 
   if (status === 'loading') return null  // breve flash mientras refresca token

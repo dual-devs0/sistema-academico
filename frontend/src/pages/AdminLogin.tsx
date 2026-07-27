@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
-import logoUCA from '../assets/uc_logo_sist_academico.png'
+import logoUCA from '../assets/uc_logo_sist_academico.webp'
 import { api, decodeToken, setAccessToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
@@ -72,7 +72,7 @@ export default function AdminLogin() {
     }
     .panel-deco-bg {
       position: absolute; inset: 0; z-index: 0;
-      background-image: url('/campus.png');
+      background-image: url('/campus.webp');
       background-size: cover; background-position: center;
       filter: contrast(1.1) brightness(0.9);
       transform: scale(1.05);
@@ -227,7 +227,7 @@ export default function AdminLogin() {
         {/* DESKTOP LEFT / MOBILE BOTTOM: FORM PANEL */}
         <div className="panel-form">
           <div className="form-header">
-            <img src={logoUCA} alt="UCA Admin" className="form-logo" />
+            <img src={logoUCA} alt="UCA Admin" className="form-logo" width={560} height={305} />
           </div>
 
           <div className="form-content">
@@ -306,7 +306,7 @@ export default function AdminLogin() {
           <div className="panel-deco-content">
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-                <img src="/icono web.png" alt="UC" style={{ width: 56, height: 56, borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', objectFit: 'cover', boxShadow: '0 8px 16px rgba(0,0,0,0.3)' }} />
+                <img src="/icono-web.webp" alt="UC" width={56} height={56} style={{ width: 56, height: 56, borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', objectFit: 'cover', boxShadow: '0 8px 16px rgba(0,0,0,0.3)' }} />
                 <div>
                   <p style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>Unidad Pedagógica</p>
                   <p style={{ fontSize: 13, color: 'var(--cyan-bright)', fontWeight: 500 }}>Sede Caacupé</p>

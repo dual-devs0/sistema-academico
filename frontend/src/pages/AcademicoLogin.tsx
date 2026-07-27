@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence, useInView } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import logoUCA from '../assets/uc_logo_sist_academico.png'
+import logoUCA from '../assets/uc_logo_sist_academico.webp'
 import { api, decodeToken, setAccessToken } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
@@ -157,7 +157,7 @@ export default function AcademicoLogin() {
     }
     .panel-left-bg {
       position:absolute; inset:0; z-index:0;
-      background-image: url('/campus.png');
+      background-image: url('/campus.webp');
       background-size:cover; background-position:center;
     }
     .panel-left-overlay {
@@ -508,7 +508,7 @@ export default function AcademicoLogin() {
           <div className="panel-left-overlay-accent" />
           <div className="panel-left-content">
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <img src="/icono web.png" alt="UC" style={{ width:52, height:52, borderRadius:'50%', border:'2px solid rgba(255,255,255,.2)', objectFit:'cover', flexShrink:0 }} />
+              <img src="/icono-web.webp" alt="UC" width={52} height={52} style={{ width:52, height:52, borderRadius:'50%', border:'2px solid rgba(255,255,255,.2)', objectFit:'cover', flexShrink:0 }} />
               <div>
                 <p style={{ fontSize:17, fontWeight:700, color:'#fff', lineHeight:1.2 }}>Sist. Académico</p>
                 <p style={{ fontSize:11, color:'rgba(255,255,255,.75)', fontWeight:500 }}>UCA — Unidad Pedagógica Caacupé</p>
@@ -529,7 +529,7 @@ export default function AcademicoLogin() {
         {/* RIGHT */}
         <div className="panel-right">
           <div className="pr-logo">
-            <img src={logoUCA} alt="Universidad Católica" style={{ width:210, maxWidth:'100%', height:'auto', opacity:0.95 }} />
+            <img src={logoUCA} alt="Universidad Católica" width={560} height={305} style={{ width:210, maxWidth:'100%', height:'auto', opacity:0.95 }} />
           </div>
 
           <div className="pr-scroll">

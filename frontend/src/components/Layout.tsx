@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { getRole, getUsername } from '../hooks/useRole'
 import { api } from '../lib/api'
-import logoUCA from '../assets/uc_logo_sist_academico.png'
+import logoUCA from '../assets/uc_logo_sist_academico.webp'
 
 type MenuItem = { label: string; path: string; icon: string; group?: string }
 
@@ -356,14 +356,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className={`layout-sidebar${mobileOpen ? ' mobile-open' : ''}`}>
           {/* Logo */}
           <div className="sidebar-header">
-            <img src={logoUCA} alt="Universidad Católica - Unidad Pedagógica de Caacupé" className="sidebar-logo" />
+            <img src={logoUCA} alt="Universidad Católica - Unidad Pedagógica de Caacupé" className="sidebar-logo" width={560} height={305} />
             <span className="sidebar-title">Sistema Académico</span>
           </div>
 
           {/* Usuario chip */}
           <div style={{ margin: '0 12px 14px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
             {fotoUrl ? (
-              <img src={fotoUrl} alt={username} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              <img src={fotoUrl} alt={username} width={34} height={34} loading="lazy" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
               <div className="avatar-initials" style={{ width: 34, height: 34, fontSize: 13 }}>
                 {(username || '?').slice(0, 2)}
@@ -492,7 +492,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button onClick={() => navigate('/perfil')} aria-label="Perfil"
                 className={fotoUrl ? '' : 'avatar-initials'}
                 style={{ width: 34, height: 34, fontSize: 12, border: '1px solid var(--border-light)', cursor: 'pointer', borderRadius: '50%', overflow: 'hidden', padding: 0, background: 'none' }}>
-                {fotoUrl ? <img src={fotoUrl} alt={username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (username || '?').slice(0, 2)}
+                {fotoUrl ? <img src={fotoUrl} alt={username} width={34} height={34} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (username || '?').slice(0, 2)}
               </button>
             </div>
           </div>
