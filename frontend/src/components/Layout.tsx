@@ -76,6 +76,7 @@ const iconOverride: Record<string, React.ComponentType<{ size?: number }>> = {
 const menuAlumno: MenuItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: 'ti-layout-dashboard', group: 'Principal' },
   { label: 'Calendario', path: '/calendario', icon: 'ti-calendar', group: 'Principal' },
+  { label: 'Escanear QR', path: '/asistencia/scan', icon: 'ti-qrcode', group: 'Principal' },
 
   { label: 'Cursos', path: '/programa', icon: 'ti-school', group: 'Académico' },
   { label: 'Boleta', path: '/boleta', icon: 'ti-file-text', group: 'Académico' },
@@ -132,30 +133,6 @@ const menuAdmin: MenuItem[] = [
   { label: 'Ajustes Globales', path: '/ajustes-globales', icon: 'ti-settings' },
 ]
 
-const bottomNavByRole: Record<string, MenuItem[]> = {
-  alumno: [
-    { label: 'Inicio', path: '/dashboard', icon: 'ti-layout-dashboard' },
-    { label: 'Cursos', path: '/programa', icon: 'ti-school' },
-    { label: 'QR', path: '/asistencia/scan', icon: 'ti-qrcode' },
-    { label: 'Calendario', path: '/calendario', icon: 'ti-calendar-event' },
-    { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
-  ],
-  profesor: [
-    { label: 'Inicio', path: '/dashboard', icon: 'ti-layout-dashboard' },
-    { label: 'Materias', path: '/mis-materias', icon: 'ti-book-2' },
-    { label: 'QR', path: '/asistencia', icon: 'ti-qrcode' },
-    { label: 'Notas', path: '/puntajes', icon: 'ti-certificate' },
-    { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
-  ],
-  admin: [
-    { label: 'Inicio', path: '/dashboard', icon: 'ti-layout-dashboard' },
-    { label: 'Usuarios', path: '/usuarios', icon: 'ti-users' },
-    { label: 'Asignaciones', path: '/gestion-asignaciones', icon: 'ti-binary-tree' },
-    { label: 'Reportes', path: '/reportes', icon: 'ti-report' },
-    { label: 'Ajustes', path: '/perfil', icon: 'ti-settings' },
-  ],
-}
-
 const roleLabel: Record<string, string> = {
   alumno: 'Estudiante',
   profesor: 'Profesor',
@@ -186,7 +163,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const role = getRole()
   const username = getUsername()
   const menuItems = getMenuPorRol(role)
-  const bottomNav = bottomNavByRole[role ?? 'alumno']
 
   useEffect(() => {
     document.title = role === 'admin' ? 'UCA Caacupé - Administrador' : 'Universidad Católica Caacupé'
@@ -280,7 +256,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           gap: 12px; padding: 0 22px;
           background: #0e1015; border-bottom: 1px solid var(--border-subtle);
         }
-        .layout-bottomnav { display: none; }
         .topbar-menu-btn { display: none; }
 
         .side-item {
@@ -313,7 +288,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         @media (max-width: 768px) {
           .layout-root { display: block !important; }
           .layout-main { padding: 0 !important; width: 100% !important; max-width: 100vw !important; height: 100% !important; }
-          .layout-main main { padding: 16px 12px 84px !important; width: 100% !important; box-sizing: border-box; }
+          .layout-main main { padding: 16px 12px 20px !important; width: 100% !important; box-sizing: border-box; }
           .topbar-menu-btn { display: flex !important; }
           .sidebar-header { padding: 16px 12px 12px; }
           .sidebar-logo { width: 140px; }
@@ -330,21 +305,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             display: block; position: fixed; inset: 0; z-index: 99;
             background: rgba(0,0,0,0.6);
           }
-          .layout-bottomnav {
-            display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
-            height: 62px; background: #0e1015;
-            border-top: 1px solid var(--border-subtle);
-            justify-content: space-around; align-items: stretch;
-            padding-bottom: env(safe-area-inset-bottom);
-          }
-          .layout-bottomnav-qr {
-            width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            background: linear-gradient(135deg, var(--accent), var(--accent-bright));
-            color: #fff; border: 4px solid #0e1015; cursor: pointer;
-            transform: translateY(-16px); box-shadow: 0 6px 18px var(--accent-hover);
-          }
-          .layout-bottomnav-qr i { font-size: 22px; }
         }
       `}</style>
 
@@ -501,33 +461,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </div>
-
-        {/* ── Bottom nav mobile ── */}
-        <nav className="layout-bottomnav">
-          {bottomNav.map(item => {
-            const active = location.pathname === item.path
-            if (item.icon === 'ti-qrcode') {
-              return (
-                <button key={item.path} onClick={() => navigate(item.path)}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}>
-                  <span className="layout-bottomnav-qr"><i className={`ti ${item.icon}`} /></span>
-                </button>
-              )
-            }
-            return (
-              <button key={item.path} onClick={() => navigate(item.path)}
-                style={{
-                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  justifyContent: 'center', gap: 2, border: 'none', background: 'transparent',
-                  color: active ? 'var(--accent-bright)' : 'var(--text-muted)', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)',
-                }}>
-                <i className={`ti ${item.icon}`} style={{ fontSize: 20 }} />
-                <span style={{ fontSize: 9, fontWeight: active ? 700 : 400 }}>{item.label}</span>
-              </button>
-            )
-          })}
-        </nav>
       </div>
 
       {/* Modal confirmación cerrar sesión */}

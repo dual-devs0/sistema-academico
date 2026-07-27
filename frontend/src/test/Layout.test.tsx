@@ -51,10 +51,10 @@ describe('Layout — menú por rol', () => {
     expect(sideItems.length).toBe(16)
   })
 
-  it('rol alumno renderiza 15 side items', () => {
+  it('rol alumno renderiza 16 side items', () => {
     renderLayout('alumno')
     const sideItems = document.querySelectorAll('button.side-item')
-    expect(sideItems.length).toBe(15)
+    expect(sideItems.length).toBe(16)
   })
 
   it('rol profesor renderiza 8 side items', () => {
