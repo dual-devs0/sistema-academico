@@ -1,8 +1,8 @@
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
-import Animated, { useSharedValue } from "react-native-reanimated";
+import Animated, { useSharedValue, useAnimatedScrollHandler } from "react-native-reanimated";
 import { BottomTabBar, QrFab } from "../../components/ui/BottomTabBar";
 import { useTheme } from "../../hooks/useTheme";
 import {
@@ -11,7 +11,8 @@ import {
 } from "../../hooks/useHideOnScroll";
 import { TabNavigationContext } from "../../hooks/TabNavigationContext";
 import type { TabKey } from "../../hooks/TabNavigationContext";
-import { registerGoToFirstTab } from "../../utils/currentTab";
+import { registerGoToFirstTab, setActiveTabIndex } from "../../utils/currentTab";
+import { fetchPerfil } from "../../services/dashboardService";
 import DashboardScreen from "./index";
 import CursosTab from "./cursos";
 import HorarioScreen from "./horario";
@@ -30,6 +31,12 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { scrollHandler, barStyle, setBarHeight, resetBar } = useHideOnScroll();
   const contentBottomPadding = 120 + insets.bottom;
+  const { width: screenWidth } = useWindowDimensions();
+
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => {
+    fetchPerfil().then((u) => setRole(u.role)).catch(() => {});
+  }, []);
 
   const [activeTab, setActiveTab] = useState<TabKey>("index");
   const activeTabRef = useRef(activeTab);
@@ -37,9 +44,27 @@ export default function TabsLayout() {
     activeTabRef.current = activeTab;
   }, [activeTab]);
 
+  const scrollX = useSharedValue(0);
   const scrollProgress = useSharedValue<number | null>(null);
+  const scrollRef = useRef<Animated.ScrollView>(null);
 
-  const screenIndex = SCREENS.findIndex(s => s.key === activeTab);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+      scrollProgress.value = event.contentOffset.x / screenWidth;
+    },
+  });
+
+  const onMomentumEnd = useCallback(() => {
+    const page = Math.round(scrollX.value / screenWidth);
+    const tab = SCREENS[page]?.key;
+    if (tab && tab !== activeTabRef.current) {
+      activeTabRef.current = tab;
+      setActiveTab(tab);
+      setActiveTabIndex(page);
+      resetBar();
+    }
+  }, [screenWidth, resetBar]);
 
   const onTabChange = useCallback(
     (tab: TabKey) => {
@@ -47,14 +72,19 @@ export default function TabsLayout() {
       if (index >= 0 && tab !== activeTabRef.current) {
         activeTabRef.current = tab;
         setActiveTab(tab);
+        setActiveTabIndex(index);
         resetBar();
+        scrollRef.current?.scrollTo({ x: index * screenWidth, animated: true });
       }
     },
-    [resetBar],
+    [screenWidth, resetBar],
   );
 
   useEffect(() => {
-    registerGoToFirstTab(() => setActiveTab("index"));
+    registerGoToFirstTab(() => {
+      setActiveTab("index");
+      scrollRef.current?.scrollTo({ x: 0, animated: true });
+    });
     return () => registerGoToFirstTab(null);
   }, []);
 
@@ -67,23 +97,34 @@ export default function TabsLayout() {
     <TabNavigationContext.Provider value={onTabChange}>
     <TabBarScrollContext.Provider value={scrollContextValue}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={{ flex: 1 }}>
-          {SCREENS.map(({ key, component: Component }, i) => (
-            <View key={key} style={{ flex: 1, display: i === screenIndex ? 'flex' : 'none' }}>
+        <Animated.ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={onScroll}
+          onMomentumScrollEnd={onMomentumEnd}
+          keyboardShouldPersistTaps="handled"
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          {SCREENS.map(({ key, component: Component }) => (
+            <View key={key} style={{ width: screenWidth, flex: 1 }}>
               <Component />
             </View>
           ))}
-        </View>
+        </Animated.ScrollView>
 
         <Animated.View
           style={[
-            { position: "absolute", left: 0, right: 0, bottom: 0 },
+            { position: "absolute", left: 0, right: 0, bottom: insets.bottom },
             barStyle,
             { zIndex: 100 },
           ]}
           pointerEvents="box-none"
         >
-          <QrFab onPress={() => router.push("/scanner")} />
+          {role === "alumno" && <QrFab onPress={() => router.push("/scanner")} />}
           <BottomTabBar
             active={activeTab}
             scrollProgressSV={scrollProgress}
