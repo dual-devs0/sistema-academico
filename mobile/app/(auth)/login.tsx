@@ -66,7 +66,7 @@ const P = {
 };
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const HEADER_H = Math.round(SCREEN_H * 0.30);
+const HEADER_H = Math.round(SCREEN_H * 0.42);
 const SAVED_CREDENTIALS_KEY = "uca.saved_credentials";
 const SECRETARIA_EMAIL = "secretaria@uca.edu.py";
 
@@ -113,13 +113,13 @@ function WaveBackground({
         </Text>
         <Svg
           width={SCREEN_W}
-          height={80}
+          height={150}
           viewBox="0 0 500 150"
           preserveAspectRatio="none"
           style={{ position: "absolute", bottom: -2 }}
         >
           <Path
-            d="M0,55 C90,140 160,140 250,95 C340,50 420,10 500,30 L500,150 L0,150 Z"
+            d="M0,40 C150,180 350,180 500,40 L500,150 L0,150 Z"
             fill={P.navy}
           />
         </Svg>
