@@ -119,7 +119,7 @@ function WaveBackground({
           style={{ position: "absolute", bottom: -2 }}
         >
           <Path
-            d="M0,75 C71,145 167,35 269,90 C340,125 410,65 500,82 L500,150 L0,150 Z"
+            d="M0,55 C90,140 160,140 250,95 C340,50 420,10 500,30 L500,150 L0,150 Z"
             fill={P.navy}
           />
         </Svg>
