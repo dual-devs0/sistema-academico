@@ -66,7 +66,7 @@ const P = {
 };
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const HEADER_H = Math.round(SCREEN_H * 0.30);
+const HEADER_H = Math.round(SCREEN_H * 0.42);
 const SAVED_CREDENTIALS_KEY = "uca.saved_credentials";
 const SECRETARIA_EMAIL = "secretaria@uca.edu.py";
 
@@ -96,8 +96,8 @@ function WaveBackground({
         }}
       >
         <Image
-          source={require("../../assets/uc_logo_sist_academico.png")}
-          style={{ width: 420, height: 130, resizeMode: "contain", marginBottom: 8, tintColor: P.headerTitle }}
+          source={require("../../assets/logo_sistema.png")}
+          style={{ width: 72, height: 72, resizeMode: "contain", marginBottom: 8 }}
         />
         <Text
           style={{
@@ -113,13 +113,13 @@ function WaveBackground({
         </Text>
         <Svg
           width={SCREEN_W}
-          height={80}
+          height={150}
           viewBox="0 0 500 150"
           preserveAspectRatio="none"
           style={{ position: "absolute", bottom: -2 }}
         >
           <Path
-            d="M0,75 C71,145 167,35 269,90 C340,125 410,65 500,82 L500,150 L0,150 Z"
+            d="M0,40 C150,180 350,180 500,40 L500,150 L0,150 Z"
             fill={P.navy}
           />
         </Svg>
