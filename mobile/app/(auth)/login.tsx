@@ -96,8 +96,8 @@ function WaveBackground({
         }}
       >
         <Image
-          source={require("../../assets/uc_logo_sist_academico.png")}
-          style={{ width: 420, height: 130, resizeMode: "contain", marginBottom: 8, tintColor: P.headerTitle }}
+          source={require("../../assets/logo_sistema.png")}
+          style={{ width: 72, height: 72, resizeMode: "contain", marginBottom: 8 }}
         />
         <Text
           style={{
