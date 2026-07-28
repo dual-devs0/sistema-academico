@@ -40,13 +40,22 @@ const css = `
     border-bottom:1px solid #2a3040; background:var(--bg-base);
     position:sticky; top:0; z-index:20; flex-shrink:0;
   }
+  /* main (Layout) tiene su propio padding-top: el contenido scrollable puede
+     "asomarse" por esa franja porque un elemento sticky solo llega hasta el
+     padding-edge del contenedor con scroll, nunca hasta su border-edge. Este
+     pseudo-elemento extiende el fondo opaco del topbar hacia arriba para tapar
+     esa franja sin tocar el layout/alto real de la barra. */
+  .topbar::before {
+    content:''; position:absolute; left:0; right:0; bottom:100%; height:24px;
+    background:var(--bg-base);
+  }
   .topbar h1 { font-size:17px; font-weight:700; color:var(--text-primary); letter-spacing:-.01em; }
   .rol-badge {
     display:inline-flex; align-items:center; gap:5px;
     padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700;
   }
 
-  .content { padding:20px 24px; flex:1; overflow-y:auto; }
+  .content { padding:20px 24px; flex:1; }
   .main-grid { display:grid; grid-template-columns:248px 1fr; gap:16px; align-items:start; }
 
   /* Panel izquierdo */
@@ -949,7 +958,7 @@ export default function Programa() {
 type TabCursos = 'temario' | 'asistencia' | 'calificaciones'
 
 const tabsCss = `
-  .cur-tabs { display:flex; gap:6px; margin-bottom:18px; }
+  .cur-tabs { display:flex; gap:6px; margin-bottom:18px; position:sticky; top:56px; z-index:15; background:var(--bg-base); padding-top:12px; margin-top:-12px; }
   .cur-tab { padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; border:1px solid #2a3040; background:transparent; color:var(--text-secondary); cursor:pointer; transition:all .15s; }
   .cur-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .asis-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; }
@@ -1033,6 +1042,7 @@ function estadoNota(p: number | null): { label: string; bg: string; color: strin
 }
 
 function AsistenciaTab({ userId }: { userId: number }) {
+  const navigate = useNavigate()
   const [periodos, setPeriodos] = useState<{ anio: number; semestre: number }[]>([])
   const [periodoSel, setPeriodoSel] = useState<string>('actual')
   const [materias, setMaterias] = useState<MateriaPeriodo[]>([])
@@ -1173,14 +1183,19 @@ function AsistenciaTab({ userId }: { userId: number }) {
   /* ── LISTA (dashboard + cards circulares) ── */
   return (
     <div>
-      {periodos.length > 0 && (
-        <select className="periodo-select" value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
-          <option value="actual">Período actual</option>
-          {periodos.map(p => (
-            <option key={`${p.anio}-${p.semestre}`} value={`${p.anio}-${p.semestre}`}>{p.anio}° Año — {p.semestre}° Semestre</option>
-          ))}
-        </select>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: periodos.length > 0 ? 0 : 16 }}>
+        {periodos.length > 0 ? (
+          <select className="periodo-select" value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
+            <option value="actual">Período actual</option>
+            {periodos.map(p => (
+              <option key={`${p.anio}-${p.semestre}`} value={`${p.anio}-${p.semestre}`}>{p.anio}° Año — {p.semestre}° Semestre</option>
+            ))}
+          </select>
+        ) : <div />}
+        <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12.5 }} onClick={() => navigate('/asistencia/scan')}>
+          <i className="ti ti-qrcode" /> Escanear QR
+        </button>
+      </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
@@ -1188,6 +1203,20 @@ function AsistenciaTab({ userId }: { userId: number }) {
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Sin materias en este período.</div>
       ) : (
         <>
+          {/* 1) Alertas críticas primero — lo más urgente arriba de todo */}
+          {critica && (
+            <div className="cur-alerta" style={{ borderLeft: '3px solid #ef4444', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="mono-label" style={{ color: '#ef4444' }}>Alerta Crítica</span>
+                <i className="ti ti-alert-triangle" style={{ color: '#ef4444' }} />
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Por debajo del {LIMITE_ASIST}% requerido — riesgo de pérdida de regularidad</div>
+              <div className="progress-track" style={{ marginTop: 8, height: 4 }}><div className="progress-fill" style={{ width: `${critica.porcentaje}%`, background: '#ef4444', height: 4 }} /></div>
+            </div>
+          )}
+
+          {/* 2) Resumen general */}
           <div className="cur-kpi-grid">
             <div className="kpi-card" style={{ borderLeft: `3px solid ${promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444'}` }}>
               <div className="kpi-top"><span className="mono-label">Promedio Total</span><i className="ti ti-percentage" style={{ color: promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444', fontSize: 15 }} /></div>
@@ -1206,25 +1235,14 @@ function AsistenciaTab({ userId }: { userId: number }) {
               <span className="kpi-value" style={{ fontSize: 26, color: '#ef4444' }}>{inasistencias}</span>
               <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Días no asistidos</div>
             </div>
-            {critica ? (
-              <div className="cur-alerta" style={{ borderLeft: '3px solid #ef4444' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span className="mono-label" style={{ color: '#ef4444' }}>Alerta Crítica</span>
-                  <i className="ti ti-alert-triangle" style={{ color: '#ef4444' }} />
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Por debajo del {LIMITE_ASIST}% requerido</div>
-                <div className="progress-track" style={{ marginTop: 8, height: 4 }}><div className="progress-fill" style={{ width: `${critica.porcentaje}%`, background: '#ef4444', height: 4 }} /></div>
-              </div>
-            ) : (
-              <div className="kpi-card" style={{ borderLeft: '3px solid #22c55e' }}>
-                <div className="kpi-top"><span className="mono-label">Alertas</span><i className="ti ti-shield-check" style={{ color: '#22c55e', fontSize: 15 }} /></div>
-                <span className="kpi-value" style={{ fontSize: 26, color: '#22c55e' }}>0</span>
-                <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Todo en regla ✓</div>
-              </div>
-            )}
+            <div className="kpi-card" style={{ borderLeft: `3px solid ${critica ? '#ef4444' : '#22c55e'}` }}>
+              <div className="kpi-top"><span className="mono-label">Alertas</span><i className={`ti ${critica ? 'ti-alert-triangle' : 'ti-shield-check'}`} style={{ color: critica ? '#ef4444' : '#22c55e', fontSize: 15 }} /></div>
+              <span className="kpi-value" style={{ fontSize: 26, color: critica ? '#ef4444' : '#22c55e' }}>{critica ? 1 : 0}</span>
+              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>{critica ? 'Materia en riesgo' : 'Todo en regla ✓'}</div>
+            </div>
           </div>
 
+          {/* 3) Detalle por materia */}
           <div className="asis-grid">
             {materias.map(m => {
               const asis = asistencias[m.id]
@@ -1275,18 +1293,6 @@ function AsistenciaTab({ userId }: { userId: number }) {
                 <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-calendar" style={{ color: 'var(--accent-bright)' }} /> Periodo Académico</h3>
                 <div style={{ fontSize: 13.5, fontWeight: 700 }}>{periodoSel === 'actual' ? `${new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre ${new Date().getFullYear()}` : (() => { const [a, s] = periodoSel.split('-'); return `${s}° Semestre ${a}` })()}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{periodoSel === 'actual' ? 'Periodo en curso' : 'Periodo anterior'}</div>
-              </div>
-
-              <div className="card">
-                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-alert-triangle" style={{ color: 'var(--danger)' }} /> Resumen de Alertas</h3>
-                {critica ? (
-                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--danger-subtle)' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
-                    <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>Riesgo de pérdida de regularidad. Se requieren asistencias consecutivas para salir de zona crítica.</p>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Sin alertas activas.</p>
-                )}
               </div>
 
               <div className="card">

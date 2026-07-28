@@ -200,15 +200,47 @@ const router = useRouter();
 
           {/* ── Contenido según vista ── */}
           {vista === "asistencia" ? (
-            <AsistenciaGrid
-              materias={materias}
-              semestre={semestre}
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              onPressMateriaId={(id) =>
-                router.push({ pathname: "/cursos/[id]", params: { id: String(id) } })
-              }
-            />
+            <>
+              {user?.role === "alumno" && (
+                <View style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.sm }}>
+                  <Pressable
+                    onPress={() => router.push("/scanner")}
+                    style={({ pressed }) => ({
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: spacing.sm,
+                      backgroundColor: colors.cyanDim,
+                      borderWidth: 1,
+                      borderColor: colors.cyan,
+                      borderRadius: radius.md,
+                      paddingVertical: spacing.md,
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <QrIcon color={colors.cyan} />
+                    <Text
+                      style={{
+                        color: colors.cyan,
+                        fontFamily: fontFamily.interSemibold,
+                        fontSize: fontSize.label,
+                      }}
+                    >
+                      Escanear QR de asistencia
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+              <AsistenciaGrid
+                materias={materias}
+                semestre={semestre}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                onPressMateriaId={(id) =>
+                  router.push({ pathname: "/cursos/[id]", params: { id: String(id) } })
+                }
+              />
+            </>
           ) : (
             <CalificacionesView
               materias={materias}
@@ -801,6 +833,15 @@ function VistaToggle({
         );
       })}
     </View>
+  );
+}
+
+function QrIcon({ color }: { color: string }) {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 3h7v7H3V3zm2 2v3h3V5H5zM14 3h7v7h-7V3zm2 2v3h3V5h-3zM3 14h7v7H3v-7zm2 2v3h3v-3H5z" fill={color} />
+      <Path d="M14 14h2v2h-2zM18 14h3v2h-3zM14 18h2v3h-2zM18 17h3v4h-3zM14 14h7v7h-7v-7z" stroke={color} strokeWidth={1.4} fill="none" />
+    </Svg>
   );
 }
 

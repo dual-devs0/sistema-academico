@@ -41,6 +41,7 @@ const css = `
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     border-left:2px solid;
   }
+  .cal-dot { display:none; width:5px; height:5px; border-radius:50%; }
   .prox-item { border-radius:12px; background:var(--bg-elevated); padding:11px 13px; margin-bottom:10px; }
   .cal-timeline { display:none; }
   .cal-last-upd { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
@@ -52,8 +53,13 @@ const css = `
   }
   @media(max-width:1024px){ .cal-grid-page { grid-template-columns:1fr; } }
   @media(max-width:768px){
-    .cal-month-card { display:none; }
     .cal-timeline { display:block; }
+    .cal-month-card { padding:10px !important; }
+    .cal-cell { min-height:38px; padding:3px; gap:2px; border-radius:8px; }
+    .cal-dia-lbl { font-size:9px; padding:4px 0; }
+    .cal-num { font-size:10.5px; }
+    .cal-chip { display:none; }
+    .cal-dot { display:block; }
   }
 `
 
@@ -220,6 +226,9 @@ export default function Calendario() {
                     className={`cal-cell${c.fuera ? ' fuera' : ''}${c.key === hoyKey ? ' hoy' : ''}${c.key === selDia ? ' sel' : ''}`}
                     onClick={() => !c.fuera && setSelDia(c.key === selDia ? null : c.key)}>
                     <span className="cal-num" style={c.key === hoyKey ? { color: 'var(--accent-bright)' } : undefined}>{c.d}</span>
+                    {evs.length > 0 && (
+                      <span className="cal-dot" style={{ background: (tipoCfg[evs[0].tipo] ?? tipoCfg.actividad).color }} />
+                    )}
                     {evs.slice(0, 2).map(e => {
                       const cfg = tipoCfg[e.tipo] ?? tipoCfg.actividad
                       return <span key={e.id} className="cal-chip" style={{ background: cfg.bg, color: cfg.color, borderLeftColor: cfg.color }}>{cfg.label}: {e.titulo}</span>
