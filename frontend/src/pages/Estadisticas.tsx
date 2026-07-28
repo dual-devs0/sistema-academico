@@ -6,6 +6,7 @@ import {
   LineChart, Line,
 } from 'recharts'
 import { api, getCurrentUser } from '../lib/api'
+import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
 
 const POLL_MS = 30000
 
@@ -25,7 +26,7 @@ const css = `
   .est-last-upd svg.spin { animation:est-spin 1s linear infinite; }
   @keyframes est-spin { to{transform:rotate(360deg)} }
 
-  .est-content { padding:20px 24px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+  .est-content { padding:${SHELL_PADDING.contentDesktop}; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
 
   .est-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .est-kpi {
@@ -59,7 +60,7 @@ const css = `
   .est-empty { display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--text-muted); }
 
   @media(max-width:900px){ .est-charts-row { grid-template-columns:1fr; } .est-kpi-row { grid-template-columns:repeat(2,1fr); } }
-  @media(max-width:768px){ .est-content { padding:14px; } .est-topbar { padding:0 14px; } }
+  @media(max-width:${MOBILE_BREAKPOINT}px){ .est-content { padding:${SHELL_PADDING.contentMobile}; } .est-topbar { padding:${SHELL_PADDING.topbarMobile}; } }
   @media(max-width:480px){ .est-kpi-row { grid-template-columns:1fr 1fr; } }
 `
 
