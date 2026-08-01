@@ -1,7 +1,8 @@
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { BackHandler, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BackHandler, StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -76,40 +77,61 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
   const { colors } = useTheme();
   const { status } = useAuth();
   const [animDone, setAnimDone] = useState(false);
+  const splashHiddenRef = useRef(false);
+  const overlayOpacity = useSharedValue(1);
 
-  // Show animated splash while animation or auth is still loading
-  if (!animDone || status === "loading") {
-    return <SplashAnimated onFinish={() => setAnimDone(true)} />;
-  }
+  const hideNativeSplash = useCallback(() => {
+    if (splashHiddenRef.current) return;
+    splashHiddenRef.current = true;
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
-  // If fonts aren't ready yet, show plain background
-  if (!fontsReady) {
-    return <View style={{ flex: 1, backgroundColor: "#1a3569" }} />;
-  }
+  const authReady = status !== "loading";
+
+  useEffect(() => {
+    if (animDone && authReady) {
+      overlayOpacity.value = withTiming(0, { duration: 400 });
+    }
+  }, [animDone, authReady, overlayOpacity]);
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
 
   return (
-    <AuthGate>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-          animation: "fade",
-        }}
-      >
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="scanner"
-          options={{
-            presentation: "modal",
-            animation: "fade",
-          }}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {authReady && (
+        <AuthGate>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+              animation: "fade",
+            }}
+          >
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="scanner"
+              options={{
+                presentation: "modal",
+                animation: "fade",
+              }}
+            />
+            <Stack.Screen name="cuenta" />
+            <Stack.Screen name="examenes" />
+            <Stack.Screen name="cursos/[id]" />
+          </Stack>
+        </AuthGate>
+      )}
+      <Animated.View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents={animDone && authReady ? "none" : "auto"}>
+        <SplashAnimated
+          onReady={hideNativeSplash}
+          onFinish={() => setAnimDone(true)}
+          authReady={authReady}
         />
-        <Stack.Screen name="cuenta" />
-        <Stack.Screen name="examenes" />
-        <Stack.Screen name="cursos/[id]" />
-      </Stack>
-    </AuthGate>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -129,18 +151,6 @@ export default function RootLayout() {
     JetBrainsMono_500Medium,
     JetBrainsMono_700Bold,
   });
-
-  // Hide the native splash screen IMMEDIATELY so our Lottie animation
-  // takes over without the native splash flashing
-  const hideSplash = useCallback(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
-
-  // Hide native splash as soon as this component mounts
-  // Font loading happens in background — title/subtitle fonts use system font
-  useEffect(() => {
-    hideSplash();
-  }, [hideSplash]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#1a3569" }}>
