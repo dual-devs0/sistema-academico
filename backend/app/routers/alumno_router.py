@@ -188,16 +188,30 @@ def mis_notas(
 
 @router.get("/mi-asistencia")
 def mi_asistencia(
+    anio: int | None = None,
+    semestre: int | None = None,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    """Asistencia agregada por materia del alumno. Sin filtro: período actual.
+    Con anio/semestre: historial de un período académico anterior (filtra por
+    el anio/semestre de la materia, igual que /alumno/mis-materias)."""
     user_id = current_user.user_id
-    asistencias = (
+    query = (
         db.query(models.asistencia.Asistencia)
         .options(joinedload(models.asistencia.Asistencia.oferta))
         .filter(models.asistencia.Asistencia.user_id == user_id)
-        .all()
     )
+    if anio is not None or semestre is not None:
+        query = (
+            query.join(models.asistencia.Asistencia.oferta)
+            .join(models.oferta_materia.OfertaMateria.materia)
+        )
+        if anio is not None:
+            query = query.filter(models.materia.Materia.anio == anio)
+        if semestre is not None:
+            query = query.filter(models.materia.Materia.semestre == semestre)
+    asistencias = query.all()
 
     por_materia: dict[int, dict] = {}
     for a in asistencias:
