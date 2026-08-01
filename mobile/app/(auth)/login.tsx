@@ -95,7 +95,7 @@ function WaveBackground({
           alignItems: "center",
           justifyContent: "center",
           paddingTop: insets.top,
-          paddingBottom: 40,
+          paddingBottom: 80,
         }}
       >
         <Image
