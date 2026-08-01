@@ -325,7 +325,7 @@ export default function LoginScreen() {
 
         {screen === "main" ? (
           <>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: spacing.lg, paddingBottom: spacing.sm }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
               <CapIcon fill={P.accent} size={34} />
               <Text style={{ fontFamily: fontFamily.interSemibold, fontSize: 13.5, color: P.accent, textAlign: "center" }}>
                 {tab === "login" ? "UCA Caacupé · Bienvenido, estudiante" : "UCA Caacupé · Creá tu cuenta"}
