@@ -1,6 +1,7 @@
 // Alumno. Boleta de calificaciones con sello digital verificable (QR+código). Depende de: /boleta/*, promedio ponderado real (no AVG crudo).
 import { useState, useEffect } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import { obtenerCreditosAlumno, type CreditosAlumnoOut } from '../services/pensumService'
 
 type NotaRow = {
@@ -243,9 +244,8 @@ export default function Boleta() {
         </div>
       )}
 
-      {loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando boleta…</div>
-      ) : !resumen || !selId ? (
+      <Skeleton name="boleta" loading={loading}>
+      {!resumen || !selId ? (
         <div className="card" style={{ textAlign: 'center', padding: 50 }}>
           <i className="ti ti-file-certificate" style={{ fontSize: 38, color: 'var(--text-muted)' }} />
           <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 13 }}>
@@ -369,6 +369,7 @@ export default function Boleta() {
           )}
         </>
       )}
+      </Skeleton>
     </>
   )
 }

@@ -1,6 +1,7 @@
 // Alumno. Solicitud de equivalencias de materias cursadas en otra institución. Depende de: /equivalencias/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import { crearSolicitudEquivalencia, getEquivalenciasAlumno,
   type SolicitudEquivalencia } from '../services/equivalenciasService'
 
@@ -71,15 +72,8 @@ export default function EquivalenciasAlumno() {
   const resueltas = solicitudes.filter(s => s.estado === 'resuelta').length
   const rechazadas = solicitudes.filter(s => s.estado === 'rechazada').length
 
-  if (loading && solicitudes.length === 0) return (
-    <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 32 }}>
-      <i className="ti ti-loader" style={{ animation: 'eqal-spin 1s linear infinite', display: 'inline-block', fontSize: 24, marginBottom: 12 }} />
-      <div style={{ fontSize: 13 }}>Cargando solicitudes…</div>
-      <style>{'@keyframes eqal-spin{to{transform:rotate(360deg)}}'}</style>
-    </div>
-  )
-
   return (
+    <Skeleton name="equivalencias-alumno" loading={loading && solicitudes.length === 0}>
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
@@ -221,5 +215,6 @@ export default function EquivalenciasAlumno() {
         </div>
       )}
     </div>
+    </Skeleton>
   )
 }

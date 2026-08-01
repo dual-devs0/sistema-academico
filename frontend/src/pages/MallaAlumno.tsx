@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getUserId } from '../hooks/useRole'
 import { obtenerAvanceAlumno, obtenerCreditosAlumno, type AvanceMateriaOut, type CreditosAlumnoOut } from '../services/pensumService'
+import { Skeleton } from 'boneyard-js/react'
 
 const POLL_MS = 30000
 
@@ -140,9 +141,8 @@ export default function MallaAlumno() {
         </div>
       )}
 
-      {loading ? (
-        <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-secondary)' }}>Cargando…</div>
-      ) : avance.length === 0 ? (
+      <Skeleton name="malla-alumno" loading={loading}>
+      {avance.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-secondary)' }}>
           Todavía no hay malla curricular cargada para tu carrera.
         </div>
@@ -226,6 +226,7 @@ export default function MallaAlumno() {
           )
         })
       )}
+      </Skeleton>
     </>
   )
 }

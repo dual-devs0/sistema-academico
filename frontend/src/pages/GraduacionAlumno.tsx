@@ -1,6 +1,7 @@
 // Alumno. Condición de egreso propia (créditos+PPA+pasantía) y estado del proceso de tesis. Depende de: /graduacion/alumno/{id}/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import { getCondicionEgreso, type CondicionEgreso } from '../services/graduacionService'
 
 const POLL_MS = 30000
@@ -34,19 +35,12 @@ export default function GraduacionAlumno() {
     return () => clearInterval(id)
   }, [cargar])
 
-  if (loading) return (
-    <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
-      <i className="ti ti-loader" style={{ animation: 'gaSpin 1s linear infinite', display: 'inline-block', fontSize: 28, marginBottom: 12 }} />
-      <div style={{ fontSize: 13 }}>Cargando condición de egreso…</div>
-      <style>{'@keyframes gaSpin{to{transform:rotate(360deg)}}'}</style>
-    </div>
-  )
-
   const creditosPct = condicion?.creditos_totales
     ? Math.round(((condicion.creditos_aprobados ?? 0) / condicion.creditos_totales) * 100)
     : 0
 
   return (
+    <Skeleton name="graduacion-alumno" loading={loading}>
     <div>
       <style>{'@keyframes gaSpin{to{transform:rotate(360deg)}}'}</style>
 
@@ -277,5 +271,6 @@ export default function GraduacionAlumno() {
         </div>
       )}
     </div>
+    </Skeleton>
   )
 }

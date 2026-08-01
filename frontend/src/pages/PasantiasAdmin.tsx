@@ -1,6 +1,7 @@
 // Admin. Aprobación de solicitudes de pasantía, empresas receptoras, control de horas. Depende de: /pasantias/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import {
   aprobarPasantia, finalizarPasantia, getProfesores,
   type Pasantia, type ProfesorItem,
@@ -290,9 +291,8 @@ export default function PasantiasAdmin() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="ps-loading">Cargando solicitudes…</div>
-      ) : filtered.length === 0 ? (
+      <Skeleton name="pasantias-admin" loading={loading}>
+      {filtered.length === 0 ? (
         <div className="ps-empty">No hay solicitudes de pasantía en esta categoría.</div>
       ) : (
         <div className="ps-table-wrap">
@@ -330,6 +330,8 @@ export default function PasantiasAdmin() {
           </table>
         </div>
       )}
+
+      </Skeleton>
 
       {/* ── Modal detalle ─────────────────────────────────────── */}
       {showDetail && selected && (

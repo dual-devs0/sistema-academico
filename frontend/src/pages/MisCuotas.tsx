@@ -1,6 +1,7 @@
 // Alumno. Cuotas propias, pago online (Stripe), comprobantes de facturación. Depende de: /finanzas/alumno/{id}/cuotas, /finanzas/pagos/*.
 import { useState, useEffect, useCallback } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import { getCuotasAlumno, getBecasActivas, initPagoOnline, formatGs, type Cuota, type BecaActiva } from '../services/finanzasService'
 
 const POLL_MS = 30000
@@ -252,9 +253,8 @@ export default function MisCuotas() {
         )}
 
         {/* Lista cuotas */}
-        {loading ? (
-          <div className="mc-empty">Cargando cuotas…</div>
-        ) : cuotasFiltradas.length === 0 ? (
+        <Skeleton name="mis-cuotas" loading={loading}>
+        {cuotasFiltradas.length === 0 ? (
           <div className="mc-empty">No hay cuotas {filtro !== 'todos' ? `con estado "${filtro}"` : ''}.</div>
         ) : (
           <div className="mc-list">
@@ -342,6 +342,7 @@ export default function MisCuotas() {
             })}
           </div>
         )}
+      </Skeleton>
       </div>
     </>
   )
