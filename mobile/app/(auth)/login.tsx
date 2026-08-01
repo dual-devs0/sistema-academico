@@ -865,18 +865,30 @@ function SelectField({
           <Pressable
             style={{
               backgroundColor: P.navyMuted,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              maxHeight: "60%",
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              maxHeight: "75%",
               paddingBottom: spacing.xl,
             }}
           >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: "rgba(255,255,255,0.3)",
+                alignSelf: "center",
+                marginTop: spacing.sm,
+                marginBottom: spacing.sm,
+              }}
+            />
             <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 15, textAlign: "center", paddingVertical: spacing.md }}>
               {label}
             </Text>
             <FlatList
               data={options}
               keyExtractor={(item) => item}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => { onSelect(item); setOpen(false); }}
