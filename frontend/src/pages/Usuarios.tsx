@@ -1,6 +1,7 @@
 // Admin. CRUD de usuarios, listado paginado server-side, búsqueda. Depende de: /users/*.
 import { useState, useEffect, useCallback } from 'react'
 import { emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import {
   listarUsuarios, crearUsuario, actualizarUsuario, eliminarUsuario,
   obtenerStatsUsuarios, listarCarreras,
@@ -409,6 +410,7 @@ export default function Usuarios() {
         </div>
       </div>
 
+      <Skeleton name="usuarios" loading={loading}>
       {/* Chips de filtro rápido */}
       <div className="us-chips">
         {chips.map(ch => (
@@ -527,6 +529,7 @@ export default function Usuarios() {
           )}
         </div>
       </div>
+      </Skeleton>
 
       {/* Modal crear/editar */}
       {modal !== null && (

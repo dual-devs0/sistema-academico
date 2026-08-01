@@ -34,6 +34,7 @@ import EquivalenciasAdmin from './pages/EquivalenciasAdmin'
 import BecasAlumno from './pages/BecasAlumno'
 import AjustesGlobales from './pages/AjustesGlobales'
 import ResetPassword from './pages/ResetPassword'
+import BoneCapture from './pages/BoneCapture'
 import { getCurrentUser, initAuth } from './lib/api'
 
 const rolesPermitidos: Record<string, string[]> = {
@@ -143,6 +144,7 @@ function App() {
         <Route path="/ajustes-globales" element={<Layout><RutaProtegida path="/ajustes-globales"><AjustesGlobales /></RutaProtegida></Layout>} />
         <Route path="/asistencia/scan" element={<Layout><RutaProtegida path="/asistencia/scan"><AsistenciaScan /></RutaProtegida></Layout>} />
         <Route path="/mis-becas" element={<Layout><RutaProtegida path="/mis-becas"><BecasAlumno /></RutaProtegida></Layout>} />
+        <Route path="/bone-capture" element={<BoneCapture />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

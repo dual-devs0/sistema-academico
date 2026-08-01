@@ -1,6 +1,7 @@
 // Alumno. Inscripción a ofertas de materia — bloqueo real por correlatividades, cupo y mora aplicado server-side, esta vista solo refleja el resultado. Depende de: /inscripciones/*, /pensum/*.
 import { useState, useEffect, useCallback } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 
 type Materia = { id: number; nombre: string; codigo?: string | null; profesor_nombre?: string | null; creditos?: number | null; cupos?: number | null; horario?: string | null; secciones?: number | null; inscritos?: number | null; anio?: number | null; semestre?: number | null }
 type Inscripcion = { id: number; alumno_id: number; materia_id: number }
@@ -206,9 +207,7 @@ function AlumnoView({ userId }: { userId: number }) {
         </div>
       )}
 
-      {loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando oferta…</div>
-      ) : (
+      <Skeleton name="inscripciones" loading={loading}>
         <div className="ins-grid">
           <div>
             {idsInscriptas.size > 0 && (
@@ -321,7 +320,7 @@ function AlumnoView({ userId }: { userId: number }) {
             </button>
           </div>
         </div>
-      )}
+      </Skeleton>
     </>
   )
 }
@@ -342,7 +341,7 @@ type MateriaConAlumnos = {
   alumnos: AlumnoInscripto[]
 }
 
-function Skeleton({ width = '100%', height }: { width?: string | number; height: number }) {
+function SkeletonBlock({ width = '100%', height }: { width?: string | number; height: number }) {
   return (
     <div style={{
       width, height, borderRadius: 8,
@@ -360,13 +359,13 @@ function LoadingSkeletonAdmin() {
       {[1, 2, 3].map(i => (
         <div key={i} className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }}>
-            <Skeleton width={180} height={18} />
+            <SkeletonBlock width={180} height={18} />
           </div>
           <div style={{ padding: '12px 18px' }}>
             {[1, 2].map(j => (
               <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                <Skeleton width={28} height={28} />
-                <Skeleton width={140} height={14} />
+                <SkeletonBlock width={28} height={28} />
+                <SkeletonBlock width={140} height={14} />
               </div>
             ))}
           </div>

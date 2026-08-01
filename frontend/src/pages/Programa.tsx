@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
 import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
+import { Skeleton } from 'boneyard-js/react'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
 
@@ -715,17 +716,6 @@ export default function Programa() {
   const completadas = temario?.clases.filter(c => c.completada).length ?? 0
   const progreso = temario?.clases.length ? Math.round((completadas / temario.clases.length) * 100) : 0
 
-  if (tab === 'temario' && cargando) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg-base)', color:'var(--text-muted)', fontFamily:'Inter,system-ui,sans-serif', flexDirection:'column', gap:12 }}>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation:'spin 1s linear infinite' }}>
-        <circle cx="12" cy="12" r="10" stroke="#2a3040" strokeWidth="3"/>
-        <path d="M12 2a10 10 0 0110 10" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"/>
-      </svg>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <span style={{ fontSize:13 }}>Cargando programa…</span>
-    </div>
-  )
-
   if (tab !== 'temario') {
     return (
       <>
@@ -743,56 +733,56 @@ export default function Programa() {
     )
   }
 
-  if (!temario) return (
-    <>
-      <style>{css}</style>
-      <div className="tem-root">
-        <header className="topbar"><h1>Cursos</h1></header>
-        <div className="content">
-          <CursosTabs tab={tab} setTab={setTab} />
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'50vh', color:'var(--text-muted)', flexDirection:'column', gap:16, textAlign:'center', padding:24 }}>
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2a3040" strokeWidth="1.5">
-              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-            </svg>
-            <div>
-              <p style={{ fontSize:16, fontWeight:700, color:'var(--text-secondary)', margin:'0 0 6px' }}>Sin programa disponible</p>
-              <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>
-                {ROL === 'alumno'
-                  ? 'Tu profesor todavía no cargó el programa de clases.'
-                  : 'No hay programas cargados aún. Creá el programa desde la sección Materias.'}
-              </p>
+  return (
+    <Skeleton name="programa-temario" loading={cargando}>
+      {!temario ? (
+        <>
+          <style>{css}</style>
+          <div className="tem-root">
+            <header className="topbar"><h1>Cursos</h1></header>
+            <div className="content">
+              <CursosTabs tab={tab} setTab={setTab} />
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'50vh', color:'var(--text-muted)', flexDirection:'column', gap:16, textAlign:'center', padding:24 }}>
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2a3040" strokeWidth="1.5">
+                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                <div>
+                  <p style={{ fontSize:16, fontWeight:700, color:'var(--text-secondary)', margin:'0 0 6px' }}>Sin programa disponible</p>
+                  <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>
+                    {ROL === 'alumno'
+                      ? 'Tu profesor todavía no cargó el programa de clases.'
+                      : 'No hay programas cargados aún. Creá el programa desde la sección Materias.'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </>
-  )
+        </>
+      ) : (
+        <>
+          <style>{css}</style>
+          <div className="tem-root">
 
-  return (
-<>
-      <style>{css}</style>
-      <div className="tem-root">
+            <header className="topbar">
+              <h1>Programa de clases</h1>
+              <div className="rol-badge" style={
+                ROL==='profesor'
+                  ? {background:'#3b82f615',color:'#3b82f6',border:'1px solid #3b82f630'}
+                  : {background:'var(--accent-muted)',color:'var(--accent)',border:'1px solid var(--accent-hover)'}
+              }>
+                {ROL==='profesor'
+                  ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Modo Profesor</>
+                  : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/></svg> Vista Alumno</>
+                }
+              </div>
+            </header>
 
-        <header className="topbar">
-          <h1>Programa de clases</h1>
-          <div className="rol-badge" style={
-            ROL==='profesor'
-              ? {background:'#3b82f615',color:'#3b82f6',border:'1px solid #3b82f630'}
-              : {background:'var(--accent-muted)',color:'var(--accent)',border:'1px solid var(--accent-hover)'}
-          }>
-            {ROL==='profesor'
-              ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Modo Profesor</>
-              : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/></svg> Vista Alumno</>
-            }
-          </div>
-        </header>
+            <div className="content">
 
-        <div className="content">
+              <CursosTabs tab={tab} setTab={setTab} />
 
-          <CursosTabs tab={tab} setTab={setTab} />
-
-          {/* Dropdown mobile */}
-          <div className="mob-drop-wrap" ref={dropRef}>
+              {/* Dropdown mobile */}
+              <div className="mob-drop-wrap" ref={dropRef}>
             <button className={`mob-drop-btn${dropOpen?' open':''}`} onClick={()=>setDropOpen(v=>!v)}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div className="mob-color-dot" style={{background:temario.color}}/>
@@ -951,6 +941,8 @@ export default function Programa() {
         {toast && <div className="toast">✓ {toast}</div>}
       </div>
     </>
+      )}
+    </Skeleton>
   )
 }
 

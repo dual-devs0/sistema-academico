@@ -1,6 +1,7 @@
 // Admin. Edición de GlobalSetting (5 tabs por categoría) + auditoría de cambios + export/import. Depende de: /admin/settings/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { emitToast } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import {
   getSettings, getAuditLog, updateSetting, exportSettings, importSettings,
   type GlobalSetting, type AuditLogEntry, type SettingsExport,
@@ -414,9 +415,8 @@ export default function AjustesGlobales() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="ag-card ag-empty"><i className="ti ti-loader" style={{ animation: 'ag-spin 1s linear infinite', display: 'inline-block' }} /> Cargando ajustes…</div>
-      ) : tab !== 'auditoria' && activeSettings.length === 0 ? (
+      <Skeleton name="ajustes-globales" loading={loading}>
+      {tab !== 'auditoria' && activeSettings.length === 0 ? (
         <div className="ag-card ag-empty">No hay ajustes en esta categoría.</div>
       ) : tab !== 'auditoria' ? (
         <div className="ag-card" style={{ paddingTop: 0, paddingBottom: 0 }}>
@@ -478,6 +478,8 @@ export default function AjustesGlobales() {
           )}
         </div>
       )}
+
+      </Skeleton>
 
       {/* Export modal */}
       {showExport && (

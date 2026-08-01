@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { emitToast } from '../lib/api'
 import { api } from '../lib/api'
+import { Skeleton } from 'boneyard-js/react'
 import { getTodasSolicitudes, getMateriasEquivalencia, type SolicitudEquivalencia, type MateriaItem } from '../services/equivalenciasService'
 
 type Tab = 'pendientes' | 'resueltas' | 'todas'
@@ -217,9 +218,8 @@ export default function EquivalenciasAdmin() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="eqa-card eqa-empty">Cargando solicitudes…</div>
-      ) : filtradas.length === 0 ? (
+      <Skeleton name="equivalencias-admin" loading={loading}>
+      {filtradas.length === 0 ? (
         <div className="eqa-card eqa-empty">No hay solicitudes de equivalencia en esta categoría.</div>
       ) : (
         <div className="eqa-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -265,6 +265,8 @@ export default function EquivalenciasAdmin() {
           </table>
         </div>
       )}
+
+      </Skeleton>
 
       {/* Modal Detalle */}
       {detalle && (
