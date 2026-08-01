@@ -391,7 +391,7 @@ function AlumnoView() {
                       })
                       return Object.keys(porAnio).map(Number).sort((a, b) => b - a).map(anio => (
                         <div key={anio}>
-                          <div className="aa-hist-anio">{anio}</div>
+                          <div className="aa-hist-anio">Año {anio}</div>
                           {porAnio[anio].sort((a, b) => b.semestre - a.semestre).map(p => (
                             <div key={p.semestre} className="aa-hist-row">
                               <span>{p.semestre === 1 ? 'Primer' : 'Segundo'} semestre</span>
