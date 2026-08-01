@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
-import { Skeleton } from 'boneyard-js/react'
 import { setDocTitle } from '../lib/docTitle'
 import QRModal from '../components/QRModal'
 
@@ -608,18 +607,14 @@ function ProfesorView() {
           {view === 'alumnos' && <div />}
         </div>
 
-        {view === 'carreras' && (
-          <Skeleton name="asistencia-carreras" loading={loading}>
-            {carreras.length === 0
-              ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-muted)', fontSize:13 }}>No tenés carreras asignadas</div>
-              : <div className="ap-chip-strip">{carreras.map(c => (
-                  <div key={c.id} className="ap-chip" onClick={() => selectCarrera(c)}>
-                    <i className="ti ti-building-community" style={{ fontSize:14, color:'var(--accent-bright)' }} />
-                    <span style={{ fontWeight:600 }}>{c.nombre}</span>
-                  </div>
-                ))}</div>
-            }
-          </Skeleton>
+        {view === 'carreras' && (carreras.length === 0
+            ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-muted)', fontSize:13 }}>No tenés carreras asignadas</div>
+            : <div className="ap-chip-strip">{carreras.map(c => (
+                <div key={c.id} className="ap-chip" onClick={() => selectCarrera(c)}>
+                  <i className="ti ti-building-community" style={{ fontSize:14, color:'var(--accent-bright)' }} />
+                  <span style={{ fontWeight:600 }}>{c.nombre}</span>
+                </div>
+              ))}</div>
         )}
 
         {view === 'materias' && (

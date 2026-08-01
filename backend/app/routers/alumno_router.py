@@ -188,10 +188,10 @@ def mis_notas(
 
 @router.get("/mi-asistencia")
 def mi_asistencia(
-    anio: int | None = None,
-    semestre: int | None = None,
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
+    anio: int | None = None,
+    semestre: int | None = None,
 ):
     """Asistencia agregada por materia del alumno. Sin filtro: período actual.
     Con anio/semestre: historial de un período académico anterior (filtra por
