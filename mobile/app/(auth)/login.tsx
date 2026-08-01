@@ -355,6 +355,38 @@ export default function LoginScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
         <View style={{ height: HEADER_H }} />
 
+        {screen === "forgot" ? (
+          <View style={{ position: "absolute", top: insets.top + spacing.sm, left: spacing.xl, zIndex: 10 }}>
+            <Pressable
+              onPress={() => setScreen("main")}
+              hitSlop={16}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "rgba(13,33,55,0.06)",
+                  borderWidth: 1,
+                  borderColor: "rgba(13,33,55,0.14)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <BackArrowIcon color={P.headerTitle} />
+              </View>
+              <Text style={{ color: P.headerTitle, fontFamily: fontFamily.interBold, fontSize: 15, marginLeft: spacing.sm }}>
+                Volver
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {screen === "main" ? (
           <>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: 0, paddingBottom: spacing.sm }}>
@@ -557,39 +589,6 @@ export default function LoginScreen() {
           </>
         ) : (
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <Pressable
-              onPress={() => setScreen("main")}
-              hitSlop={16}
-              style={({ pressed }) => ({
-                position: "absolute",
-                top: insets.top + spacing.sm,
-                left: spacing.xl,
-                zIndex: 10,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: "rgba(255,255,255,0.06)",
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.14)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <BackArrowIcon color={P.white} />
-              </View>
-              <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 15 }}>
-                Volver
-              </Text>
-            </Pressable>
-
             <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingBottom: spacing["3xl"] }}>
               <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 26, textAlign: "center" }}>
                 Recuperar contraseña
