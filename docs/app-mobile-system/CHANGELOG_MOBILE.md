@@ -4,6 +4,60 @@ Formato cronológico inverso (nuevo arriba).
 
 ---
 
+## 2026-07-27 — Sesión persistente, swipe entre tabs, splash Lottie, version info + seguridad Android
+
+### Sesión persistente (cierre/re-apertura)
+- **Backend** (`auth_router.py`): login y refresh devuelven `refresh_token` en el body (además de cookie httpOnly) para clientes que no persisten cookies
+- **Backend** (`users_schemas.py`): `LoginResponse` y `RefreshResponse` incluyen `refresh_token: str | None`
+- **Mobile** (`hooks/useAuth.ts`): guarda `access_token`, `refresh_token` y `csrf_token` en `SecureStore` al loguearse
+- Al abrir la app, restaura los tokens → arranca autenticado sin pedir login
+- Al refrescar token (interceptor 401), actualiza el almacenado
+- Al hacer logout, limpia `SecureStore`
+
+### Swipe lateral entre tabs + back button fix
+- `(tabs)/_layout.tsx`: reemplazado render condicional (`display: flex/none`) por `Animated.ScrollView` horizontal con `pagingEnabled`
+- Las 4 pantallas (Inicio, Cursos, Horario, Perfil) se deslizan sincronizadas
+- `scrollProgressSV` sincroniza animación del indicador en `BottomTabBar`
+- Tocar tabs o deslizar mantiene todo sincronizado (tab bar + scroll position)
+- `setActiveTabIndex(index)` se llama en cada cambio → `BackExitGuard` detecta correctamente y vuelve a Inicio con back
+
+### Splash screen con Lottie
+- `components/SplashAnimated.tsx`: reemplazada animación manual (Reanimated) por `LottieView` con `splash-animation.json`
+- Animación Lottie existente (libro + estrella + partículas) se reproduce al iniciar
+- Título "Sistema Académico" + subtítulo "UCA Caacupé" aparecen con fade-in a los 800/1200ms
+- Partículas flotantes de fondo (conservadas de versión anterior)
+- A los ~3.5s: fade out del Lottie (400ms) → `onFinish()` → transición al login
+
+### Version info + update checker
+- **Backend** (`main.py`): nuevo `GET /version` → `{ latestVersion, minVersion, updateUrl, releaseNotes }`
+- **Mobile** (`services/versionService.ts`): `checkVersion()` + `compareVersions()` para comparación semver
+- **Mobile** (`components/ui/InfoAppModal.tsx`): modal con info de app (versión actual, dispositivo OS/version, build)
+- Al abrir modal, consulta automáticamente el backend; si hay versión más nueva → botón "Actualizar app" que abre link EAS
+- Botón "Información de la app" agregado en Perfil → Soporte (junto a FAQ y Términos)
+
+### Android release signing
+- `android/app/build.gradle`: agregado `signingConfigs.release` con variables de entorno (`MYAPP_RELEASE_STORE_FILE`, etc.)
+- Release build type ahora usa `signingConfig signingConfigs.release` (antes usaba debug keystore en producción)
+- Compatible con Android Developer Verification (ADC) para distribución fuera de Play Store
+
+### EAS y configuración de proyecto
+- `eas.json`: creado con perfiles `development`, `preview`, `production`
+- `app.json`: agregado `owner: "cabrvix"` + `extra.apiBase` para URL de API en Expo Go
+- `app.json`: agregado plugin `expo-video` (requiere development build para video real)
+- Proyecto EAS vinculado: `@cabrvix/uca-movil` (ID: `8099d7e4-3d70-4edf-82b4-d0c2ff73e6fd`)
+
+### Correcciones
+- `backend/scripts/seed_usuarios.py`: bug `ci` → `cedula` (el modelo User tiene `cedula`, no `ci`)
+- `services/api.ts`: `API_BASE` ahora resuelve `process.env.EXPO_PUBLIC_API_BASE` → `extra.apiBase` → `localhost:8000`
+- `services/authService.ts`: `refreshRequest()` acepta `refreshToken` opcional para body-flow
+
+### Estado
+- `tsc --noEmit`: 0 errores ✅
+- Dependencias nuevas: `expo-video`, `expo-dev-client`
+- Build EAS development en progreso (para splash con video)
+
+---
+
 ## 2026-07-17 — UI polish + seguridad + navegación
 
 ### Tab bar sync (UI thread)

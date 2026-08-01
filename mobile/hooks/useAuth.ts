@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import * as SecureStore from "expo-secure-store";
 import { configureApi } from "../services/api";
 import {
   loginRequest,
@@ -18,6 +19,14 @@ import {
 } from "../services/authService";
 
 type Status = "loading" | "auth" | "anon";
+
+const SESSION_KEY = "uca.session_tokens";
+
+interface StoredSession {
+  access_token: string;
+  refresh_token: string;
+  csrf_token: string;
+}
 
 interface AuthState {
   status: Status;
@@ -29,13 +38,37 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+async function saveSession(tokens: StoredSession): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(tokens));
+  } catch { /* silent */ }
+}
+
+async function loadSession(): Promise<StoredSession | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StoredSession;
+  } catch {
+    return null;
+  }
+}
+
+async function clearSession(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(SESSION_KEY);
+  } catch { /* silent */ }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const accessRef = useRef<string | null>(null);
   const csrfRef = useRef<string | null>(null);
+  const refreshTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
+    let cancelled = false;
 
     configureApi({
       getAccess: () => accessRef.current,
@@ -43,24 +76,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessRef.current = token;
       },
       refresh: async () => {
+        const rt = refreshTokenRef.current;
+        if (rt) {
+          const res = await refreshRequest(csrfRef.current, rt);
+          accessRef.current = res.access_token;
+          if (res.csrf_token) csrfRef.current = res.csrf_token;
+          if (res.refresh_token) {
+            refreshTokenRef.current = res.refresh_token;
+            saveSession({
+              access_token: res.access_token,
+              refresh_token: res.refresh_token,
+              csrf_token: res.csrf_token ?? "",
+            });
+          }
+          return res.access_token;
+        }
         const res = await refreshRequest(csrfRef.current);
         accessRef.current = res.access_token;
-        if (res.csrf_token) {
-          csrfRef.current = res.csrf_token;
+        if (res.csrf_token) csrfRef.current = res.csrf_token;
+        if (res.refresh_token) {
+          refreshTokenRef.current = res.refresh_token;
         }
         return res.access_token;
       },
       onAuthFailed: () => {
         accessRef.current = null;
         csrfRef.current = null;
+        refreshTokenRef.current = null;
+        clearSession();
         if (mounted) setStatus("anon");
       },
     });
 
-    if (mounted) setStatus("anon");
+    (async () => {
+      const saved = await loadSession();
+      if (saved && !cancelled) {
+        accessRef.current = saved.access_token;
+        csrfRef.current = saved.csrf_token;
+        refreshTokenRef.current = saved.refresh_token;
+        if (mounted) setStatus("auth");
+        return;
+      }
+      if (mounted) setStatus("anon");
+    })();
 
     return () => {
       mounted = false;
+      cancelled = true;
     };
   }, []);
 
@@ -70,9 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (payload) => {
         const res = await loginRequest(payload);
         accessRef.current = res.access_token;
-        if (res.csrf_token) {
-          csrfRef.current = res.csrf_token;
-        }
+        if (res.csrf_token) csrfRef.current = res.csrf_token;
+        if (res.refresh_token) refreshTokenRef.current = res.refresh_token;
+        saveSession({
+          access_token: res.access_token,
+          refresh_token: res.refresh_token ?? "",
+          csrf_token: res.csrf_token ?? "",
+        });
         setStatus("auth");
       },
       logout: async () => {
@@ -83,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         accessRef.current = null;
         csrfRef.current = null;
+        refreshTokenRef.current = null;
+        clearSession();
         setStatus("anon");
       },
       setTokens: (access, csrf) => {

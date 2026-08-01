@@ -20,7 +20,11 @@ import Constants from "expo-constants";
  *   refresh (evita recursión infinita).
  */
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://localhost:8000";
+const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>;
+const API_BASE: string =
+  process.env.EXPO_PUBLIC_API_BASE ??
+  (extra.apiBase as string | undefined) ??
+  "http://localhost:8000";
 
 export const api = axios.create({
   baseURL: API_BASE,
