@@ -1,6 +1,7 @@
 // Admin. Reportes exportables (estadísticas, RUE-ES/MEC). Depende de: /reportes/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../lib/api'
+import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
 
 interface CarreraStats {
   carrera: string
@@ -209,7 +210,7 @@ const css = `
   .last-upd svg.spin { animation:spin 1s linear infinite; }
   @keyframes spin { to{transform:rotate(360deg)} }
 
-  .content { padding:20px 24px; flex:1; overflow-y:auto; }
+  .content { padding:${SHELL_PADDING.contentDesktop}; flex:1; overflow-y:auto; }
 
   .err-banner { display:flex; align-items:center; gap:8px; background:#ef444415; border:1px solid #ef444440; color:#ef4444; border-radius:10px; padding:10px 14px; font-size:12px; font-weight:600; margin-bottom:16px; }
 
@@ -370,9 +371,9 @@ const css = `
   @keyframes tin { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
 
   @media(max-width:900px){ .main-grid { grid-template-columns:1fr; } .kpi-row { grid-template-columns:repeat(2,1fr); } }
-  @media(max-width:768px){
-    .topbar  { padding:0 14px; }
-    .content { padding:14px; }
+  @media(max-width:${MOBILE_BREAKPOINT}px){
+    .topbar  { padding:${SHELL_PADDING.topbarMobile}; }
+    .content { padding:${SHELL_PADDING.contentMobile}; }
     .rep-item  { display:none; }
     .rep-cards { display:flex; }
     .kpi-row { gap:8px; }

@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
+import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
 
@@ -55,7 +56,7 @@ const css = `
     padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700;
   }
 
-  .content { padding:20px 24px; flex:1; }
+  .content { padding:${SHELL_PADDING.contentDesktop}; flex:1; }
   .main-grid { display:grid; grid-template-columns:248px 1fr; gap:16px; align-items:start; }
 
   /* Panel izquierdo */
@@ -227,9 +228,9 @@ const css = `
 
   /* Responsive */
   @media(max-width:900px){ .main-grid { grid-template-columns:210px 1fr; } }
-  @media(max-width:768px){
-    .topbar  { padding:0 14px; }
-    .content { padding:14px; }
+  @media(max-width:${MOBILE_BREAKPOINT}px){
+    .topbar  { padding:${SHELL_PADDING.topbarMobile}; }
+    .content { padding:${SHELL_PADDING.contentMobile}; }
     .main-grid { grid-template-columns:1fr; }
     .left-panel { display:none; }
     .mob-drop-wrap { display:block; }

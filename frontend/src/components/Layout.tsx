@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getRole, getUsername } from '../hooks/useRole'
 import { api } from '../lib/api'
 import logoUCA from '../assets/uc_logo_sist_academico.webp'
+import { MOBILE_BREAKPOINT } from '../styles/responsiveTokens'
 
 type MenuItem = { label: string; path: string; icon: string; group?: string }
 
@@ -285,7 +286,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         @keyframes gni-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
         @keyframes gni-flow { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
 
-        @media (max-width: 768px) {
+        @media (max-width: ${MOBILE_BREAKPOINT}px) {
           .layout-root { display: block !important; }
           .layout-main { padding: 0 !important; width: 100% !important; max-width: 100vw !important; height: 100% !important; }
           .layout-main main { padding: 16px 12px 20px !important; width: 100% !important; box-sizing: border-box; }
