@@ -146,6 +146,7 @@ const TITLE = "PORTAL ACADÉMICO";
 
 export default function LoginScreen() {
   const { setTokens, confirmAuth } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [screen, setScreen] = useState<Screen>("main");
   const [tab, setTab] = useState<Tab>("login");
@@ -529,17 +530,17 @@ export default function LoginScreen() {
           </>
         ) : (
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <View style={{ height: Math.max(HEADER_H - 300, 0) }} />
             <Pressable
               onPress={() => setScreen("main")}
               hitSlop={16}
               style={({ pressed }) => ({
+                position: "absolute",
+                top: insets.top + spacing.sm,
+                left: spacing.xl,
+                zIndex: 10,
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.sm,
-                alignSelf: "flex-start",
-                paddingHorizontal: spacing.xl,
-                paddingVertical: spacing.sm,
                 opacity: pressed ? 0.75 : 1,
               })}
             >
@@ -566,7 +567,7 @@ export default function LoginScreen() {
               <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 26, textAlign: "center" }}>
                 Recuperar contraseña
               </Text>
-              <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing["3xl"] }}>
+              <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing.xl }}>
                 Le enviaremos un correo electrónico con su nueva contraseña.
               </Text>
 
