@@ -69,28 +69,10 @@ export default function Asistencia() {
 /* ─── ALUMNO: Control de Asistencia (rediseño) ─── */
 type MateriaAsistRow = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
 type SesionRow = { materia_id: number; materia_nombre: string; fecha: string; presente: boolean }
+type PeriodoRow = { anio: number; semestre: number }
 
-/* Alumno: estilos mínimos que no están en design-tokens */
+/* Alumno: estilos del rediseño (grid circular + panel acordeón + stat cards chicas) */
 const cssAlumno = `
-  .aa-alerta { background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius); padding:14px 16px; }
-  .aa-fab-qr {
-    position:fixed; bottom:26px; right:26px; z-index:60;
-    display:flex; align-items:center; gap:8px;
-    background:var(--accent); color:#fff; border:none; border-radius:999px;
-    padding:13px 22px; font-family:var(--font-sans); font-weight:700; font-size:13px;
-    cursor:pointer; box-shadow:0 10px 30px var(--accent-hover); transition:transform .15s;
-  }
-  .aa-fab-qr:hover { transform:scale(1.05); }
-  @media(max-width:768px){ .aa-fab-qr { bottom:80px; } }
-
-  /* Diseño Web Adaptable — mobile-first (solo alumno) */
-  .aa-kpi-grid { display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:20px; }
-  @media(min-width:640px){ .aa-kpi-grid { grid-template-columns:repeat(2,1fr); } }
-  @media(min-width:1024px){ .aa-kpi-grid { grid-template-columns:repeat(4,1fr); } }
-
-  .aa-main-grid { display:grid; grid-template-columns:1fr; gap:18px; align-items:start; }
-  @media(min-width:1024px){ .aa-main-grid { grid-template-columns:1fr 300px; } }
-
   .aa-err-banner {
     display:flex; align-items:center; gap:8px; background:rgba(239,68,68,0.10);
     border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius);
@@ -99,9 +81,86 @@ const cssAlumno = `
   .aa-refresh-btn { display:flex; align-items:center; gap:6px; }
   .aa-refresh-btn svg.spin { animation:aa-spin 1s linear infinite; }
   @keyframes aa-spin { to { transform:rotate(360deg); } }
-  .aa-mat-row { padding:12px 14px; border:1px solid var(--border-subtle); border-radius:10px; margin-bottom:0; transition:border-color .15s,transform .1s,box-shadow .15s; cursor:default; background:var(--bg-surface); }
-  .aa-mat-row:hover { border-color:var(--accent-hover); transform:translateX(2px); box-shadow:0 4px 14px rgba(0,0,0,.15); }
+
+  /* Chip período junto al título */
+  .aa-chip-periodo {
+    display:inline-flex; align-items:center; gap:7px; padding:6px 12px;
+    border:1px solid var(--border-subtle); border-radius:999px; background:var(--bg-input);
+    font-size:11.5px; font-weight:700; color:var(--text-secondary); white-space:nowrap;
+  }
+  .aa-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+  /* Grid de tarjetas circulares por materia (escala solo si hay más) */
+  .aa-chips-grid {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px;
+  }
+  .aa-chip-card {
+    position:relative; background:var(--bg-surface); border:1px solid var(--border-subtle);
+    border-radius:14px; padding:16px 12px 13px; text-align:center; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:7px;
+    transition:border-color .15s,transform .12s,box-shadow .15s;
+  }
+  .aa-chip-card:hover { border-color:var(--accent-hover); transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.18); }
+  .aa-chip-card.riesgo { border-color:rgba(239,68,68,.55); }
+  .aa-chip-card.riesgo:hover { border-color:#ef4444; }
+  .aa-chip-card.open { border-color:var(--accent); }
+  .aa-chip-alerta {
+    position:absolute; top:7px; right:7px; width:19px; height:19px; border-radius:50%;
+    background:rgba(239,68,68,.16); color:#ef4444; display:flex; align-items:center; justify-content:center;
+  }
+  .aa-chip-nombre { font-size:12px; font-weight:700; line-height:1.3; min-height:32px; display:flex; align-items:center; }
+  .aa-chip-clases { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); }
+
+  /* Panel detalle acordeón */
+  .aa-panel {
+    margin-top:14px; border:1px solid var(--border-subtle); border-radius:14px;
+    background:var(--bg-surface); padding:16px; animation:aa-panel-in .16s ease-out;
+  }
+  @keyframes aa-panel-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+
+  /* Tabs Recientes / Semestres anteriores (mismo estilo que cur-tab de Programa) */
+  .aa-tabs { display:flex; gap:6px; margin:14px 0; }
+  .aa-tab {
+    padding:7px 14px; border-radius:10px; font-size:12px; font-weight:700;
+    border:1px solid #2a3040; background:transparent; color:var(--text-secondary);
+    cursor:pointer; transition:all .15s; font-family:inherit;
+  }
+  .aa-tab:hover { border-color:var(--accent-hover); color:var(--text-primary); }
+  .aa-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  .aa-sesion-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 0; border-bottom:1px solid rgba(42,48,64,.25); font-size:12.5px;
+  }
+  .aa-sesion-row:last-child { border-bottom:none; }
+  .aa-hist-anio { font-size:12px; font-weight:800; color:var(--accent-bright); margin:10px 0 2px; }
+  .aa-hist-anio:first-child { margin-top:0; }
+  .aa-hist-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:7px 0; font-size:12.5px; color:var(--text-secondary);
+    border-bottom:1px solid rgba(42,48,64,.15);
+  }
+  .aa-hist-row:last-child { border-bottom:none; }
+
+  /* Stat cards compactas al final */
+  .aa-stat-row { display:flex; gap:10px; margin-top:18px; }
+  .aa-stat {
+    flex:1; background:var(--bg-surface); border:1px solid var(--border-subtle);
+    border-radius:12px; padding:10px 12px; text-align:center; min-width:0;
+  }
+  .aa-stat-label {
+    font-size:11px; color:var(--text-muted); font-weight:600;
+    text-transform:uppercase; letter-spacing:.04em; white-space:nowrap;
+  }
+  .aa-stat-value { font-size:17px; font-weight:800; margin-top:3px; font-family:var(--font-mono); }
 `
+
+function donutColor(pct: number): string {
+  if (pct >= 90) return '#22c55e'
+  if (pct >= 75) return 'var(--accent)'
+  if (pct >= 60) return '#f59e0b'
+  return '#ef4444'
+}
 
 interface AsistenciaApiRow {
   materia_id: number
@@ -117,11 +176,16 @@ function AlumnoView() {
   const uid = Number(getCurrentUser()?.user_id || 0)
   const [porMateria, setPorMateria] = useState<MateriaAsistRow[]>([])
   const [sesiones, setSesiones] = useState<SesionRow[]>([])
+  const [periodos, setPeriodos] = useState<PeriodoRow[]>([])
+  const [historial, setHistorial] = useState<Record<number, { anio: number; semestre: number; porcentaje: number }[]>>({})
+  const [historialLoading, setHistorialLoading] = useState(false)
   const [carreraNombre, setCarreraNombre] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [openId, setOpenId] = useState<number | null>(null)
+  const [panelTab, setPanelTab] = useState<'recientes' | 'historial'>('recientes')
   const firstLoad = useRef(true)
   const LIMITE = 80
 
@@ -132,7 +196,8 @@ function AlumnoView() {
       api.get<AsistenciaApiRow[]>(`/asistencias/?user_id=${uid}`),
       api.get<{ carrera_id: number | null }>('/users/me'),
       api.get<{ id: number; nombre: string }[]>('/carreras/'),
-    ]).then(([porMat, asis, me, carreras]) => {
+      api.get<PeriodoRow[]>('/alumno/mis-periodos'),
+    ]).then(([porMat, asis, me, carreras, per]) => {
       const fails: string[] = []
       if (porMat.status === 'fulfilled') setPorMateria(porMat.value)
       else fails.push('resumen por materia')
@@ -148,6 +213,7 @@ function AlumnoView() {
         const c = carreras.value.find(c => c.id === me.value!.carrera_id)
         if (c) setCarreraNombre(c.nombre)
       }
+      if (per.status === 'fulfilled') setPeriodos(per.value)
       setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
       setLastUpdate(new Date())
     }).finally(() => { setLoading(false); setRefreshing(false); firstLoad.current = false })
@@ -160,45 +226,68 @@ function AlumnoView() {
     return () => clearInterval(id)
   }, [cargar])
 
+  const cargarHistorial = useCallback(async (matId: number) => {
+    if (!periodos.length) return
+    setHistorialLoading(true)
+    try {
+      const results = await Promise.allSettled(
+        periodos.map(p => api.get<MateriaAsistRow[]>(`/alumno/mi-asistencia?anio=${p.anio}&semestre=${p.semestre}`))
+      )
+      const filas: { anio: number; semestre: number; porcentaje: number }[] = []
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          const m = r.value.find(x => x.materia_id === matId)
+          if (m) filas.push({ anio: periodos[i].anio, semestre: periodos[i].semestre, porcentaje: m.porcentaje })
+        }
+      })
+      filas.sort((a, b) => b.anio - a.anio || b.semestre - a.semestre)
+      setHistorial(h => ({ ...h, [matId]: filas }))
+    } finally {
+      setHistorialLoading(false)
+    }
+  }, [periodos])
+
   const totalClases = porMateria.reduce((s, m) => s + m.total_clases, 0)
   const totalPresentes = porMateria.reduce((s, m) => s + m.presentes, 0)
   const promedioTotal = totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : 0
   const inasistencias = totalClases - totalPresentes
-  const critica = porMateria.filter(m => m.porcentaje < LIMITE).sort((a, b) => a.porcentaje - b.porcentaje)[0]
+  const alertasCount = porMateria.filter(m => m.porcentaje < LIMITE).length
+
+  const materiaAbierta = openId !== null ? porMateria.find(m => m.materia_id === openId) : null
+  const sesionesMateria = materiaAbierta ? sesiones.filter(s => s.materia_id === materiaAbierta.materia_id) : []
+
+  const periodoLabel = `${new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} semestre ${new Date().getFullYear()}`
 
   return (
     <>
       <style>{cssAlumno}</style>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 className="page-title">Control de Asistencia</h1>
-          <p className="page-subtitle">
-            {carreraNombre || 'Visualiza tu registro de asistencia por materia y semestre.'} Mantén un seguimiento preciso para cumplir con los requisitos académicos.
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {lastUpdate && (
-            <span className="mono-label" style={{ fontSize: 10.5 }}>
-              Actualizado {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
-          <button type="button" className="btn-ghost aa-refresh-btn" disabled={refreshing} onClick={() => cargar(true)}>
-            <svg className={refreshing ? 'spin' : ''} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="23 4 23 10 17 10" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-            </svg>
-            {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
-          <span className="badge" style={{
-            background: totalClases === 0 ? 'var(--bg-elevated)' : promedioTotal >= LIMITE ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-            color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444',
-            border: `1px solid ${totalClases === 0 ? 'var(--border-subtle)' : promedioTotal >= LIMITE ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-            padding: '5px 14px', fontSize: 11.5,
-          }}>
-            <i className={`ti ${totalClases === 0 ? 'ti-minus' : promedioTotal >= LIMITE ? 'ti-shield-check' : 'ti-alert-triangle'}`} /> Estado: {totalClases === 0 ? 'Sin datos aún' : promedioTotal >= LIMITE ? 'Alumno Regular' : 'En Riesgo'}
+      {/* 1) Header: título + chip período | Escanear QR */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h1 className="page-title" style={{ margin: 0 }}>Asistencia</h1>
+          <span className="aa-chip-periodo">
+            <span className="aa-dot" style={{ background: '#22c55e' }} />
+            {periodoLabel}
           </span>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {lastUpdate && (
+            <span className="mono-label" style={{ fontSize: 10 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
+          )}
+          <button type="button" className="btn-ghost aa-refresh-btn" disabled={refreshing} onClick={() => cargar(true)}>
+            <svg className={refreshing ? 'spin' : ''} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="23 4 23 10 17 10" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => navigate('/asistencia/scan')}
+            style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+            <i className="ti ti-qrcode" style={{ fontSize: 15 }} /> Escanear QR
+          </button>
+        </div>
       </div>
+
+      {carreraNombre && <p className="page-subtitle" style={{ marginTop: -10, marginBottom: 16 }}>{carreraNombre}</p>}
 
       {error && (
         <div className="aa-err-banner">
@@ -210,174 +299,130 @@ function AlumnoView() {
         <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando asistencia…</div>
       ) : (
         <>
-          {/* KPIs */}
-          <div className="aa-kpi-grid">
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444'}` }}>
-              <div className="kpi-top"><span className="mono-label">Promedio Total</span><i className="ti ti-percentage" style={{ color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444', fontSize: 15 }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="kpi-value" style={{ fontSize: 26, color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</span>
-              </div>
-              <div className="progress-track" style={{ marginTop: 8 }}>
-                <div className="progress-fill" style={{ width: `${promedioTotal}%`, background: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444' }} />
-              </div>
+          {/* 2) Grid de tarjetas circulares por materia */}
+          {porMateria.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: 28 }}>Sin registros de asistencia aún.</div>
+          ) : (
+            <div className="aa-chips-grid">
+              {porMateria.map(m => {
+                const pct = m.porcentaje
+                const riesgo = pct < LIMITE
+                const color = donutColor(pct)
+                const c = 2 * Math.PI * 30
+                const abierta = openId === m.materia_id
+                return (
+                  <div key={m.materia_id}
+                    className={`aa-chip-card${riesgo ? ' riesgo' : ''}${abierta ? ' open' : ''}`}
+                    onClick={() => { setOpenId(abierta ? null : m.materia_id); setPanelTab('recientes') }}>
+                    {riesgo && (
+                      <span className="aa-chip-alerta" title="Materia en riesgo"><i className="ti ti-alert-triangle" style={{ fontSize: 11 }} /></span>
+                    )}
+                    <div style={{ position: 'relative', width: 72, height: 72 }}>
+                      <svg width="72" height="72" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="36" cy="36" r="30" stroke="var(--bg-elevated)" strokeWidth="6" fill="none" />
+                        <circle cx="36" cy="36" r="30" stroke={color} strokeWidth="6" fill="none"
+                          strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
+                      </svg>
+                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 15, color }}>{pct}%</span>
+                    </div>
+                    <div className="aa-chip-nombre">{m.materia_nombre}</div>
+                    <div className="aa-chip-clases">{m.presentes}/{m.total_clases} clases</div>
+                  </div>
+                )
+              })}
             </div>
-            <div className="kpi-card" style={{ borderLeft: '3px solid var(--accent-bright)' }}>
-              <div className="kpi-top"><span className="mono-label">Clases Totales</span><i className="ti ti-calendar-stats" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-              <span className="kpi-value" style={{ fontSize: 26 }}>{totalClases}</span>
-              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Sesiones registradas</div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${inasistencias > 3 ? '#ef4444' : '#f59e0b'}` }}>
-              <div className="kpi-top"><span className="mono-label">Inasistencias</span><i className="ti ti-calendar-off" style={{ color: '#ef4444', fontSize: 15 }} /></div>
-              <span className="kpi-value" style={{ fontSize: 26, color: '#ef4444' }}>{inasistencias}</span>
-              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Días no asistidos</div>
-            </div>
-            {critica ? (
-              <div className="aa-alerta" style={{ borderLeft: '3px solid #ef4444' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span className="mono-label" style={{ color: '#ef4444' }}>Alerta Crítica</span>
-                  <i className="ti ti-alert-triangle" style={{ color: '#ef4444' }} />
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>A {Math.max(0, Math.ceil((LIMITE - critica.porcentaje) / 100 * critica.total_clases))} faltas del límite permitido ({LIMITE}% req.)</div>
-                <div className="progress-track" style={{ marginTop: 8, height: 4 }}><div className="progress-fill" style={{ width: `${critica.porcentaje}%`, background: '#ef4444', height: 4 }} /></div>
-              </div>
-            ) : (
-              <div className="kpi-card" style={{ borderLeft: '3px solid #22c55e' }}>
-                <div className="kpi-top"><span className="mono-label">Alertas</span><i className="ti ti-shield-check" style={{ color: '#22c55e', fontSize: 15 }} /></div>
-                <span className="kpi-value" style={{ fontSize: 26, color: '#22c55e' }}>0</span>
-                <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Todo en regla ✓</div>
-              </div>
-            )}
-          </div>
+          )}
 
-          <div className="aa-main-grid">
-            <div>
-              {/* Cumplimiento por materia */}
-              <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 800 }}><i className="ti ti-list-check" style={{ color: 'var(--accent-bright)' }} /> Cumplimiento por Materia</h3>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>{porMateria.length} materias</span>
+          {/* 3) Panel de detalle (acordeón) de la materia abierta */}
+          {materiaAbierta && (
+            <div className="aa-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span className="mono-label">Cumplimiento</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 14, color: donutColor(materiaAbierta.porcentaje) }}>{materiaAbierta.porcentaje}%</span>
+              </div>
+              <div className="progress-track" style={{ height: 8 }}>
+                <div className="progress-fill" style={{ width: `${materiaAbierta.porcentaje}%`, background: donutColor(materiaAbierta.porcentaje), height: 8 }} />
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5 }}>{materiaAbierta.presentes} de {materiaAbierta.total_clases} clases asistidas</div>
+
+              <div className="aa-tabs">
+                <button className={`aa-tab${panelTab === 'recientes' ? ' active' : ''}`} onClick={() => setPanelTab('recientes')}>Recientes</button>
+                <button className={`aa-tab${panelTab === 'historial' ? ' active' : ''}`} onClick={() => {
+                  setPanelTab('historial')
+                  if (!historial[materiaAbierta.materia_id]) cargarHistorial(materiaAbierta.materia_id)
+                }}>Semestres anteriores</button>
+              </div>
+
+              {panelTab === 'recientes' ? (
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {sesionesMateria.length === 0 ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 14 }}>Sin sesiones registradas.</p>
+                  ) : sesionesMateria.map((s, i) => (
+                    <div key={i} className="aa-sesion-row">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span className="aa-dot" style={{ background: s.presente ? '#22c55e' : '#ef4444' }} />
+                        {s.fecha}
+                      </span>
+                      <span className="badge" style={{
+                        background: s.presente ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                        color: s.presente ? '#22c55e' : '#ef4444',
+                        border: `1px solid ${s.presente ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                        padding: '3px 10px', fontSize: 10.5,
+                      }}>
+                        {s.presente ? '✓ Presente' : '✗ Ausente'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                {porMateria.length === 0 ? (
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: 24 }}>Sin registros de asistencia aún.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {porMateria.map(m => {
-                      const pct = m.porcentaje
-                      const ok = pct >= LIMITE
-                      const color = pct >= 90 ? '#22c55e' : pct >= 75 ? 'var(--accent-bright)' : pct >= 60 ? '#f59e0b' : '#ef4444'
-                      const c = 2 * Math.PI * 18
-                      return (
-                        <div key={m.materia_id} className="aa-mat-row">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
-                              <svg width="48" height="48" style={{ transform: 'rotate(-90deg)' }}>
-                                <circle cx="24" cy="24" r="18" stroke="var(--bg-elevated)" strokeWidth="4" fill="none" />
-                                <circle cx="24" cy="24" r="18" stroke={color} strokeWidth="4" fill="none"
-                                  strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
-                              </svg>
-                              <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 10, color }}>{pct}%</span>
+              ) : (
+                <div>
+                  {historialLoading ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center', padding: 14 }}>Cargando historial…</p>
+                  ) : (historial[materiaAbierta.materia_id] || []).length === 0 ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 14 }}>Sin datos de semestres anteriores.</p>
+                  ) : (
+                    (() => {
+                      const hist = historial[materiaAbierta.materia_id] || []
+                      const porAnio: Record<number, { semestre: number; porcentaje: number }[]> = {}
+                      hist.forEach(h => {
+                        if (!porAnio[h.anio]) porAnio[h.anio] = []
+                        porAnio[h.anio].push({ semestre: h.semestre, porcentaje: h.porcentaje })
+                      })
+                      return Object.keys(porAnio).map(Number).sort((a, b) => b - a).map(anio => (
+                        <div key={anio}>
+                          <div className="aa-hist-anio">Año {anio}</div>
+                          {porAnio[anio].sort((a, b) => b.semestre - a.semestre).map(p => (
+                            <div key={p.semestre} className="aa-hist-row">
+                              <span>{p.semestre === 1 ? 'Primer' : 'Segundo'} semestre</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: p.porcentaje >= LIMITE ? '#22c55e' : '#ef4444' }}>{p.porcentaje}%</span>
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.materia_nombre}</span>
-                                <span className="badge" style={{
-                                  background: ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                                  color: ok ? '#22c55e' : '#ef4444',
-                                  border: `1px solid ${ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                                  padding: '2px 10px', fontSize: 10, whiteSpace: 'nowrap',
-                                }}>
-                                  <i className={`ti ${ok ? 'ti-shield-check' : 'ti-alert-triangle'}`} style={{ fontSize: 10, marginRight: 3 }} />
-                                  {ok ? 'Regular' : 'En riesgo'}
-                                </span>
-                              </div>
-                              <div className="progress-track" style={{ marginTop: 6, height: 5 }}>
-                                <div className="progress-fill" style={{ width: `${pct}%`, background: color, height: 5 }} />
-                              </div>
-                              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>{m.presentes}/{m.total_clases} Sesiones</div>
-                            </div>
-                          </div>
+                          ))}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 10.5, color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', marginRight: 5 }} />Óptimo (≥90%)</span>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-bright)', marginRight: 5 }} />Bueno (≥75%)</span>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', marginRight: 5 }} />Mínimo (≥60%)</span>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#ef4444', marginRight: 5 }} />Crítico (&lt;60%)</span>
+                      ))
+                    })()
+                  )}
                 </div>
-              </div>
+              )}
             </div>
+          )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="card" style={{ borderLeft: '3px solid var(--accent-bright)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <i className="ti ti-calendar" style={{ color: 'var(--accent-bright)', fontSize: 16 }} />
-                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Periodo Académico</h3>
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre {new Date().getFullYear()}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
-                  Periodo académico en curso
-                </div>
-              </div>
-
-              <div className="card" style={{ borderLeft: `3px solid ${critica ? '#ef4444' : '#22c55e'}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <i className="ti ti-alert-triangle" style={{ color: critica ? '#ef4444' : '#22c55e', fontSize: 16 }} />
-                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Resumen de Alertas</h3>
-                </div>
-                {critica ? (
-                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#ef4444' }}>{critica.materia_nombre}</div>
-                    <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-                      Riesgo de pérdida de regularidad. Se requieren asistencias consecutivas para salir de zona crítica.
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-                    <i className="ti ti-shield-check" style={{ color: '#22c55e', fontSize: 18 }} />
-                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0 }}>Sin alertas activas. Todo en orden.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <i className="ti ti-history" style={{ color: 'var(--accent-bright)', fontSize: 16 }} />
-                    <h3 style={{ fontSize: 14, fontWeight: 800 }}>Bitácora de Sesiones</h3>
-                  </div>
-                  <span className="badge" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontSize: 10 }}>{sesiones.length} últimas</span>
-                </div>
-                {sesiones.length === 0 ? (
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin sesiones registradas.</p>
-                ) : (
-                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                    {sesiones.slice(0, 8).map((s, i) => (
-                      <div key={i} className="det-row" style={{ padding: '8px 0', borderBottom: i < 7 ? '1px solid rgba(42,48,64,0.2)' : 'none', fontSize: 11.5 }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: s.presente ? '#22c55e' : '#ef4444' }} />
-                          {s.materia_nombre}
-                        </span>
-                        <span style={{ color: s.presente ? '#22c55e' : '#ef4444', fontWeight: 700, flexShrink: 0, fontSize: 11 }}>
-                          {s.presente ? 'Presente' : 'Ausente'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* 4) Stat cards chicas (resumen secundario) */}
+          <div className="aa-stat-row">
+            <div className="aa-stat">
+              <div className="aa-stat-label">Promedio total</div>
+              <div className="aa-stat-value" style={{ color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</div>
+            </div>
+            <div className="aa-stat">
+              <div className="aa-stat-label">Inasistencias</div>
+              <div className="aa-stat-value" style={{ color: inasistencias > 3 ? '#ef4444' : '#f59e0b' }}>{inasistencias}</div>
+            </div>
+            <div className="aa-stat">
+              <div className="aa-stat-label">Alertas</div>
+              <div className="aa-stat-value" style={{ color: alertasCount > 0 ? '#ef4444' : '#22c55e' }}>{alertasCount}</div>
             </div>
           </div>
         </>
       )}
-
-      <button className="aa-fab-qr" onClick={() => navigate('/asistencia/scan')}>
-        <i className="ti ti-qrcode" style={{ fontSize: 18 }} /> Escanear QR
-      </button>
     </>
   )
 }
@@ -562,9 +607,7 @@ function ProfesorView() {
           {view === 'alumnos' && <div />}
         </div>
 
-        {view === 'carreras' && (
-          loading ? <div style={{ textAlign:'center', padding:'32px 20px', color:'var(--text-muted)', fontSize:13 }}>Cargando carreras…</div>
-          : carreras.length === 0
+        {view === 'carreras' && (carreras.length === 0
             ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-muted)', fontSize:13 }}>No tenés carreras asignadas</div>
             : <div className="ap-chip-strip">{carreras.map(c => (
                 <div key={c.id} className="ap-chip" onClick={() => selectCarrera(c)}>
