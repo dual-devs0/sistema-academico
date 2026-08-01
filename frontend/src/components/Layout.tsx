@@ -309,7 +309,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         }
       `}</style>
 
-      <div className="layout-root" style={{ display: 'flex', background: 'var(--bg-base)', height: '100vh', overflow: 'hidden', fontFamily: 'var(--font-sans)' }}>
+      <div className="layout-root" style={{ display: 'flex', background: 'var(--bg-base)', height: '100dvh', overflow: 'hidden', fontFamily: 'var(--font-sans)' }}>
 
         {mobileOpen && <div className="layout-overlay" onClick={() => setMobileOpen(false)} />}
 
