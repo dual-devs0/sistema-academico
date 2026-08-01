@@ -506,25 +506,25 @@ export default function LoginScreen() {
                     />
                   </Animated.View>
                 )}
-                <View style={{ flexDirection: "row", justifyContent: "space-evenly", paddingTop: spacing.lg, paddingBottom: spacing.md }}>
-                  <QuickTile
-                    active={foreignOpen}
-                    icon={<GlobeIcon />}
-                    label={"Documento\nextranjero"}
-                    onPress={() => setForeignOpen((v) => !v)}
-                  />
-                  <QuickTile
-                    icon={<FingerprintIcon />}
-                    label={bioType}
-                    onPress={handleBiometricPress}
-                  />
-                  <QuickTile
-                    icon={<KeyIcon />}
-                    label={"Olvidé mi\ncontraseña"}
-                    onPress={() => setScreen("forgot")}
-                  />
-                </View>
               </ScrollView>
+              <View style={{ flexDirection: "row", justifyContent: "space-evenly", paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md }}>
+                <QuickTile
+                  active={foreignOpen}
+                  icon={<GlobeIcon />}
+                  label={"Documento\nextranjero"}
+                  onPress={() => setForeignOpen((v) => !v)}
+                />
+                <QuickTile
+                  icon={<FingerprintIcon />}
+                  label={bioType}
+                  onPress={handleBiometricPress}
+                />
+                <QuickTile
+                  icon={<KeyIcon />}
+                  label={"Olvidé mi\ncontraseña"}
+                  onPress={() => setScreen("forgot")}
+                />
+              </View>
             </KeyboardAvoidingView>
           </>
         ) : (
