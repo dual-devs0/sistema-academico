@@ -69,7 +69,7 @@ const P = {
 };
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const HEADER_H = Math.round(SCREEN_H * 0.42);
+const HEADER_H = Math.round(SCREEN_H * 0.38);
 const SAVED_CREDENTIALS_KEY = "uca.saved_credentials";
 const SECRETARIA_EMAIL = "secretaria@uca.edu.py";
 
@@ -357,7 +357,7 @@ export default function LoginScreen() {
 
         {screen === "main" ? (
           <>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: 0, paddingBottom: spacing.sm }}>
               <CapIcon fill={P.accent} size={34} />
               <Text style={{ fontFamily: fontFamily.interSemibold, fontSize: 13.5, color: P.accent, textAlign: "center" }}>
                 {tab === "login" ? "UCA Caacupé · Bienvenido, estudiante" : "UCA Caacupé · Creá tu cuenta"}
