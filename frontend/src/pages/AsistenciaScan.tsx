@@ -1,6 +1,7 @@
 // Alumno. Pantalla de escaneo de QR para registrar presente. Depende de: POST /asistencias/qr/verificar.
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import jsQR from 'jsqr'
 import { api, getCurrentUser } from '../lib/api'
 
 type Estado = 'idle' | 'verificando' | 'exito' | 'duplicado' | 'expirado' | 'no_autorizado' | 'error'
@@ -69,6 +70,7 @@ export default function AsistenciaScan() {
   const [materias, setMaterias] = useState<MateriaAsist[]>([])
   const [camara, setCamara] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const user = getCurrentUser()
   const nombre = user?.username || 'Alumno'
@@ -99,7 +101,7 @@ export default function AsistenciaScan() {
       })
   }, [token, navigate])
 
-  // Cámara + detección QR nativa (BarcodeDetector)
+  // Cámara + detección QR: BarcodeDetector nativo (Chrome/Edge) → fallback jsQR (Firefox/Safari)
   async function activarCamara() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
@@ -110,28 +112,49 @@ export default function AsistenciaScan() {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
         }
-        interface BarcodeDetectorCtor {
-  new (options: { formats: string[] }): {
-    detect(el: HTMLVideoElement): Promise<Array<{ rawValue: string }>>
-  }
-}
-const BD = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector
-        if (!BD) { setErrorMsg('Tu navegador no soporta detección QR nativa. Usá la cámara del teléfono.'); return }
-        const detector = new BD({ formats: ['qr_code'] })
-        const tick = async () => {
-          if (!streamRef.current || !videoRef.current) return
-          try {
-            const codes = await detector.detect(videoRef.current)
-            if (codes.length > 0) {
-              const raw = codes[0].rawValue as string
-              const m = raw.match(/token=([\w.-]+)/)
-              pararCamara()
-              if (m) { window.location.href = `/asistencia/scan?token=${m[1]}`; return }
+        const BD = (window as unknown as {
+          BarcodeDetector?: new (options: { formats: string[] }) => {
+            detect(el: HTMLVideoElement): Promise<Array<{ rawValue: string }>>
+          }
+        }).BarcodeDetector
+        if (BD) {
+          const detector = new BD({ formats: ['qr_code'] })
+          const tick = async () => {
+            if (!streamRef.current || !videoRef.current) return
+            try {
+              const codes = await detector.detect(videoRef.current)
+              if (codes.length > 0) {
+                const raw = codes[0].rawValue as string
+                const m = raw.match(/token=([\w.-]+)/)
+                pararCamara()
+                if (m) { window.location.href = `/asistencia/scan?token=${m[1]}`; return }
+              }
+            } catch { /* frame no listo */ }
+            requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        } else {
+          const canvas = canvasRef.current!
+          const ctx = canvas.getContext('2d')!
+          const tick = () => {
+            if (!streamRef.current || !videoRef.current) return
+            const video = videoRef.current
+            if (video.readyState >= 2) {
+              canvas.width = video.videoWidth
+              canvas.height = video.videoHeight
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+              const code = jsQR(imageData.data, imageData.width, imageData.height)
+              if (code) {
+                const m = code.data.match(/token=([\w.-]+)/)
+                pararCamara()
+                if (m) { window.location.href = `/asistencia/scan?token=${m[1]}`; return }
+              }
             }
-          } catch { /* frame no listo */ }
+            requestAnimationFrame(tick)
+          }
           requestAnimationFrame(tick)
         }
-        requestAnimationFrame(tick)
       }, 50)
     } catch {
       setErrorMsg('No se pudo acceder a la cámara. Verificá los permisos.')
@@ -214,6 +237,7 @@ const BD = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).Barc
           <div className="scan-col-left">
             <div className="scan-visor">
               {camara && <video ref={videoRef} muted playsInline />}
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
               <span className="scan-corner tl" /><span className="scan-corner tr" />
               <span className="scan-corner bl" /><span className="scan-corner br" />
               {camara ? <span className="scan-line" /> : (
