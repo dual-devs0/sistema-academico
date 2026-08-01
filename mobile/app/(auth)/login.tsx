@@ -28,6 +28,7 @@ import Svg, { Path, Rect, Circle } from "react-native-svg";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { AxiosError } from "axios";
+import { CurveBackground } from "../../components/CurveBackground";
 import { useAuth } from "../../hooks/useAuth";
 import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
 import { fetchPerfil } from "../../services/dashboardService";
@@ -111,18 +112,7 @@ function WaveBackground({
         >
           {title}
         </Text>
-        <Svg
-          width={SCREEN_W}
-          height={150}
-          viewBox="0 0 500 150"
-          preserveAspectRatio="none"
-          style={{ position: "absolute", bottom: -2 }}
-        >
-          <Path
-            d="M0,40 C150,180 350,180 500,40 L500,150 L0,150 Z"
-            fill={P.navy}
-          />
-        </Svg>
+        <CurveBackground width={SCREEN_W} fill={P.navy} />
       </View>
       {children}
     </View>
