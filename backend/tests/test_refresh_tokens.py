@@ -241,19 +241,23 @@ def test_refresh_despues_de_logout_retorna_401(client, seed):
 # ---------------------------------------------------------------------------
 
 
-def test_login_no_devuelve_refresh_token_en_body(client, seed):
-    """El refresh_token NO debe estar en el body — solo en la httpOnly cookie."""
+def test_login_devuelve_refresh_token_en_body(client, seed):
+    """El refresh_token se devuelve en el body para clientes móviles SIN
+    cookie jar (que lo persisten en SecureStore), además de en la cookie
+    httpOnly para el flujo web."""
     res = client.post(
         "/auth/login", json={"username": "alumno_test", "password": "alumno123"}
     )
     assert res.status_code == 200
     data = res.json()
-    assert "refresh_token" not in data
-    # Debe estar en la cookie httpOnly
+    # Body (flujo móvil)
+    assert "refresh_token" in data
+    body_raw = data["refresh_token"]
+    assert isinstance(body_raw, str)
+    assert len(body_raw) > 20
+    # También en la cookie httpOnly (flujo web) — debe ser el mismo token
     assert "refresh_token" in res.cookies
-    raw_cookie = res.cookies.get("refresh_token")
-    assert isinstance(raw_cookie, str)
-    assert len(raw_cookie) > 20
+    assert body_raw == res.cookies.get("refresh_token")
 
 
 def test_login_refresh_token_en_cookie(client, seed, db):
@@ -288,7 +292,7 @@ def test_refresh_acepta_token_por_body(client, seed):
     assert res.status_code == 200
     data = res.json()
     assert "access_token" in data
-    assert "refresh_token" not in data  # no se devuelve en body
+    assert "refresh_token" in data  # se devuelve en body para clientes móviles
 
 
 def test_refresh_rechaza_body_invalido(client, seed):

@@ -28,6 +28,7 @@ import Svg, { Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { UserAvatar } from "../../components/ui/UserAvatar";
+import { InfoAppModal } from "../../components/ui/InfoAppModal";
 import { SettingRow } from "../../components/ui/SettingRow";
 import { SkeletonLoader } from "../../components/ui/SkeletonLoader";
 import {
@@ -65,6 +66,7 @@ const { logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [u, r] = await Promise.all([
@@ -233,6 +235,13 @@ const { logout } = useAuth();
                 onPress={() => setTermsOpen(true)}
                 right={<ChevronIcon />}
               />
+              <SettingRow
+                glyph="ℹ"
+                label="Información de la app"
+                variant="chevron"
+                onPress={() => setInfoOpen(true)}
+                right={<ChevronIcon />}
+              />
             </View>
 
             <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.xl }}>
@@ -287,6 +296,7 @@ const { logout } = useAuth();
 
       <FaqModal visible={faqOpen} onClose={() => setFaqOpen(false)} />
       <TermsModal visible={termsOpen} onClose={() => setTermsOpen(false)} />
+      <InfoAppModal visible={infoOpen} onClose={() => setInfoOpen(false)} />
 
       {toast ? (
         <Animated.View

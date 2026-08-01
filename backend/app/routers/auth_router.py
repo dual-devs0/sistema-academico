@@ -180,6 +180,7 @@ def login(
         "access_token": access_token,
         "token_type": "bearer",
         "csrf_token": csrf_token,
+        "refresh_token": raw,
     }
 
 
@@ -251,6 +252,7 @@ def refresh(
         "access_token": access_token,
         "token_type": "bearer",
         "csrf_token": csrf_token,
+        "refresh_token": raw,
     }
 
 

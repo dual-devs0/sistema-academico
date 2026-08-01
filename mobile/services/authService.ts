@@ -14,12 +14,14 @@ export interface LoginResponse {
   access_token: string;
   token_type: string;
   csrf_token?: string;
+  refresh_token?: string;
 }
 
 export interface RefreshResponse {
   access_token: string;
   token_type: string;
   csrf_token?: string;
+  refresh_token?: string;
 }
 
 export interface LoginPayload {
@@ -34,12 +36,14 @@ export async function loginRequest(payload: LoginPayload): Promise<LoginResponse
 
 export async function refreshRequest(
   csrfToken: string | null,
+  refreshToken?: string,
 ): Promise<RefreshResponse> {
   const headers: Record<string, string> = {};
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  const body = refreshToken ? { refresh_token: refreshToken } : {};
   const { data } = await api.post<RefreshResponse>(
     "/auth/refresh",
-    {},
+    body,
     { headers },
   );
   return data;

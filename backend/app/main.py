@@ -145,3 +145,17 @@ app.include_router(foro_router.router)
 )
 def root():
     return {"message": "API Sistema Academico funcionando"}
+
+
+@app.get(
+    "/version",
+    tags=["default"],
+    responses={200: {"description": "Información de versión de la app mobile"}},
+)
+def version():
+    return {
+        "latestVersion": "1.0.0",
+        "minVersion": "1.0.0",
+        "updateUrl": "https://expo.dev/accounts/cabrvix/projects/uca-movil/builds",
+        "releaseNotes": "Primera versión del sistema académico móvil UCA Caacupé.",
+    }

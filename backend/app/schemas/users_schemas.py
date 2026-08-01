@@ -36,6 +36,7 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str
     csrf_token: str | None = None
+    refresh_token: str | None = None
 
 
 class RefreshRequest(BaseModel):

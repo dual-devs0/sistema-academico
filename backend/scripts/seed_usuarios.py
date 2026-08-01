@@ -1,4 +1,8 @@
 """Seed mínimo: solo crea los 3 usuarios de prueba en PostgreSQL."""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -28,7 +32,7 @@ try:
             role=u["role"],
             nombre=u["nombre"],
             email=u["email"],
-            ci=u["ci"],
+            cedula=u["ci"],
             activo=True,
         )
         db.add(user)
