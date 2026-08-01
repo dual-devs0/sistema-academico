@@ -60,7 +60,7 @@ const css = `
   .main-grid { display:grid; grid-template-columns:248px 1fr; gap:16px; align-items:start; }
 
   /* Panel izquierdo */
-  .left-panel { display:flex; flex-direction:column; gap:10px; position:sticky; top:76px; max-height:calc(100vh - 90px); overflow-y:auto; scrollbar-width:thin; }
+  .left-panel { display:flex; flex-direction:column; gap:10px; position:sticky; top:76px; max-height:calc(100dvh - 90px); overflow-y:auto; scrollbar-width:thin; }
   .panel-lbl { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; font-weight:700; margin-bottom:4px; }
   .mat-item { border-radius:12px; padding:12px 12px 12px 14px; cursor:pointer; border:1px solid #2a3040; transition:all .15s; background:var(--bg-surface); position:relative; overflow:hidden; margin-bottom:6px; }
   .mat-item:hover { border-color:var(--border-light); }
