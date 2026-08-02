@@ -4,8 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +30,7 @@ import Svg, { Path, Rect, Circle } from "react-native-svg";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { AxiosError } from "axios";
+import { CurveBackground } from "../../components/CurveBackground";
 import { useAuth } from "../../hooks/useAuth";
 import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
 import { fetchPerfil } from "../../services/dashboardService";
@@ -66,7 +69,7 @@ const P = {
 };
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const HEADER_H = Math.round(SCREEN_H * 0.42);
+const HEADER_H = Math.round(SCREEN_H * 0.38);
 const SAVED_CREDENTIALS_KEY = "uca.saved_credentials";
 const SECRETARIA_EMAIL = "secretaria@uca.edu.py";
 
@@ -92,7 +95,7 @@ function WaveBackground({
           alignItems: "center",
           justifyContent: "center",
           paddingTop: insets.top,
-          paddingBottom: 40,
+          paddingBottom: 80,
         }}
       >
         <Image
@@ -111,18 +114,7 @@ function WaveBackground({
         >
           {title}
         </Text>
-        <Svg
-          width={SCREEN_W}
-          height={150}
-          viewBox="0 0 500 150"
-          preserveAspectRatio="none"
-          style={{ position: "absolute", bottom: -2 }}
-        >
-          <Path
-            d="M0,40 C150,180 350,180 500,40 L500,150 L0,150 Z"
-            fill={P.navy}
-          />
-        </Svg>
+        <CurveBackground width={SCREEN_W} fill={P.navy} />
       </View>
       {children}
     </View>
@@ -154,8 +146,38 @@ type BioType = "Face ID" | "Huella digital" | "Biométrico";
 
 const TITLE = "PORTAL ACADÉMICO";
 
+const DOC_TYPES = [
+  "Libreta de Baja",
+  "Libreta Cívica",
+  "Pasaporte",
+  "Carnet de Migraciones",
+  "RUC",
+  "Indefinido",
+  "DNI",
+  "RG - Registro General",
+  "Cédula de Identidad",
+  "RUT",
+];
+
+const COUNTRIES = [
+  "Paraguay",
+  "Argentina",
+  "Brasil",
+  "Bolivia",
+  "Chile",
+  "Uruguay",
+  "Perú",
+  "Colombia",
+  "Venezuela",
+  "España",
+  "Estados Unidos",
+  "México",
+  "Otro",
+];
+
 export default function LoginScreen() {
   const { setTokens, confirmAuth } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [screen, setScreen] = useState<Screen>("main");
   const [tab, setTab] = useState<Tab>("login");
@@ -168,7 +190,7 @@ export default function LoginScreen() {
   const [regMatricula, setRegMatricula] = useState("");
 
   const [foreignOpen, setForeignOpen] = useState(false);
-  const [foreignDoc, setForeignDoc] = useState("");
+  const [foreignDocType, setForeignDocType] = useState("");
   const [foreignCountry, setForeignCountry] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -333,9 +355,41 @@ export default function LoginScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
         <View style={{ height: HEADER_H }} />
 
+        {screen === "forgot" ? (
+          <View style={{ position: "absolute", top: insets.top + spacing.sm, left: spacing.xl, zIndex: 10 }}>
+            <Pressable
+              onPress={() => setScreen("main")}
+              hitSlop={16}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "rgba(13,33,55,0.06)",
+                  borderWidth: 1,
+                  borderColor: "rgba(13,33,55,0.14)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <BackArrowIcon color={P.headerTitle} />
+              </View>
+              <Text style={{ color: P.headerTitle, fontFamily: fontFamily.interBold, fontSize: 15, marginLeft: spacing.sm }}>
+                Volver
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {screen === "main" ? (
           <>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: spacing.lg, paddingBottom: spacing.sm }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: 0, paddingBottom: spacing.sm }}>
               <CapIcon fill={P.accent} size={34} />
               <Text style={{ fontFamily: fontFamily.interSemibold, fontSize: 13.5, color: P.accent, textAlign: "center" }}>
                 {tab === "login" ? "UCA Caacupé · Bienvenido, estudiante" : "UCA Caacupé · Creá tu cuenta"}
@@ -424,23 +478,21 @@ export default function LoginScreen() {
 
                     {foreignOpen ? (
                       <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ gap: spacing.md }}>
-                        <LabeledInput
-                          label="Pasaporte o documento extranjero"
+                        <SelectField
+                          label="Tipo de documento"
                           accent
-                          value={foreignDoc}
-                          onChangeText={setForeignDoc}
-                          placeholder="Ej: AB123456"
-                          autoCapitalize="none"
-                          autoCorrect={false}
+                          value={foreignDocType}
+                          onSelect={setForeignDocType}
+                          options={DOC_TYPES}
+                          placeholder="Seleccioná un tipo"
                         />
-                        <LabeledInput
+                        <SelectField
                           label="País del documento"
                           accent
                           value={foreignCountry}
-                          onChangeText={setForeignCountry}
-                          placeholder="Ej: Argentina"
-                          autoCapitalize="words"
-                          autoCorrect={false}
+                          onSelect={setForeignCountry}
+                          options={COUNTRIES}
+                          placeholder="Seleccioná un país"
                         />
                       </Animated.View>
                     ) : null}
@@ -485,23 +537,21 @@ export default function LoginScreen() {
 
                     {foreignOpen ? (
                       <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ gap: spacing.md }}>
-                        <LabeledInput
-                          label="Pasaporte o documento extranjero"
+                        <SelectField
+                          label="Tipo de documento"
                           accent
-                          value={foreignDoc}
-                          onChangeText={setForeignDoc}
-                          placeholder="Ej: AB123456"
-                          autoCapitalize="none"
-                          autoCorrect={false}
+                          value={foreignDocType}
+                          onSelect={setForeignDocType}
+                          options={DOC_TYPES}
+                          placeholder="Seleccioná un tipo"
                         />
-                        <LabeledInput
+                        <SelectField
                           label="País del documento"
                           accent
                           value={foreignCountry}
-                          onChangeText={setForeignCountry}
-                          placeholder="Ej: Argentina"
-                          autoCapitalize="words"
-                          autoCorrect={false}
+                          onSelect={setForeignCountry}
+                          options={COUNTRIES}
+                          placeholder="Seleccioná un país"
                         />
                       </Animated.View>
                     ) : null}
@@ -516,67 +566,34 @@ export default function LoginScreen() {
                     />
                   </Animated.View>
                 )}
-                <View style={{ flexDirection: "row", justifyContent: "space-evenly", paddingTop: spacing.lg, paddingBottom: spacing.md }}>
-                  <QuickTile
-                    active={foreignOpen}
-                    icon={<GlobeIcon />}
-                    label={"Documento\nextranjero"}
-                    onPress={() => setForeignOpen((v) => !v)}
-                  />
-                  <QuickTile
-                    icon={<FingerprintIcon />}
-                    label={bioType}
-                    onPress={handleBiometricPress}
-                  />
-                  <QuickTile
-                    icon={<KeyIcon />}
-                    label={"Olvidé mi\ncontraseña"}
-                    onPress={() => setScreen("forgot")}
-                  />
-                </View>
               </ScrollView>
+              <View style={{ flexDirection: "row", justifyContent: "space-evenly", paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md }}>
+                <QuickTile
+                  active={foreignOpen}
+                  icon={<GlobeIcon />}
+                  label={"Documento\nextranjero"}
+                  onPress={() => setForeignOpen((v) => !v)}
+                />
+                <QuickTile
+                  icon={<FingerprintIcon />}
+                  label={bioType}
+                  onPress={handleBiometricPress}
+                />
+                <QuickTile
+                  icon={<KeyIcon />}
+                  label={"Olvidé mi\ncontraseña"}
+                  onPress={() => setScreen("forgot")}
+                />
+              </View>
             </KeyboardAvoidingView>
           </>
         ) : (
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <View style={{ height: Math.max(HEADER_H - 300, 0) }} />
-            <Pressable
-              onPress={() => setScreen("main")}
-              hitSlop={16}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                alignSelf: "flex-start",
-                paddingHorizontal: spacing.xl,
-                paddingVertical: spacing.sm,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: "rgba(255,255,255,0.06)",
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.14)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <BackArrowIcon color={P.white} />
-              </View>
-              <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 15 }}>
-                Volver
-              </Text>
-            </Pressable>
-
             <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingBottom: spacing["3xl"] }}>
               <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 26, textAlign: "center" }}>
                 Recuperar contraseña
               </Text>
-              <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing["3xl"] }}>
+              <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing.xl }}>
                 Le enviaremos un correo electrónico con su nueva contraseña.
               </Text>
 
@@ -798,6 +815,102 @@ const LabeledInput = React.forwardRef<TextInput, {
   );
 });
 
+function SelectField({
+  label,
+  value,
+  options,
+  placeholder,
+  onSelect,
+  accent,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  placeholder: string;
+  onSelect: (v: string) => void;
+  accent?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const borderColor = open || accent ? P.inputBorderAccent : P.inputBorder;
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={{ fontFamily: fontFamily.interBold, fontSize: 11.5, color: P.inputLabel, textAlign: "center", letterSpacing: 0.4 }}>
+        {label}
+      </Text>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: P.inputBg,
+          borderWidth: 1.5,
+          borderColor,
+          borderRadius: 999,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: 16,
+        }}
+      >
+        <Text style={{ color: value ? P.white : P.placeholder, fontFamily: fontFamily.interSemibold, fontSize: 15 }}>
+          {value || placeholder}
+        </Text>
+        <ChevronDownIcon />
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}
+          onPress={() => setOpen(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: P.navyMuted,
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              maxHeight: "75%",
+              paddingBottom: spacing.xl,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: "rgba(255,255,255,0.3)",
+                alignSelf: "center",
+                marginTop: spacing.sm,
+                marginBottom: spacing.sm,
+              }}
+            />
+            <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 15, textAlign: "center", paddingVertical: spacing.md }}>
+              {label}
+            </Text>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => { onSelect(item); setOpen(false); }}
+                  style={({ pressed }) => ({
+                    paddingVertical: 14,
+                    paddingHorizontal: spacing.xl,
+                    backgroundColor: pressed ? "rgba(255,255,255,0.06)" : "transparent",
+                  })}
+                >
+                  <Text style={{ color: item === value ? P.accent : P.white, fontFamily: fontFamily.interSemibold, fontSize: 15 }}>
+                    {item}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
 function GradientButton({
   label,
   disabled,
@@ -893,6 +1006,14 @@ function EyeIcon({ open }: { open: boolean }) {
       <Path d="M3 3l18 18" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" />
       <Path d="M10.6 5.2A10.9 10.9 0 0112 5c6.5 0 10 7 10 7a15.6 15.6 0 01-3.4 4.3M6.5 6.6C4 8.3 2 12 2 12a15.9 15.9 0 004.2 4.8A10.6 10.6 0 0012 19c1 0 1.9-.1 2.8-.4" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" />
       <Path d="M9.9 10a3 3 0 004.2 4.2" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M6 9l6 6 6-6" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
