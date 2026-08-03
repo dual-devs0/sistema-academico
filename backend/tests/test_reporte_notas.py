@@ -89,16 +89,6 @@ def test_reporte_notas_creditos_plan(client, seed, tokens, db):
     assert met["faltan"] == 1
 
 
-def test_reporte_notas_pdf_descarga(client, seed, tokens, db):
-    db.add(Puntaje(user_id=seed["alumno"].id, oferta_materia_id=seed["oferta"].id, tipo="directa", valor=9.0, felicitado=True))
-    db.commit()
-
-    res = client.get("/alumno/reporte-notas/pdf", headers=auth(tokens["alumno"]))
-    assert res.status_code == 200
-    assert res.headers["content-type"] == "application/pdf"
-    assert res.content[:4] == b"%PDF"
-
-
 def test_reporte_notas_requiere_auth(client):
     res = client.get("/alumno/reporte-notas")
     assert res.status_code == 401

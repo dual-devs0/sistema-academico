@@ -644,7 +644,7 @@ def test_boleta_uses_weighted_average(client, seed, tokens, db):
         db.add(Puntaje(**p, editado_por=seed["admin"].id))
     db.commit()
 
-    res = client.get(f"/boleta/{seed['alumno'].id}", headers=auth(tokens["alumno"]))
+    res = client.get(f"/boleta/pdf?scope=global&alumno_id={seed['alumno'].id}", headers=auth(tokens["alumno"]))
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/pdf"
 

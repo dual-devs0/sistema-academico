@@ -7,7 +7,6 @@ import io
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from reportlab.lib import colors
@@ -44,7 +43,7 @@ def _periodo_label(periodo: str) -> str:
         return periodo
 
 
-def _build_pdf(reporte: dict, semestre: str | None) -> bytes:
+def _build_pdf(reporte: dict, titulo: str, mostrar_recursadas: bool = True) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -69,10 +68,7 @@ def _build_pdf(reporte: dict, semestre: str | None) -> bytes:
     ci = f"C.I. {alumno['cedula']}" if alumno.get("cedula") else ""
     carrera = alumno.get("carrera_nombre") or "—"
     story.append(Paragraph(" · ".join(p for p in [ci, carrera] if p), style_small))
-    story.append(Paragraph(
-        _periodo_label(semestre) if semestre else "Todos los semestres",
-        style_small,
-    ))
+    story.append(Paragraph(titulo, style_small))
     story.append(Spacer(1, 0.4 * cm))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
     story.append(Spacer(1, 0.4 * cm))
@@ -125,7 +121,7 @@ def _build_pdf(reporte: dict, semestre: str | None) -> bytes:
         story.append(Spacer(1, 0.3 * cm))
 
     # Recursadas
-    if reporte["recursadas"] and not semestre:
+    if reporte["recursadas"] and mostrar_recursadas:
         story.append(Paragraph("Historial de recursadas", style_h2))
         rows = [["Materia", "Período", "Nota"]]
         for r in reporte["recursadas"]:
@@ -168,25 +164,10 @@ def reporte_notas(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    """Usado por Cursos > Calificaciones (desglose inline por semestre). El PDF
+    unificado (con selección de scope) vive en boleta_router::/boleta/pdf —
+    reutiliza construir_reporte_notas() y _build_pdf() de este módulo."""
     reporte = construir_reporte_notas(db, current_user.user_id, semestre)
     if reporte is None:
         raise HTTPException(status_code=404, detail="Alumno no encontrado")
     return reporte
-
-
-@router.get("/reporte-notas/pdf")
-def reporte_notas_pdf(
-    semestre: str | None = Query(None, description="Formato 'YYYY-N', ej. 2026-1. Sin valor: reporte global."),
-    db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
-):
-    reporte = construir_reporte_notas(db, current_user.user_id, semestre)
-    if reporte is None:
-        raise HTTPException(status_code=404, detail="Alumno no encontrado")
-    pdf_bytes = _build_pdf(reporte, semestre)
-    sufijo = semestre if semestre else "global"
-    return StreamingResponse(
-        iter([pdf_bytes]),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="reporte_calificaciones_{sufijo}.pdf"'},
-    )
