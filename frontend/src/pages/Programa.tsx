@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
 import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
 import { Skeleton } from 'boneyard-js/react'
+import AsistenciaAlumnoPanel from '../components/AsistenciaAlumnoPanel'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
 
@@ -726,7 +727,7 @@ export default function Programa() {
           </header>
           <div className="content">
             <CursosTabs tab={tab} setTab={setTab} />
-            {tab === 'asistencia' ? <AsistenciaTab userId={Number(user?.user_id ?? 0)} /> : <CalificacionesTab userId={Number(user?.user_id ?? 0)} />}
+            {tab === 'asistencia' ? <AsistenciaTab /> : <CalificacionesTab userId={Number(user?.user_id ?? 0)} />}
           </div>
         </div>
       </>
@@ -990,13 +991,6 @@ const tabsCss = `
   @media(max-width:900px){ .exp-stats { grid-template-columns:1fr; } }
 `
 
-function donutColor(pct: number): string {
-  if (pct >= 90) return '#22c55e'
-  if (pct >= 75) return 'var(--accent)'
-  if (pct >= 60) return '#f59e0b'
-  return '#ef4444'
-}
-
 function CursosTabs({ tab, setTab }: { tab: TabCursos; setTab: (t: TabCursos) => void }) {
   return (
     <>
@@ -1012,7 +1006,6 @@ function CursosTabs({ tab, setTab }: { tab: TabCursos; setTab: (t: TabCursos) =>
   )
 }
 
-type MateriaPeriodo = { id: number; nombre: string; profesor: string | null; anio?: number | null; semestre?: number | null }
 type NotaMateriaCursos = {
   materia_id: number; materia_nombre: string
   parcial1: number | null; parcial2: number | null; practico: number | null
@@ -1020,12 +1013,8 @@ type NotaMateriaCursos = {
   promedio: number | null
   pesos: { parcial1: number; parcial2: number; practico: number; final: number }
 }
-type AsistenciaMateriaCursos = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
 
 const PESOS_DEFAULT_CURSOS = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
-const LIMITE_ASIST = 80
-
-type SesionCursos = { materia_id: number; materia_nombre: string; fecha: string; presente: boolean }
 
 function estadoNota(p: number | null): { label: string; bg: string; color: string } {
   if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
@@ -1034,280 +1023,8 @@ function estadoNota(p: number | null): { label: string; bg: string; color: strin
   return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
 }
 
-function AsistenciaTab({ userId }: { userId: number }) {
-  const navigate = useNavigate()
-  const [periodos, setPeriodos] = useState<{ anio: number; semestre: number }[]>([])
-  const [periodoSel, setPeriodoSel] = useState<string>('actual')
-  const [materias, setMaterias] = useState<MateriaPeriodo[]>([])
-  const [notas, setNotas] = useState<Record<number, NotaMateriaCursos>>({})
-  const [asistencias, setAsistencias] = useState<Record<number, AsistenciaMateriaCursos>>({})
-  const [sesiones, setSesiones] = useState<SesionCursos[]>([])
-  const [loading, setLoading] = useState(true)
-  const [detalle, setDetalle] = useState<number | null>(null)
-
-  useEffect(() => {
-    api.get<{ anio: number; semestre: number }[]>('/alumno/mis-periodos').then(setPeriodos).catch(() => {})
-    api.get<SesionCursos[]>(`/asistencias/?user_id=${userId}`).then(setSesiones).catch(() => {})
-  }, [userId])
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      const qs = periodoSel === 'actual' ? '' : (() => {
-        const [a, s] = periodoSel.split('-')
-        return `?anio=${a}&semestre=${s}`
-      })()
-      try {
-        const [mats, notasData, asisData] = await Promise.all([
-          api.get<MateriaPeriodo[]>(`/alumno/mis-materias${qs}`).catch(() => []),
-          api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
-          api.get<AsistenciaMateriaCursos[]>('/alumno/mi-asistencia').catch(() => []),
-        ])
-        setMaterias(mats)
-        setNotas(Object.fromEntries(notasData.map(n => [n.materia_id, n])))
-        setAsistencias(Object.fromEntries(asisData.map(a => [a.materia_id, a])))
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [periodoSel, userId])
-
-  const totalClases = Object.values(asistencias).reduce((s, m) => s + m.total_clases, 0)
-  const totalPresentes = Object.values(asistencias).reduce((s, m) => s + m.presentes, 0)
-  const promedioTotal = totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : 0
-  const inasistencias = totalClases - totalPresentes
-  const critica = Object.values(asistencias).filter(m => m.porcentaje < LIMITE_ASIST).sort((a, b) => a.porcentaje - b.porcentaje)[0]
-
-  /* ── DETALLE (swap de vista, como Expediente Académico admin) ── */
-  if (detalle !== null) {
-    const m = materias.find(x => x.id === detalle)
-    const notaM = notas[detalle]
-    const asis = asistencias[detalle]
-    const pesos = notaM?.pesos || PESOS_DEFAULT_CURSOS
-    const sesM = sesiones.filter(s => s.materia_id === detalle)
-    const pct = asis?.porcentaje ?? 0
-    const color = donutColor(pct)
-    const c = 2 * Math.PI * 34
-
-    return (
-      <div>
-        <button className="cur-back-btn" onClick={() => setDetalle(null)}>
-          <i className="ti ti-arrow-left" /> Volver a Asistencia
-        </button>
-
-        <div className="card" style={{ marginBottom: 20, padding: 20, background: `linear-gradient(135deg,${color}08,transparent 70%)`, borderColor: `${color}25` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 17 }}>{m?.nombre ?? '—'}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Prof. {m?.profesor || '—'}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-              <div className="det-stat" style={{ background: 'transparent', border: '1px solid var(--border-subtle)', padding: '8px 16px' }}>
-                <div className="det-stat-val" style={{ color }}>{asis ? `${pct}%` : '—'}</div>
-                <div className="det-stat-lbl">Asistencia</div>
-              </div>
-              <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
-                <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
-                  <circle cx="40" cy="40" r="34" stroke="var(--bg-elevated)" strokeWidth="7" fill="none" />
-                  <circle cx="40" cy="40" r="34" stroke={color} strokeWidth="7" fill="none"
-                    strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
-                </svg>
-                <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color }}>{asis ? `${pct}%` : '—'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
-          <div className="card" style={{ padding: 20 }}>
-            <div className="det-head"><i className="ti ti-certificate" style={{ color: 'var(--accent-bright)' }} /> Calificaciones</div>
-            <div className="det-row"><span>Parcial 1</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.parcial1 ?? '—'} / {pesos.parcial1}</b></div>
-            <div className="det-row"><span>Parcial 2</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.parcial2 ?? '—'} / {pesos.parcial2}</b></div>
-            <div className="det-row"><span>Trabajo Práctico</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.practico ?? '—'} / {pesos.practico}</b></div>
-            <div className="det-row"><span>Final (1ª oport.)</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.final1 ?? '—'} / {pesos.final}</b></div>
-            <div className="det-row"><span>Final (2ª oport.)</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.final2 ?? '—'} / {pesos.final}</b></div>
-            <div className="det-row"><span>Final (3ª oport.)</span><b style={{ fontFamily: 'var(--font-mono)' }}>{notaM?.final3 ?? '—'} / {pesos.final}</b></div>
-            <div className="det-row" style={{ marginTop: 6, borderTop: '2px solid var(--border-subtle)', paddingTop: 12 }}>
-              <span style={{ fontWeight: 700 }}>Promedio</span>
-              <b style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--accent-bright)' }}>{notaM?.promedio ?? '—'} / 10</b>
-            </div>
-          </div>
-
-          <div className="card" style={{ padding: 20 }}>
-            <div className="det-head"><i className="ti ti-clipboard-check" style={{ color: 'var(--accent-bright)' }} /> Asistencia detallada</div>
-            {asis ? (
-              <>
-                <div className="det-stats" style={{ marginBottom: 14 }}>
-                  <div className="det-stat"><div className="det-stat-val" style={{ color: '#22c55e' }}>{asis.presentes}</div><div className="det-stat-lbl">Presentes</div></div>
-                  <div className="det-stat"><div className="det-stat-val" style={{ color: '#ef4444' }}>{asis.total_clases - asis.presentes}</div><div className="det-stat-lbl">Ausentes</div></div>
-                  <div className="det-stat"><div className="det-stat-val">{asis.total_clases}</div><div className="det-stat-lbl">Total</div></div>
-                </div>
-                <div style={{ marginTop: 8, maxHeight: 280, overflowY: 'auto' }}>
-                  {sesM.length === 0 ? (
-                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>Sin sesiones registradas.</p>
-                  ) : sesM.map((s, i) => (
-                    <div key={i} className="det-row" style={{ padding: '10px 0' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <i className="ti ti-calendar-event" style={{ fontSize: 14, color: 'var(--text-muted)' }} />
-                        {s.fecha}
-                      </span>
-                      <span className="badge" style={{
-                        background: s.presente ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                        color: s.presente ? '#22c55e' : '#ef4444',
-                        border: `1px solid ${s.presente ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                        padding: '4px 12px',
-                      }}>
-                        {s.presente ? '✓ Presente' : '✗ Ausente'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>Sin datos de asistencia.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  /* ── LISTA (dashboard + cards circulares) ── */
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: periodos.length > 0 ? 0 : 16 }}>
-        {periodos.length > 0 ? (
-          <select className="periodo-select" value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
-            <option value="actual">Período actual</option>
-            {periodos.map(p => (
-              <option key={`${p.anio}-${p.semestre}`} value={`${p.anio}-${p.semestre}`}>{p.anio}° Año — {p.semestre}° Semestre</option>
-            ))}
-          </select>
-        ) : <div />}
-        <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12.5 }} onClick={() => navigate('/asistencia/scan')}>
-          <i className="ti ti-qrcode" /> Escanear QR
-        </button>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
-      ) : materias.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Sin materias en este período.</div>
-      ) : (
-        <>
-          {/* 1) Alertas críticas primero — lo más urgente arriba de todo */}
-          {critica && (
-            <div className="cur-alerta" style={{ borderLeft: '3px solid #ef4444', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span className="mono-label" style={{ color: '#ef4444' }}>Alerta Crítica</span>
-                <i className="ti ti-alert-triangle" style={{ color: '#ef4444' }} />
-              </div>
-              <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 4 }}>{critica.materia_nombre}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Por debajo del {LIMITE_ASIST}% requerido — riesgo de pérdida de regularidad</div>
-              <div className="progress-track" style={{ marginTop: 8, height: 4 }}><div className="progress-fill" style={{ width: `${critica.porcentaje}%`, background: '#ef4444', height: 4 }} /></div>
-            </div>
-          )}
-
-          {/* 2) Resumen general */}
-          <div className="cur-kpi-grid">
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444'}` }}>
-              <div className="kpi-top"><span className="mono-label">Promedio Total</span><i className="ti ti-percentage" style={{ color: promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444', fontSize: 15 }} /></div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span className="kpi-value" style={{ fontSize: 26, color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</span>
-              </div>
-              <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill" style={{ width: `${promedioTotal}%`, background: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE_ASIST ? '#22c55e' : '#ef4444' }} /></div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: '3px solid var(--accent-bright)' }}>
-              <div className="kpi-top"><span className="mono-label">Clases Totales</span><i className="ti ti-calendar-stats" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-              <span className="kpi-value" style={{ fontSize: 26 }}>{totalClases}</span>
-              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Sesiones registradas</div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${inasistencias > 3 ? '#ef4444' : '#f59e0b'}` }}>
-              <div className="kpi-top"><span className="mono-label">Inasistencias</span><i className="ti ti-calendar-off" style={{ color: '#ef4444', fontSize: 15 }} /></div>
-              <span className="kpi-value" style={{ fontSize: 26, color: '#ef4444' }}>{inasistencias}</span>
-              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>Días no asistidos</div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${critica ? '#ef4444' : '#22c55e'}` }}>
-              <div className="kpi-top"><span className="mono-label">Alertas</span><i className={`ti ${critica ? 'ti-alert-triangle' : 'ti-shield-check'}`} style={{ color: critica ? '#ef4444' : '#22c55e', fontSize: 15 }} /></div>
-              <span className="kpi-value" style={{ fontSize: 26, color: critica ? '#ef4444' : '#22c55e' }}>{critica ? 1 : 0}</span>
-              <div className="mono-label" style={{ marginTop: 6, fontSize: 9 }}>{critica ? 'Materia en riesgo' : 'Todo en regla ✓'}</div>
-            </div>
-          </div>
-
-          {/* 3) Detalle por materia */}
-          <div className="asis-grid">
-            {materias.map(m => {
-              const asis = asistencias[m.id]
-              const pct = asis?.porcentaje ?? 0
-              const color = donutColor(pct)
-              const c = 2 * Math.PI * 30
-              return (
-                <div key={m.id} className="asis-card" onClick={() => setDetalle(m.id)}>
-                  <div style={{ position: 'relative', width: 70, height: 70, margin: '0 auto' }}>
-                    <svg width="70" height="70" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="35" cy="35" r="30" stroke="var(--bg-elevated)" strokeWidth="6" fill="none" />
-                      <circle cx="35" cy="35" r="30" stroke={color} strokeWidth="6" fill="none"
-                        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
-                    </svg>
-                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 14, color }}>{asis ? `${pct}%` : '—'}</span>
-                  </div>
-                  <div className="asis-nombre">{m.nombre}</div>
-                  <div className="mono-label" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{asis ? `${asis.presentes}/${asis.total_clases} clases` : 'Sin registros'}</div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="cur-two-col">
-            <div className="card">
-              <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}><i className="ti ti-list-check" style={{ color: 'var(--accent-bright)' }} /> Cumplimiento por Materia</h3>
-              {Object.keys(asistencias).length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Sin registros de asistencia aún.</p>
-              ) : materias.map(m => {
-                const a = asistencias[m.id]
-                if (!a) return null
-                const ok = a.porcentaje >= LIMITE_ASIST
-                return (
-                  <div key={m.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>{a.materia_nombre}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13, color: ok ? 'var(--accent-bright)' : 'var(--danger)' }}>{a.porcentaje}%</span>
-                    </div>
-                    <div className="progress-track"><div className="progress-fill" style={{ width: `${a.porcentaje}%`, background: ok ? undefined : 'var(--danger)' }} /></div>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5 }}>{a.presentes}/{a.total_clases} Sesiones</div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="card">
-                <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}><i className="ti ti-calendar" style={{ color: 'var(--accent-bright)' }} /> Periodo Académico</h3>
-                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{periodoSel === 'actual' ? `${new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Semestre ${new Date().getFullYear()}` : (() => { const [a, s] = periodoSel.split('-'); return `${s}° Semestre ${a}` })()}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{periodoSel === 'actual' ? 'Periodo en curso' : 'Periodo anterior'}</div>
-              </div>
-
-              <div className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 800 }}>Bitácora de Sesiones</h3>
-                  <i className="ti ti-code" style={{ color: 'var(--text-muted)' }} />
-                </div>
-                {sesiones.length === 0 ? (
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin sesiones registradas.</p>
-                ) : sesiones.slice(-6).reverse().map((s, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--border-subtle)' : 'none', fontSize: 11.5 }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{s.materia_nombre}</span>
-                    <span style={{ color: s.presente ? 'var(--success)' : 'var(--danger)', fontWeight: 700, flexShrink: 0 }}>{s.presente ? 'Presente' : 'Ausente'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  )
+function AsistenciaTab() {
+  return <AsistenciaAlumnoPanel />
 }
 
 function CalificacionesTab({ userId }: { userId: number }) {
