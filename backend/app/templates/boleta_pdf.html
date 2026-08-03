@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte de Calificaciones</title>
+<style>
+  :root{
+    --paper:#ffffff;
+    --panel:#f7f8fa;
+    --panel-strong:#eef0f3;
+    --line:#e2e5ea;
+    --line-soft:#edeff2;
+    --text-hi:#1a1d24;
+    --text-mid:#5b616e;
+    --text-low:#8b9099;
+
+    --indigo-600:#4548b0;
+    --indigo-bg:#eeeefd;
+
+    --coral-600:#c14e26;
+    --coral-bg:#fbeee7;
+
+    --mint-600:#0f8c66;
+    --mint-bg:#e6f6f0;
+
+    --amber-600:#a3690f;
+    --amber-bg:#fbf1de;
+
+    --red-600:#b83232;
+    --red-bg:#fbeaea;
+  }
+  *{ box-sizing:border-box; }
+  html, body{ margin:0; padding:0; }
+  body{
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    color:var(--text-hi);
+    font-size:12px;
+  }
+
+  @page{
+    size: A4;
+    margin: 30mm 18mm 22mm;
+    @bottom-left{
+      content: "Sistema Académico UCA V2 · Reporte informativo, no reemplaza el Certificado de Estudios legalizado.";
+      font-size: 8px;
+      color:#8b9099;
+      width: 130mm;
+    }
+    @bottom-right{
+      content: "Página " counter(page) " / " counter(pages);
+      font-size: 9px;
+      color:#8b9099;
+    }
+  }
+
+  .section{ page-break-after: always; }
+  .section:last-child{ page-break-after: auto; }
+
+  /* HEADER INSTITUCIONAL */
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:22px;
+  }
+  .header-brand{ display:flex; gap:14px; align-items:center; }
+  .crest{ width:40px; height:40px; border-radius:8px; overflow:hidden; }
+  .crest img{ width:100%; height:100%; object-fit:contain; }
+  .brand-text .uni{
+    font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text-mid); margin:0 0 3px;
+  }
+  .brand-text .doc-title{ font-size:17px; font-weight:600; margin:0; color:var(--text-hi); }
+  .header-meta{ text-align:right; font-size:10px; color:var(--text-low); line-height:1.6; }
+  .badge-generado{
+    display:inline-block; margin-top:6px; padding:3px 10px; border-radius:20px;
+    background:var(--mint-bg); color:var(--mint-600); font-size:9px; font-weight:600; letter-spacing:.03em;
+  }
+
+  /* IDENTIDAD ESTUDIANTE */
+  .student-block{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 18px; margin-bottom:20px;
+  }
+  .student-name{ font-size:15px; font-weight:600; color:var(--text-hi); margin:0 0 4px; }
+  .student-doc{ font-size:11px; color:var(--text-mid); margin:0; }
+  .scope-pill{
+    padding:5px 13px; border-radius:20px; font-size:11px; font-weight:600;
+    background:var(--indigo-bg); border:1px solid var(--indigo-600); color:var(--indigo-600);
+  }
+  .scope-pill.mint{ background:var(--mint-bg); border-color:var(--mint-600); color:var(--mint-600); }
+  .scope-pill.coral{ background:var(--coral-bg); border-color:var(--coral-600); color:var(--coral-600); }
+
+  /* KPIs */
+  .kpi-row{ display:flex; gap:10px; margin-bottom:26px; }
+  .kpi-card{ flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .kpi-label{ font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-low); margin:0 0 7px; }
+  .kpi-value{ font-size:23px; font-weight:700; margin:0; line-height:1; }
+  .kpi-sub{ font-size:10px; color:var(--text-mid); margin:5px 0 0; }
+  .kpi-value.indigo{ color:var(--indigo-600); }
+  .kpi-value.mint{ color:var(--mint-600); }
+  .kpi-value.coral{ color:var(--coral-600); }
+  .kpi-value.amber{ color:var(--amber-600); }
+
+  /* SECTION LABEL */
+  .section-label{ display:flex; align-items:center; gap:9px; margin:0 0 12px; }
+  .section-label .dot{ width:7px; height:7px; border-radius:50%; background:var(--indigo-600); }
+  .section-label h2{
+    font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-mid);
+    font-weight:600; margin:0;
+  }
+  .section-label .count{ font-size:10px; color:var(--text-low); margin-left:auto; }
+
+  .table-wrap{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  table.grades{ width:100%; border-collapse:collapse; font-size:11px; }
+  table.grades thead th{
+    text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--text-low); padding:8px 16px; background:var(--panel-strong);
+    border-bottom:1px solid var(--line-soft); font-weight:600;
+  }
+  table.grades tbody td{ padding:8px 16px; border-bottom:1px solid var(--line-soft); color:var(--text-mid); }
+  table.grades tbody tr:last-child td{ border-bottom:none; }
+  .col-code{ color:var(--text-low); font-family:'SF Mono','Consolas',monospace; font-size:10px; width:80px; }
+  .col-name{ color:var(--text-hi); font-weight:500; }
+  .col-date{ width:95px; color:var(--text-low); font-size:10px; }
+
+  .badge{
+    display:inline-block; min-width:30px; text-align:center; padding:2px 8px;
+    border-radius:6px; font-size:10px; font-weight:700;
+  }
+  .badge-alto{ background:var(--mint-bg); color:var(--mint-600); }
+  .badge-medio{ background:var(--amber-bg); color:var(--amber-600); }
+  .badge-bajo{ background:var(--red-bg); color:var(--red-600); }
+  .badge-recursada{
+    margin-left:6px; font-size:8px; font-weight:600; padding:2px 6px; border-radius:5px;
+    background:var(--coral-bg); color:var(--coral-600); vertical-align:middle;
+  }
+</style>
+</head>
+<body>
+
+{% macro header() %}
+  <div class="header">
+    <div class="header-brand">
+      <div class="crest"><img src="{{ logo_src }}" alt="Sistema Académico UCA"></div>
+      <div class="brand-text">
+        <p class="uni">{{ universidad_nombre }}</p>
+        <p class="doc-title">Reporte de calificaciones</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      Emitido: {{ emitido_str }}<br>
+      Sistema Académico UCA V2<br>
+      <span class="badge-generado">Auto-generado</span>
+    </div>
+  </div>
+  <div class="student-block">
+    <div>
+      <p class="student-name">{{ alumno.nombre }}</p>
+      <p class="student-doc">{% if alumno.cedula %}C.I. {{ alumno.cedula }}{% endif %}{% if alumno.carrera_nombre %} · {{ alumno.carrera_nombre }}{% endif %}</p>
+    </div>
+    <div class="scope-pill {{ scope_pill_class }}">{{ scope_pill_label }}</div>
+  </div>
+{% endmacro %}
+
+{% if resumen %}
+<div class="section">
+  {{ header() }}
+
+  <div class="section-label"><div class="dot"></div><h2>Resumen académico</h2></div>
+  <div class="kpi-row">
+    {% for k in resumen.kpis %}
+    <div class="kpi-card">
+      <p class="kpi-label">{{ k.label }}</p>
+      <p class="kpi-value {{ k.clase }}">{{ k.valor }}</p>
+      {% if k.sub %}<p class="kpi-sub">{{ k.sub }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="section-label">
+    <div class="dot"></div><h2>Evolución por semestre</h2>
+    <span class="count">promedio por período</span>
+  </div>
+  <div class="table-wrap">
+    <table class="grades">
+      <thead><tr><th style="width:110px;">Período</th><th>Materias</th><th style="width:100px;">Promedio</th><th style="width:100px;">Reprobadas</th></tr></thead>
+      <tbody>
+        {% for f in resumen.evolucion %}
+        <tr>
+          <td class="col-date">{{ f.periodo_label }}</td>
+          <td class="col-name">{{ f.materias_count }}</td>
+          <td><span class="badge {{ f.badge_clase }}">{{ f.promedio }}</span></td>
+          <td>{% if f.reprobadas > 0 %}<span class="badge badge-bajo">{{ f.reprobadas }}</span>{% else %}0{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% for p in detalles %}
+<div class="section">
+  {{ header() }}
+
+  <div class="kpi-row">
+    {% for k in p.kpis %}
+    <div class="kpi-card">
+      <p class="kpi-label">{{ k.label }}</p>
+      <p class="kpi-value {{ k.clase }}">{{ k.valor }}</p>
+      {% if k.sub %}<p class="kpi-sub">{{ k.sub }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="section-label">
+    <div class="dot"></div><h2>Detalle de materias — {{ p.periodo_label }}</h2>
+    <span class="count">{{ p.materias|length }} registro{{ 's' if p.materias|length != 1 else '' }}</span>
+  </div>
+  <div class="table-wrap">
+    <table class="grades">
+      <thead><tr><th class="col-code">Código</th><th>Asignatura</th><th style="width:90px;">Nota</th><th class="col-date">Fecha</th></tr></thead>
+      <tbody>
+        {% for m in p.materias %}
+        <tr>
+          <td class="col-code">{{ m.codigo }}</td>
+          <td class="col-name">{{ m.nombre }}{% if m.recursada %}<span class="badge-recursada">recursada</span>{% endif %}</td>
+          <td><span class="badge {{ m.badge_clase }}">{{ m.nota_label }}</span></td>
+          <td class="col-date">{{ m.fecha_label }}</td>
+        </tr>
+        {% endfor %}
+        {% if not p.materias %}
+        <tr><td colspan="4" style="text-align:center; color:var(--text-low); padding:14px;">Sin materias registradas.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+</body>
+</html>

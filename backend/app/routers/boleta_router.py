@@ -23,7 +23,7 @@ from app.dependencias import get_current_user
 from app.services.autorizacion import es_profesor_de_alumno
 from app.services.boleta_data import construir_boleta_data
 from app.services.reporte_notas import construir_reporte_notas
-from app.routers.reporte_notas_router import _build_pdf, _periodo_label
+from app.services.boleta_pdf import render_boleta_pdf
 
 router = APIRouter(prefix="/boleta", tags=["boleta"])
 
@@ -141,31 +141,15 @@ def boleta_pdf(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    if scope == "anio" and anio is None:
+        raise HTTPException(status_code=422, detail="El parámetro 'anio' es requerido para scope=anio")
+
     target_id = _resolver_alumno_id(alumno_id, current_user, db)
     reporte = construir_reporte_notas(db, target_id)
     if reporte is None:
         raise HTTPException(status_code=404, detail="Alumno no encontrado")
 
-    if scope == "semestre_actual":
-        periodo_actual = reporte["periodos_disponibles"][0] if reporte["periodos_disponibles"] else None
-        reporte["semestres"] = [s for s in reporte["semestres"] if s["periodo"] == periodo_actual]
-        titulo = _periodo_label(periodo_actual) if periodo_actual else "Semestre actual"
-        mostrar_recursadas = False
-    elif scope == "anio":
-        if anio is None:
-            raise HTTPException(status_code=422, detail="El parámetro 'anio' es requerido para scope=anio")
-        if semestre is not None:
-            reporte["semestres"] = [s for s in reporte["semestres"] if s["periodo"] == f"{anio}-{semestre}"]
-            titulo = _periodo_label(f"{anio}-{semestre}")
-        else:
-            reporte["semestres"] = [s for s in reporte["semestres"] if s["periodo"].startswith(f"{anio}-")]
-            titulo = f"Año {anio}"
-        mostrar_recursadas = False
-    else:
-        titulo = "Todos los semestres"
-        mostrar_recursadas = True
-
-    pdf_bytes = _build_pdf(reporte, titulo, mostrar_recursadas)
+    pdf_bytes = render_boleta_pdf(reporte, scope, anio=anio, semestre=semestre)
     sufijo = f"{scope}_{anio}" if scope == "anio" else scope
     return StreamingResponse(
         iter([pdf_bytes]),

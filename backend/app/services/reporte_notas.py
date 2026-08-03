@@ -73,10 +73,16 @@ def construir_reporte_notas(db: Session, alumno_id: int, semestre: str | None = 
 
     notas_por_oferta: dict[int, dict] = defaultdict(dict)
     felicitado_por_oferta: dict[int, bool] = {}
+    fecha_por_oferta: dict[int, object] = {}
     for f in filas:
         notas_por_oferta[f.oferta_materia_id][f.tipo] = float(f.valor)
         if f.tipo == "directa":
             felicitado_por_oferta[f.oferta_materia_id] = bool(f.felicitado)
+        if f.editado_en and (
+            f.oferta_materia_id not in fecha_por_oferta
+            or f.editado_en > fecha_por_oferta[f.oferta_materia_id]
+        ):
+            fecha_por_oferta[f.oferta_materia_id] = f.editado_en
 
     pesos_cache: dict[int, dict] = {}
 
@@ -101,6 +107,7 @@ def construir_reporte_notas(db: Session, alumno_id: int, semestre: str | None = 
             "promedio": promedio,
             "felicitado": felicitado_por_oferta.get(oferta_id, False),
             "notas": notas,
+            "fecha": fecha_por_oferta.get(oferta_id),
         })
 
     semestres_map: dict[str, list[dict]] = defaultdict(list)
@@ -137,10 +144,12 @@ def construir_reporte_notas(db: Session, alumno_id: int, semestre: str | None = 
             semestres_map[vigente["periodo"]].append({
                 "materia_id": mid,
                 "materia_nombre": nombre,
+                "materia_codigo": materia.codigo if materia else None,
                 "promedio": vigente["promedio"],
                 "felicitado": vigente["felicitado"],
                 "aprobado": vigente["promedio"] >= APROBACION_MINIMA,
                 "recursada": len(intentos) > 1,
+                "fecha": vigente["fecha"],
                 "parcial1": notas_vigente.get("parcial1"),
                 "parcial2": notas_vigente.get("parcial2"),
                 "practico": notas_vigente.get("practico"),
