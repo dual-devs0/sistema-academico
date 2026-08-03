@@ -1028,21 +1028,63 @@ function AsistenciaTab() {
   return <AsistenciaAlumnoPanel />
 }
 
+/* ─── Chip de período (detalle de semestres anteriores) en Calificaciones ─── */
+type MateriaSemestreRow = { materia_id: number; materia_nombre: string; promedio: number; felicitado: boolean; aprobado: boolean; recursada: boolean }
+type SemestreRow = { periodo: string; materias: MateriaSemestreRow[] }
+type ReporteNotas = {
+  alumno: { user_id: number; nombre: string; cedula: string | null; carrera_nombre: string | null }
+  metricas: {
+    promedio_general: number | null; materias_aprobadas: number
+    total_materias_plan: number | null; materias_aprobadas_plan: number | null
+    avance_pct: number | null; faltan: number | null
+  }
+  periodos_disponibles: string[]
+  semestres: SemestreRow[]
+  recursadas: { materia_id: number; materia_nombre: string; intentos: { periodo: string; promedio: number; felicitado: boolean; aprobado: boolean; vigente: boolean }[] }[]
+}
+
+function periodoLabelCursos(periodo: string): string {
+  const [anio, sem] = periodo.split('-')
+  return `${sem === '1' ? 'Primer' : 'Segundo'} semestre ${anio}`
+}
+
+function notaTxt(m: { promedio: number; felicitado: boolean }): string {
+  const base = Number.isInteger(m.promedio) ? String(m.promedio) : m.promedio.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+  return m.felicitado ? `${base}F` : base
+}
+
 function CalificacionesTab({ userId }: { userId: number }) {
-  const navigate = useNavigate()
   const [materias, setMaterias] = useState<NotaMateriaCursos[]>([])
   const [creditos, setCreditos] = useState<{ creditos_acumulados: number; creditos_totales: number | null } | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const [reporte, setReporte] = useState<ReporteNotas | null>(null)
+  const [periodoOpen, setPeriodoOpen] = useState(false)
+  const [periodoDetalle, setPeriodoDetalle] = useState<string | null>(null)
+  const periodoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([
       api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
       api.get<{ creditos_acumulados: number; creditos_totales: number | null }>(`/pensum/alumno/${userId}/creditos`).catch(() => null),
-    ]).then(([notas, cred]) => {
+      api.get<ReporteNotas>('/alumno/reporte-notas').catch(() => null),
+    ]).then(([notas, cred, rep]) => {
       setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || m.final1 !== null || m.final2 !== null || m.final3 !== null || m.directa != null))
       setCreditos(cred)
+      setReporte(rep)
     }).finally(() => setLoading(false))
   }, [userId])
+
+  useEffect(() => {
+    function onClickAway(e: MouseEvent) {
+      if (periodoRef.current && !periodoRef.current.contains(e.target as Node)) setPeriodoOpen(false)
+    }
+    document.addEventListener('mousedown', onClickAway)
+    return () => document.removeEventListener('mousedown', onClickAway)
+  }, [])
+
+  const periodoActual = reporte?.periodos_disponibles[0] ?? null
+  const semDetalle = periodoDetalle ? reporte?.semestres.find(s => s.periodo === periodoDetalle) : null
 
   const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
   const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
@@ -1055,12 +1097,6 @@ function CalificacionesTab({ userId }: { userId: number }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-        <button className="btn-ghost" onClick={() => navigate('/boleta')}>
-          <i className="ti ti-history" /> Ver semestres anteriores
-        </button>
-      </div>
-
       <div className="exp-stats" style={{ marginBottom: 22 }}>
         <div className="kpi-card" style={{ borderLeft: `3px solid ${promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444'}` }}>
           <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-star" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
@@ -1090,10 +1126,91 @@ function CalificacionesTab({ userId }: { userId: number }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 800 }}>Detalle de Materias</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>Detalle de Materias</h3>
+          {reporte && (
+            <div style={{ position: 'relative' }} ref={periodoRef}>
+              <button type="button"
+                onClick={() => setPeriodoOpen(v => !v)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 12px',
+                  border: `1px solid ${periodoOpen ? 'var(--accent)' : 'var(--border-subtle)'}`, borderRadius: 999,
+                  background: 'var(--bg-input)', fontSize: 11.5, fontWeight: 700,
+                  color: periodoOpen ? 'var(--text-primary)' : 'var(--text-secondary)', whiteSpace: 'nowrap',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                {periodoLabelCursos(periodoDetalle ?? periodoActual ?? '')}
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  style={{ transform: periodoOpen ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {periodoOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, minWidth: 190,
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12,
+                  overflow: 'hidden', boxShadow: '0 12px 32px rgba(0,0,0,.45)', zIndex: 30,
+                }}>
+                  {reporte.periodos_disponibles.map(p => (
+                    <button key={p} type="button"
+                      onClick={() => { setPeriodoDetalle(p); setPeriodoOpen(false) }}
+                      style={{
+                        display: 'flex', width: '100%', padding: '9px 13px', fontSize: 12, fontWeight: 600,
+                        color: periodoDetalle === p ? 'var(--accent)' : 'var(--text-secondary)',
+                        background: periodoDetalle === p ? 'var(--accent-muted)' : 'none',
+                        border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                      }}>
+                      {periodoLabelCursos(p)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{materias.length} materias</span>
       </div>
+
+      {semDetalle && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
+          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 800 }}>{periodoLabelCursos(semDetalle.periodo)}</span>
+            <button type="button" onClick={() => setPeriodoDetalle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
+              <i className="ti ti-x" />
+            </button>
+          </div>
+          <table className="table-uca">
+            <thead><tr><th>Materia</th><th style={{ textAlign: 'center' }}>Nota</th><th style={{ textAlign: 'center' }}>Estado</th></tr></thead>
+            <tbody>
+              {semDetalle.materias.map(m => (
+                <tr key={m.materia_id}>
+                  <td style={{ fontWeight: 600 }}>
+                    {m.materia_nombre}
+                    {m.recursada && <span className="badge" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', fontSize: 10, marginLeft: 8 }}>Recursada</span>}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: m.felicitado ? '#fbbf24' : m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                      {m.felicitado && <i className="ti ti-star" style={{ fontSize: 13, marginRight: 3, verticalAlign: -1 }} />}
+                      {notaTxt(m)}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span className="badge" style={{ background: m.aprobado ? 'var(--success-subtle)' : 'var(--danger-subtle)', color: m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                      {m.aprobado ? 'APROBADO' : 'REPROBADO'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {semDetalle.materias.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 16 }}>Sin materias en este semestre.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {materias.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 46 }}>
           <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
