@@ -1,11 +1,22 @@
-// Panel de asistencia del alumno (tarjetas circulares + panel acordeón fijo a semestres anteriores + selector de período).
+// Panel de asistencia del alumno (tarjetas circulares + detalle por materia con calificaciones y bitácora + selector de período).
 // Compartido entre pages/Asistencia.tsx (ruta /asistencia) y la pestaña Asistencia de pages/Programa.tsx.
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
 
 type MateriaAsistRow = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
 type PeriodoRow = { anio: number; semestre: number }
+type MateriaConProfesor = { id: number; nombre: string; profesor: string | null }
+type NotaMateria = {
+  materia_id: number; materia_nombre: string
+  parcial1: number | null; parcial2: number | null; practico: number | null
+  final1: number | null; final2: number | null; final3: number | null
+  promedio: number | null
+  pesos: { parcial1: number; parcial2: number; practico: number; final: number }
+}
+type SesionRow = { materia_id: number; materia_nombre: string; fecha: string; presente: boolean }
+
+const PESOS_DEFAULT = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
 
 const cssAlumno = `
   .aa-err-banner {
@@ -57,33 +68,12 @@ const cssAlumno = `
   .aa-chip-card:hover { border-color:var(--accent-hover); transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.18); }
   .aa-chip-card.riesgo { border-color:rgba(239,68,68,.55); }
   .aa-chip-card.riesgo:hover { border-color:#ef4444; }
-  .aa-chip-card.open { border-color:var(--accent); }
   .aa-chip-alerta {
     position:absolute; top:7px; right:7px; width:19px; height:19px; border-radius:50%;
     background:rgba(239,68,68,.16); color:#ef4444; display:flex; align-items:center; justify-content:center;
   }
   .aa-chip-nombre { font-size:12px; font-weight:700; line-height:1.3; min-height:32px; display:flex; align-items:center; }
   .aa-chip-clases { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); }
-
-  /* Panel detalle acordeón — fijo, solo semestres anteriores */
-  .aa-panel {
-    margin-top:14px; border:1px solid var(--border-subtle); border-radius:14px;
-    background:var(--bg-surface); padding:16px; animation:aa-panel-in .16s ease-out;
-  }
-  @keyframes aa-panel-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-  .aa-panel-title {
-    font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.07em;
-    font-weight:700; margin-bottom:10px;
-  }
-
-  .aa-hist-anio { font-size:12px; font-weight:800; color:var(--accent-bright); margin:10px 0 2px; }
-  .aa-hist-anio:first-child { margin-top:0; }
-  .aa-hist-row {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:7px 0; font-size:12.5px; color:var(--text-secondary);
-    border-bottom:1px solid rgba(42,48,64,.15);
-  }
-  .aa-hist-row:last-child { border-bottom:none; }
 
   /* Stat cards chicas — resumen superior */
   .aa-stat-row { display:flex; gap:10px; margin-bottom:18px; }
@@ -96,6 +86,37 @@ const cssAlumno = `
     text-transform:uppercase; letter-spacing:.04em; white-space:nowrap;
   }
   .aa-stat-value { font-size:17px; font-weight:800; margin-top:3px; font-family:var(--font-mono); }
+
+  /* ── Detalle de materia (swap de vista) ── */
+  .aa-back-btn {
+    display:inline-flex; align-items:center; gap:6px; margin-bottom:16px;
+    padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600;
+    background:var(--bg-surface); border:1px solid var(--border-subtle); cursor:pointer;
+    color:var(--text-secondary); font-family:inherit; transition:all .15s;
+  }
+  .aa-back-btn:hover { color:var(--text-primary); border-color:var(--accent-hover); }
+  .aa-det-head {
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; align-items:center;
+    padding:20px; border-radius:14px; margin-bottom:20px;
+  }
+  .aa-det-stat {
+    background:transparent; border:1px solid var(--border-subtle); border-radius:10px;
+    padding:8px 16px; text-align:center;
+  }
+  .aa-det-stat-val { font-family:var(--font-mono); font-size:22px; font-weight:800; }
+  .aa-det-stat-lbl { font-size:10px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+  .aa-det-grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+  .aa-det-card-title { font-size:13px; font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .aa-det-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 0; border-bottom:1px solid rgba(42,48,64,.15); font-size:13px;
+  }
+  .aa-det-row:last-child { border-bottom:none; }
+  .aa-det-row b { font-family:var(--font-mono); }
+  .aa-det-stats-row { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+  .aa-det-mini { background:var(--bg-elevated); border-radius:10px; padding:12px 16px; flex:1; min-width:100px; text-align:center; }
+  .aa-det-mini-val { font-family:var(--font-mono); font-size:22px; font-weight:800; }
+  .aa-det-mini-lbl { font-size:10px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
 `
 
 function donutColor(pct: number): string {
@@ -115,19 +136,21 @@ const AA_POLL_MS = 30000
 
 export default function AsistenciaAlumnoPanel() {
   const navigate = useNavigate()
+  const uid = Number(getCurrentUser()?.user_id || 0)
   const [porMateria, setPorMateria] = useState<MateriaAsistRow[]>([])
+  const [materias, setMaterias] = useState<MateriaConProfesor[]>([])
+  const [notas, setNotas] = useState<Record<number, NotaMateria>>({})
+  const [sesiones, setSesiones] = useState<SesionRow[]>([])
   const [periodos, setPeriodos] = useState<PeriodoRow[]>([])
   const [periodoSel, setPeriodoSel] = useState('actual')
   const [periodoOpen, setPeriodoOpen] = useState(false)
   const periodoRef = useRef<HTMLDivElement>(null)
-  const [historial, setHistorial] = useState<Record<number, { anio: number; semestre: number; porcentaje: number }[]>>({})
-  const [historialLoading, setHistorialLoading] = useState(false)
   const [carreraNombre, setCarreraNombre] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [openId, setOpenId] = useState<number | null>(null)
+  const [detalle, setDetalle] = useState<number | null>(null)
   const firstLoad = useRef(true)
   const LIMITE = 80
 
@@ -138,7 +161,10 @@ export default function AsistenciaAlumnoPanel() {
       api.get<{ carrera_id: number | null }>('/users/me'),
       api.get<{ id: number; nombre: string }[]>('/carreras/'),
       api.get<PeriodoRow[]>('/alumno/mis-periodos'),
-    ]).then(([porMat, me, carreras, per]) => {
+      api.get<MateriaConProfesor[]>('/alumno/mis-materias'),
+      api.get<NotaMateria[]>('/alumno/mis-notas'),
+      api.get<SesionRow[]>(`/asistencias/?user_id=${uid}`),
+    ]).then(([porMat, me, carreras, per, mats, notasData, sesData]) => {
       const fails: string[] = []
       if (porMat.status === 'fulfilled') setPorMateria(porMat.value)
       else fails.push('resumen por materia')
@@ -147,10 +173,13 @@ export default function AsistenciaAlumnoPanel() {
         if (c) setCarreraNombre(c.nombre)
       }
       if (per.status === 'fulfilled') setPeriodos(per.value)
+      if (mats.status === 'fulfilled') setMaterias(mats.value)
+      if (notasData.status === 'fulfilled') setNotas(Object.fromEntries(notasData.value.map(n => [n.materia_id, n])))
+      if (sesData.status === 'fulfilled') setSesiones(sesData.value)
       setError(fails.length ? `No se pudo cargar: ${fails.join(', ')}. Mostrando último dato disponible.` : '')
       setLastUpdate(new Date())
     }).finally(() => { setLoading(false); setRefreshing(false); firstLoad.current = false })
-  }, [])
+  }, [uid])
 
   useEffect(() => {
     const load = () => cargar()
@@ -162,7 +191,7 @@ export default function AsistenciaAlumnoPanel() {
 
   const cargarPeriodo = useCallback((sel: string) => {
     setPeriodoSel(sel)
-    setOpenId(null)
+    setDetalle(null)
     if (sel === 'actual') { cargar(); return }
     const [anio, semestre] = sel.split('-')
     setLoading(true)
@@ -180,40 +209,103 @@ export default function AsistenciaAlumnoPanel() {
     return () => document.removeEventListener('mousedown', onClickAway)
   }, [])
 
-  const cargarHistorial = useCallback(async (matId: number) => {
-    if (!periodos.length) return
-    setHistorialLoading(true)
-    try {
-      const results = await Promise.allSettled(
-        periodos.map(p => api.get<MateriaAsistRow[]>(`/alumno/mi-asistencia?anio=${p.anio}&semestre=${p.semestre}`))
-      )
-      const filas: { anio: number; semestre: number; porcentaje: number }[] = []
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled') {
-          const m = r.value.find(x => x.materia_id === matId)
-          if (m) filas.push({ anio: periodos[i].anio, semestre: periodos[i].semestre, porcentaje: m.porcentaje })
-        }
-      })
-      filas.sort((a, b) => b.anio - a.anio || b.semestre - a.semestre)
-      setHistorial(h => ({ ...h, [matId]: filas }))
-    } finally {
-      setHistorialLoading(false)
-    }
-  }, [periodos])
-
   const totalClases = porMateria.reduce((s, m) => s + m.total_clases, 0)
   const totalPresentes = porMateria.reduce((s, m) => s + m.presentes, 0)
   const promedioTotal = totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : 0
   const inasistencias = totalClases - totalPresentes
   const alertasCount = porMateria.filter(m => m.porcentaje < LIMITE).length
 
-  const materiaAbierta = openId !== null ? porMateria.find(m => m.materia_id === openId) : null
+  /* ── Vista de detalle por materia (Calificaciones + Asistencia detallada) ── */
+  if (detalle !== null) {
+    const asis = porMateria.find(x => x.materia_id === detalle)
+    const mat = materias.find(x => x.id === detalle)
+    const notaM = notas[detalle]
+    const pesos = notaM?.pesos || PESOS_DEFAULT
+    const sesM = sesiones.filter(s => s.materia_id === detalle)
+    const pct = asis?.porcentaje ?? 0
+    const color = donutColor(pct)
+    const c = 2 * Math.PI * 34
 
-  function toggleMateria(matId: number) {
-    const abierta = openId === matId
-    const next = abierta ? null : matId
-    setOpenId(next)
-    if (next !== null && !historial[next]) cargarHistorial(next)
+    return (
+      <>
+        <style>{cssAlumno}</style>
+        <button className="aa-back-btn" onClick={() => setDetalle(null)}>
+          <i className="ti ti-arrow-left" /> Volver a Asistencia
+        </button>
+
+        <div className="aa-det-head" style={{ background: `linear-gradient(135deg,${color}08,transparent 70%)`, border: `1px solid ${color}25` }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 17 }}>{mat?.nombre ?? asis?.materia_nombre ?? '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Prof. {mat?.profesor || '—'}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div className="aa-det-stat">
+              <div className="aa-det-stat-val" style={{ color }}>{asis ? `${pct}%` : '—'}</div>
+              <div className="aa-det-stat-lbl">Asistencia</div>
+            </div>
+            <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+              <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="40" cy="40" r="34" stroke="var(--bg-elevated)" strokeWidth="7" fill="none" />
+                <circle cx="40" cy="40" r="34" stroke={color} strokeWidth="7" fill="none"
+                  strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
+              </svg>
+              <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color }}>{asis ? `${pct}%` : '—'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="aa-det-grid">
+          <div className="card" style={{ padding: 20 }}>
+            <div className="aa-det-card-title"><i className="ti ti-certificate" style={{ color: 'var(--accent-bright)' }} /> Calificaciones</div>
+            <div className="aa-det-row"><span>Parcial 1</span><b>{notaM?.parcial1 ?? '—'} / {pesos.parcial1}</b></div>
+            <div className="aa-det-row"><span>Parcial 2</span><b>{notaM?.parcial2 ?? '—'} / {pesos.parcial2}</b></div>
+            <div className="aa-det-row"><span>Trabajo Práctico</span><b>{notaM?.practico ?? '—'} / {pesos.practico}</b></div>
+            <div className="aa-det-row"><span>Final (1ª oport.)</span><b>{notaM?.final1 ?? '—'} / {pesos.final}</b></div>
+            <div className="aa-det-row"><span>Final (2ª oport.)</span><b>{notaM?.final2 ?? '—'} / {pesos.final}</b></div>
+            <div className="aa-det-row"><span>Final (3ª oport.)</span><b>{notaM?.final3 ?? '—'} / {pesos.final}</b></div>
+            <div className="aa-det-row" style={{ marginTop: 6, borderTop: '2px solid var(--border-subtle)', paddingTop: 12 }}>
+              <span style={{ fontWeight: 700 }}>Promedio</span>
+              <b style={{ fontSize: 18, color: 'var(--accent-bright)' }}>{notaM?.promedio ?? '—'} / 10</b>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 20 }}>
+            <div className="aa-det-card-title"><i className="ti ti-clipboard-check" style={{ color: 'var(--accent-bright)' }} /> Asistencia detallada</div>
+            {asis ? (
+              <>
+                <div className="aa-det-stats-row">
+                  <div className="aa-det-mini"><div className="aa-det-mini-val" style={{ color: '#22c55e' }}>{asis.presentes}</div><div className="aa-det-mini-lbl">Presentes</div></div>
+                  <div className="aa-det-mini"><div className="aa-det-mini-val" style={{ color: '#ef4444' }}>{asis.total_clases - asis.presentes}</div><div className="aa-det-mini-lbl">Ausentes</div></div>
+                  <div className="aa-det-mini"><div className="aa-det-mini-val">{asis.total_clases}</div><div className="aa-det-mini-lbl">Total</div></div>
+                </div>
+                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                  {sesM.length === 0 ? (
+                    <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>Sin sesiones registradas.</p>
+                  ) : sesM.map((s, i) => (
+                    <div key={i} className="aa-det-row">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="ti ti-calendar-event" style={{ fontSize: 14, color: 'var(--text-muted)' }} />
+                        {s.fecha}
+                      </span>
+                      <span className="badge" style={{
+                        background: s.presente ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                        color: s.presente ? '#22c55e' : '#ef4444',
+                        border: `1px solid ${s.presente ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                        padding: '4px 12px',
+                      }}>
+                        {s.presente ? '✓ Presente' : '✗ Ausente'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>Sin datos de asistencia.</p>
+            )}
+          </div>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -303,11 +395,10 @@ export default function AsistenciaAlumnoPanel() {
                 const riesgo = pct < LIMITE
                 const color = donutColor(pct)
                 const c = 2 * Math.PI * 30
-                const abierta = openId === m.materia_id
                 return (
                   <div key={m.materia_id}
-                    className={`aa-chip-card${riesgo ? ' riesgo' : ''}${abierta ? ' open' : ''}`}
-                    onClick={() => toggleMateria(m.materia_id)}>
+                    className={`aa-chip-card${riesgo ? ' riesgo' : ''}`}
+                    onClick={() => setDetalle(m.materia_id)}>
                     {riesgo && (
                       <span className="aa-chip-alerta" title="Materia en riesgo"><i className="ti ti-alert-triangle" style={{ fontSize: 11 }} /></span>
                     )}
@@ -324,38 +415,6 @@ export default function AsistenciaAlumnoPanel() {
                   </div>
                 )
               })}
-            </div>
-          )}
-
-          {/* 4) Panel de detalle (acordeón) — fijo, solo semestres anteriores */}
-          {materiaAbierta && (
-            <div className="aa-panel">
-              <div className="aa-panel-title">Semestres anteriores — {materiaAbierta.materia_nombre}</div>
-              {historialLoading ? (
-                <p style={{ fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center', padding: 14 }}>Cargando historial…</p>
-              ) : (historial[materiaAbierta.materia_id] || []).length === 0 ? (
-                <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', textAlign: 'center', padding: 14 }}>Sin datos de semestres anteriores.</p>
-              ) : (
-                (() => {
-                  const hist = historial[materiaAbierta.materia_id] || []
-                  const porAnio: Record<number, { semestre: number; porcentaje: number }[]> = {}
-                  hist.forEach(h => {
-                    if (!porAnio[h.anio]) porAnio[h.anio] = []
-                    porAnio[h.anio].push({ semestre: h.semestre, porcentaje: h.porcentaje })
-                  })
-                  return Object.keys(porAnio).map(Number).sort((a, b) => b - a).map(anio => (
-                    <div key={anio}>
-                      <div className="aa-hist-anio">Año {anio}</div>
-                      {porAnio[anio].sort((a, b) => b.semestre - a.semestre).map(p => (
-                        <div key={p.semestre} className="aa-hist-row">
-                          <span>{p.semestre === 1 ? 'Primer' : 'Segundo'} semestre</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: p.porcentaje >= LIMITE ? '#22c55e' : '#ef4444' }}>{p.porcentaje}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))
-                })()
-              )}
             </div>
           )}
         </>
