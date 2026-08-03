@@ -170,12 +170,16 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list, db: 
             "final1": None,
             "final2": None,
             "final3": None,
+            "directa": None,
+            "felicitado": False,
         }
     )
     for p in puntajes:
         mat_map[p.materia_id]["nombre"] = p.materia_nombre
         if p.tipo in mat_map[p.materia_id]:
             mat_map[p.materia_id][p.tipo] = float(p.valor)
+            if p.tipo == "directa":
+                mat_map[p.materia_id]["felicitado"] = bool(p.felicitado)
 
     # Table
     header_row = [
@@ -203,6 +207,7 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list, db: 
             "final1": row["final1"],
             "final2": row["final2"],
             "final3": row["final3"],
+            "directa": row["directa"],
         }
         pesos = get_pesos(db, mid)
         prom = calcular_promedio_final(scores, pesos)
@@ -241,7 +246,7 @@ def _build_pdf(user: models.user.User, carrera_nombre: str, puntajes: list, db: 
                 Paragraph(_fmt(row["parcial2"]), style_small_c),
                 Paragraph(_fmt(row["practico"]), style_small_c),
                 Paragraph(_fmt(row["final"]), style_small_c),
-                Paragraph(_fmt(prom), prom_style),
+                Paragraph(_fmt(prom) + (" F" if row["felicitado"] and prom is not None else ""), prom_style),
             ]
         )
 

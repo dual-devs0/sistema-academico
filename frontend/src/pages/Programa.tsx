@@ -1010,6 +1010,7 @@ type NotaMateriaCursos = {
   materia_id: number; materia_nombre: string
   parcial1: number | null; parcial2: number | null; practico: number | null
   final1: number | null; final2: number | null; final3: number | null
+  directa?: number | null; felicitado?: boolean
   promedio: number | null
   pesos: { parcial1: number; parcial2: number; practico: number; final: number }
 }
@@ -1037,7 +1038,7 @@ function CalificacionesTab({ userId }: { userId: number }) {
       api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
       api.get<{ creditos_acumulados: number; creditos_totales: number | null }>(`/pensum/alumno/${userId}/creditos`).catch(() => null),
     ]).then(([notas, cred]) => {
-      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || m.final1 !== null || m.final2 !== null || m.final3 !== null))
+      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || m.final1 !== null || m.final2 !== null || m.final3 !== null || m.directa != null))
       setCreditos(cred)
     }).finally(() => setLoading(false))
   }, [userId])
@@ -1104,16 +1105,25 @@ function CalificacionesTab({ userId }: { userId: number }) {
               <div key={m.materia_id} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>{p ?? '—'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>
+                    {m.felicitado && <i className="ti ti-star" style={{ fontSize: 16, marginRight: 3, verticalAlign: -1 }} />}
+                    {p === null ? '—' : m.felicitado ? `${p}F` : p}
+                  </span>
                 </div>
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
-                  <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
-                  <div className="desglose-row">
-                    <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
-                    <b>{m.parcial2 ?? '—'}</b>
-                  </div>
-                  <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
-                  <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{finalEf ?? '—'}</b></div>
+                  {m.directa != null ? (
+                    <div className="desglose-row"><span>Nota final (carga directa)</span><b>{m.felicitado ? `${m.directa}F` : m.directa}</b></div>
+                  ) : (
+                    <>
+                      <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
+                      <div className="desglose-row">
+                        <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
+                        <b>{m.parcial2 ?? '—'}</b>
+                      </div>
+                      <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
+                      <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{finalEf ?? '—'}</b></div>
+                    </>
+                  )}
                 </div>
                 <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
               </div>

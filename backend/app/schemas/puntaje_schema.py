@@ -2,7 +2,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 
-TipoEvaluacion = Literal["parcial1", "parcial2", "practico", "final1", "final2", "final3"]
+TipoEvaluacion = Literal["parcial1", "parcial2", "practico", "final1", "final2", "final3", "directa"]
 
 
 class PuntajeBase(BaseModel):
@@ -10,6 +10,17 @@ class PuntajeBase(BaseModel):
     materia_id: int
     tipo: TipoEvaluacion
     valor: float = Field(ge=0, le=50)
+    # Solo válido junto con tipo="directa" — nota final 0-10 cargada directo por el
+    # profesor sin desglose, felicitado=True marca "5F" (5 Felicitado).
+    felicitado: bool = False
+
+    @model_validator(mode="after")
+    def _felicitado_solo_directa(self):
+        if self.felicitado and self.tipo != "directa":
+            raise ValueError("'felicitado' solo aplica a notas de tipo 'directa'")
+        if self.tipo == "directa" and self.valor > 10:
+            raise ValueError("La nota directa es una escala de 0 a 10")
+        return self
 
 
 class PuntajeCreate(PuntajeBase):
@@ -34,6 +45,8 @@ class PromedioFinalOut(BaseModel):
     final1: float | None = None
     final2: float | None = None
     final3: float | None = None
+    directa: float | None = None
+    felicitado: bool = False
     promedio_final: float | None = None
 
 
@@ -47,6 +60,8 @@ class AlumnoExportRow(BaseModel):
     final1: float | None = None
     final2: float | None = None
     final3: float | None = None
+    directa: float | None = None
+    felicitado: bool = False
     promedio: float | None = None
     asistencia_pct: float | None = None
 

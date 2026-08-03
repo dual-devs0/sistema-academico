@@ -11,6 +11,7 @@ type NotaMateria = {
   materia_id: number; materia_nombre: string
   parcial1: number | null; parcial2: number | null; practico: number | null
   final1: number | null; final2: number | null; final3: number | null
+  directa?: number | null; felicitado?: boolean
   promedio: number | null
   pesos: { parcial1: number; parcial2: number; practico: number; final: number }
 }
@@ -257,15 +258,21 @@ export default function AsistenciaAlumnoPanel() {
         <div className="aa-det-grid">
           <div className="card" style={{ padding: 20 }}>
             <div className="aa-det-card-title"><i className="ti ti-certificate" style={{ color: 'var(--accent-bright)' }} /> Calificaciones</div>
-            <div className="aa-det-row"><span>Parcial 1</span><b>{notaM?.parcial1 ?? '—'} / {pesos.parcial1}</b></div>
-            <div className="aa-det-row"><span>Parcial 2</span><b>{notaM?.parcial2 ?? '—'} / {pesos.parcial2}</b></div>
-            <div className="aa-det-row"><span>Trabajo Práctico</span><b>{notaM?.practico ?? '—'} / {pesos.practico}</b></div>
-            <div className="aa-det-row"><span>Final (1ª oport.)</span><b>{notaM?.final1 ?? '—'} / {pesos.final}</b></div>
-            <div className="aa-det-row"><span>Final (2ª oport.)</span><b>{notaM?.final2 ?? '—'} / {pesos.final}</b></div>
-            <div className="aa-det-row"><span>Final (3ª oport.)</span><b>{notaM?.final3 ?? '—'} / {pesos.final}</b></div>
+            {notaM?.directa != null ? (
+              <div className="aa-det-row"><span>Nota final (carga directa)</span><b>{notaM.felicitado ? `${notaM.directa}F` : notaM.directa} / 10</b></div>
+            ) : (
+              <>
+                <div className="aa-det-row"><span>Parcial 1</span><b>{notaM?.parcial1 ?? '—'} / {pesos.parcial1}</b></div>
+                <div className="aa-det-row"><span>Parcial 2</span><b>{notaM?.parcial2 ?? '—'} / {pesos.parcial2}</b></div>
+                <div className="aa-det-row"><span>Trabajo Práctico</span><b>{notaM?.practico ?? '—'} / {pesos.practico}</b></div>
+                <div className="aa-det-row"><span>Final (1ª oport.)</span><b>{notaM?.final1 ?? '—'} / {pesos.final}</b></div>
+                <div className="aa-det-row"><span>Final (2ª oport.)</span><b>{notaM?.final2 ?? '—'} / {pesos.final}</b></div>
+                <div className="aa-det-row"><span>Final (3ª oport.)</span><b>{notaM?.final3 ?? '—'} / {pesos.final}</b></div>
+              </>
+            )}
             <div className="aa-det-row" style={{ marginTop: 6, borderTop: '2px solid var(--border-subtle)', paddingTop: 12 }}>
               <span style={{ fontWeight: 700 }}>Promedio</span>
-              <b style={{ fontSize: 18, color: 'var(--accent-bright)' }}>{notaM?.promedio ?? '—'} / 10</b>
+              <b style={{ fontSize: 18, color: notaM?.felicitado ? '#fbbf24' : 'var(--accent-bright)' }}>{notaM?.promedio == null ? '—' : notaM.felicitado ? `${notaM.promedio}F` : notaM.promedio} / 10</b>
             </div>
           </div>
 
