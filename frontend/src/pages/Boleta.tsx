@@ -26,6 +26,33 @@ type Resumen = {
 }
 type AlumnoOpt = { id: number; nombre: string; username: string; role: string }
 
+/* ─── Historial académico: reporte agrupado por semestre + recursadas ─── */
+type MateriaSemestreRow = { materia_id: number; materia_nombre: string; promedio: number; felicitado: boolean; aprobado: boolean; recursada: boolean }
+type SemestreRow = { periodo: string; materias: MateriaSemestreRow[] }
+type IntentoRecursada = { periodo: string; promedio: number; felicitado: boolean; aprobado: boolean; vigente: boolean }
+type RecursadaRow = { materia_id: number; materia_nombre: string; intentos: IntentoRecursada[] }
+type ReporteNotas = {
+  alumno: { user_id: number; nombre: string; cedula: string | null; carrera_nombre: string | null }
+  metricas: {
+    promedio_general: number | null; materias_aprobadas: number
+    total_materias_plan: number | null; materias_aprobadas_plan: number | null
+    avance_pct: number | null; faltan: number | null
+  }
+  periodos_disponibles: string[]
+  semestres: SemestreRow[]
+  recursadas: RecursadaRow[]
+}
+
+function periodoLabelHist(periodo: string): string {
+  const [anio, sem] = periodo.split('-')
+  return `${sem === '1' ? 'Primer' : 'Segundo'} semestre ${anio}`
+}
+
+function notaTxtHist(m: { promedio: number; felicitado: boolean }): string {
+  const base = Number.isInteger(m.promedio) ? String(m.promedio) : m.promedio.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+  return m.felicitado ? `${base}F` : base
+}
+
 const css = `
   .bo-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:20px; }
   .bo-row { display:flex; align-items:center; gap:14px; padding:13px 0; border-bottom:1px solid var(--border-subtle); }
@@ -74,6 +101,28 @@ export default function Boleta() {
   const [nombreReal, setNombreReal] = useState('')
   const [periodoActualInfo, setPeriodoActualInfo] = useState<{ anio: number; semestre: number } | null>(null)
   const [sello, setSello] = useState<{ codigo: string; qr_base64: string; validado_en: string } | null>(null)
+
+  const [reporte, setReporte] = useState<ReporteNotas | null>(null)
+  const [semestreHist, setSemestreHist] = useState<string>('todos')
+  const [descargandoReporte, setDescargandoReporte] = useState(false)
+
+  useEffect(() => {
+    if (!esAlumno) return
+    api.get<ReporteNotas>('/alumno/reporte-notas').then(setReporte).catch(() => setReporte(null))
+  }, [esAlumno])
+
+  async function descargarReportePDF() {
+    setDescargandoReporte(true)
+    try {
+      const qs = semestreHist !== 'todos' ? `?semestre=${semestreHist}` : ''
+      await api.download(`/alumno/reporte-notas/pdf${qs}`, `reporte_calificaciones_${semestreHist}.pdf`)
+      emitToast('PDF descargado')
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al descargar el PDF', 'error')
+    } finally {
+      setDescargandoReporte(false)
+    }
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -347,6 +396,111 @@ export default function Boleta() {
               })}
             </div>
           </div>
+
+          {/* Historial académico: reporte agrupado por semestre + recursadas */}
+          {esAlumno && reporte && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <h3 style={{ fontSize: 17, fontWeight: 800 }}>Historial Académico</h3>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <select className="input-uca" style={{ width: 'auto', minWidth: 200 }} value={semestreHist} onChange={e => setSemestreHist(e.target.value)}>
+                    <option value="todos">Todos los semestres</option>
+                    {reporte.periodos_disponibles.map(p => (
+                      <option key={p} value={p}>{periodoLabelHist(p)}</option>
+                    ))}
+                  </select>
+                  <button className="btn-primary" disabled={descargandoReporte} onClick={descargarReportePDF}>
+                    <i className="ti ti-download" /> {descargandoReporte ? 'Generando…' : 'Descargar PDF'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bo-kpis">
+                <div className="kpi-card">
+                  <div className="kpi-top"><span className="mono-label">Materias Aprobadas</span><i className="ti ti-checks" style={{ color: 'var(--success)', fontSize: 15 }} /></div>
+                  <span className="kpi-value" style={{ fontSize: 30, color: 'var(--success)' }}>{reporte.metricas.materias_aprobadas}</span>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-top"><span className="mono-label">Avance de Carrera</span><i className="ti ti-road" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+                  <span className="kpi-value" style={{ fontSize: 30 }}>{reporte.metricas.avance_pct === null ? '—' : `${reporte.metricas.avance_pct}%`}</span>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-top"><span className="mono-label">Faltan para Graduarse</span><i className="ti ti-flag" style={{ color: 'var(--warning)', fontSize: 15 }} /></div>
+                  <span className="kpi-value" style={{ fontSize: 30 }}>{reporte.metricas.faltan === null ? '—' : reporte.metricas.faltan}<span className="kpi-unit"> materias</span></span>
+                </div>
+              </div>
+
+              {reporte.metricas.total_materias_plan !== null && (
+                <div className="card" style={{ padding: '14px 20px', marginBottom: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                    <span>Progreso hacia la graduación</span>
+                    <span>{reporte.metricas.materias_aprobadas_plan} / {reporte.metricas.total_materias_plan} materias</span>
+                  </div>
+                  <div className="progress-track"><div className="progress-fill" style={{ width: `${reporte.metricas.avance_pct ?? 0}%` }} /></div>
+                </div>
+              )}
+
+              {(semestreHist === 'todos' ? reporte.semestres : reporte.semestres.filter(s => s.periodo === semestreHist)).map(sem => (
+                <div key={sem.periodo} style={{ marginBottom: 20 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>{periodoLabelHist(sem.periodo)}</h4>
+                  <div style={{ overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
+                    <table className="table-uca">
+                      <thead><tr><th>Materia</th><th style={{ textAlign: 'center' }}>Nota</th><th style={{ textAlign: 'center' }}>Estado</th></tr></thead>
+                      <tbody>
+                        {sem.materias.map(m => (
+                          <tr key={m.materia_id}>
+                            <td style={{ fontWeight: 600 }}>
+                              {m.materia_nombre}
+                              {m.recursada && <span className="badge" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', fontSize: 10, marginLeft: 8 }}>Recursada</span>}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: m.felicitado ? '#fbbf24' : m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                                {m.felicitado && <i className="ti ti-star" style={{ fontSize: 13, marginRight: 3, verticalAlign: -1 }} />}
+                                {notaTxtHist(m)}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span className="badge" style={{ background: m.aprobado ? 'var(--success-subtle)' : 'var(--danger-subtle)', color: m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                                {m.aprobado ? 'APROBADO' : 'REPROBADO'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+
+              {semestreHist === 'todos' && reporte.recursadas.length > 0 && (
+                <div style={{ border: '1px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <i className="ti ti-refresh" style={{ color: 'var(--warning)' }} />
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>Historial de recursadas</span>
+                  </div>
+                  {reporte.recursadas.map(r => (
+                    <div key={r.materia_id} style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>{r.materia_nombre}</div>
+                      {r.intentos.map((it, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>{periodoLabelHist(it.periodo)}</span>
+                          {it.vigente ? (
+                            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: it.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                              {notaTxtHist(it)} vigente
+                            </span>
+                          ) : (
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                              {notaTxtHist(it)} {!it.aprobado && '(reprobado)'}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Sello digital real: código firmado con SECRET_KEY, verificable en /boleta/verificar/{codigo} */}
           {sello && (
