@@ -1,7 +1,7 @@
 // Alumno y Profesor. Cursos unificado: Temario + Asistencia + Calificaciones en tabs (Fase 19B). Depende de: /programas/*, /puntajes/*, /asistencias/*.
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { api, getCurrentUser } from '../lib/api'
+import { api, getCurrentUser, emitToast } from '../lib/api'
 import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
 import { Skeleton } from 'boneyard-js/react'
 import AsistenciaAlumnoPanel from '../components/AsistenciaAlumnoPanel'
@@ -1006,129 +1006,188 @@ function CursosTabs({ tab, setTab }: { tab: TabCursos; setTab: (t: TabCursos) =>
   )
 }
 
-type NotaMateriaCursos = {
-  materia_id: number; materia_nombre: string
-  parcial1: number | null; parcial2: number | null; practico: number | null
-  final1: number | null; final2: number | null; final3: number | null
-  directa?: number | null; felicitado?: boolean
-  promedio: number | null
-  pesos: { parcial1: number; parcial2: number; practico: number; final: number }
+/* ─── Reporte de calificaciones: selector de semestre + descarga PDF ─── */
+type MateriaSemestreRow = { materia_id: number; materia_nombre: string; promedio: number; felicitado: boolean; aprobado: boolean; recursada: boolean }
+type SemestreRow = { periodo: string; materias: MateriaSemestreRow[] }
+type IntentoRecursada = { periodo: string; promedio: number; felicitado: boolean; aprobado: boolean; vigente: boolean }
+type RecursadaRow = { materia_id: number; materia_nombre: string; intentos: IntentoRecursada[] }
+type ReporteNotas = {
+  alumno: { user_id: number; nombre: string; cedula: string | null; carrera_nombre: string | null }
+  metricas: {
+    promedio_general: number | null; materias_aprobadas: number
+    total_materias_plan: number | null; materias_aprobadas_plan: number | null
+    avance_pct: number | null; faltan: number | null
+  }
+  periodos_disponibles: string[]
+  semestres: SemestreRow[]
+  recursadas: RecursadaRow[]
 }
 
-const PESOS_DEFAULT_CURSOS = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
+function periodoLabelCursos(periodo: string): string {
+  const [anio, sem] = periodo.split('-')
+  return `${sem === '1' ? 'Primer' : 'Segundo'} semestre ${anio}`
+}
 
-function estadoNota(p: number | null): { label: string; bg: string; color: string } {
-  if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
-  if (p >= 9) return { label: 'PROMOCIONADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
-  if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
-  return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
+function notaTxt(m: { promedio: number; felicitado: boolean }): string {
+  const base = Number.isInteger(m.promedio) ? String(m.promedio) : m.promedio.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+  return m.felicitado ? `${base}F` : base
 }
 
 function AsistenciaTab() {
   return <AsistenciaAlumnoPanel />
 }
 
-function CalificacionesTab({ userId }: { userId: number }) {
-  const [materias, setMaterias] = useState<NotaMateriaCursos[]>([])
-  const [creditos, setCreditos] = useState<{ creditos_acumulados: number; creditos_totales: number | null } | null>(null)
+function CalificacionesTab({ userId: _userId }: { userId: number }) {
+  const [reporte, setReporte] = useState<ReporteNotas | null>(null)
   const [loading, setLoading] = useState(true)
+  const [semestreSel, setSemestreSel] = useState<string>('todos')
+  const [descargando, setDescargando] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      api.get<NotaMateriaCursos[]>('/alumno/mis-notas').catch(() => []),
-      api.get<{ creditos_acumulados: number; creditos_totales: number | null }>(`/pensum/alumno/${userId}/creditos`).catch(() => null),
-    ]).then(([notas, cred]) => {
-      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || m.final1 !== null || m.final2 !== null || m.final3 !== null || m.directa != null))
-      setCreditos(cred)
-    }).finally(() => setLoading(false))
-  }, [userId])
+    api.get<ReporteNotas>('/alumno/reporte-notas')
+      .then(setReporte)
+      .catch(() => setReporte(null))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
-  const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
-  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
-  const pctAprob = materias.length ? Math.round((aprobadas / materias.length) * 100) : 0
-  const ringC = 2 * Math.PI * 34
-  const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
+  async function descargarPDF() {
+    setDescargando(true)
+    try {
+      const qs = semestreSel !== 'todos' ? `?semestre=${semestreSel}` : ''
+      await api.download(`/alumno/reporte-notas/pdf${qs}`, `reporte_calificaciones_${semestreSel}.pdf`)
+      emitToast('PDF descargado')
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al descargar el PDF', 'error')
+    } finally {
+      setDescargando(false)
+    }
+  }
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
 
+  if (!reporte) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: 46 }}>
+        <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
+        <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>No se pudo cargar el reporte de calificaciones.</p>
+      </div>
+    )
+  }
+
+  const { metricas, semestres, recursadas, periodos_disponibles } = reporte
+  const semestresVisibles = semestreSel === 'todos' ? semestres : semestres.filter(s => s.periodo === semestreSel)
+  const promGeneral = metricas.promedio_general
+  const avance = metricas.avance_pct
+
   return (
     <div>
+      {/* Selector de semestre + descarga PDF */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <select className="input-uca" style={{ width: 'auto', minWidth: 200 }} value={semestreSel} onChange={e => setSemestreSel(e.target.value)}>
+          <option value="todos">Todos los semestres</option>
+          {periodos_disponibles.map(p => (
+            <option key={p} value={p}>{periodoLabelCursos(p)}</option>
+          ))}
+        </select>
+        <button className="btn-primary" disabled={descargando} onClick={descargarPDF}>
+          <i className="ti ti-download" /> {descargando ? 'Generando…' : 'Descargar PDF'}
+        </button>
+      </div>
+
+      {/* Métricas clave */}
       <div className="exp-stats" style={{ marginBottom: 22 }}>
-        <div className="kpi-card" style={{ borderLeft: `3px solid ${promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444'}` }}>
+        <div className="kpi-card" style={{ borderLeft: `3px solid ${promGeneral === null ? 'var(--text-muted)' : promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444'}` }}>
           <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-star" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-          <span className="kpi-value" style={{ fontSize: 36, color: promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444' }}>{promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
+          <span className="kpi-value" style={{ fontSize: 36, color: promGeneral === null ? 'var(--text-muted)' : promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444' }}>{promGeneral === null ? '—' : promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
         </div>
-        <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', gap: 18, borderLeft: `3px solid ${pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444'}` }}>
-          <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
-            <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="40" cy="40" r="34" stroke="var(--bg-elevated)" strokeWidth="7" fill="none" />
-              <circle cx="40" cy="40" r="34" stroke={pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444'} strokeWidth="7" fill="none"
-                strokeDasharray={ringC} strokeDashoffset={ringC * (1 - pctAprob / 100)} strokeLinecap="round" />
-            </svg>
-            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444' }}>{pctAprob}%</span>
-          </div>
-          <div>
-            <div className="mono-label" style={{ marginBottom: 4 }}>Aprobación</div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{aprobadas} de {materias.length} Materias</div>
-          </div>
+        <div className="kpi-card">
+          <div className="kpi-top"><span className="mono-label">Materias Aprobadas</span><i className="ti ti-checks" style={{ color: 'var(--success)', fontSize: 15 }} /></div>
+          <span className="kpi-value" style={{ fontSize: 36, color: 'var(--success)' }}>{metricas.materias_aprobadas}</span>
         </div>
-        <div className="kpi-card" style={{ borderLeft: `3px solid ${pctCreditos >= 80 ? '#22c55e' : 'var(--accent-bright)'}` }}>
-          <div className="kpi-top">
-            <span className="mono-label">Créditos Acumulados</span>
-            <i className="ti ti-certificate" style={{ color: 'var(--accent)', fontSize: 15 }} />
-          </div>
-          <span className="kpi-value" style={{ fontSize: 34 }}>{creditos ? creditos.creditos_acumulados : '—'}<span className="kpi-unit"> / {creditos?.creditos_totales ?? '—'}</span></span>
-          <div className="progress-track" style={{ marginTop: 12 }}><div className="progress-fill" style={{ width: `${pctCreditos}%`, background: pctCreditos >= 80 ? '#22c55e' : undefined }} /></div>
+        <div className="kpi-card" style={{ borderLeft: `3px solid ${avance === null ? 'var(--text-muted)' : avance >= 80 ? '#22c55e' : 'var(--accent-bright)'}` }}>
+          <div className="kpi-top"><span className="mono-label">Avance de Carrera</span><i className="ti ti-road" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
+          <span className="kpi-value" style={{ fontSize: 36 }}>{avance === null ? '—' : `${avance}%`}</span>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-top"><span className="mono-label">Faltan para Graduarse</span><i className="ti ti-flag" style={{ color: 'var(--warning)', fontSize: 15 }} /></div>
+          <span className="kpi-value" style={{ fontSize: 36 }}>{metricas.faltan === null ? '—' : metricas.faltan}<span className="kpi-unit"> materias</span></span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 800 }}>Detalle de Materias</h3>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{materias.length} materias</span>
-      </div>
-      {materias.length === 0 ? (
+      {metricas.total_materias_plan !== null && (
+        <div className="card" style={{ padding: '14px 20px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+            <span>Progreso hacia la graduación</span>
+            <span>{metricas.materias_aprobadas_plan} / {metricas.total_materias_plan} materias</span>
+          </div>
+          <div className="progress-track"><div className="progress-fill" style={{ width: `${avance ?? 0}%` }} /></div>
+        </div>
+      )}
+
+      {/* Tabla por semestre */}
+      {semestresVisibles.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 46 }}>
           <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
           <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Aún no tenés calificaciones cargadas.</p>
         </div>
-      ) : (
-        <div className="exp-cards">
-          {materias.map(m => {
-            const p = m.promedio
-            const pesos = m.pesos || PESOS_DEFAULT_CURSOS
-            const fin = [m.final1, m.final2, m.final3].filter((v): v is number => v !== null)
-            const finalEf = fin.length ? Math.max(...fin) : null
-            const pendienteP2 = m.parcial1 !== null && m.parcial2 === null
-            const est = estadoNota(p)
-            return (
-              <div key={m.materia_id} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>
-                    {m.felicitado && <i className="ti ti-star" style={{ fontSize: 16, marginRight: 3, verticalAlign: -1 }} />}
-                    {p === null ? '—' : m.felicitado ? `${p}F` : p}
-                  </span>
-                </div>
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
-                  {m.directa != null ? (
-                    <div className="desglose-row"><span>Nota final (carga directa)</span><b>{m.felicitado ? `${m.directa}F` : m.directa}</b></div>
+      ) : semestresVisibles.map(sem => (
+        <div key={sem.periodo} style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>{periodoLabelCursos(sem.periodo)}</h3>
+          <div style={{ overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
+            <table className="table-uca">
+              <thead><tr><th>Materia</th><th style={{ textAlign: 'center' }}>Nota</th><th style={{ textAlign: 'center' }}>Estado</th></tr></thead>
+              <tbody>
+                {sem.materias.map(m => (
+                  <tr key={m.materia_id}>
+                    <td style={{ fontWeight: 600 }}>
+                      {m.materia_nombre}
+                      {m.recursada && <span className="badge" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', fontSize: 10, marginLeft: 8 }}>Recursada</span>}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: m.felicitado ? '#fbbf24' : m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                        {m.felicitado && <i className="ti ti-star" style={{ fontSize: 13, marginRight: 3, verticalAlign: -1 }} />}
+                        {notaTxt(m)}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className="badge" style={{ background: m.aprobado ? 'var(--success-subtle)' : 'var(--danger-subtle)', color: m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                        {m.aprobado ? 'APROBADO' : 'REPROBADO'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+
+      {/* Historial de recursadas */}
+      {semestreSel === 'todos' && recursadas.length > 0 && (
+        <div style={{ border: '1px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: '16px 20px', marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <i className="ti ti-refresh" style={{ color: 'var(--warning)' }} />
+            <span style={{ fontWeight: 700, fontSize: 14 }}>Historial de recursadas</span>
+          </div>
+          {recursadas.map(r => (
+            <div key={r.materia_id} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>{r.materia_nombre}</div>
+              {r.intentos.map((it, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{periodoLabelCursos(it.periodo)}</span>
+                  {it.vigente ? (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: it.aprobado ? 'var(--success)' : 'var(--danger)' }}>
+                      {notaTxt(it)} vigente
+                    </span>
                   ) : (
-                    <>
-                      <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
-                      <div className="desglose-row">
-                        <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
-                        <b>{m.parcial2 ?? '—'}</b>
-                      </div>
-                      <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
-                      <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{finalEf ?? '—'}</b></div>
-                    </>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                      {notaTxt(it)} {!it.aprobado && '(reprobado)'}
+                    </span>
                   )}
                 </div>
-                <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
-              </div>
-            )
-          })}
+              ))}
+            </div>
+          ))}
         </div>
       )}
     </div>

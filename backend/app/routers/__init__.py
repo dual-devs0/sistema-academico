@@ -13,6 +13,7 @@ from . import programas_router as programas
 from . import reportes_router as reportes
 from . import boleta_router as boleta
 from . import alumno_router as alumno
+from . import reporte_notas_router as reporte_notas
 from . import horarios_router as horarios
 from . import profesor_router as profesor
 from . import pensum_router as pensum
@@ -44,6 +45,7 @@ __all__ = [
     "reportes",
     "boleta",
     "alumno",
+    "reporte_notas",
     "horarios",
     "profesor",
     "pensum",
