@@ -100,6 +100,7 @@ def construir_reporte_notas(db: Session, alumno_id: int, semestre: str | None = 
             "periodo": oferta.periodo,
             "promedio": promedio,
             "felicitado": felicitado_por_oferta.get(oferta_id, False),
+            "notas": notas,
         })
 
     semestres_map: dict[str, list[dict]] = defaultdict(list)
@@ -132,6 +133,7 @@ def construir_reporte_notas(db: Session, alumno_id: int, semestre: str | None = 
             })
 
         if vigente["periodo"]:
+            notas_vigente = vigente["notas"]
             semestres_map[vigente["periodo"]].append({
                 "materia_id": mid,
                 "materia_nombre": nombre,
@@ -139,6 +141,14 @@ def construir_reporte_notas(db: Session, alumno_id: int, semestre: str | None = 
                 "felicitado": vigente["felicitado"],
                 "aprobado": vigente["promedio"] >= APROBACION_MINIMA,
                 "recursada": len(intentos) > 1,
+                "parcial1": notas_vigente.get("parcial1"),
+                "parcial2": notas_vigente.get("parcial2"),
+                "practico": notas_vigente.get("practico"),
+                "final1": notas_vigente.get("final1"),
+                "final2": notas_vigente.get("final2"),
+                "final3": notas_vigente.get("final3"),
+                "directa": notas_vigente.get("directa"),
+                "pesos": pesos_de(mid),
             })
 
     recursadas.sort(key=lambda r: r["materia_nombre"])

@@ -17,6 +17,13 @@ class MetricasReporteOut(BaseModel):
     faltan: int | None = None
 
 
+class PesosOut(BaseModel):
+    parcial1: float
+    parcial2: float
+    practico: float
+    final: float
+
+
 class MateriaSemestreOut(BaseModel):
     materia_id: int
     materia_nombre: str
@@ -24,6 +31,14 @@ class MateriaSemestreOut(BaseModel):
     felicitado: bool
     aprobado: bool
     recursada: bool
+    parcial1: float | None = None
+    parcial2: float | None = None
+    practico: float | None = None
+    final1: float | None = None
+    final2: float | None = None
+    final3: float | None = None
+    directa: float | None = None
+    pesos: PesosOut | None = None
 
 
 class SemestreOut(BaseModel):

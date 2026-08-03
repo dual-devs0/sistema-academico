@@ -1029,7 +1029,13 @@ function AsistenciaTab() {
 }
 
 /* ─── Chip de período (detalle de semestres anteriores) en Calificaciones ─── */
-type MateriaSemestreRow = { materia_id: number; materia_nombre: string; promedio: number; felicitado: boolean; aprobado: boolean; recursada: boolean }
+type MateriaSemestreRow = {
+  materia_id: number; materia_nombre: string; promedio: number; felicitado: boolean; aprobado: boolean; recursada: boolean
+  parcial1: number | null; parcial2: number | null; practico: number | null
+  final1: number | null; final2: number | null; final3: number | null
+  directa: number | null
+  pesos: { parcial1: number; parcial2: number; practico: number; final: number } | null
+}
 type SemestreRow = { periodo: string; materias: MateriaSemestreRow[] }
 type ReporteNotas = {
   alumno: { user_id: number; nombre: string; cedula: string | null; carrera_nombre: string | null }
@@ -1043,14 +1049,54 @@ type ReporteNotas = {
   recursadas: { materia_id: number; materia_nombre: string; intentos: { periodo: string; promedio: number; felicitado: boolean; aprobado: boolean; vigente: boolean }[] }[]
 }
 
+type MateriaCardData = {
+  materia_id: number; materia_nombre: string
+  parcial1: number | null; parcial2: number | null; practico: number | null
+  final1: number | null; final2: number | null; final3: number | null
+  directa: number | null; felicitado: boolean
+  promedio: number | null
+  pesos: { parcial1: number; parcial2: number; practico: number; final: number } | null
+}
+
+function MateriaCard({ m }: { m: MateriaCardData }) {
+  const p = m.promedio
+  const pesos = m.pesos || PESOS_DEFAULT_CURSOS
+  const fin = [m.final1, m.final2, m.final3].filter((v): v is number => v !== null)
+  const finalEf = fin.length ? Math.max(...fin) : null
+  const pendienteP2 = m.parcial1 !== null && m.parcial2 === null
+  const est = estadoNota(p)
+  return (
+    <div className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>
+          {m.felicitado && <i className="ti ti-star" style={{ fontSize: 16, marginRight: 3, verticalAlign: -1 }} />}
+          {p === null ? '—' : m.felicitado ? `${p}F` : p}
+        </span>
+      </div>
+      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
+        {m.directa != null ? (
+          <div className="desglose-row"><span>Nota final (carga directa)</span><b>{m.felicitado ? `${m.directa}F` : m.directa}</b></div>
+        ) : (
+          <>
+            <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
+            <div className="desglose-row">
+              <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
+              <b>{m.parcial2 ?? '—'}</b>
+            </div>
+            <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
+            <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{finalEf ?? '—'}</b></div>
+          </>
+        )}
+      </div>
+      <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
+    </div>
+  )
+}
+
 function periodoLabelCursos(periodo: string): string {
   const [anio, sem] = periodo.split('-')
   return `${sem === '1' ? 'Primer' : 'Segundo'} semestre ${anio}`
-}
-
-function notaTxt(m: { promedio: number; felicitado: boolean }): string {
-  const base = Number.isInteger(m.promedio) ? String(m.promedio) : m.promedio.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
-  return m.felicitado ? `${base}F` : base
 }
 
 function CalificacionesTab({ userId }: { userId: number }) {
@@ -1170,89 +1216,22 @@ function CalificacionesTab({ userId }: { userId: number }) {
             </div>
           )}
         </div>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{materias.length} materias</span>
+        {semDetalle && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{semDetalle.materias.length} materias</span>}
       </div>
 
-      {semDetalle && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
-          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 800 }}>{periodoLabelCursos(semDetalle.periodo)}</span>
-            <button type="button" onClick={() => setPeriodoDetalle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
-              <i className="ti ti-x" />
-            </button>
-          </div>
-          <table className="table-uca">
-            <thead><tr><th>Materia</th><th style={{ textAlign: 'center' }}>Nota</th><th style={{ textAlign: 'center' }}>Estado</th></tr></thead>
-            <tbody>
-              {semDetalle.materias.map(m => (
-                <tr key={m.materia_id}>
-                  <td style={{ fontWeight: 600 }}>
-                    {m.materia_nombre}
-                    {m.recursada && <span className="badge" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', fontSize: 10, marginLeft: 8 }}>Recursada</span>}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: m.felicitado ? '#fbbf24' : m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
-                      {m.felicitado && <i className="ti ti-star" style={{ fontSize: 13, marginRight: 3, verticalAlign: -1 }} />}
-                      {notaTxt(m)}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span className="badge" style={{ background: m.aprobado ? 'var(--success-subtle)' : 'var(--danger-subtle)', color: m.aprobado ? 'var(--success)' : 'var(--danger)' }}>
-                      {m.aprobado ? 'APROBADO' : 'REPROBADO'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {semDetalle.materias.length === 0 && (
-                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 16 }}>Sin materias en este semestre.</td></tr>
-              )}
-            </tbody>
-          </table>
+      {!semDetalle ? (
+        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+          <i className="ti ti-hand-click" style={{ fontSize: 32, color: 'var(--text-muted)' }} />
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Elegí un semestre para ver el desglose de materias.</p>
         </div>
-      )}
-
-      {materias.length === 0 ? (
+      ) : semDetalle.materias.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 46 }}>
           <i className="ti ti-file-off" style={{ fontSize: 36, color: 'var(--text-muted)' }} />
-          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Aún no tenés calificaciones cargadas.</p>
+          <p style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 13 }}>Sin calificaciones cargadas en este semestre.</p>
         </div>
       ) : (
         <div className="exp-cards">
-          {materias.map(m => {
-            const p = m.promedio
-            const pesos = m.pesos || PESOS_DEFAULT_CURSOS
-            const fin = [m.final1, m.final2, m.final3].filter((v): v is number => v !== null)
-            const finalEf = fin.length ? Math.max(...fin) : null
-            const pendienteP2 = m.parcial1 !== null && m.parcial2 === null
-            const est = estadoNota(p)
-            return (
-              <div key={m.materia_id} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>
-                    {m.felicitado && <i className="ti ti-star" style={{ fontSize: 16, marginRight: 3, verticalAlign: -1 }} />}
-                    {p === null ? '—' : m.felicitado ? `${p}F` : p}
-                  </span>
-                </div>
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
-                  {m.directa != null ? (
-                    <div className="desglose-row"><span>Nota final (carga directa)</span><b>{m.felicitado ? `${m.directa}F` : m.directa}</b></div>
-                  ) : (
-                    <>
-                      <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
-                      <div className="desglose-row">
-                        <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
-                        <b>{m.parcial2 ?? '—'}</b>
-                      </div>
-                      <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
-                      <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{finalEf ?? '—'}</b></div>
-                    </>
-                  )}
-                </div>
-                <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
-              </div>
-            )
-          })}
+          {semDetalle.materias.map(m => <MateriaCard key={m.materia_id} m={m} />)}
         </div>
       )}
     </div>
