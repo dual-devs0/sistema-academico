@@ -179,6 +179,19 @@ Ninguna. Ver sección 1.3 punto 5.
 - Subida de fotos de perfil/apuntes/comprobantes/informes — **bloqueante real**, faltan las
   credenciales R2 (sección 2.3), sin esto esas features sí fallan al usarlas, no degradan solas.
 
+**Riesgo real sin confirmar (2026-08-03) — `GET /boleta/pdf` puede fallar en este runtime:**
+El PDF de boleta se generó con WeasyPrint (`backend/app/services/boleta_pdf.py`), que necesita
+librerías nativas del sistema (Pango, Cairo, GObject) — no vienen con `pip install`. `render.yaml`
+usa `runtime: python` (runtime nativo de Render), y según la documentación de Render ese runtime
+no permite instalar paquetes de sistema (`apt-get`) — eso requeriría pasar el servicio a
+`runtime: docker` con un `Dockerfile` propio que instale
+`libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info fonts-*`.
+<!-- TODO: verificar contra un deploy real — no se pudo confirmar si el runtime nativo de Render
+ya trae estas libs preinstaladas por alguna otra dependencia del sistema. Si no las trae,
+`GET /boleta/pdf` responde 500 al intentar importar `weasyprint` en producción. --> Antes de dar
+por buena esta feature en producción, correr el smoke test de la sección 4 sobre `/boleta/pdf`
+específicamente, no asumir que pasa solo porque el resto del backend levantó bien.
+
 ---
 
 ## 4. Verificación post-deploy (smoke test mínimo)
@@ -205,7 +218,11 @@ Con el backend en Render y el frontend en Vercel ya desplegados:
    Como alumno, confirmar que aparece en su vista de asistencia. Confirma: el flujo académico core
    end-to-end funciona.
 
-5. **Rotar las 3 contraseñas de bootstrap** (`Perfil → Cambiar contraseña` de cada usuario, o
+5. **Descarga de boleta PDF** *(2026-08-03)* — como alumno, en Boleta, probar los 3 scopes de
+   descarga (Global/Por año/Semestre actual). Si devuelve 500, es el riesgo de WeasyPrint/runtime
+   nativo de Render descripto en la sección 3 — no asumir que funciona sin probarlo.
+
+6. **Rotar las 3 contraseñas de bootstrap** (`Perfil → Cambiar contraseña` de cada usuario, o
    `PATCH /users/{id}` como admin) antes de dar acceso a usuarios reales — son públicas, están en
    este mismo repo.
 

@@ -73,6 +73,8 @@ export async function recuperarContrasenaRequest(
 export interface RegistroPayload {
   documento: string;
   matricula: string;
+  tipo_documento_extranjero?: string;
+  pais_documento?: string;
 }
 
 export async function registroRequest(payload: RegistroPayload): Promise<string> {

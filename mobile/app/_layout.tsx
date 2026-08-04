@@ -87,12 +87,13 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
   }, []);
 
   const authReady = status !== "loading";
+  const uiReady = authReady && fontsReady;
 
   useEffect(() => {
-    if (animDone && authReady) {
+    if (animDone && uiReady) {
       overlayOpacity.value = withTiming(0, { duration: 400 });
     }
-  }, [animDone, authReady, overlayOpacity]);
+  }, [animDone, uiReady, overlayOpacity]);
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: overlayOpacity.value,
@@ -100,7 +101,7 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {authReady && (
+      {uiReady && (
         <AuthGate>
           <Stack
             screenOptions={{
@@ -124,7 +125,7 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
           </Stack>
         </AuthGate>
       )}
-      <Animated.View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents={animDone && authReady ? "none" : "auto"}>
+      <Animated.View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents={animDone && uiReady ? "none" : "auto"}>
         <SplashAnimated
           onReady={hideNativeSplash}
           onFinish={() => setAnimDone(true)}

@@ -77,10 +77,11 @@ Property `materia_id` (solo lectura, vía `oferta.materia_id`) para compatibilid
 | id | Integer PK | |
 | user_id | FK → users.id | |
 | oferta_materia_id | FK → ofertas_materia.id | |
-| tipo | String(20) | `parcial1`\|`parcial2`\|`practico`\|`final` |
-| valor | Numeric(5,2) | |
+| tipo | String(20) | `parcial1`\|`parcial2`\|`practico`\|`final1`\|`final2`\|`final3`\|`directa` (`directa` agregado 2026-08-02: carga simplificada del profesor, nota final única 0-10 sin desglose) |
+| valor | Numeric(5,2) | Para `tipo="directa"` es directamente el promedio 0-10, no un puntaje crudo |
+| felicitado | Boolean, default `false` (2026-08-02, migración `a9b8c7d6e5f4`) | Solo tiene sentido con `tipo="directa"` — marca la nota como "5F" (5 Felicitado) en toda la UI |
 | editado_por | FK → users.id, nullable | |
-| editado_en | DateTime(tz) | |
+| editado_en | DateTime(tz) | También usado como "fecha" de la nota en el reporte/PDF de boleta (no hay campo de fecha de examen separado) |
 
 `UniqueConstraint(user_id, oferta_materia_id, tipo)` como `uq_puntaje_user_oferta_tipo` — permite repetir la materia en otro período sin colisión.
 

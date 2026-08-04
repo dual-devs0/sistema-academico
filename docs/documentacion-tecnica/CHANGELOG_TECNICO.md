@@ -4,6 +4,139 @@
 
 ---
 
+## Asistencia unificada + carga directa/5F + rediseño Boleta (WeasyPrint) (2026-08-01 a 2026-08-03)
+
+### Resumen
+
+Cinco piezas de trabajo en la misma sesión, sobre rol alumno/profesor: unificar
+la vista de asistencia que existía duplicada, agregar un modo de carga rápida
+de notas para el profesor, armar un reporte de calificaciones por semestre, y
+rediseñar el módulo Boleta completo (backend + frontend + el PDF en sí, ahora
+con WeasyPrint en vez de reportlab).
+
+### 1. Asistencia del alumno unificada (`AsistenciaAlumnoPanel.tsx`)
+
+La ruta standalone `/asistencia` y la pestaña Asistencia dentro de Cursos
+(`Programa.tsx`) eran dos implementaciones separadas que se habían
+desincronizado visualmente. Se extrajo a un componente compartido
+(`frontend/src/components/AsistenciaAlumnoPanel.tsx`): tarjetas circulares por
+materia, chip de período clickeable (dropdown de semestres), y al hacer click
+en una materia un detalle con calificaciones + bitácora de sesiones (mismo
+patrón full-swap que `ExpedienteAdmin.tsx`).
+
+**Archivos:** `frontend/src/components/AsistenciaAlumnoPanel.tsx` (nuevo),
+`frontend/src/pages/Asistencia.tsx`, `frontend/src/pages/Programa.tsx`.
+
+### 2. Carga directa de notas + "5F" (felicitado)
+
+El profesor puede cargar una nota final única 0-10 (`tipo="directa"` en
+`Puntaje`) sin pasar por el desglose parcial1/parcial2/práctico/final —
+pensado para agilizar la carga cuando no hace falta ese nivel de detalle.
+Campo nuevo `felicitado: bool` (solo válido junto con `tipo="directa"`,
+validado en el schema) marca la nota como "5F" en toda la UI que muestra
+calificaciones (Boleta, Cursos, reporte de notas).
+
+**Archivos:** `backend/app/models/puntaje.py`, `backend/alembic/versions/a9b8c7d6e5f4_add_felicitado_to_puntajes.py`,
+`backend/app/schemas/puntaje_schema.py`, `backend/app/services/puntajes_utils.py`,
+`backend/app/routers/puntajes_router.py`, `backend/app/routers/boleta_router.py` (fmt del PDF viejo, ya reemplazado),
+`frontend/src/pages/Puntajes.tsx`.
+
+**Tests:** `backend/tests/test_puntajes.py` (existentes, sin romper) + cobertura nueva vía `test_reporte_notas.py`/`test_boleta.py` (recursadas, felicitado).
+
+### 3. Reporte de calificaciones por semestre (`GET /alumno/reporte-notas`)
+
+Nuevo servicio `backend/app/services/reporte_notas.py`: agrupa las notas del
+alumno por semestre real (`OfertaMateria.periodo`, ej. `"2026-1"` — no se
+infiere de fechas), detecta recursadas (misma materia con notas en más de una
+oferta — se marca la del período más reciente como "vigente"), y calcula
+métricas de avance hacia graduación usando `PensumMateria`/`Carrera.creditos_totales`
+si la carrera tiene plan de estudios cargado (si no, cae a un fallback sobre
+el total de materias con nota). Expuesto en `GET /alumno/reporte-notas`
+(`?semestre=YYYY-N` opcional). En Cursos → Calificaciones, un chip de período
+al lado de "Detalle de Materias" despliega inline el desglose de un semestre
+anterior sin redirigir a Boleta (mismo estilo de tarjeta que el semestre
+actual — se compartió el componente `MateriaCard` para evitar duplicar el
+mismo dato dos veces en pantalla).
+
+**Archivos:** `backend/app/services/reporte_notas.py` (nuevo),
+`backend/app/routers/reporte_notas_router.py` (nuevo), `backend/app/schemas/reporte_notas_schema.py` (nuevo),
+`frontend/src/pages/Programa.tsx`.
+
+**Tests:** `backend/tests/test_reporte_notas.py` (nuevo, 5 tests: agrupamiento, filtro por semestre, recursadas, métricas de plan, auth).
+
+### 4. Rediseño completo del módulo Boleta
+
+Motivado por **dos botones de descarga de PDF en paralelo** (uno de ellos
+roto/inconsistente) y una vista sin agrupar por semestre, todo expandido de
+una — el pedido explícito fue consolidar en un solo flujo de datos y un solo
+botón de descarga.
+
+- **Backend:** `GET /boleta/resumen` (dato único: resumen + periodos, antes se
+  armaba en el frontend con 3 llamadas sueltas — `mis-notas` + `mis-periodos` +
+  `creditos`) y `GET /boleta/pdf?scope=global|anio|semestre_actual` (antes dos
+  endpoints de PDF distintos: `GET /boleta/{user_id}` con reportlab y
+  `GET /alumno/reporte-notas/pdf` — **ambos eliminados**, unificados en este
+  uno solo). Autorización: self, o `?alumno_id=` con admin/profesor titular de
+  ese alumno (`_resolver_alumno_id`, mismo patrón que el resto del sistema).
+  Sello digital (`/boleta/{id}/sello`, `/boleta/verificar/{codigo}`) sin
+  cambios — es independiente del reporte de notas.
+- **Frontend:** `frontend/src/pages/Boleta.tsx` (monolítico) reemplazado por
+  `frontend/src/pages/Boleta/` — `BoletaPage.tsx` + `hooks/useBoletaData.ts` +
+  `hooks/usePdfExport.ts` + componentes `BoletaHeader`/`PdfExportMenu` (único
+  punto de descarga, dropdown de 3 opciones), `SummaryCards` (siempre desde
+  `resumen`, no se recalcula al cambiar el filtro — evita que el promedio
+  "cambie" al mirar un semestre viejo), `FilterBar`/`PeriodSelect`
+  (Todos/Por año/Por semestre), `SemesterAccordion` (colapsado por defecto,
+  solo el semestre actual expandido — antes todo se mostraba expandido, scroll
+  largo) + `SubjectTable` (Materia/Nota/Estado; el desglose P1/P2/TP/Final se
+  ve solo al hacer click en la fila, no siempre visible).
+
+**Archivos:** `backend/app/routers/boleta_router.py`, `backend/app/services/boleta_data.py` (nuevo),
+`backend/app/schemas/boleta_schema.py` (nuevo), `frontend/src/pages/Boleta/**` (nuevo, reemplaza `Boleta.tsx`),
+`frontend/src/App.tsx` (ruta actualizada).
+
+**Tests:** `backend/tests/test_boleta.py` (nuevo, 8 tests) + `backend/tests/test_security.py::test_boleta_uses_weighted_average` (migrado al endpoint nuevo).
+
+### 5. PDF de boleta rediseñado con WeasyPrint (reemplaza reportlab)
+
+El PDF se rearmó siguiendo un mockup HTML/CSS (tema light, header
+institucional con logo, watermark "SIN USO ADMINISTRATIVO", tabla de
+"Evolución por semestre"). Se cambió el motor de generación de `reportlab` a
+**WeasyPrint + Jinja2** porque WeasyPrint renderiza HTML/CSS directo y soporta
+paginación real vía CSS `@page`/`counter(page)`/`counter(pages)` — reportlab
+arma la página a mano (`Table`/`Paragraph`), sin equivalente nativo para eso.
+El contenido varía según `scope`: `global` arma una página de resumen
+(evolución por semestre, todo el historial) + una página de detalle por cada
+semestre; `anio` arma un mini-resumen acotado a ese año + detalle de sus
+semestres; `semestre_actual` arma solo la página de detalle del período más
+reciente, sin resumen.
+
+**Archivos:** `backend/app/services/boleta_pdf.py` (nuevo),
+`backend/app/templates/boleta_pdf.html` (nuevo, plantilla Jinja2),
+`backend/static/branding/logo_sistema.png` (nuevo, logo embebido como data URI),
+`backend/app/services/reporte_notas.py` (agrega `materia_codigo` y `fecha` por
+materia — necesarios para la tabla de detalle del PDF),
+`backend/app/routers/reporte_notas_router.py` (se eliminó el builder reportlab
+que quedó sin uso al mover el PDF a `boleta_router.py`).
+
+**Dependencia nueva de sistema (no solo Python) — riesgo real sin resolver en
+producción:** WeasyPrint necesita librerías nativas GTK3 (Pango, Cairo,
+GObject), que no vienen con `pip install`. En Windows dev se instaló MSYS2 +
+`pacman -S mingw-w64-x86_64-pango` + `C:\msys64\mingw64\bin` al `PATH` de
+usuario (ver `INSTALACION.md`). En producción, `render.yaml` usa
+`runtime: python` (runtime nativo de Render) — ese runtime no permite
+`apt-get`; según la documentación de Render, dependencias de sistema como
+estas requieren pasar el servicio a `runtime: docker`. **No confirmado contra
+un deploy real** si esto rompe `GET /boleta/pdf` en producción tal cual está
+hoy — ver nota en `GUIA_DEPLOY_PRODUCCION.md` sección 3.
+
+**Tests:** verificado con WeasyPrint real (no smoke test con reportlab) —
+suite completa 300 passed, 4 skipped, corrida con `PATH` incluyendo
+`mingw64/bin`. PDFs de los 3 scopes generados contra datos reales de dev y
+revisados visualmente antes de dar la tarea por cerrada.
+
+---
+
 ## Fase 19 — Motor de notas por puntos + Cursos unificado + auditoría real-data/mobile rol alumno (2026-07-23) — COMPLETA (código), PENDIENTE de commit/push/deploy
 
 ### Resumen

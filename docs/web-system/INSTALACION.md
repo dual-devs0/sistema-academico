@@ -52,10 +52,26 @@ Instalar dependencias:
 pip install -r requeriments.txt
 ```
 
-> **Si falla instalar `weasyprint` o `pdfplumber`/`pymupdf`** (piden librerías del
-> sistema tipo GTK/Pango en Windows): no se usan en el código actual, podés
-> comentarlas en `requeriments.txt` y reinstalar. La generación de boleta PDF usa
-> `reportlab`, no `weasyprint`.
+> **`weasyprint` (2026-08-03): SÍ se usa** — genera el PDF de la Boleta
+> (`GET /boleta/pdf`, ver `API_REFERENCE.md`) vía HTML/CSS con Jinja2
+> (`app/services/boleta_pdf.py` + `app/templates/boleta_pdf.html`). Se eligió
+> sobre `reportlab` (que sigue en `requeriments.txt` mixto por compatibilidad,
+> pero ya no genera el PDF de boleta) porque WeasyPrint soporta paginación real
+> vía CSS `@page` (`counter(page)`/`counter(pages)`), que reportlab no da nativo.
+>
+> **`pip install` no alcanza en Windows** — WeasyPrint necesita las librerías
+> nativas GTK3 (Pango, Cairo, GObject) instaladas en el sistema, no vienen en
+> el wheel de pip. Sin esto falla al importar con
+> `OSError: cannot load library 'libgobject-2.0-0'`. Instalar:
+> 1. [MSYS2](https://www.msys2.org/) (instalable también vía `winget install MSYS2.MSYS2`).
+> 2. Desde una shell de MSYS2 (`C:\msys64\usr\bin\bash.exe`): `pacman -Sy && pacman -S mingw-w64-x86_64-pango` (trae cairo/gobject/freetype/fontconfig como dependencias).
+> 3. Agregar `C:\msys64\mingw64\bin` al `PATH` (variable de usuario alcanza, no hace falta admin).
+> 4. Verificar: `python -c "import weasyprint; print(weasyprint.__version__)"` sin traceback.
+>
+> En Linux (prod) se instala vía apt, no hace falta MSYS2 — ver
+> `GUIA_DEPLOY_PRODUCCION.md` (**ojo:** el `render.yaml` actual usa runtime
+> nativo de Python, que no soporta `apt-get`; hay un riesgo real de deploy
+> documentado ahí, sin resolver todavía).
 
 Copiar el archivo de entorno:
 ```bash

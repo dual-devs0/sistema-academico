@@ -6,6 +6,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -35,6 +36,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
 import { fetchPerfil } from "../../services/dashboardService";
 import { fontFamily, spacing } from "../../constants/design";
+import SelectField, { SelectOption } from "../../components/ui/SelectField";
 
 // ---------------------------------------------------------------------------
 // Paleta v4 — blanco/celeste arriba, azul marino abajo.
@@ -75,9 +77,11 @@ const SECRETARIA_EMAIL = "secretaria@uca.edu.py";
 
 function WaveBackground({
   title,
+  heroHeight = HEADER_H,
   children,
 }: {
   title: string;
+  heroHeight?: number;
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -89,7 +93,7 @@ function WaveBackground({
           top: 0,
           left: 0,
           right: 0,
-          height: HEADER_H,
+          height: heroHeight,
           backgroundColor: P.headerLight,
           overflow: "hidden",
           alignItems: "center",
@@ -146,33 +150,33 @@ type BioType = "Face ID" | "Huella digital" | "Biométrico";
 
 const TITLE = "PORTAL ACADÉMICO";
 
-const DOC_TYPES = [
-  "Libreta de Baja",
-  "Libreta Cívica",
-  "Pasaporte",
-  "Carnet de Migraciones",
-  "RUC",
-  "Indefinido",
-  "DNI",
-  "RG - Registro General",
-  "Cédula de Identidad",
-  "RUT",
+const DOC_TYPES: SelectOption[] = [
+  { label: 'Libreta de Baja', value: 'LIBRETA_BAJA', icon: 'book-outline' },
+  { label: 'Libreta Cívica', value: 'LIBRETA_CIVICA', icon: 'book-outline' },
+  { label: 'Pasaporte', value: 'PASAPORTE', icon: 'passport' },
+  { label: 'Carnet de Migraciones', value: 'MIGRACIONES', icon: 'briefcase-outline' },
+  { label: 'RUC', value: 'RUC', icon: 'file-account-outline' },
+  { label: 'Indefinido', value: 'INDEFINIDO', icon: 'help-circle-outline' },
+  { label: 'DNI', value: 'DNI', icon: 'card-account-details-outline' },
+  { label: 'RG - Registro General', value: 'RG', icon: 'card-account-details-outline' },
+  { label: 'Cédula de Identidad', value: 'CI', icon: 'card-account-details-outline' },
+  { label: 'RUT', value: 'RUT', icon: 'file-account-outline' },
 ];
 
-const COUNTRIES = [
-  "Paraguay",
-  "Argentina",
-  "Brasil",
-  "Bolivia",
-  "Chile",
-  "Uruguay",
-  "Perú",
-  "Colombia",
-  "Venezuela",
-  "España",
-  "Estados Unidos",
-  "México",
-  "Otro",
+const COUNTRIES: SelectOption[] = [
+  { label: 'Paraguay', value: 'PY', subtitle: '🇵🇾 PY' },
+  { label: 'Argentina', value: 'AR', subtitle: '🇦🇷 AR' },
+  { label: 'Brasil', value: 'BR', subtitle: '🇧🇷 BR' },
+  { label: 'Bolivia', value: 'BO', subtitle: '🇧🇴 BO' },
+  { label: 'Chile', value: 'CL', subtitle: '🇨🇱 CL' },
+  { label: 'Uruguay', value: 'UY', subtitle: '🇺🇾 UY' },
+  { label: 'Perú', value: 'PE', subtitle: '🇵🇪 PE' },
+  { label: 'Colombia', value: 'CO', subtitle: '🇨🇴 CO' },
+  { label: 'Venezuela', value: 'VE', subtitle: '🇻🇪 VE' },
+  { label: 'España', value: 'ES', subtitle: '🇪🇸 ES' },
+  { label: 'Estados Unidos', value: 'US', subtitle: '🇺🇸 US' },
+  { label: 'México', value: 'MX', subtitle: '🇲🇽 MX' },
+  { label: 'Otro', value: 'OTRO', subtitle: '🌐 OTRO' },
 ];
 
 export default function LoginScreen() {
@@ -205,6 +209,10 @@ export default function LoginScreen() {
   const [fpMatricula, setFpMatricula] = useState("");
   const [fpSending, setFpSending] = useState(false);
 
+  // Collapsa el header cuando el teclado está abierto para que los campos
+  // (Documento / Contraseña) queden siempre visibles sobre el teclado.
+  const [kbOpen, setKbOpen] = useState(false);
+
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const welcomeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -219,6 +227,18 @@ export default function LoginScreen() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     if (welcomeTimer.current) clearTimeout(welcomeTimer.current);
   }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKbOpen(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKbOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  // Header más corto con teclado abierto: deja espacio para el formulario.
+  const heroH = Math.round(SCREEN_H * (kbOpen ? 0.14 : 0.38));
 
   useEffect(() => {
     LocalAuthentication.supportedAuthenticationTypesAsync().then((types) => {
@@ -271,11 +291,16 @@ export default function LoginScreen() {
     try {
       const detail = await registroRequest({
         documento: regDoc.trim(),
-        matricula: regMatricula.trim()
+        matricula: regMatricula.trim(),
+        ...(foreignOpen && foreignDocType ? { tipo_documento_extranjero: foreignDocType } : {}),
+        ...(foreignOpen && foreignCountry ? { pais_documento: foreignCountry } : {}),
       });
       showToast(detail);
       setRegDoc("");
       setRegMatricula("");
+      setForeignOpen(false);
+      setForeignDocType("");
+      setForeignCountry("");
       setTab("login");
     } catch (err) {
       const axErr = err as AxiosError<{ detail?: string }>;
@@ -350,10 +375,10 @@ export default function LoginScreen() {
   }
 
   return (
-    <WaveBackground title={TITLE}>
+    <WaveBackground title={TITLE} heroHeight={heroH}>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
-        <View style={{ height: HEADER_H }} />
+        <View style={{ height: heroH }} />
 
         {screen === "forgot" ? (
           <View style={{ position: "absolute", top: insets.top + spacing.sm, left: spacing.xl, zIndex: 10 }}>
@@ -432,7 +457,7 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 50 : 0}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 50 : 0}>
               <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: spacing.lg, gap: spacing.md }}
@@ -452,7 +477,7 @@ export default function LoginScreen() {
                       value={username}
                       onChangeText={setUsername}
                       placeholder="Nro. de Documento"
-                      keyboardType="numeric"
+                      keyboardType={foreignOpen ? "default" : "number-pad"}
                       autoCapitalize="none"
                       autoCorrect={false}
                       returnKeyType="next"
@@ -480,19 +505,17 @@ export default function LoginScreen() {
                       <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ gap: spacing.md }}>
                         <SelectField
                           label="Tipo de documento"
-                          accent
-                          value={foreignDocType}
-                          onSelect={setForeignDocType}
                           options={DOC_TYPES}
+                          selectedValue={foreignDocType || null}
                           placeholder="Seleccioná un tipo"
+                          onSelect={(opt) => setForeignDocType(opt.value)}
                         />
                         <SelectField
                           label="País del documento"
-                          accent
-                          value={foreignCountry}
-                          onSelect={setForeignCountry}
                           options={COUNTRIES}
+                          selectedValue={foreignCountry || null}
                           placeholder="Seleccioná un país"
+                          onSelect={(opt) => setForeignCountry(opt.value)}
                         />
                       </Animated.View>
                     ) : null}
@@ -519,7 +542,7 @@ export default function LoginScreen() {
                       value={regDoc}
                       onChangeText={setRegDoc}
                       placeholder="Nro. de Documento"
-                      keyboardType="numeric"
+                      keyboardType={foreignOpen ? "default" : "number-pad"}
                       autoCapitalize="none"
                       autoCorrect={false}
                       returnKeyType="next"
@@ -539,19 +562,17 @@ export default function LoginScreen() {
                       <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ gap: spacing.md }}>
                         <SelectField
                           label="Tipo de documento"
-                          accent
-                          value={foreignDocType}
-                          onSelect={setForeignDocType}
                           options={DOC_TYPES}
+                          selectedValue={foreignDocType || null}
                           placeholder="Seleccioná un tipo"
+                          onSelect={(opt) => setForeignDocType(opt.value)}
                         />
                         <SelectField
                           label="País del documento"
-                          accent
-                          value={foreignCountry}
-                          onSelect={setForeignCountry}
                           options={COUNTRIES}
+                          selectedValue={foreignCountry || null}
                           placeholder="Seleccioná un país"
+                          onSelect={(opt) => setForeignCountry(opt.value)}
                         />
                       </Animated.View>
                     ) : null}
@@ -588,7 +609,7 @@ export default function LoginScreen() {
             </KeyboardAvoidingView>
           </>
         ) : (
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingBottom: spacing["3xl"] }}>
               <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 26, textAlign: "center" }}>
                 Recuperar contraseña
@@ -815,102 +836,9 @@ const LabeledInput = React.forwardRef<TextInput, {
   );
 });
 
-function SelectField({
-  label,
-  value,
-  options,
-  placeholder,
-  onSelect,
-  accent,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  placeholder: string;
-  onSelect: (v: string) => void;
-  accent?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const borderColor = open || accent ? P.inputBorderAccent : P.inputBorder;
-  return (
-    <View style={{ gap: 6 }}>
-      <Text style={{ fontFamily: fontFamily.interBold, fontSize: 11.5, color: P.inputLabel, textAlign: "center", letterSpacing: 0.4 }}>
-        {label}
-      </Text>
-      <Pressable
-        onPress={() => setOpen(true)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: P.inputBg,
-          borderWidth: 1.5,
-          borderColor,
-          borderRadius: 999,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: 16,
-        }}
-      >
-        <Text style={{ color: value ? P.white : P.placeholder, fontFamily: fontFamily.interSemibold, fontSize: 15 }}>
-          {value || placeholder}
-        </Text>
-        <ChevronDownIcon />
-      </Pressable>
-
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}
-          onPress={() => setOpen(false)}
-        >
-          <Pressable
-            style={{
-              backgroundColor: P.navyMuted,
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              maxHeight: "75%",
-              paddingBottom: spacing.xl,
-            }}
-          >
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: "rgba(255,255,255,0.3)",
-                alignSelf: "center",
-                marginTop: spacing.sm,
-                marginBottom: spacing.sm,
-              }}
-            />
-            <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 15, textAlign: "center", paddingVertical: spacing.md }}>
-              {label}
-            </Text>
-            <FlatList
-              data={options}
-              keyExtractor={(item) => item}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => { onSelect(item); setOpen(false); }}
-                  style={({ pressed }) => ({
-                    paddingVertical: 14,
-                    paddingHorizontal: spacing.xl,
-                    backgroundColor: pressed ? "rgba(255,255,255,0.06)" : "transparent",
-                  })}
-                >
-                  <Text style={{ color: item === value ? P.accent : P.white, fontFamily: fontFamily.interSemibold, fontSize: 15 }}>
-                    {item}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
-  );
-}
-
+// Selector tipo LabeledInput: mismo pill (borderRadius 999), misma label
+// centrada arriba, mismo borde. El borde acentúa cuando hay valor elegido
+// (equivalente al estado "focused" del input). Texto + chevron a la derecha.
 function GradientButton({
   label,
   disabled,
@@ -1006,14 +934,6 @@ function EyeIcon({ open }: { open: boolean }) {
       <Path d="M3 3l18 18" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" />
       <Path d="M10.6 5.2A10.9 10.9 0 0112 5c6.5 0 10 7 10 7a15.6 15.6 0 01-3.4 4.3M6.5 6.6C4 8.3 2 12 2 12a15.9 15.9 0 004.2 4.8A10.6 10.6 0 0012 19c1 0 1.9-.1 2.8-.4" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" />
       <Path d="M9.9 10a3 3 0 004.2 4.2" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path d="M6 9l6 6 6-6" stroke={P.inputLabel} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }

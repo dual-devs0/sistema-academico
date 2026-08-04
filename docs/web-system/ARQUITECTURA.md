@@ -123,6 +123,48 @@ Fuente: `frontend/src/styles/design-tokens.css`, `frontend/src/components/Layout
 - **Estado global:** sin Redux ni Context pesado. Token de sesión en memoria (`lib/api.ts`, nunca `localStorage`/`sessionStorage` — ver incidente de Fase 1 en `CHANGELOG_TECNICO.md`), eventos DOM globales (`emitToast`, `emitHelp`, `emitAvatarUpdated`) para comunicación entre componentes desacoplados, resto es estado local por página.
 - **`Layout.tsx`:** sidebar 216px desktop / drawer mobile, topbar, bottom-nav mobile (5 ítems por rol, `bottomNavByRole`). Incluye dropdown de notificaciones (`GET /eventos/`, click navega a `/calendario`), dropdown de aplicaciones (quick-launcher con los ítems del menú del rol activo) y modal de Centro de Ayuda (invocable desde cualquier componente vía `emitHelp()`).
 - **`hooks/useRole.ts`:** `getRole()`, `getUserId()`, `getUsername()` derivados del JWT decodificado en memoria (`getCurrentUser()` de `lib/api.ts`) — nunca leer el rol de otra fuente.
+- **`AsistenciaAlumnoPanel.tsx` (2026-08-01, `components/`):** vista de asistencia del alumno unificada en un solo componente, usado tanto por la ruta standalone `/asistencia` como por la pestaña Asistencia dentro de Cursos (`Programa.tsx`) — antes eran dos implementaciones separadas que se desincronizaban. Tarjetas circulares por materia + selector de período + detalle de materia (calificaciones y bitácora de sesiones) al hacer click.
+
+## Módulo Boleta / Reporte de calificaciones (rediseño 2026-08-03)
+
+Rediseño completo del módulo Boleta, motivado por dos botones de descarga de
+PDF duplicados (uno roto) y una vista desordenada sin agrupar por semestre.
+
+- **Backend:** `services/reporte_notas.py` es la única fuente de agregación
+  (agrupa por `OfertaMateria.periodo`, detecta recursadas, calcula métricas de
+  avance) — usada tanto por `GET /alumno/reporte-notas` (JSON, para el chip
+  inline de Cursos → Calificaciones) como por `GET /boleta/resumen` (vía
+  reshape en `services/boleta_data.py`) y `GET /boleta/pdf` (vía
+  `services/boleta_pdf.py`). Un solo cálculo, tres consumidores — evita que se
+  desincronicen entre sí como pasaba antes con el PDF viejo (`reportlab`,
+  cálculo propio) vs la vista web (otro cálculo propio).
+- **PDF — por qué WeasyPrint y no reportlab:** el PDF de boleta se rearmó
+  siguiendo un mockup HTML/CSS (tema light, header institucional con logo,
+  watermark, tabla de evolución por semestre). WeasyPrint renderiza HTML/CSS
+  directo (vía Jinja2, `app/templates/boleta_pdf.html`) y soporta paginación
+  real con CSS `@page`/`counter(page)`/`counter(pages)` — reportlab arma la
+  página a mano con `Table`/`Paragraph`, no tiene equivalente nativo. Contenido
+  varía por `scope` (`global`/`anio`/`semestre_actual`), ver `API_REFERENCE.md`.
+- **Riesgo de producción sin resolver:** WeasyPrint necesita librerías nativas
+  (Pango/Cairo/GObject) que no vienen con `pip install`. En Windows dev se
+  resolvió instalando MSYS2 + `mingw-w64-x86_64-pango` (ver `INSTALACION.md`).
+  En producción, `render.yaml` usa `runtime: python` (runtime nativo de
+  Render) — ese runtime **no** permite `apt-get`/paquetes de sistema; según la
+  documentación de Render, instalar dependencias de sistema como las que pide
+  WeasyPrint requiere pasar el servicio a `runtime: docker` con un `Dockerfile`
+  propio. <!-- TODO: verificar en un deploy real a Render si el runtime nativo
+  de Render ya trae Pango/Cairo preinstalados por algún otro paquete; si no,
+  GET /boleta/pdf devuelve 500 en producción hasta migrar a Docker --> Ver
+  `GUIA_DEPLOY_PRODUCCION.md`.
+- **Frontend:** `frontend/src/pages/Boleta/` reemplaza el `Boleta.tsx`
+  monolítico anterior. `BoletaPage.tsx` (contenedor) + `hooks/useBoletaData.ts`
+  (fetch de `/boleta/resumen`) + `hooks/usePdfExport.ts` (dispara
+  `/boleta/pdf` según scope) + componentes: `BoletaHeader`/`PdfExportMenu`
+  (único punto de descarga, dropdown de 3 opciones), `SummaryCards` (siempre
+  desde `resumen`, no se recalcula al filtrar), `FilterBar`/`PeriodSelect`
+  (Todos/Por año/Por semestre), `SemesterAccordion` (colapsado por defecto,
+  solo el semestre actual abierto) + `SubjectTable` (desglose P1/P2/TP/Final
+  al hacer click en la fila, no visible por default).
 
 ## Migraciones
 
