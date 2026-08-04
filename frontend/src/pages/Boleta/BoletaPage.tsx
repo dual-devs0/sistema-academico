@@ -44,27 +44,25 @@ export default function BoletaPage() {
   }, [esAlumno])
 
   useEffect(() => {
-    if (!selId) { setSello(null); return }
+    if (!selId) return
     api.get<Sello>(`/boleta/${selId}/sello`).then(setSello).catch(() => setSello(null))
   }, [selId])
+  const selloVisible = selId ? sello : null
 
-  // Defaults del período seleccionado cuando llegan los datos o cambia el modo de filtro.
-  useEffect(() => {
-    if (!data?.periodos.length) return
-    if (filtro === 'por_anio' && selectedAnio === null) setSelectedAnio(data.periodos[0].anio)
-    if (filtro === 'por_semestre' && selectedPeriodoKey === null) {
-      setSelectedPeriodoKey(`${data.periodos[0].anio}-${data.periodos[0].semestre}`)
-    }
-  }, [data, filtro, selectedAnio, selectedPeriodoKey])
+  // Defaults del período: si el usuario no eligió uno, se usa el primero disponible.
+  const defaultAnio = data?.periodos[0]?.anio ?? null
+  const defaultPeriodoKey = data?.periodos[0] ? `${data.periodos[0].anio}-${data.periodos[0].semestre}` : null
+  const effectiveAnio = selectedAnio ?? defaultAnio
+  const effectivePeriodoKey = selectedPeriodoKey ?? defaultPeriodoKey
 
   const periodosFiltrados = useMemo(() => {
     if (!data) return []
     if (filtro === 'todos') return data.periodos
-    if (filtro === 'por_anio') return data.periodos.filter(p => p.anio === selectedAnio)
-    return data.periodos.filter(p => `${p.anio}-${p.semestre}` === selectedPeriodoKey)
-  }, [data, filtro, selectedAnio, selectedPeriodoKey])
+    if (filtro === 'por_anio') return data.periodos.filter(p => p.anio === effectiveAnio)
+    return data.periodos.filter(p => `${p.anio}-${p.semestre}` === effectivePeriodoKey)
+  }, [data, filtro, effectiveAnio, effectivePeriodoKey])
 
-  const anioParaExport = filtro === 'por_anio' && selectedAnio !== null ? selectedAnio : data?.periodos[0]?.anio
+  const anioParaExport = filtro === 'por_anio' ? (effectiveAnio ?? undefined) : (data?.periodos[0]?.anio ?? undefined)
 
   return (
     <>
@@ -108,8 +106,8 @@ export default function BoletaPage() {
               <PeriodSelect
                 filtro={filtro}
                 periodos={data.periodos}
-                selectedAnio={selectedAnio}
-                selectedPeriodoKey={selectedPeriodoKey}
+                selectedAnio={effectiveAnio}
+                selectedPeriodoKey={effectivePeriodoKey}
                 onChangeAnio={setSelectedAnio}
                 onChangePeriodo={setSelectedPeriodoKey}
               />
@@ -119,7 +117,7 @@ export default function BoletaPage() {
           <SemesterAccordion periodos={periodosFiltrados} loading={loading} />
 
           {/* Sello digital real: código firmado con SECRET_KEY, verificable en /boleta/verificar/{codigo} */}
-          {sello && (
+          {selloVisible && (
             <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginTop: 20 }}>
               <span style={{ width: 56, height: 56, borderRadius: '50%', border: '2px dashed var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: 'var(--text-secondary)', flexShrink: 0 }}>
                 <i className="ti ti-rosette-discount-check" />
@@ -128,12 +126,12 @@ export default function BoletaPage() {
                 <div style={{ fontSize: 14.5, fontWeight: 800, marginBottom: 4 }}>Sello Digital de Autenticidad</div>
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   Código firmado por el Sistema Académico UCA, verificable en cualquier momento. Código de verificación:{' '}
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 700 }}>{sello.codigo}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 700 }}>{selloVisible.codigo}</span>
                 </p>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <img src={`data:image/png;base64,${sello.qr_base64}`} alt="QR verificación boleta" style={{ width: 86, height: 86, borderRadius: 10, background: '#fff', padding: 6 }} />
-                <div className="mono-label" style={{ fontSize: 8, marginTop: 6 }}>VALIDADO: {new Date(sello.validado_en).toLocaleDateString('es-PY')}</div>
+                <img src={`data:image/png;base64,${selloVisible.qr_base64}`} alt="QR verificación boleta" style={{ width: 86, height: 86, borderRadius: 10, background: '#fff', padding: 6 }} />
+                <div className="mono-label" style={{ fontSize: 8, marginTop: 6 }}>VALIDADO: {new Date(selloVisible.validado_en).toLocaleDateString('es-PY')}</div>
               </div>
             </div>
           )}
