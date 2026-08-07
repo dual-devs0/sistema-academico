@@ -173,9 +173,13 @@ def mis_notas(
                 "final1": None,
                 "final2": None,
                 "final3": None,
+                "directa": None,
+                "felicitado": False,
             }
         if p.tipo in por_materia[mid]:
             por_materia[mid][p.tipo] = float(p.valor)
+            if p.tipo == "directa":
+                por_materia[mid]["felicitado"] = bool(p.felicitado)
 
     result = []
     for mid, data in por_materia.items():

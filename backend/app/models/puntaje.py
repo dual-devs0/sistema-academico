@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from sqlalchemy import (
+    Boolean,
     Integer,
     String,
     Numeric,
@@ -23,8 +24,11 @@ class Puntaje(Base):
     oferta_materia_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("ofertas_materia.id"), nullable=False, index=True
     )
-    tipo: Mapped[str] = mapped_column(String(20), nullable=False)  # parcial1, parcial2, practico, final
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)  # parcial1, parcial2, practico, final, directa
     valor: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    # Solo aplica a tipo="directa": nota final cargada directo por el profesor (0-10),
+    # sin pasar por el desglose parcial/practico/final. felicitado=True -> "5F" (5 Felicitado).
+    felicitado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     editado_por: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     editado_en: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

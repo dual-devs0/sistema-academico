@@ -1194,10 +1194,10 @@ function LogoutConfirmModal({
                 flex: 1,
                 paddingVertical: spacing.md,
                 borderRadius: radius.pill,
-                backgroundColor: colors.error,
+                backgroundColor: "#dc2626",
                 alignItems: "center",
                 opacity: pressed ? 0.8 : 1,
-                shadowColor: colors.error,
+                shadowColor: "#dc2626",
                 shadowOffset: { width: 0, height: 4 },
                 shadowRadius: 12,
                 shadowOpacity: 0.4,
@@ -1206,7 +1206,7 @@ function LogoutConfirmModal({
             >
               <Text
                 style={{
-                  color: colors.background,
+                  color: "#ffffff",
                   fontFamily: fontFamily.interBold,
                   fontSize: fontSize.body,
                 }}

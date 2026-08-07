@@ -345,16 +345,19 @@ const { id } = useLocalSearchParams<{ id: string }>();
                 >
                   <IconClipboardCheck color={colors.cyan} size={16} />
                 </View>
-                <View>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontFamily: fontFamily.interSemibold,
-                      fontSize: 14,
-                    }}
-                  >
-                    Ver Asistencia Detallada
-                  </Text>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text
+                      style={{
+                        color: colors.textPrimary,
+                        fontFamily: fontFamily.interSemibold,
+                        fontSize: 14,
+                      }}
+                    >
+                      Ver Asistencia Detallada
+                    </Text>
+                    <ChevronRight />
+                  </View>
                   <Text
                     style={{
                       color: colors.textSecondary,
@@ -367,7 +370,6 @@ const { id } = useLocalSearchParams<{ id: string }>();
                   </Text>
                 </View>
               </View>
-              <ChevronRight />
             </Pressable>
           </View>
         </Animated.View>

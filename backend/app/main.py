@@ -29,6 +29,7 @@ from app.routers import (  # noqa: E402
     reportes,
     boleta,
     alumno,
+    reporte_notas,
     horarios,
     profesor,
     pensum,
@@ -118,6 +119,7 @@ app.include_router(programas.router)
 app.include_router(reportes.router)
 app.include_router(boleta.router)
 app.include_router(alumno.router)
+app.include_router(reporte_notas.router)
 app.include_router(horarios.router)
 app.include_router(profesor.router)
 app.include_router(pensum.router)

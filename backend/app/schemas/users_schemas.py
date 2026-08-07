@@ -55,6 +55,8 @@ class ResetPasswordRequest(BaseModel):
 class RegistroRequest(BaseModel):
     documento: str
     matricula: str
+    tipo_documento_extranjero: str | None = None
+    pais_documento: str | None = None
 
 
 class UserOut(BaseModel):

@@ -15,7 +15,6 @@
     "icon": "./assets/icon.png",
     "scheme": "ucamovil",
     "userInterfaceStyle": "dark",
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "py.edu.uca.movil",
@@ -68,7 +67,8 @@
         }
       ],
       "expo-video",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

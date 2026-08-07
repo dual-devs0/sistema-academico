@@ -20,6 +20,8 @@ from . import equivalencia
 from . import examen_schema as examen
 from . import tramites
 from . import global_settings
+from . import reporte_notas_schema as reporte_notas
+from . import boleta_schema as boleta
 
 __all__ = [
     "user",
@@ -44,4 +46,6 @@ __all__ = [
     "examen",
     "tramites",
     "global_settings",
+    "reporte_notas",
+    "boleta",
 ]

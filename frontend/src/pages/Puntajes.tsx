@@ -64,8 +64,15 @@ type NotaMateria = {
   final1: number | null
   final2: number | null
   final3: number | null
+  directa?: number | null
+  felicitado?: boolean
   promedio: number | null
   pesos: Pesos
+}
+
+function formatNota(n: number | null, felicitado?: boolean): string {
+  if (n === null) return '—'
+  return felicitado ? `${n}F` : String(n)
 }
 
 type MateriaApi = { id: number; nombre: string; profesor_nombre?: string | null; profesor_id?: number | null }
@@ -102,7 +109,7 @@ function AlumnoView({ userId }: { userId: number }) {
       api.get<NotaMateria[]>('/alumno/mis-notas').catch(() => [] as NotaMateria[]),
       obtenerCreditosAlumno(userId).catch(() => null),
     ]).then(([notas, cred]) => {
-      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || finalEfectivo(m) !== null))
+      setMaterias(notas.filter(m => m.parcial1 !== null || m.parcial2 !== null || m.practico !== null || finalEfectivo(m) !== null || m.directa != null))
       setCreditos(cred)
     }).finally(() => setLoading(false))
   }, [userId])
@@ -178,16 +185,25 @@ function AlumnoView({ userId }: { userId: number }) {
               <div key={m.materia_id} className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: notaColor(p) }}>{p ?? '—'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : notaColor(p) }}>
+                    {m.felicitado && <i className="ti ti-star" style={{ fontSize: 16, marginRight: 3, verticalAlign: -1 }} />}
+                    {formatNota(p, m.felicitado)}
+                  </span>
                 </div>
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, marginBottom: 10 }}>
-                  <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
-                  <div className="desglose-row">
-                    <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
-                    <b>{m.parcial2 ?? '—'}</b>
-                  </div>
-                  <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
-                  <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{fin ?? '—'}</b></div>
+                  {m.directa != null ? (
+                    <div className="desglose-row"><span>Nota final (carga directa)</span><b>{formatNota(m.directa, m.felicitado)}</b></div>
+                  ) : (
+                    <>
+                      <div className="desglose-row"><span>Parcial 1 ({pesos.parcial1} pts)</span><b>{m.parcial1 ?? '—'}</b></div>
+                      <div className="desglose-row">
+                        <span style={{ color: pendienteP2 ? 'var(--warning)' : undefined }}>Parcial 2 ({pesos.parcial2} pts) {pendienteP2 && '· Pendiente'}</span>
+                        <b>{m.parcial2 ?? '—'}</b>
+                      </div>
+                      <div className="desglose-row"><span>Trabajo Práctico ({pesos.practico} pts)</span><b>{m.practico ?? '—'}</b></div>
+                      <div className="desglose-row"><span>Final ({pesos.final} pts)</span><b>{fin ?? '—'}</b></div>
+                    </>
+                  )}
                 </div>
                 <span className="badge" style={{ background: estadoDe(p).bg, color: estadoDe(p).color }}>{estadoDe(p).label}</span>
               </div>
@@ -206,13 +222,18 @@ type AlumnoRow = {
   alumno_id: number
   nombre: string
   username: string
-  ids: { parcial1: number; parcial2: number; tp: number; final1: number; final2: number; final3: number }
-  vals: { parcial1: string; parcial2: string; tp: string; final1: string; final2: string; final3: string }
+  ids: { parcial1: number; parcial2: number; tp: number; final1: number; final2: number; final3: number; directa: number }
+  vals: { parcial1: string; parcial2: string; tp: string; final1: string; final2: string; final3: string; directa: string }
   oportunidadActiva: 1 | 2 | 3
+  felicitado: boolean
   saving: boolean
 }
 
 function calcPromedio(vals: AlumnoRow['vals'], pesos: Pesos): number | null {
+  if (vals.directa !== '') {
+    const d = parseFloat(vals.directa)
+    return isNaN(d) ? null : Math.round(d * 100) / 100
+  }
   const fins = [vals.final1, vals.final2, vals.final3].map(s => parseFloat(s)).filter(n => !isNaN(n))
   const finalEf = fins.length ? Math.max(...fins) : null
   const partes: { v: number; max: number }[] = []
@@ -241,6 +262,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [dirtyCount, setDirtyCount] = useState(0)
   const [savingAll, setSavingAll] = useState(false)
+  const [modoDirecta, setModoDirecta] = useState(false)
   const originalRef = useRef<string>('')
 
   const fetchAlumnos = useCallback(async (materia: MateriaSimple) => {
@@ -250,7 +272,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     try {
       const [alumnosData, puntajesData, pesosData] = await Promise.all([
         api.get<{ alumno_id: number; nombre: string; username: string }[]>(`/inscripciones/materia/${materia.id}`).catch(() => []),
-        api.get<{ id: number; user_id: number; tipo: string; valor: number }[]>(`/puntajes/?materia_id=${materia.id}`).catch(() => []),
+        api.get<{ id: number; user_id: number; tipo: string; valor: number; felicitado?: boolean }[]>(`/puntajes/?materia_id=${materia.id}`).catch(() => []),
         api.get<{ parcial1_max: number; parcial2_max: number; practico_max: number; final_max: number }>(`/puntajes/pesos/${materia.id}`).catch(() => null),
       ])
       const pesosResueltos: Pesos = pesosData
@@ -265,13 +287,14 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
         const oportunidadActiva: 1 | 2 | 3 = fval('final1') ? 1 : fval('final2') ? 2 : fval('final3') ? 3 : 1
         return {
           alumno_id: a.alumno_id, nombre: a.nombre, username: a.username,
-          ids: { parcial1: fid('parcial1'), parcial2: fid('parcial2'), tp: fid('practico'), final1: fid('final1'), final2: fid('final2'), final3: fid('final3') },
-          vals: { parcial1: fval('parcial1'), parcial2: fval('parcial2'), tp: fval('practico'), final1: fval('final1'), final2: fval('final2'), final3: fval('final3') },
+          ids: { parcial1: fid('parcial1'), parcial2: fid('parcial2'), tp: fid('practico'), final1: fid('final1'), final2: fid('final2'), final3: fid('final3'), directa: fid('directa') },
+          vals: { parcial1: fval('parcial1'), parcial2: fval('parcial2'), tp: fval('practico'), final1: fval('final1'), final2: fval('final2'), final3: fval('final3'), directa: fval('directa') },
           oportunidadActiva,
+          felicitado: find('directa')?.felicitado ?? false,
           saving: false,
         }
       })
-      originalRef.current = JSON.stringify(rows.map(r => r.vals))
+      originalRef.current = JSON.stringify(rows.map(r => ({ ...r.vals, felicitado: r.felicitado })))
       setAlumnos(rows)
       setLastUpdate(new Date().toLocaleTimeString())
     } finally { setLoadingAlumnos(false) }
@@ -290,16 +313,17 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
       .finally(() => setLoadingMaterias(false))
   }, [profesorId, fetchAlumnos])
 
-  const valsSnapshot = useMemo(() => JSON.stringify(alumnos.map(r => r.vals)), [alumnos])
+  const valsSnapshot = useMemo(() => JSON.stringify(alumnos.map(r => ({ ...r.vals, felicitado: r.felicitado }))), [alumnos])
   useEffect(() => {
     if (originalRef.current && valsSnapshot !== originalRef.current) {
-      const current = JSON.parse(valsSnapshot) as AlumnoRow['vals'][]
-      const orig = JSON.parse(originalRef.current) as AlumnoRow['vals'][]
+      const current = JSON.parse(valsSnapshot) as (AlumnoRow['vals'] & { felicitado: boolean })[]
+      const orig = JSON.parse(originalRef.current) as (AlumnoRow['vals'] & { felicitado: boolean })[]
       let dirty = 0
       for (let i = 0; i < current.length; i++) {
         const c = current[i]; const o = orig[i]
         if (c.parcial1 !== o.parcial1 || c.parcial2 !== o.parcial2 || c.tp !== o.tp ||
-            c.final1 !== o.final1 || c.final2 !== o.final2 || c.final3 !== o.final3) dirty++
+            c.final1 !== o.final1 || c.final2 !== o.final2 || c.final3 !== o.final3 ||
+            c.directa !== o.directa || c.felicitado !== o.felicitado) dirty++
       }
       setDirtyCount(dirty)
     } else {
@@ -322,6 +346,17 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     }))
   }
 
+  function updateDirecta(alumno_id: number, value: string) {
+    if (value !== '' && !/^\d{0,2}(\.\d{0,1})?$/.test(value)) return
+    const num = parseFloat(value)
+    if (value !== '' && !isNaN(num) && (num < 0 || num > 10)) return
+    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, vals: { ...a.vals, directa: value } } : a))
+  }
+
+  function toggleFelicitado(alumno_id: number) {
+    setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, felicitado: !a.felicitado } : a))
+  }
+
   function setOportunidad(alumno_id: number, op: 1 | 2 | 3) {
     setAlumnos(prev => prev.map(a => a.alumno_id === alumno_id ? { ...a, oportunidadActiva: op } : a))
   }
@@ -330,30 +365,49 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     if (!selectedMateria) return
     setSavingAll(true)
     let successCount = 0; let errorCount = 0
-    const tiposMap: { campo: keyof AlumnoRow['vals']; tipo: string }[] = [
-      { campo: 'parcial1', tipo: 'parcial1' }, { campo: 'parcial2', tipo: 'parcial2' },
-      { campo: 'tp', tipo: 'practico' },
-      { campo: 'final1', tipo: 'final1' }, { campo: 'final2', tipo: 'final2' }, { campo: 'final3', tipo: 'final3' },
-    ]
-    for (const row of alumnos) {
-      for (const { campo, tipo } of tiposMap) {
-        const valStr = row.vals[campo]
+    if (modoDirecta) {
+      for (const row of alumnos) {
+        const valStr = row.vals.directa
         if (valStr === '') continue
         const valor = parseFloat(valStr)
         if (isNaN(valor)) continue
         try {
-          if (row.ids[campo]) {
-            await api.put(`/puntajes/${row.ids[campo]}`, { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo, valor })
+          if (row.ids.directa) {
+            await api.put(`/puntajes/${row.ids.directa}`, { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo: 'directa', valor, felicitado: row.felicitado })
           } else {
-            const created = await api.post<{ id: number }>('/puntajes/', { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo, valor })
+            const created = await api.post<{ id: number }>('/puntajes/', { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo: 'directa', valor, felicitado: row.felicitado })
             setAlumnos(prev => prev.map(a => a.alumno_id === row.alumno_id
-              ? { ...a, ids: { ...a.ids, [campo]: created.id } } : a))
+              ? { ...a, ids: { ...a.ids, directa: created.id } } : a))
           }
           successCount++
         } catch { errorCount++ }
       }
+    } else {
+      const tiposMap: { campo: keyof AlumnoRow['vals']; tipo: string }[] = [
+        { campo: 'parcial1', tipo: 'parcial1' }, { campo: 'parcial2', tipo: 'parcial2' },
+        { campo: 'tp', tipo: 'practico' },
+        { campo: 'final1', tipo: 'final1' }, { campo: 'final2', tipo: 'final2' }, { campo: 'final3', tipo: 'final3' },
+      ]
+      for (const row of alumnos) {
+        for (const { campo, tipo } of tiposMap) {
+          const valStr = row.vals[campo]
+          if (valStr === '') continue
+          const valor = parseFloat(valStr)
+          if (isNaN(valor)) continue
+          try {
+            if (row.ids[campo]) {
+              await api.put(`/puntajes/${row.ids[campo]}`, { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo, valor })
+            } else {
+              const created = await api.post<{ id: number }>('/puntajes/', { user_id: row.alumno_id, materia_id: selectedMateria.id, tipo, valor })
+              setAlumnos(prev => prev.map(a => a.alumno_id === row.alumno_id
+                ? { ...a, ids: { ...a.ids, [campo]: created.id } } : a))
+            }
+            successCount++
+          } catch { errorCount++ }
+        }
+      }
     }
-    originalRef.current = JSON.stringify(alumnos.map(r => r.vals))
+    originalRef.current = JSON.stringify(alumnos.map(r => ({ ...r.vals, felicitado: r.felicitado })))
     setDirtyCount(0)
     setSavingAll(false)
     setLastUpdate(new Date().toLocaleTimeString())
@@ -427,6 +481,15 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
               <i className="ti ti-adjustments" /> Pesos
             </button>
           )}
+          {selectedMateria && (
+            <button
+              className={modoDirecta ? 'btn-primary' : 'btn-ghost'}
+              title="Cargar solo la nota final, sin desglose de parcial/final"
+              onClick={() => setModoDirecta(v => !v)}
+            >
+              <i className="ti ti-bolt" /> Carga directa
+            </button>
+          )}
           <button className="btn-ghost" onClick={exportCSV}><i className="ti ti-file-spreadsheet" /> CSV</button>
         </div>
       </div>
@@ -483,7 +546,9 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--danger)' }} /> {nReprob} Reprobados</span>
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--info)' }} /> {nPromo} Promocionados</span>
               <span style={{ flex: 1 }} />
-              <span className="pro-filtro" style={{ fontSize: 10 }}>P1 /{pesos.parcial1} · P2 /{pesos.parcial2} · TP /{pesos.practico} · Final /{pesos.final}</span>
+              {!modoDirecta && (
+                <span className="pro-filtro" style={{ fontSize: 10 }}>P1 /{pesos.parcial1} · P2 /{pesos.parcial2} · TP /{pesos.practico} · Final /{pesos.final}</span>
+              )}
               {dirtyCount > 0 && (
                 <button className="btn-primary" style={{ padding: '4px 14px', fontSize: 11 }} disabled={savingAll} onClick={saveAll}>
                   {savingAll ? 'Guardando…' : `Guardar (${dirtyCount})`}
@@ -502,10 +567,19 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
                     <thead>
                       <tr>
                         <th>Legajo</th><th>Estudiante</th>
-                        <th style={{ textAlign: 'center' }}>Parcial 1</th>
-                        <th style={{ textAlign: 'center' }}>Parcial 2</th>
-                        <th style={{ textAlign: 'center' }}>Trabajos</th>
-                        <th style={{ textAlign: 'center' }}>Final</th>
+                        {modoDirecta ? (
+                          <>
+                            <th style={{ textAlign: 'center' }}>Nota final</th>
+                            <th style={{ textAlign: 'center' }}>Felicitado</th>
+                          </>
+                        ) : (
+                          <>
+                            <th style={{ textAlign: 'center' }}>Parcial 1</th>
+                            <th style={{ textAlign: 'center' }}>Parcial 2</th>
+                            <th style={{ textAlign: 'center' }}>Trabajos</th>
+                            <th style={{ textAlign: 'center' }}>Final</th>
+                          </>
+                        )}
                         <th style={{ textAlign: 'center' }}>Estado</th>
                       </tr>
                     </thead>
@@ -525,34 +599,53 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
                                 <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre || `@${a.username}`}</span>
                               </div>
                             </td>
+                            {modoDirecta ? (
+                              <>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                    value={a.vals.directa} disabled={savingAll}
+                                    onChange={e => updateDirecta(a.alumno_id, e.target.value)} />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input type="checkbox" checked={a.felicitado} disabled={savingAll}
+                                    onChange={() => toggleFelicitado(a.alumno_id)}
+                                    title="Marcar como 5 Felicitado" style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                    value={a.vals.parcial1} disabled={savingAll}
+                                    onChange={e => updateVal(a.alumno_id, 'parcial1', e.target.value)} />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                    value={a.vals.parcial2} disabled={savingAll}
+                                    onChange={e => updateVal(a.alumno_id, 'parcial2', e.target.value)} />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                    value={a.vals.tp} disabled={savingAll}
+                                    onChange={e => updateVal(a.alumno_id, 'tp', e.target.value)} />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <div className="oport-chip">
+                                    {([1, 2, 3] as const).map(op => (
+                                      <button key={op} type="button" className={`oport-btn${a.oportunidadActiva === op ? ' active' : ''}`}
+                                        onClick={() => setOportunidad(a.alumno_id, op)}>{op}</button>
+                                    ))}
+                                  </div>
+                                  <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                    value={a.vals[finalKey]} disabled={savingAll}
+                                    onChange={e => updateVal(a.alumno_id, 'final', e.target.value)} />
+                                </td>
+                              </>
+                            )}
                             <td style={{ textAlign: 'center' }}>
-                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
-                                value={a.vals.parcial1} disabled={savingAll}
-                                onChange={e => updateVal(a.alumno_id, 'parcial1', e.target.value)} />
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
-                                value={a.vals.parcial2} disabled={savingAll}
-                                onChange={e => updateVal(a.alumno_id, 'parcial2', e.target.value)} />
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
-                                value={a.vals.tp} disabled={savingAll}
-                                onChange={e => updateVal(a.alumno_id, 'tp', e.target.value)} />
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              <div className="oport-chip">
-                                {([1, 2, 3] as const).map(op => (
-                                  <button key={op} type="button" className={`oport-btn${a.oportunidadActiva === op ? ' active' : ''}`}
-                                    onClick={() => setOportunidad(a.alumno_id, op)}>{op}</button>
-                                ))}
-                              </div>
-                              <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
-                                value={a.vals[finalKey]} disabled={savingAll}
-                                onChange={e => updateVal(a.alumno_id, 'final', e.target.value)} />
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              <span className="badge" style={{ background: est.bg, color: est.color }}>{est.label}</span>
+                              <span className="badge" style={{ background: a.felicitado && modoDirecta ? 'rgba(251,191,36,0.15)' : est.bg, color: a.felicitado && modoDirecta ? '#fbbf24' : est.color }}>
+                                {a.felicitado && modoDirecta ? '★ Felicitado' : est.label}
+                              </span>
                             </td>
                           </tr>
                         )

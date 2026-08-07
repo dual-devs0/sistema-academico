@@ -81,6 +81,8 @@ def actualizar_pesos_materia(
 
 
 def _max_para_tipo(pesos: dict[str, float], tipo: str) -> float:
+    if tipo == "directa":
+        return 10  # nota final directa, siempre escala 0-10
     clave = "final" if tipo.startswith("final") else tipo
     return pesos.get(clave, 100)
 
@@ -164,6 +166,7 @@ def create_puntaje(
         oferta_materia_id=oferta_id,
         tipo=puntaje.tipo,
         valor=puntaje.valor,
+        felicitado=puntaje.felicitado,
         editado_por=user.id,
     )
     db.add(new_puntaje)
@@ -378,9 +381,13 @@ def puntajes_por_materia(
                 "final1": None,
                 "final2": None,
                 "final3": None,
+                "directa": None,
+                "felicitado": False,
             }
         if p.tipo in alumno_map[p.user_id]:
             alumno_map[p.user_id][p.tipo] = float(p.valor)
+            if p.tipo == "directa":
+                alumno_map[p.user_id]["felicitado"] = bool(p.felicitado)
 
     result = []
     for uid, data in alumno_map.items():
@@ -415,11 +422,14 @@ def promedio_final_alumno(
 
     notas: dict[str, float | None] = {
         "parcial1": None, "parcial2": None, "practico": None,
-        "final1": None, "final2": None, "final3": None,
+        "final1": None, "final2": None, "final3": None, "directa": None,
     }
+    felicitado = False
     for p in puntajes:
         if str(p.tipo) in notas:
             notas[str(p.tipo)] = float(str(p.valor))
+            if str(p.tipo) == "directa":
+                felicitado = bool(p.felicitado)
 
     alumno = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     nombre_val: str | None = getattr(alumno, 'nombre', None) if alumno else None
@@ -428,7 +438,7 @@ def promedio_final_alumno(
     prom = calcular_promedio_final(notas, pesos)
 
     return schemas.puntaje.PromedioFinalOut(
-        user_id=user_id, nombre=nombre, **notas, promedio_final=prom
+        user_id=user_id, nombre=nombre, **notas, felicitado=felicitado, promedio_final=prom
     )
 
 
@@ -459,9 +469,12 @@ def exportar_materia(
                 "nombre": nombre, "username": username,
                 "parcial1": None, "parcial2": None, "practico": None,
                 "final1": None, "final2": None, "final3": None,
+                "directa": None, "felicitado": False,
             }
         if p.tipo in alumno_map[p.user_id]:
             alumno_map[p.user_id][p.tipo] = float(p.valor)
+            if p.tipo == "directa":
+                alumno_map[p.user_id]["felicitado"] = bool(p.felicitado)
 
     asistencia_oferta_id = _oferta_activa_id(db, materia_id)
     uids = list(alumno_map.keys())
@@ -518,7 +531,7 @@ def estadisticas_materia(
     for p in filas:
         d = por_alumno.setdefault(p.user_id, {
             "parcial1": None, "parcial2": None, "practico": None,
-            "final1": None, "final2": None, "final3": None,
+            "final1": None, "final2": None, "final3": None, "directa": None,
         })
         if p.tipo in d:
             d[p.tipo] = float(p.valor)

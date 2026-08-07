@@ -41,7 +41,11 @@ def calcular_promedio_final(
     Promedio 0-10 a partir de puntos obtenidos / puntos máximos configurados (reescalado a /10).
     Si falta algún tipo, se recalcula proporcional solo con los tipos presentes (materia "en curso").
     El final efectivo es el mayor valor no nulo entre final1/final2/final3 (mejor nota entre oportunidades).
+    Si hay una nota "directa" (carga simplificada del profesor, ya en escala 0-10), esa vale
+    como promedio final y se ignora el desglose parcial/practico/final.
     """
+    if notas.get("directa") is not None:
+        return round(float(notas["directa"]), 2)
     pesos = pesos or PESO_DEFAULT_FLOAT
     final_vals = [notas.get(t) for t in FINAL_TIPOS if notas.get(t) is not None]
     final_efectivo = max(final_vals) if final_vals else notas.get("final")  # compat con tipo legacy "final"
@@ -62,7 +66,7 @@ def calcular_promedio_final(
     return round(puntos / max_total * 10, 2)
 
 
-TIPOS_VALIDOS = {"parcial1", "parcial2", "practico", "final1", "final2", "final3"}
+TIPOS_VALIDOS = {"parcial1", "parcial2", "practico", "final1", "final2", "final3", "directa"}
 
 
 def promedios_por_alumno(db: Session, user_ids: list[int]) -> dict[int, float]:

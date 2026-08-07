@@ -78,6 +78,8 @@
 
 Pesos del promedio ponderado (constante `PESOS` repetida en varios módulos): `parcial1=0.25, parcial2=0.25, practico=0.20, final=0.30`.
 
+**Carga directa + "5F" (2026-08-02):** `tipo` acepta también `"directa"` — el profesor carga una única nota final 0-10 sin pasar por el desglose parcial1/parcial2/práctico/final (pensado para agilizar la carga). `calcular_promedio_final()` (`puntajes_utils.py`) devuelve ese valor directo como promedio, ignorando el resto del desglose si existe. Campo nuevo `felicitado: bool` en `Puntaje` — solo tiene sentido junto con `tipo="directa"` (validado en `PuntajeBase._felicitado_solo_directa`, 422 si `felicitado=true` con otro tipo, o si la nota directa supera 10); marca la nota como "5F" (5 Felicitado) en toda la UI (Boleta, reporte de notas, Cursos → Calificaciones).
+
 ## `/apuntes` — `apuntes_router.py`
 
 CRUD + moderación de apuntes compartidos. `POST /`, `GET /` (`?materia_id&aprobado&tipo_contenido&q`), `GET /{id}`, `PUT /{id}` (owner o admin), `PATCH /{id}/aprobar` (admin), `PATCH /{id}/like`, `PATCH /{id}/descargar`, `POST /{id}/archivo` (upload a R2), `GET /{id}/url-descarga`, `DELETE /{id}` (owner o admin).
@@ -96,13 +98,22 @@ Contenido curricular por materia (semana + título + descripción; temario adem�
 
 **Exportación RUE-ES/MEC** *(nuevo, 2026-07-13 — ver `ARQUITECTURA.md` para la nota sobre falta de plantilla oficial)*: `GET /reportes/rue-es/matricula` (CSV `;`, un renglón por alumno: `cedula;apellidos_nombres;carrera;codigo_mec_carrera;anio_ingreso;condicion_beca;estado`), `GET /reportes/rue-es/trayecto-academico` (CSV `;`, un renglón por inscripción: `cedula;apellidos_nombres;carrera;materia;periodo;nota_final;estado_materia;porcentaje_asistencia`, `estado_materia` = `CURSANDO`/`APROBADO`/`REPROBADO` según promedio ponderado `>=6`).
 
-## `/boleta` — `boleta_router.py`
+## `/boleta` — `boleta_router.py` *(rediseñado 2026-08-03)*
 
-`GET /boleta/{user_id}` (self, profesor o admin) — genera PDF con reportlab, promedio ponderado por materia.
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| GET | `/boleta/resumen` | self, o `?alumno_id=` con admin/profesor titular | Devuelve `BoletaData` (`schemas/boleta_schema.py`): `resumen` (promedio global, materias aprobadas/totales, avance de carrera, faltan para graduarse — fuente única, `services/boleta_data.py`) + `periodos[]` (por año/semestre, con sus materias `{id, nombre, p1, p2, tp, final, promedio, estado}`) |
+| GET | `/boleta/pdf` | self, o `?alumno_id=` con admin/profesor titular | `?scope=global\|anio\|semestre_actual&anio=&semestre=` → `application/pdf` generado con WeasyPrint (`services/boleta_pdf.py`, plantilla `templates/boleta_pdf.html`). `anio` requerido si `scope=anio` (422 si falta). `global`: página resumen (evolución por semestre, todo el historial) + una página de detalle por semestre. `anio`: mini-resumen del año + detalle de sus semestres. `semestre_actual`: solo la página de detalle del período más reciente, sin resumen |
+| GET | `/boleta/{user_id}/sello` | self, profesor (de ese alumno) o admin | Código HMAC-SHA256 (`UCA-X####-...`) + QR en base64, para verificación de autenticidad |
+| GET | `/boleta/verificar/{codigo}` | público | Valida un código de sello, devuelve `{valido, alumno_nombre?}` |
+
+**Endpoints eliminados en este rediseño** (reemplazados por los de arriba): `GET /boleta/{user_id}` (PDF viejo con reportlab, sin scope) y `GET /alumno/reporte-notas/pdf` (el otro botón de descarga que existía en paralelo — dos endpoints de PDF distintos para el mismo dato era la causa del "botón que no funcionaba" reportado).
 
 ## `/alumno` — `alumno_router.py` (self siempre, vía token)
 
 `GET/PATCH /mi-perfil`, `GET /mis-materias`, `GET /mis-notas`, `GET /mi-asistencia`, `GET /mi-resumen` (agregado de los tres anteriores).
+
+`GET /alumno/reporte-notas` *(nuevo 2026-08-02, router propio `reporte_notas_router.py`)* — `?semestre=YYYY-N` opcional (sin valor: global). Devuelve notas agrupadas por semestre real (`OfertaMateria.periodo`, no inferido de fechas), con detección de recursadas (misma materia con notas en más de una oferta — se marca la del período más reciente como vigente) y métricas de avance (usa `PensumMateria`/`Carrera.creditos_totales` si la carrera tiene plan de estudios cargado, si no cae a un fallback sobre el total de materias con nota). Usado por el chip de período inline en Cursos → Calificaciones (`Programa.tsx`) para ver el desglose de un semestre anterior sin salir de la página — lógica de agregación compartida con `/boleta/pdf` vía `services/reporte_notas.py`.
 
 ## `/foro` — `foro_router.py`
 
