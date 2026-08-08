@@ -173,7 +173,7 @@ async function requestBlob(path: string, options?: RequestInit, isRetry = false)
   return res.blob()
 }
 
-async function requestFormData<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
+async function requestFormData<T>(path: string, formData: FormData, isRetry = false, method = 'POST'): Promise<T> {
   const token = getAccessToken()
   const csrf = _getCsrfToken()
   const headers: Record<string, string> = {
@@ -181,7 +181,7 @@ async function requestFormData<T>(path: string, formData: FormData, isRetry = fa
     ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
   }
   const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
+    method,
     credentials: 'include',
     headers,
     body: formData,
@@ -190,7 +190,7 @@ async function requestFormData<T>(path: string, formData: FormData, isRetry = fa
   if (res.status === 401 && !isRetry) {
     const refreshed = await tryRefresh()
     if (refreshed) {
-      return requestFormData<T>(path, formData, true)
+      return requestFormData<T>(path, formData, true, method)
     }
     const role = _currentUser?.role
     setAccessToken(null)
@@ -221,6 +221,7 @@ export const api = {
   delete: <T>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, formData: FormData) => requestFormData<T>(path, formData),
+  uploadPut: <T>(path: string, formData: FormData) => requestFormData<T>(path, formData, false, 'PUT'),
   download: (path: string, filename?: string) => requestBlob(path).then(blob => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -248,7 +249,9 @@ export interface UserInfo {
 
 export function decodeToken(token: string): UserInfo | null {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
+    // JWT usa base64url (con '-' y '_'); atob espera base64 estándar.
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(b64))
     return { username: payload.sub, role: payload.role, user_id: payload.user_id }
   } catch {
     return null

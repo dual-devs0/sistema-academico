@@ -12,6 +12,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Animated, {
   Easing,
   FadeIn,
@@ -24,7 +25,7 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 import { useTabBarScroll } from "../../hooks/useHideOnScroll";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, Circle } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenHeader } from "../../components/ui/ScreenHeader";
 import { UserAvatar } from "../../components/ui/UserAvatar";
@@ -43,9 +44,13 @@ import { useBiometry } from "../../hooks/useBiometry";
 import {
   fetchPerfil,
   fetchResumen,
+  subirFotoPerfil,
   type MiResumen,
   type UserInfo,
 } from "../../services/dashboardService";
+import { checkForUpdate } from "../../services/updateService";
+
+import * as ImagePicker from "expo-image-picker";
 
 /**
  * Pantalla Perfil (reemplaza stub).
@@ -59,6 +64,7 @@ export default function PerfilScreen() {
 const { logout } = useAuth();
   const theme = useTheme();
   const biometry = useBiometry();
+  const router = useRouter();
 
   const [user, setUser] = useState<UserInfo | null>(null);
   const [resumen, setResumen] = useState<MiResumen | null>(null);
@@ -67,6 +73,21 @@ const { logout } = useAuth();
   const [faqOpen, setFaqOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  const runUpdateCheck = useCallback(async () => {
+    try {
+      const res = await checkForUpdate();
+      setUpdateAvailable(res.otaAvailable || res.backendNewer);
+    } catch {
+      setUpdateAvailable(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (updateAvailable || infoOpen) return;
+    void runUpdateCheck();
+  }, [runUpdateCheck, updateAvailable, infoOpen]);
 
   const load = useCallback(async () => {
     const [u, r] = await Promise.all([
@@ -125,6 +146,32 @@ const { logout } = useAuth();
     }
   };
 
+  const handleAvatarPress = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      showToast("Necesitamos acceso a tus fotos para cambiar el avatar");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    const mime = asset.mimeType ?? "image/jpeg";
+    try {
+      showToast("Subiendo foto…");
+      await subirFotoPerfil(asset.uri, mime);
+      await load();
+      showToast("Foto actualizada");
+    } catch {
+      showToast("No se pudo subir la foto. Intentá de nuevo.");
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <ScreenHeader title="Perfil" hideAvatar />
@@ -152,6 +199,8 @@ const { logout } = useAuth();
               legajo={legajo}
               esBecado={!!user?.es_becado}
               fuenteBeca={user?.fuente_beca}
+              fotoUrl={user?.foto_url}
+              onAvatarPress={() => void handleAvatarPress()}
             />
 
             <SectionLabel text="Resumen académico" />
@@ -201,7 +250,7 @@ const { logout } = useAuth();
                 }
               />
               <SettingRow
-                glyph="◈"
+                icon={<FingerprintIcon />}
                 label="Biometría"
                 hint={
                   !biometry.available
@@ -216,6 +265,13 @@ const { logout } = useAuth();
                   void handleBiometryToggle(v);
                 }}
                 disabled={!biometry.available || biometry.loading}
+              />
+<SettingRow
+                icon={<LockIcon />}
+                label="Cambiar contraseña"
+                variant="chevron"
+                onPress={() => router.push("/cambiar-contrasena")}
+                right={<ChevronIcon />}
               />
             </View>
 
@@ -236,11 +292,31 @@ const { logout } = useAuth();
                 right={<ChevronIcon />}
               />
               <SettingRow
-                glyph="ℹ"
+                icon={<InfoIcon />}
                 label="Información de la app"
                 variant="chevron"
                 onPress={() => setInfoOpen(true)}
-                right={<ChevronIcon />}
+                right={
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                    {updateAvailable ? (
+                      <View
+                        style={{
+                          paddingHorizontal: 7,
+                          paddingVertical: 3,
+                          borderRadius: radius.pill,
+                          backgroundColor: "rgba(245,158,11,0.15)",
+                          borderWidth: 1,
+                          borderColor: "rgba(245,158,11,0.4)",
+                        }}
+                      >
+                        <Text style={{ color: "#f59e0b", fontFamily: fontFamily.interBold, fontSize: 9, letterSpacing: 0.5 }}>
+                          NUEVA VERSIÓN
+                        </Text>
+                      </View>
+                    ) : null}
+                    <ChevronIcon />
+                  </View>
+                }
               />
             </View>
 
@@ -340,12 +416,16 @@ function IdentitySection({
   legajo,
   esBecado,
   fuenteBeca,
+  fotoUrl,
+  onAvatarPress,
 }: {
   nombre: string;
   carrera: string;
   legajo: string;
   esBecado: boolean;
   fuenteBeca?: string | null;
+  fotoUrl?: string | null;
+  onAvatarPress?: () => void;
 }) {
   const { colors } = useTheme();
 
@@ -360,7 +440,12 @@ function IdentitySection({
       }}
     >
       <View style={{ marginBottom: spacing.md }}>
-        <UserAvatar nombre={nombre} size={80} borderWidth={2} />
+        <UserAvatar nombre={nombre} fotoUrl={fotoUrl ?? undefined} size={80} borderWidth={2} onPress={onAvatarPress} />
+        <Pressable onPress={onAvatarPress} hitSlop={8} style={{ marginTop: spacing.sm, alignItems: "center" }}>
+          <Text style={{ color: colors.cyan, fontFamily: fontFamily.interMedium, fontSize: fontSize.caption, letterSpacing: 0.5 }}>
+            CAMBIAR FOTO
+          </Text>
+        </Pressable>
       </View>
       <Text
         style={{
@@ -1054,6 +1139,57 @@ function ChevronIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </Svg>
+  );
+}
+
+function LockIcon() {
+  const { colors } = useTheme();
+
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M7 11V8a5 5 0 0110 0v3"
+        stroke={colors.cyan}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M5 11h14a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1v-7a1 1 0 011-1z"
+        stroke={colors.cyan}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function FingerprintIcon() {
+  const { colors } = useTheme();
+  const c = colors.cyan;
+
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 11a3 3 0 013 3c0 2.5-.5 4.5-1.2 6.2" stroke={c} strokeWidth={1.9} strokeLinecap="round" />
+      <Path d="M9.2 20.5c.9-1.8 1.3-4 1.3-6.5a1.5 1.5 0 013 0" stroke={c} strokeWidth={1.9} strokeLinecap="round" />
+      <Path d="M6.5 18.2C7.5 16.3 8 14.3 8 12a4 4 0 017-2.6" stroke={c} strokeWidth={1.9} strokeLinecap="round" />
+      <Path d="M4.6 15A9 9 0 014 12a8 8 0 0112.6-6.5" stroke={c} strokeWidth={1.9} strokeLinecap="round" />
+      <Path d="M19.5 9.5c.3.8.5 1.6.5 2.5 0 1.2-.1 2.3-.3 3.4" stroke={c} strokeWidth={1.9} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function InfoIcon() {
+  const { colors } = useTheme();
+  const c = colors.cyan;
+
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9" stroke={c} strokeWidth={2} />
+      <Path d="M12 11v5" stroke={c} strokeWidth={2} strokeLinecap="round" />
+      <Circle cx="12" cy="8" r="1" fill={c} />
     </Svg>
   );
 }

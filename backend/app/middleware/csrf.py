@@ -18,6 +18,12 @@ CSRF_EXEMPT_PATHS = {
     "/auth/recuperar-contrasena",
     "/auth/reset-password",
     "/auth/refresh",
+    # Autenticado por Bearer (no cookie) → CSRF no aplica, igual que los
+    # otros /auth. Mobile no envía el header X-CSRF-Token en este POST.
+    "/auth/cambiar-contrasena",
+    # Subida de foto de perfil: autenticada por Bearer; mobile usará
+    # FormData sin el header X-CSRF-Token.
+    "/users/me/foto",
 }
 
 CSRF_PREFIX_EXEMPT = {"/static"}

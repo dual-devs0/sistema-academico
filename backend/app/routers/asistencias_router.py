@@ -537,10 +537,15 @@ def verificar_qr_asistencia(
     """Registra la asistencia del alumno autenticado usando el QR emitido
     por el profesor. Valida:
     - JWT firmado con SECRET_KEY, con `kind == "asistencia_qr"` y sin vencer.
+    - El usuario autenticado tiene rol `alumno`.
     - Alumno inscripto en una oferta de la materia indicada.
     - No hay asistencia registrada para hoy en la misma oferta.
     Devuelve el conteo de presentes/ausentes en la clase de hoy.
     """
+    # 0. Solo alumnos pueden registrar asistencia con QR (defensa en profundidad:
+    #    el frontend ya lo filtra, pero el backend no debe confiar en el cliente).
+    if current_user.role != "alumno":
+        raise HTTPException(status_code=403, detail="Solo alumnos pueden escanear")
     # 1. Decodificar y validar el JWT del QR.
     try:
         payload = jwt.decode(body.qr_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -789,6 +794,10 @@ def generar_qr(
 ):
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, materia_id, current_user.user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado para esta materia")
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == materia_id)
@@ -844,6 +853,16 @@ def profesor_toggle_asistencia(
     )
     if not existing:
         raise HTTPException(status_code=404, detail="Asistencia no encontrada")
+    oferta = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(models.oferta_materia.OfertaMateria.id == existing.oferta_materia_id)
+        .first()
+    )
+    if current_user.role == "profesor" and (
+        oferta is None
+        or not es_profesor_de_materia(db, oferta.materia_id, current_user.user_id)
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado para esta materia")
     existing.presente = presente
     if motivo is not None:
         existing.motivo = motivo
@@ -867,6 +886,10 @@ def profesor_marcar_asistencia(
 ):
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, materia_id, current_user.user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado para esta materia")
     oferta_id = _oferta_activa_id(db, materia_id)
     if oferta_id is None:
         raise HTTPException(
@@ -877,6 +900,20 @@ def profesor_marcar_asistencia(
     alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
     if not alumno:
         raise HTTPException(status_code=404, detail="Alumno no encontrado")
+
+    # Verificar que el alumno está inscripto en la oferta activa antes de marcar presente.
+    inscripto = (
+        db.query(models.inscripcion.Inscripcion)
+        .filter(
+            models.inscripcion.Inscripcion.alumno_id == alumno_id,
+            models.inscripcion.Inscripcion.oferta_materia_id == oferta_id,
+        )
+        .first()
+    )
+    if not inscripto:
+        raise HTTPException(
+            status_code=403, detail="El alumno no está inscripto en esta materia"
+        )
 
     existing = (
         db.query(models.asistencia.Asistencia)

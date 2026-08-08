@@ -60,7 +60,10 @@
 | GET | `/asistencias/materia/{materia_id}/alumnos` | admin, profesor | Alumnos inscriptos + % asistencia — fuente de verdad para conteo de alumnos por materia |
 | GET | `/asistencias/alumno/{user_id}/porcentaje` | self o no-alumno | `?materia_id` opcional |
 | GET | `/asistencias/{materia_id}/resumen` | auth | % global de asistencia de la materia |
-| POST | `/asistencias/qr/verificar` | alumno (auth) | Registra la asistencia propia escaneando el QR emitido por el profesor (JWT firmado, TTL 15 min). Valida inscripción y evita duplicados. Solo registra presentes, nunca dispara la alerta de inasistencia |
+| GET | `/asistencias/qr/{materia_id}` | admin o profesor (titular de la materia) | Genera el QR de asistencia de una materia (JWT firmado, TTL 15 min). Desde 2026-08-07 el profesor solo puede generar QR de materias que dicta (`es_profesor_de_materia`); admin exento |
+| POST | `/asistencias/qr/verificar` | alumno (auth) | Registra la asistencia propia escaneando el QR emitido por el profesor (JWT firmado, TTL 15 min). Valida inscripción y evita duplicados. Desde 2026-08-07 exige rol `alumno` a nivel servidor (`403 "Solo alumnos pueden escanear"`). Solo registra presentes, nunca dispara la alerta de inasistencia |
+| PUT | `/asistencias/profesor/toggle/{id}` | admin o profesor (titular de la materia) | Toggle presente/ausente de una asistencia existente. Desde 2026-08-07 el profesor solo modifica asistencias de materias que dicta |
+| POST | `/asistencias/profesor/marcar` | admin o profesor (titular de la materia) | Registra asistencia de un alumno en una materia. Desde 2026-08-07 valida que el profesor dicte la materia y que el alumno esté inscripto en la oferta activa antes de marcar presente |
 
 ## `/puntajes` — `puntajes_router.py`
 

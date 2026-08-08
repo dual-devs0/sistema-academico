@@ -4,6 +4,49 @@ Formato cronológico inverso (nuevo arriba).
 
 ---
 
+## 2026-08-08 — Actualizaciones OTA (expo-updates) + splash nativo sin logo estático
+
+### Refuerzo del chequeo de versión desde el móvil
+- **Mobile** (`services/updateService.ts`, nuevo): unifica el chequeo de
+  actualizaciones en un solo servicio:
+  - `checkForUpdate()` → `{ otaEnabled, otaAvailable, backendNewer, latestVersion, updateUrl, releaseNotes }`
+  - combina OTA de `expo-updates` con el chequeo remoto `GET /version`
+  - `downloadAndReloadUpdate()` → descarga el bundle OTA y recarga la app
+  - acceso al módulo nativo vía `requireOptionalNativeModule("ExpoUpdates")`
+    (de `expo-modules-core`), que **no lanza** en dev builds / Expo Go; se
+    requiere de forma protegida para no tumbar la app cuando el módulo nativo
+    no está linkeado (`Cannot find native module 'ExpoUpdates'`)
+- **Mobile** (`components/ui/InfoAppModal.tsx`): reescrita para usar
+  `updateService`. Cuando hay una actualización OTA muestra botón
+  **"Actualizar y recargar"** (con spinner); si solo hay versión nueva vía
+  backend conserva el enlace externo "Actualizar app". Se mantiene el badge
+  y el fallback a "Buscar actualizaciones" cuando no hay red.
+- **Mobile** (`app/(tabs)/perfil.tsx`): el badge **"NUEVA VERSIÓN"** ahora se
+  prende con `otaAvailable || backendNewer`.
+- **Eliminado** `mobile/services/versionService.ts` (reemplazado por
+  `updateService`).
+- **Docs**: `mobile/UPDATES_MOVIL.md` (nuevo) con la publicación OTA
+  (`npx eas update --branch <branch>`) y flujo de la app.
+
+### Splash nativo estático → solo splash animado en video
+- La pantalla azul con el logo era la splash nativa generada por
+  `expo-splash-screen` (Android `Theme.App.SplashScreen` + `splashscreen_logo`).
+- **Mobile** (`app.json`): el plugin `expo-splash-screen` usa ahora una
+  **imagen transparente** (`assets/splash-transparent.png`, nueva) con
+  `backgroundColor: #083D74` (color del primer frame del video de splash).
+  Android sincronizado: `splashscreen_logo.png` (todas las densidades)
+  reemplazados por el PNG transparente y `splashscreen_background` en
+  `res/values/colors.xml`). Al regenerar prebuild/`eas build` la nativa queda
+  sin logo estático.
+- **Mobile** (`components/SplashAnimated.tsx`): el gradiente de fondo detrás
+  del video empieza en `#083D74` → transición nativa→video imperceptible.
+- **Mobile** (`app/_layout.tsx`): fondo raíz `#083D74` para evitar "flash" de
+  otro azul durante el arranque.
+- **Comportamiento logrado**: inicio → splash animado en video →
+  login, eliminando la pantalla azul con logo intermedia.
+
+---
+
 ## 2026-07-27 — Sesión persistente, swipe entre tabs, splash Lottie, version info + seguridad Android
 
 ### Sesión persistente (cierre/re-apertura)

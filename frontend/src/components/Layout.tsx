@@ -215,7 +215,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     const wasAdmin = role === 'admin'
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      // Usar el cliente api (adjunta X-CSRF-Token + Authorization) para que el
+      // backend revoque refresh token y access token (jti) y limpie las cookies.
+      await api.post('/auth/logout', {})
     } catch {
       // ignorar errores de red — el cliente limpia igual
     }

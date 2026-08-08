@@ -37,6 +37,51 @@ function ErrorBanner({ msg }: { msg: string }) {
   )
 }
 
+/* ═══ Input de contraseña con toggle visible ═══════════════════ */
+
+function PasswordInput({
+  value,
+  onChange,
+  show,
+  onToggle,
+  autoComplete,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  show: boolean
+  onToggle: () => void
+  autoComplete?: string
+  placeholder?: string
+}) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        className="input-uca"
+        type={show ? 'text' : 'password'}
+        value={value}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        style={{ paddingRight: 38, marginBottom: 12 }}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        style={{
+          position: 'absolute', right: 8, top: 0, bottom: 12, width: 28,
+          border: 'none', background: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <i className={`ti ${show ? 'ti-eye-off' : 'ti-eye'}`} style={{ fontSize: 16 }} />
+      </button>
+    </div>
+  )
+}
+
 /* ═══ Notificaciones Push ═══════════════════════════════════════ */
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -178,8 +223,12 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
   const [promedio, setPromedio] = useState<number | null>(null)
   const [asistencia, setAsistencia] = useState<number | null>(null)
   const [condicion, setCondicion] = useState<CondicionEgreso | null>(null)
+  const [pwCurrent, setPwCurrent] = useState('')
   const [pwNew, setPwNew] = useState('')
   const [pwConf, setPwConf] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConf, setShowConf] = useState(false)
   const [pwLoading, setPwLoading] = useState(false)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
@@ -420,22 +469,21 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
           {tab === 'seguridad' && (
             <div style={{ maxWidth: 380 }}>
               <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>Cambiar contraseña</h3>
+              <div className="mono-label" style={{ marginBottom: 6 }}>Contraseña actual</div>
+              <PasswordInput value={pwCurrent} onChange={setPwCurrent} show={showCurrent} onToggle={() => setShowCurrent(s => !s)} autoComplete="current-password" />
               <div className="mono-label" style={{ marginBottom: 6 }}>Nueva contraseña</div>
-              <input className="input-uca" type="password" value={pwNew} onChange={e => setPwNew(e.target.value)} style={{ marginBottom: 12 }} />
+              <PasswordInput value={pwNew} onChange={setPwNew} show={showNew} onToggle={() => setShowNew(s => !s)} autoComplete="new-password" placeholder="Mínimo 6 caracteres" />
               <div className="mono-label" style={{ marginBottom: 6 }}>Confirmar contraseña</div>
-              <input className="input-uca" type="password" value={pwConf} onChange={e => setPwConf(e.target.value)} style={{ marginBottom: 16 }} />
+              <PasswordInput value={pwConf} onChange={setPwConf} show={showConf} onToggle={() => setShowConf(s => !s)} autoComplete="new-password" placeholder="Repetí la nueva contraseña" />
               <button className="btn-primary" disabled={pwLoading} onClick={async () => {
+                if (!pwCurrent) { emitToast('Ingresá tu contraseña actual', 'error'); return }
                 if (!pwNew || pwNew !== pwConf) { emitToast('Las contraseñas no coinciden', 'error'); return }
-                if (pwNew.length < 8) { emitToast('La contraseña debe tener al menos 8 caracteres', 'error'); return }
+                if (pwNew.length < 6) { emitToast('La contraseña debe tener al menos 6 caracteres', 'error'); return }
                 setPwLoading(true)
                 try {
-                  if (role === 'admin') {
-                    await api.patch(`/users/${userId}`, { password: pwNew })
-                  } else {
-                    await api.patch('/alumno/mi-perfil', { password: pwNew })
-                  }
+                  await api.post('/auth/cambiar-contrasena', { current_password: pwCurrent, new_password: pwNew })
                   emitToast('Contraseña actualizada correctamente')
-                  setPwNew(''); setPwConf('')
+                  setPwCurrent(''); setPwNew(''); setPwConf('')
                 } catch (e: unknown) {
                   const msg = e instanceof Error ? e.message : 'Error al actualizar contraseña'
                   emitToast(msg, 'error')

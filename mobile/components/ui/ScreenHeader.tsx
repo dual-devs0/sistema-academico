@@ -38,6 +38,7 @@ interface Props {
   hideBell?: boolean;
   hideAvatar?: boolean;
   right?: React.ReactNode;
+  rightExtra?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -53,6 +54,7 @@ export function ScreenHeader({
   hideBell,
   hideAvatar,
   right,
+  rightExtra,
   style,
 }: Props) {
   const { colors } = useTheme();
@@ -236,6 +238,7 @@ const router = useRouter();
           </View>
         </View>
 
+        {rightExtra}
         {hideBell ? null : onBellPress ? (
           <Pressable
             onPress={onBellPress}

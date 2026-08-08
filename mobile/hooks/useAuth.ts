@@ -142,16 +142,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("auth");
       },
       logout: async () => {
-        try {
-          await logoutRequest();
-        } catch {
-          // sesión ya inválida en server
-        }
+        // Limpieza local inmediata: la próxima apertura exige login sí o sí,
+        // incluso si la llamada de red falla (seguridad).
         accessRef.current = null;
         csrfRef.current = null;
         refreshTokenRef.current = null;
-        clearSession();
+        await clearSession();
         setStatus("anon");
+        // Revocación en el servidor best-effort (no bloquea la salida).
+        logoutRequest().catch(() => {});
       },
       setTokens: (access, csrf) => {
         accessRef.current = access;

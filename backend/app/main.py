@@ -155,9 +155,18 @@ def root():
     responses={200: {"description": "Información de versión de la app mobile"}},
 )
 def version():
+    # Configurable vía .env para no tocar código en cada release:
+    #   MOBILE_LATEST_VERSION, MOBILE_MIN_VERSION, MOBILE_UPDATE_URL,
+    #   MOBILE_RELEASE_NOTES
     return {
-        "latestVersion": "1.0.0",
-        "minVersion": "1.0.0",
-        "updateUrl": "https://expo.dev/accounts/cabrvix/projects/uca-movil/builds",
-        "releaseNotes": "Primera versión del sistema académico móvil UCA Caacupé.",
+        "latestVersion": os.getenv("MOBILE_LATEST_VERSION", "1.0.0"),
+        "minVersion": os.getenv("MOBILE_MIN_VERSION", "1.0.0"),
+        "updateUrl": os.getenv(
+            "MOBILE_UPDATE_URL",
+            "https://expo.dev/accounts/cabrvix/projects/uca-movil/builds",
+        ),
+        "releaseNotes": os.getenv(
+            "MOBILE_RELEASE_NOTES",
+            "Primera versión del sistema académico móvil UCA Caacupé.",
+        ),
     }

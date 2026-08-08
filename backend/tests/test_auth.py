@@ -64,3 +64,46 @@ def test_login_exitoso_limpia_intentos_previos(client, seed):
     assert res.status_code == 400
 
     auth_router._login_failed_attempts.clear()
+
+
+def test_cambiar_contrasena_success(client, seed, tokens):
+    res = client.post(
+        "/auth/cambiar-contrasena",
+        json={"current_password": "alumno123", "new_password": "nueva123"},
+        headers={"Authorization": f"Bearer {tokens['alumno']}"},
+    )
+    assert res.status_code == 200
+    assert "actualizada" in res.json()["detail"]
+
+    # La contraseña nueva debe servir para el login
+    res = client.post(
+        "/auth/login", json={"username": "alumno_test", "password": "nueva123"}
+    )
+    assert res.status_code == 200
+
+
+def test_cambiar_contrasena_current_password_incorrecta(client, seed, tokens):
+    res = client.post(
+        "/auth/cambiar-contrasena",
+        json={"current_password": "incorrecta", "new_password": "nueva123"},
+        headers={"Authorization": f"Bearer {tokens['alumno']}"},
+    )
+    assert res.status_code == 400
+    assert "incorrecta" in res.json()["detail"]
+
+
+def test_cambiar_contrasena_requiere_auth(client, seed):
+    res = client.post(
+        "/auth/cambiar-contrasena",
+        json={"current_password": "alumno123", "new_password": "nueva123"},
+    )
+    assert res.status_code in (401, 403)
+
+
+def test_cambiar_contrasena_new_password_corta(client, seed, tokens):
+    res = client.post(
+        "/auth/cambiar-contrasena",
+        json={"current_password": "alumno123", "new_password": "abc"},
+        headers={"Authorization": f"Bearer {tokens['alumno']}"},
+    )
+    assert res.status_code == 422

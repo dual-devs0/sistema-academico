@@ -35,6 +35,7 @@ from app.auth import (
     create_refresh_token,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
+from app.dependencias import get_current_user
 from app.email_utils import send_reset_link_email_bg, send_welcome_email_bg
 from app.models.refresh_token import RefreshToken
 from app.models.password_reset_token import PasswordResetToken
@@ -384,6 +385,37 @@ def reset_password(
 
     setattr(db_user, 'hashed_password', security.hash_password(req.new_password))
     setattr(reset_token, 'used', True)
+    db.commit()
+
+    return {"detail": "Contraseña actualizada correctamente."}
+
+
+@router.post("/cambiar-contrasena")
+@limiter.limit("10/minute")
+def cambiar_contrasena(
+    request: Request,
+    req: schemas.user.ChangePasswordRequest,
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Cambio de contraseña autenticado: exige la contraseña actual y actualiza
+    el hash. La sesión actual se mantiene (el access token sigue siendo válido);
+    no se revocan refresh tokens para no forzar un re-login indeseado a mitad
+    de uso. Aplica para cualquier rol (alumno, profesor, admin)."""
+    db_user = (
+        db.query(models.user.User)
+        .filter(models.user.User.id == current_user.user_id)
+        .first()
+    )
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if not security.verify_password(
+        req.current_password, str(db_user.hashed_password)
+    ):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+
+    setattr(db_user, 'hashed_password', security.hash_password(req.new_password))
     db.commit()
 
     return {"detail": "Contraseña actualizada correctamente."}
