@@ -4,7 +4,7 @@
     "slug": "uca-movil",
     "owner": "cabrvix",
     "extra": {
-      "apiBase": "http://192.168.100.12:8000",
+      "apiBase": "https://uca-v2-backend.onrender.com",
       "router": {},
       "eas": {
         "projectId": "8099d7e4-3d70-4edf-82b4-d0c2ff73e6fd"
