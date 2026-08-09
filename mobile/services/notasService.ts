@@ -220,6 +220,9 @@ export type MateriaDetalle = {
   nombre: string;
   profesor: string | null;
   semestre: number;
+  promedio: number | null;
+  directa: number | null;
+  felicitado: boolean;
   asistenciaPct: number | null;
   totalClases: number;
   presentes: number;
