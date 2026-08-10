@@ -94,9 +94,14 @@ def create_materia(
         )
     new_materia = models.materia.Materia(
         nombre=materia.nombre,
+        codigo=materia.codigo,
         carrera_id=materia.carrera_id,
         anio=materia.anio or 1,
         semestre=materia.semestre or 1,
+        creditos=materia.creditos,
+        cupos=materia.cupos,
+        horario=materia.horario,
+        secciones=materia.secciones,
     )
     db.add(new_materia)
     db.commit()
