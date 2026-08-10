@@ -234,6 +234,14 @@ type AlumnoRow = {
   saving: boolean
 }
 
+// PREVIEW EN VIVO, no fuente de verdad: reimplementa en JS el mismo calculo
+// de backend/app/services/puntajes_utils.py::calcular_promedio_final (mismo
+// caso "directa" gana todo, mismo mejor-de-final1/2/3, mismo reescalado
+// proporcional). Se usa solo para pintar la tabla mientras el profesor
+// escribe, ANTES de guardar -- el promedio real que ve el alumno/boleta
+// siempre sale de ese endpoint. Si se cambia la formula del backend, esta
+// copia hay que actualizarla a mano o va a mostrar un preview que no
+// coincide con lo que realmente se termina guardando.
 function calcPromedio(vals: AlumnoRow['vals'], pesos: Pesos): number | null {
   if (vals.directa !== '') {
     const d = parseFloat(vals.directa)

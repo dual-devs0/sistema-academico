@@ -27,7 +27,6 @@ import {
 } from "../../constants/design";
 import {
   fetchNotasCompleto,
-  PUNTAJE_POR_TIPO,
   type MateriaCard,
   type NotasCompleto,
 } from "../../services/notasService";
@@ -39,20 +38,6 @@ import {
 } from "../../services/boletaService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function puntajeTotalMateria(m: MateriaCard): number {
-  return m.desglose.reduce((acc, d) => {
-    if (d.tipo === "final" || d.tipo.startsWith("final")) return acc;
-    return acc + (d.puntajeLogrado ?? 0);
-  }, 0);
-}
-
-function puntajeMaximoMateria(m: MateriaCard): number {
-  return m.desglose.reduce((acc, d) => {
-    if (d.tipo === "final" || d.tipo.startsWith("final")) return acc;
-    return acc + (d.puntajeActividad ?? PUNTAJE_POR_TIPO[d.tipo] ?? 0);
-  }, 0);
-}
 
 function donutColor(pct: number): string {
   if (pct >= 90) return "#22c55e";
@@ -457,8 +442,6 @@ function MateriaCard({
   const { colors } = useTheme();
   const pct = materia.asistenciaPct ?? 0;
   const color = donutColor(pct);
-  const logrado = puntajeTotalMateria(materia);
-  const maximo = puntajeMaximoMateria(materia);
 
   return (
     <GlassCard
@@ -1322,7 +1305,6 @@ function CalificacionesView({
       ) : (
         materias.map((m, i) => {
           const isOpen = expanded === m.materiaId;
-          const total = m.desglose.reduce((a, d) => a + (d.nota != null ? d.nota * d.peso : 0), 0);
 
           return (
             <Animated.View
@@ -1372,7 +1354,7 @@ function CalificacionesView({
                           letterSpacing: -0.5,
                         }}
                       >
-                        {total > 0 ? total.toFixed(1) : "—"}
+                        {m.promedio != null ? m.promedio.toFixed(1) : "—"}
                       </Text>
                       <Text
                         style={{
@@ -1427,12 +1409,7 @@ function CalificacionesView({
                             </Text>
                             <Text
                               style={{
-                                color:
-                                  d.nota == null
-                                    ? colors.textSecondary
-                                    : d.nota >= 6
-                                      ? colors.cyan
-                                      : colors.error,
+                                color: d.nota == null ? colors.textSecondary : colors.textPrimary,
                                 fontFamily: fontFamily.monoMedium,
                                 fontSize: fontSize.caption,
                                 minWidth: 32,

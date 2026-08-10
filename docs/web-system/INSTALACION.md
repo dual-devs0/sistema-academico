@@ -11,7 +11,7 @@ Frontend (React/Vite). Windows/Linux/Mac, comandos equivalentes indicados.
 
 - **Python 3.11 o superior** (probado con 3.14).
 - **Node.js 20 o superior** + npm.
-- **PostgreSQL** — vía [Neon](https://neon.tech) (usado en este proyecto, branches separadas dev/test) o una instancia local. No hay modo SQLite soportado para desarrollo real: `DATABASE_URL` debe apuntar a Postgres (`backend/app/database.py` solo tiene fallback SQLite para tests, ver `tests/conftest.py`).
+- **PostgreSQL** — vía [Supabase](https://supabase.com) (usado en este proyecto, pooler de conexión) o una instancia local. No hay modo SQLite soportado para desarrollo real: `DATABASE_URL` debe apuntar a Postgres (`backend/app/database.py` solo tiene fallback SQLite para tests, ver `tests/conftest.py`).
 - Git.
 
 Verificar:
@@ -84,7 +84,7 @@ copy .env.example .env     # Windows
 > con los valores reales de abajo, no confiar en el `.example` tal cual.
 
 Editar `backend/.env` y completar:
-- **`DATABASE_URL`**: connection string de Postgres, ej. `postgresql+psycopg2://user:pass@host/db?sslmode=require` (formato Neon). Requerido — sin esto el backend no arranca.
+- **`DATABASE_URL`**: connection string de Postgres, ej. `postgresql+psycopg2://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require` (formato Supabase pooler). Requerido — sin esto el backend no arranca.
 - `JWT_SECRET`: cualquier string largo random (no dejar el valor de ejemplo).
 - `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`: credenciales de Cloudflare R2 (o cualquier S3-compatible) para storage de archivos (fotos de perfil, apuntes de biblioteca). Sin esto, los endpoints de upload fallan.
 - `MAIL_PASSWORD`: opcional. Sin configurar, los emails (nueva nota, reset de
@@ -151,11 +151,11 @@ estar corriendo en el puerto 8000** para que el login y todas las páginas funci
 - **`bcrypt` warnings o error de versión**: el proyecto usa `bcrypt` 4.0.1 por
   compatibilidad con `passlib`; si `pip` instaló una versión más nueva por error,
   correr `pip install "bcrypt==4.0.1"`.
-- **`password authentication failed` / `endpoint could not be found` contra Neon**:
-  el compute del free tier de Neon se suspende por inactividad. Reactivar desde el
-  dashboard de Neon — no es un problema de código ni de configuración local.
-  **Solución permanente:** en el dashboard de Neon, editar el compute → **Auto-suspend**
-  → seleccionar **Never** para que nunca se suspenda.
+- **`password authentication failed` / `connection refused` contra Supabase**:
+  confirmar que se está usando la connection string del **pooler** (puerto 6543,
+  `?sslmode=require`), no la conexión directa. Verificar también que el proyecto
+  Supabase no esté pausado (el free tier de Supabase pausa proyectos inactivos
+  por 7+ días — reactivar desde el dashboard).
 
 ## 8. Estructura rápida
 

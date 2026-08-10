@@ -14,8 +14,11 @@ import { api } from "./api";
  * `fetchNotasCompleto()` los une por `materia_id` y expone el semestre
  * (para el chip selector) + desglose ponderado.
  *
- * Pesos oficiales del backend (auth-router:133):
- *   parcial1: 25%, parcial2: 25%, práctico: 20%, final: 30%.
+ * Pesos default del backend (services/puntajes_utils.py::PESO_DEFAULT,
+ * sobre 100 puntos): parcial1 20, parcial2 20, práctico 10, final 50.
+ * Una materia puede tener pesos custom vía PesoEvaluacion -- el desglose acá
+ * solo usa el default para el label de "peso", el promedio real que se
+ * muestra siempre viene ya calculado del backend con los pesos reales.
  */
 
 export interface MateriaResumen {
@@ -114,10 +117,10 @@ async function fetchMiAsistencia(): Promise<AsistenciaBackend[]> {
 // ---------------------------------------------------------------------------
 
 const PESO: Record<NotaTipo, number> = {
-  parcial1: 0.25,
-  parcial2: 0.25,
-  practico: 0.2,
-  final: 0.3,
+  parcial1: 0.2,
+  parcial2: 0.2,
+  practico: 0.1,
+  final: 0.5,
 };
 
 const LABEL: Record<NotaTipo, string> = {
