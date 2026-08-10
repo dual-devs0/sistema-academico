@@ -33,8 +33,7 @@ function saludoDelDia(): { texto: string; icon: string } {
 
 const estadoBadge: Record<string, { bg: string; color: string }> = {
   REGULAR:        { bg: 'var(--success-subtle)', color: 'var(--success)' },
-  PROMOCIONANDO:  { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
-  PROMOCIONADO:   { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
+  DESTACADO:      { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
   APROBADO:       { bg: 'var(--info-subtle)', color: 'var(--info)' },
   REPROBADO:      { bg: 'var(--danger-subtle)', color: 'var(--danger)' },
   'SIN CURSAR':   { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' },
@@ -922,7 +921,8 @@ export default function Dashboard() {
       const rows: MateriaRow[] = misMaterias.map(m => {
         const n = notaMap.get(m.id)
         const prom = n?.promedio ?? null
-        const estado = prom === null ? 'EN CURSO' : prom >= 9 ? 'PROMOCIONANDO' : prom >= 6 ? 'REGULAR' : 'REPROBADO'
+        // Escala oficial UC (Art. 24): nota final entera 1-5, aprobado >= 2, destacado = 5 (nota maxima real)
+        const estado = prom === null ? 'EN CURSO' : prom >= 5 ? 'DESTACADO' : prom >= 2 ? 'REGULAR' : 'REPROBADO'
         return {
           nombre: m.nombre, profesor: m.profesor || '—', ultimaNota: prom, estado,
           parcial1: n?.parcial1 ?? null, parcial2: n?.parcial2 ?? null, practico: n?.practico ?? null, final: n?.final ?? null,

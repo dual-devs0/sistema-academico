@@ -77,7 +77,7 @@ export default function SemesterAccordion({ periodos, loading }: Props) {
                   }}>
                   <span style={{ fontSize: 13.5, fontWeight: 800 }}>{p.etiqueta}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 14, color: p.promedioSemestre >= 6 ? 'var(--success)' : 'var(--danger)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 14, color: p.promedioSemestre >= 2 ? 'var(--success)' : 'var(--danger)' }}>
                       {p.promedioSemestre.toFixed(2)}
                     </span>
                     <i className={`ti ti-chevron-${abierta ? 'up' : 'down'}`} style={{ color: 'var(--text-muted)' }} />

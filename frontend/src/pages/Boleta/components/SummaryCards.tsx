@@ -12,8 +12,8 @@ export default function SummaryCards({ resumen, loading }: Props) {
       <div className="kpi-card">
         <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-star" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
         {loading ? <Skel /> : (
-          <span className="kpi-value" style={{ fontSize: 32, color: (resumen?.promedioGlobal ?? 0) >= 7 ? '#22c55e' : (resumen?.promedioGlobal ?? 0) >= 6 ? '#f59e0b' : '#ef4444' }}>
-            {resumen?.promedioGlobal.toFixed(2) ?? '—'}<span className="kpi-unit"> / 10</span>
+          <span className="kpi-value" style={{ fontSize: 32, color: (resumen?.promedioGlobal ?? 0) >= 3 ? '#22c55e' : (resumen?.promedioGlobal ?? 0) >= 2 ? '#f59e0b' : '#ef4444' }}>
+            {resumen?.promedioGlobal.toFixed(2) ?? '—'}<span className="kpi-unit"> / 5</span>
           </span>
         )}
       </div>

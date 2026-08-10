@@ -31,10 +31,11 @@ const css = `
   .ea-kpi-unit-block { display:block; margin-top:6px; font-size:11.5px; color:var(--text-secondary); font-weight:600; }
 `
 
+// PPA entero 1-5 (Art. 24 Reglamento UC), aprobado >= 2
 function ppaColor(v: number | null | undefined): string {
   if (v === null || v === undefined) return 'var(--text-muted)'
-  if (v >= 9) return 'var(--accent-bright)'
-  if (v >= 6) return 'var(--success)'
+  if (v >= 5) return 'var(--accent-bright)'
+  if (v >= 2) return 'var(--success)'
   return 'var(--danger)'
 }
 
@@ -136,7 +137,7 @@ export default function ExpedienteAlumno() {
                     <i className="ti ti-chart-bar" />
                   </span>
                 </div>
-                <span className="kpi-value" style={{ color: ppaColor(ppa?.ppa) }}>{ppa?.ppa?.toFixed(2) ?? '—'}</span>
+                <span className="kpi-value" style={{ color: ppaColor(ppa?.ppa) }}>{ppa?.ppa ?? '—'}</span>
                 <span className="ea-kpi-unit-block">{ppa ? `${ppa.creditos_computados} créd. computados` : 'Sin materias aprobadas aún'}</span>
               </div>
 

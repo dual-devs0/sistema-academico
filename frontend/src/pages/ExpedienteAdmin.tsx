@@ -324,7 +324,7 @@ export default function ExpedienteAdmin() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
                   <div className="kpi-card">
                     <div className="kpi-top"><span className="mono-label">PPA Acumulado</span></div>
-                    <span className="kpi-value">{ppa?.ppa?.toFixed(2) ?? '—'}</span>
+                    <span className="kpi-value">{ppa?.ppa ?? '—'}</span>
                     {ppa && <span className="kpi-unit">{ppa.creditos_computados} créd. computados</span>}
                   </div>
                   {rBadge && (

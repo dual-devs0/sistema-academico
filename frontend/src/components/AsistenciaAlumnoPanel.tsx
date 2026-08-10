@@ -259,7 +259,7 @@ export default function AsistenciaAlumnoPanel() {
           <div className="card" style={{ padding: 20 }}>
             <div className="aa-det-card-title"><i className="ti ti-certificate" style={{ color: 'var(--accent-bright)' }} /> Calificaciones</div>
             {notaM?.directa != null ? (
-              <div className="aa-det-row"><span>Nota final (carga directa)</span><b>{notaM.felicitado ? `${notaM.directa}F` : notaM.directa} / 10</b></div>
+              <div className="aa-det-row"><span>Nota final (carga directa)</span><b>{notaM.felicitado ? `${notaM.directa}F` : notaM.directa} / 5</b></div>
             ) : (
               <>
                 <div className="aa-det-row"><span>Parcial 1</span><b>{notaM?.parcial1 ?? '—'} / {pesos.parcial1}</b></div>
@@ -272,7 +272,7 @@ export default function AsistenciaAlumnoPanel() {
             )}
             <div className="aa-det-row" style={{ marginTop: 6, borderTop: '2px solid var(--border-subtle)', paddingTop: 12 }}>
               <span style={{ fontWeight: 700 }}>Promedio</span>
-              <b style={{ fontSize: 18, color: notaM?.felicitado ? '#fbbf24' : 'var(--accent-bright)' }}>{notaM?.promedio == null ? '—' : notaM.felicitado ? `${notaM.promedio}F` : notaM.promedio} / 10</b>
+              <b style={{ fontSize: 18, color: notaM?.felicitado ? '#fbbf24' : 'var(--accent-bright)' }}>{notaM?.promedio == null ? '—' : notaM.felicitado ? `${notaM.promedio}F` : notaM.promedio} / 5</b>
             </div>
           </div>
 

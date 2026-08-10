@@ -82,23 +82,28 @@ function finalEfectivo(m: { final1: number | null; final2: number | null; final3
   return vals.length ? Math.max(...vals) : null
 }
 
+// Escala oficial UC (Art. 24 Reglamento de Estudiante): nota final entera 1-5,
+// aprobado >= 2. Ya no es 0-10 -- ver auditoria de notas / migracion de escala.
+const NOTA_MAXIMA = 5
+const APROBACION_MINIMA = 2
+
 function notaColor(n: number | null): string {
   if (n === null) return 'var(--text-muted)'
-  if (n >= 9) return 'var(--accent-bright)'
-  if (n >= 7.5) return 'var(--success)'
-  if (n >= 6) return 'var(--warning)'
+  if (n >= NOTA_MAXIMA) return 'var(--accent-bright)'
+  if (n >= 3) return 'var(--success)'
+  if (n >= APROBACION_MINIMA) return 'var(--warning)'
   return 'var(--danger)'
 }
 
-// Corte de "destacado" alineado a boleta_pdf.py::_badge_clase (>= 8) -- antes
-// decia "PROMOCIONADO" en >= 9, termino que en Paraguay implica exencion del
-// final por desempeño en parciales (una decision previa al final, no un
-// label post-hoc sobre el promedio ya cerrado), y con un corte distinto al
-// de la boleta oficial. Ver auditoria de notas: los dos deben coincidir.
+// "Destacado" = nota maxima real (5), no un umbral arbitrario -- alineado a
+// boleta_pdf.py::_badge_clase. Antes decia "PROMOCIONADO" en >=9 (escala
+// vieja 0-10), termino que en Paraguay implica exencion del final por
+// desempeño en parciales (una decision previa al final, no un label
+// post-hoc), y con un corte que no coincidia con la boleta oficial.
 function estadoDe(p: number | null): { label: string; bg: string; color: string } {
   if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
-  if (p >= 8) return { label: 'DESTACADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
-  if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
+  if (p >= NOTA_MAXIMA) return { label: 'DESTACADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
+  if (p >= APROBACION_MINIMA) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
   return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
 }
 
@@ -121,7 +126,7 @@ function AlumnoView({ userId }: { userId: number }) {
 
   const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
   const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
-  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
+  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= APROBACION_MINIMA).length
   const pctAprob = materias.length ? Math.round((aprobadas / materias.length) * 100) : 0
   const ringC = 2 * Math.PI * 34
   const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
@@ -142,7 +147,7 @@ function AlumnoView({ userId }: { userId: number }) {
           <div className="kpi-top">
             <span className="mono-label">Promedio General</span>
           </div>
-          <span className="kpi-value" style={{ fontSize: 36 }}>{loading ? '—' : promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
+          <span className="kpi-value" style={{ fontSize: 36 }}>{loading ? '—' : promGeneral.toFixed(2)}<span className="kpi-unit"> / {NOTA_MAXIMA}</span></span>
         </div>
         <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
@@ -234,18 +239,37 @@ type AlumnoRow = {
   saving: boolean
 }
 
+// Round-half-up a entero -- espejo de backend/app/services/puntajes_utils.py
+// ::redondear_half_up. Math.round() de JS ya redondea half-up para positivos
+// (a diferencia del round() de Python), pero se nombra igual para que quede
+// obvio que es la MISMA regla, no una calculada distinto por casualidad.
+function redondearHalfUp(x: number): number {
+  return Math.floor(x + 0.5)
+}
+
+// Tabla oficial Art. 24 Reglamento UC -- espejo de puntajes_utils.py::porcentaje_a_escalon
+function porcentajeAEscalon(pct: number): number {
+  const p = redondearHalfUp(Math.max(0, Math.min(100, pct)))
+  if (p <= 59) return 1
+  if (p <= 69) return 2
+  if (p <= 79) return 3
+  if (p <= 90) return 4
+  return 5
+}
+
 // PREVIEW EN VIVO, no fuente de verdad: reimplementa en JS el mismo calculo
 // de backend/app/services/puntajes_utils.py::calcular_promedio_final (mismo
-// caso "directa" gana todo, mismo mejor-de-final1/2/3, mismo reescalado
-// proporcional). Se usa solo para pintar la tabla mientras el profesor
-// escribe, ANTES de guardar -- el promedio real que ve el alumno/boleta
-// siempre sale de ese endpoint. Si se cambia la formula del backend, esta
-// copia hay que actualizarla a mano o va a mostrar un preview que no
-// coincide con lo que realmente se termina guardando.
+// caso "directa" gana todo -- ahora el profesor ya escribe el escalon 1-5
+// directo, no hay conversion -- mismo mejor-de-final1/2/3, mismo porcentaje
+// ponderado convertido con la tabla del Art. 24). Se usa solo para pintar la
+// tabla mientras el profesor escribe, ANTES de guardar -- el promedio real
+// que ve el alumno/boleta siempre sale de ese endpoint. Si se cambia la
+// formula del backend, esta copia hay que actualizarla a mano o va a mostrar
+// un preview que no coincide con lo que realmente se termina guardando.
 function calcPromedio(vals: AlumnoRow['vals'], pesos: Pesos): number | null {
   if (vals.directa !== '') {
     const d = parseFloat(vals.directa)
-    return isNaN(d) ? null : Math.round(d * 100) / 100
+    return isNaN(d) ? null : Math.round(d)
   }
   const fins = [vals.final1, vals.final2, vals.final3].map(s => parseFloat(s)).filter(n => !isNaN(n))
   const finalEf = fins.length ? Math.max(...fins) : null
@@ -257,7 +281,7 @@ function calcPromedio(vals: AlumnoRow['vals'], pesos: Pesos): number | null {
   if (!partes.length) return null
   const maxTotal = partes.reduce((a, x) => a + x.max, 0)
   const puntos = partes.reduce((a, x) => a + x.v, 0)
-  return maxTotal > 0 ? Math.round(puntos / maxTotal * 10 * 100) / 100 : null
+  return maxTotal > 0 ? porcentajeAEscalon(puntos / maxTotal * 100) : null
 }
 
 const PAGE_SIZE = 8
@@ -470,9 +494,9 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     emitToast('CSV exportado')
   }
 
-  const nAprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 6 && p < 8 }).length
-  const nReprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p < 6 }).length
-  const nPromo = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 8 }).length
+  const nAprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= APROBACION_MINIMA && p < NOTA_MAXIMA }).length
+  const nReprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p < APROBACION_MINIMA }).length
+  const nPromo = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= NOTA_MAXIMA }).length
   const totalPages = Math.max(1, Math.ceil(alumnos.length / PAGE_SIZE))
   const pageRows = alumnos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -615,7 +639,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
                             {modoDirecta ? (
                               <>
                                 <td style={{ textAlign: 'center' }}>
-                                  <input className="nota-input" type="text" inputMode="decimal" placeholder="—"
+                                  <input className="nota-input" type="text" inputMode="numeric" placeholder="1-5"
                                     value={a.vals.directa} disabled={savingAll}
                                     onChange={e => updateDirecta(a.alumno_id, e.target.value)} />
                                 </td>
@@ -812,7 +836,7 @@ function AdminView() {
 
   const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
   const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : null
-  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
+  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= APROBACION_MINIMA).length
 
   /* ── Agrupar por año → semestre ──────────────────────────── */
   const grupos = new Map<number, Map<number, MateriaAdm[]>>()
