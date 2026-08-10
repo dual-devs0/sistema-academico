@@ -26,6 +26,7 @@ import {
   fontFamily, fontSize, radius, spacing,
 } from "../../constants/design";
 import {
+  computePromedioSemestre,
   fetchNotasCompleto,
   type MateriaCard,
   type NotasCompleto,
@@ -138,22 +139,7 @@ const router = useRouter();
 
     for (const sem of data.semestresDisponibles) {
       const materiasSem = data.materias.filter((m) => m.semestre === sem);
-      const conNota = materiasSem.filter((m) =>
-        m.desglose.some((d) => d.puntajeLogrado != null)
-      );
-      const promedio =
-        conNota.length > 0
-          ? conNota.reduce((acc, m) => {
-            const pts = m.desglose.reduce(
-              (a, d) => a + (d.puntajeLogrado ?? 0), 0
-            );
-            const max = m.desglose.reduce(
-              (a, d) => a + (d.puntajeActividad ?? 0), 0
-            );
-            return acc + (max > 0 ? (pts / max) * 10 : 0);
-          }, 0) / conNota.length
-          : null;
-
+      const promedio = computePromedioSemestre(data.materias, sem);
       const primerAnio = materiasSem[0]?.anio ?? new Date().getFullYear();
       map.set(sem, { anio: primerAnio, promedio });
     }
