@@ -614,28 +614,26 @@ function AdminDash({ nombre }: AdminDashProps) {
   const navigate = useNavigate()
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [tab, setTab] = useState<'gestion' | 'alertas' | 'usuarios'>('gestion')
 
-  useEffect(() => {
-    let mounted = true
-    const fetchData = async () => {
-      try {
-        const res = await obtenerDashboardAdmin()
-        if (mounted) {
-          setData(res)
-          setLoading(false)
-        }
-      } catch {
-        if (mounted) setLoading(false)
-      }
-    }
-    fetchData()
-    const interval = setInterval(fetchData, 30_000)
-    return () => {
-      mounted = false
-      clearInterval(interval)
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await obtenerDashboardAdmin()
+      setData(res)
+      setError(false)
+      setLoading(false)
+    } catch {
+      setError(true)
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 30_000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const modulos = [
     { icon: 'ti-users', color: 'var(--info)', titulo: 'Usuarios y Roles', sub: 'CRUD completo de usuarios', path: '/usuarios', badge: data?.resumen?.total_alumnos },
@@ -649,7 +647,7 @@ function AdminDash({ nombre }: AdminDashProps) {
     { icon: 'ti-certificate-2', color: 'var(--accent)', titulo: 'Graduación', sub: 'Candidatos y procesos', path: '/graduacion-admin' },
     { icon: 'ti-briefcase', color: 'var(--warning)', titulo: 'Pasantías', sub: 'Solicitudes y tutorías', path: '/pasantias-admin' },
     { icon: 'ti-arrows-shuffle', color: 'var(--purple)', titulo: 'Equivalencias', sub: 'Convalidación de materias', path: '/equivalencias-admin' },
-    { icon: 'ti-file-description', color: 'var(--success)', titulo: 'Trámites', sub: 'Solicitudes pendientes', path: '/tramites', badge: data?.resumen.tramites_pendientes },
+    { icon: 'ti-file-description', color: 'var(--success)', titulo: 'Trámites', sub: 'Solicitudes pendientes', path: '/tramites', badge: data?.resumen?.tramites_pendientes },
     { icon: 'ti-calendar', color: 'var(--orange)', titulo: 'Calendario', sub: 'Eventos académicos', path: '/calendario' },
   ]
 
@@ -676,8 +674,18 @@ function AdminDash({ nombre }: AdminDashProps) {
     )
   }
 
-  const r = data!.resumen
-  const k = data!.kpis
+  if (error || !data) {
+    return (
+      <div style={{ textAlign: 'center', padding: 48 }}>
+        <i className="ti ti-alert-circle" style={{ fontSize: 32, color: '#ef4444', marginBottom: 12 }} />
+        <div style={{ color: '#ef4444', fontSize: 14, marginBottom: 8 }}>No se pudo cargar el dashboard</div>
+        <button className="ag-btn" onClick={() => { setLoading(true); fetchData() }}>Reintentar</button>
+      </div>
+    )
+  }
+
+  const r = data.resumen
+  const k = data.kpis
 
   return (
     <>
