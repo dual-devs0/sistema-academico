@@ -108,6 +108,11 @@ def materia_detalle(
 
     pesos = get_pesos(db, materia_id)
 
+    # Nota cargada directo por el profesor (bypassa parcial/practico/final) — ver Puntaje.felicitado
+    directa_puntaje = next((p for p in puntajes if p.tipo == "directa"), None)
+    directa = float(directa_puntaje.valor) if directa_puntaje else None
+    felicitado = bool(directa_puntaje.felicitado) if directa_puntaje else False
+
     # Construir desglose (puntos obtenidos vs. máximo real configurado para la materia)
     tipos_existentes = {p.tipo: p for p in puntajes}
     orden_tipos = ["parcial1", "parcial2", "practico", "final1", "final2", "final3"]
@@ -154,6 +159,8 @@ def materia_detalle(
         "profesor": profesor_nombre,
         "semestre": materia.semestre,
         "promedio": promedio,
+        "directa": directa,
+        "felicitado": felicitado,
         "asistenciaPct": asistencia_pct,
         "totalClases": total_clases,
         "presentes": presentes,
