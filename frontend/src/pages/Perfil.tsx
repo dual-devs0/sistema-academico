@@ -516,8 +516,12 @@ function PerfilProfesor({ userId }: { userId: number }) {
   const [errorMe, setErrorMe] = useState<string | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const [pwCurrent, setPwCurrent] = useState('')
   const [pwNew, setPwNew] = useState('')
   const [pwConf, setPwConf] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConf, setShowConf] = useState(false)
   const [pwLoading, setPwLoading] = useState(false)
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null)
   const fotoInputRef = useRef<HTMLInputElement>(null)
@@ -705,18 +709,21 @@ function PerfilProfesor({ userId }: { userId: number }) {
           <h3 style={{ fontSize:15, fontWeight:800, marginBottom:16 }}>
             <i className="ti ti-lock" style={{ marginRight:8 }} /> Cambiar contraseña
           </h3>
+          <div className="mono-label" style={{ marginBottom:6 }}>Contraseña actual</div>
+          <PasswordInput value={pwCurrent} onChange={setPwCurrent} show={showCurrent} onToggle={() => setShowCurrent(s => !s)} autoComplete="current-password" />
           <div className="mono-label" style={{ marginBottom:6 }}>Nueva contraseña</div>
-          <input className="input-uca" type="password" value={pwNew} onChange={e => setPwNew(e.target.value)} style={{ marginBottom:12 }} placeholder="Mínimo 8 caracteres" />
+          <PasswordInput value={pwNew} onChange={setPwNew} show={showNew} onToggle={() => setShowNew(s => !s)} autoComplete="new-password" placeholder="Mínimo 6 caracteres" />
           <div className="mono-label" style={{ marginBottom:6 }}>Confirmar contraseña</div>
-          <input className="input-uca" type="password" value={pwConf} onChange={e => setPwConf(e.target.value)} style={{ marginBottom:16 }} placeholder="Repetí la nueva contraseña" />
-          <button className="btn-primary" disabled={pwLoading} onClick={async () => {
+          <PasswordInput value={pwConf} onChange={setPwConf} show={showConf} onToggle={() => setShowConf(s => !s)} autoComplete="new-password" placeholder="Repetí la nueva contraseña" />
+          <button className="btn-primary" style={{ marginTop:16 }} disabled={pwLoading} onClick={async () => {
+            if (!pwCurrent) { emitToast('Ingresá tu contraseña actual', 'error'); return }
             if (!pwNew || pwNew !== pwConf) { emitToast('Las contraseñas no coinciden', 'error'); return }
-            if (pwNew.length < 8) { emitToast('La contraseña debe tener al menos 8 caracteres', 'error'); return }
+            if (pwNew.length < 6) { emitToast('La contraseña debe tener al menos 6 caracteres', 'error'); return }
             setPwLoading(true)
             try {
-              await api.patch(`/users/${userId}`, { password: pwNew })
+              await api.post('/auth/cambiar-contrasena', { current_password: pwCurrent, new_password: pwNew })
               emitToast('Contraseña actualizada correctamente')
-              setPwNew(''); setPwConf('')
+              setPwCurrent(''); setPwNew(''); setPwConf('')
             } catch (e: unknown) {
               const msg = e instanceof Error ? e.message : 'Error al actualizar contraseña'
               emitToast(msg, 'error')
