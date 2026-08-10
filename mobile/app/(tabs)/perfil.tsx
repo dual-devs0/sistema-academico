@@ -53,10 +53,9 @@ import { checkForUpdate } from "../../services/updateService";
 import * as ImagePicker from "expo-image-picker";
 
 /**
- * Pantalla Perfil (reemplaza stub).
+ * Pantalla Perfil.
  *
  * Datos: reusa `fetchPerfil` y `fetchResumen` de dashboardService.
- * BACKEND TODO: resuelto, el backend ya expone `fuente_beca` y `legajo`.
  */
 export default function PerfilScreen() {
   const { colors } = useTheme();

@@ -300,14 +300,6 @@ export default function AcademicoLogin() {
     .sx-forgot { font-size:11px; color:var(--accent); text-decoration:none; }
     .sx-forgot:hover { text-decoration:underline; }
 
-    .sx-demo {
-      display:flex; align-items:center; gap:8px;
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:7px; padding:7px 11px; margin-bottom:10px; width:100%;
-    }
-    .sx-demo p { font-size:10px; color:var(--text-2); line-height:1.4; }
-    .sx-demo strong { color:var(--text-1); font-weight:600; }
-
     .sx-btn-primary {
       width:100%; height:39px;
       background:var(--accent); border:none; border-radius:8px;
@@ -657,18 +649,6 @@ export default function AcademicoLogin() {
                       </button>
                     </div>
                   </div>
-
-                  {!showDocExtranjero && (
-                    <div className="sx-demo">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                      </svg>
-                      <p>
-                        <strong>Alumno:</strong> 12345678 · Alumno1234! &nbsp;
-                        <strong>Profesor:</strong> prof@uca.edu.py · Profesor1234!
-                      </p>
-                    </div>
-                  )}
 
                   <button className="sx-btn-primary" type="submit" disabled={loading} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                     {loading ? (
