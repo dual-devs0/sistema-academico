@@ -560,7 +560,8 @@ function PromedioCard({
   const { colors, effective } = useTheme();
   const isDark = effective === "dark";
   const val = promedio != null ? promedio.toFixed(2) : "—";
-  const pct = promedio != null ? Math.min(promedio / 10, 1) : 0;
+  // Escala oficial UC (Art. 24 Reglamento de Estudiante): nota maxima 5, no 10.
+  const pct = promedio != null ? Math.min(promedio / 5, 1) : 0;
 
   return (
     <View

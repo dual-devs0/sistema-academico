@@ -84,7 +84,7 @@ describe('DashboardScreen', () => {
       resumen: {
         alumno: null,
         cantidad_materias: 6,
-        promedio_general: 7.8,
+        promedio_general: 4,
         notas: [],
         asistencia: [],
       },
@@ -92,7 +92,7 @@ describe('DashboardScreen', () => {
         creditos_aprobados: 120,
         creditos_pendientes: 120,
         creditos_totales: 240,
-        promedio_general: 7.8,
+        promedio_general: 4,
         asistencia_promedio: 85,
         avance_porcentaje: 50,
         estado_financiero: 'al_dia',
