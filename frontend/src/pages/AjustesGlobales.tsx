@@ -218,7 +218,6 @@ export default function AjustesGlobales() {
     const newValue = dirty[key]
     setSaving(prev => ({ ...prev, [key]: true }))
     try {
-      await updateSetting(key, newValue)
       const reason = newValue !== null ? `Cambiado a: ${newValue}` : 'Valor limpiado'
       await updateSetting(key, newValue, reason)
       emitToast(`"${key}" actualizado`, 'success')
