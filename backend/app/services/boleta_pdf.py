@@ -15,12 +15,12 @@ from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 
+from app.services.puntajes_utils import APROBACION_MINIMA
+
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
 LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "static", "branding", "logo_sistema.png")
 
 _env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=True)
-
-APROBACION_MINIMA = 6.0
 
 
 def _badge_clase(promedio: float) -> str:

@@ -11,7 +11,7 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_alumno, es_profesor_de_materia
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos
+from app.services.puntajes_utils import calcular_promedio_final, get_pesos, promedios_por_alumno
 # AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
 from app.routers.asistencias_router import _oferta_activa_id
 
@@ -161,6 +161,20 @@ def create_puntaje(
             detail=f"Ya existe una nota de tipo '{puntaje.tipo}' "
             "para este alumno en esta materia",
         )
+    # "directa" y desglose (parcial/practico/final) son mutuamente excluyentes
+    # -- calcular_promedio_final le da precedencia absoluta a "directa" si
+    # existe, asi que dejar la del modo contrario tirada silenciosamente
+    # anula cualquier nota nueva cargada en el otro modo. Se borra al vuelo.
+    tipo_contrario = (
+        models.puntaje.Puntaje.tipo != "directa"
+        if puntaje.tipo == "directa"
+        else models.puntaje.Puntaje.tipo == "directa"
+    )
+    db.query(models.puntaje.Puntaje).filter(
+        models.puntaje.Puntaje.user_id == puntaje.user_id,
+        models.puntaje.Puntaje.oferta_materia_id == oferta_id,
+        tipo_contrario,
+    ).delete(synchronize_session=False)
     new_puntaje = models.puntaje.Puntaje(
         user_id=puntaje.user_id,
         oferta_materia_id=oferta_id,
@@ -290,6 +304,20 @@ def update_puntaje(
             status_code=422,
             detail=f"El valor máximo para '{data['tipo']}' en esta materia es {maximo}",
         )
+    if data["tipo"] != existing.tipo:
+        # Mismo motivo que en create_puntaje: "directa" y desglose son
+        # mutuamente excluyentes, se limpia el modo contrario al cambiar tipo.
+        tipo_contrario = (
+            models.puntaje.Puntaje.tipo != "directa"
+            if data["tipo"] == "directa"
+            else models.puntaje.Puntaje.tipo == "directa"
+        )
+        db.query(models.puntaje.Puntaje).filter(
+            models.puntaje.Puntaje.user_id == existing.user_id,
+            models.puntaje.Puntaje.oferta_materia_id == existing.oferta_materia_id,
+            models.puntaje.Puntaje.id != existing.id,
+            tipo_contrario,
+        ).delete(synchronize_session=False)
     for key, value in data.items():
         setattr(existing, key, value)
     existing.editado_por = user.id
@@ -579,13 +607,15 @@ def promedio_puntajes(
 ):
     if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
-    puntajes = (
+    # Promedio real (pesos reales por materia, promedio de promedios) -- no un
+    # AVG crudo sobre todos los tipos/materias, que mezclaria escalas
+    # distintas (parcial max 20, final max 50, directa 0-10) sin sentido.
+    promedios = promedios_por_alumno(db, [user_id])
+    if user_id not in promedios:
+        raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
+    total_puntajes = (
         db.query(models.puntaje.Puntaje)
         .filter(models.puntaje.Puntaje.user_id == user_id)
-        .all()
+        .count()
     )
-    if not puntajes:
-        raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
-    valores = [float(str(p.valor)) for p in puntajes]
-    promedio = round(sum(valores) / len(valores), 2)
-    return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
+    return {"user_id": user_id, "promedio": promedios[user_id], "total_puntajes": total_puntajes}

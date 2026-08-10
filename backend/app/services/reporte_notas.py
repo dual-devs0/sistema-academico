@@ -15,9 +15,7 @@ from collections import defaultdict
 from sqlalchemy.orm import Session
 
 from app import models
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos
-
-APROBACION_MINIMA = 6.0
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos
 
 
 def _periodo_sort_key(periodo: str | None) -> tuple[int, int]:

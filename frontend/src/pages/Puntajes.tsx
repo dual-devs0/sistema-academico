@@ -90,9 +90,14 @@ function notaColor(n: number | null): string {
   return 'var(--danger)'
 }
 
+// Corte de "destacado" alineado a boleta_pdf.py::_badge_clase (>= 8) -- antes
+// decia "PROMOCIONADO" en >= 9, termino que en Paraguay implica exencion del
+// final por desempeño en parciales (una decision previa al final, no un
+// label post-hoc sobre el promedio ya cerrado), y con un corte distinto al
+// de la boleta oficial. Ver auditoria de notas: los dos deben coincidir.
 function estadoDe(p: number | null): { label: string; bg: string; color: string } {
   if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
-  if (p >= 9) return { label: 'PROMOCIONADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
+  if (p >= 8) return { label: 'DESTACADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
   if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
   return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
 }
@@ -457,9 +462,9 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     emitToast('CSV exportado')
   }
 
-  const nAprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 6 && p < 9 }).length
+  const nAprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 6 && p < 8 }).length
   const nReprob = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p < 6 }).length
-  const nPromo = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 9 }).length
+  const nPromo = alumnos.filter(a => { const p = calcPromedio(a.vals, pesos); return p !== null && p >= 8 }).length
   const totalPages = Math.max(1, Math.ceil(alumnos.length / PAGE_SIZE))
   const pageRows = alumnos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -544,7 +549,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
             <div className="pro-filtros">
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--success)' }} /> {nAprob} Aprobados</span>
               <span className="pro-filtro"><span className="dot" style={{ background: 'var(--danger)' }} /> {nReprob} Reprobados</span>
-              <span className="pro-filtro"><span className="dot" style={{ background: 'var(--info)' }} /> {nPromo} Promocionados</span>
+              <span className="pro-filtro"><span className="dot" style={{ background: 'var(--info)' }} /> {nPromo} Destacados</span>
               <span style={{ flex: 1 }} />
               {!modoDirecta && (
                 <span className="pro-filtro" style={{ fontSize: 10 }}>P1 /{pesos.parcial1} · P2 /{pesos.parcial2} · TP /{pesos.practico} · Final /{pesos.final}</span>

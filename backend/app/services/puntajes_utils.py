@@ -19,6 +19,12 @@ PESO_DEFAULT_FLOAT = {k: float(v) for k, v in PESO_DEFAULT.items()}
 
 FINAL_TIPOS = ("final1", "final2", "final3")
 
+# Nota minima de aprobacion (escala 0-10). Fuente unica -- reporte_notas.py,
+# boleta_pdf.py y cualquier otro lugar que necesite este corte deben
+# importarlo de aca, no redeclararlo, para que boleta/expediente/dashboard
+# nunca puedan divergir en que cuenta como "aprobado".
+APROBACION_MINIMA = 6.0
+
 
 def get_pesos(db: Session, materia_id: int | None) -> dict[str, float]:
     """Puntaje máximo por tipo para una materia. Sin fila configurada -> default 20/20/10/50."""

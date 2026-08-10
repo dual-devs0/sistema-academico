@@ -1017,9 +1017,10 @@ type NotaMateriaCursos = {
 
 const PESOS_DEFAULT_CURSOS = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
 
+// Corte alineado a boleta_pdf.py::_badge_clase (>= 8) -- ver Puntajes.tsx::estadoDe
 function estadoNota(p: number | null): { label: string; bg: string; color: string } {
   if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
-  if (p >= 9) return { label: 'PROMOCIONADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
+  if (p >= 8) return { label: 'DESTACADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
   if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
   return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
 }
