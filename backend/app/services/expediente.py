@@ -14,6 +14,7 @@ from app.models.oferta_materia import OfertaMateria
 from app.models.inscripcion import Inscripcion
 from app.models.asistencia import Asistencia
 from app.models.materia import Materia
+from app.models.global_settings import GlobalSetting
 from app.services.puntajes_utils import APROBACION_MINIMA, redondear_half_up
 
 # PPA_UMBRAL_RIESGO: PPA solo promedia 'aprobada' (siempre nota>=APROBACION_MINIMA),
@@ -21,9 +22,26 @@ from app.services.puntajes_utils import APROBACION_MINIMA, redondear_half_up
 # marca "aprobado pero flojo" (misma logica que el 7.0 original sobre el 6.0 en
 # la escala vieja 0-10, ahora 3 sobre el 2 en la escala 1-5).
 PPA_UMBRAL_RIESGO = APROBACION_MINIMA + 1
-ASISTENCIA_UMBRAL_RIESGO = 75  # %
+ASISTENCIA_UMBRAL_RIESGO = 75  # % -- fallback si el GlobalSetting no existe aun
 PLAZO_RECURSAR_PERIODOS = 2
 PERIODOS_INACTIVIDAD_BAJA = 3
+
+
+def asistencia_minima_institucional(db: Session) -> float:
+    """% de asistencia minimo, leido de GlobalSetting (categoria academico,
+    key "porcentaje_asistencia_minimo") -- configurable por el admin en Ajustes
+    Globales, no hardcodeado. Fallback a ASISTENCIA_UMBRAL_RIESGO si el setting
+    todavia no existe en la DB (ver settings_router.py::_seed_defaults, que
+    recien inserta los defaults la primera vez que se abre Ajustes Globales).
+    Mismo patron que graduacion.py::ppa_minimo_institucional.
+    """
+    setting = db.query(GlobalSetting).filter_by(key="porcentaje_asistencia_minimo").first()
+    if setting and setting.value:
+        try:
+            return float(setting.value)
+        except ValueError:
+            pass
+    return float(ASISTENCIA_UMBRAL_RIESGO)
 
 
 def calcular_ppa(alumno_id: int, db: Session) -> dict:

@@ -12,10 +12,38 @@ from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_alumno, es_profesor_de_materia
 from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos, promedios_por_alumno
+from app.services.expediente import asistencia_minima_institucional
 # AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
-from app.routers.asistencias_router import _oferta_activa_id
+from app.routers.asistencias_router import _oferta_activa_id, calcular_porcentaje_asistencia
 
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
+
+_TIPOS_NOTA_FINAL = {"final1", "final2", "final3", "directa"}
+
+
+def _verificar_regularidad(db: Session, user_id: int, materia_id: int, tipo: str) -> None:
+    """Gate de regularidad (Art. 24 Reglamento UCA): un profesor no puede cargar
+    la nota final de un alumno si su asistencia esta por debajo del minimo
+    institucional. Solo aplica a las notas que definen aprobado/reprobado
+    (final1/2/3, directa) -- los parciales y el practico se cargan libremente
+    durante el cursado. Un admin puede forzar la carga igual (override
+    explicito), por eso el llamador solo invoca esto para role == "profesor".
+    """
+    if tipo not in _TIPOS_NOTA_FINAL:
+        return
+    asistencia = calcular_porcentaje_asistencia(db, user_id, materia_id)
+    if asistencia["total_clases"] == 0:
+        return  # sin clases registradas todavia, no hay base para juzgar regularidad
+    minimo = asistencia_minima_institucional(db)
+    if asistencia["porcentaje"] < minimo:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"El alumno no cumple el minimo de asistencia requerido "
+                f"({asistencia['porcentaje']}% de {minimo}% ) -- no se puede "
+                f"cargar la nota final. Un admin puede forzar la carga."
+            ),
+        )
 
 
 @router.get("/pesos/{materia_id}", response_model=schemas.puntaje.PesoEvaluacionOut)
@@ -133,6 +161,7 @@ def create_puntaje(
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
+        _verificar_regularidad(db, puntaje.user_id, puntaje.materia_id, puntaje.tipo)
     oferta_id = _oferta_activa_id(db, puntaje.materia_id)
     if oferta_id is None:
         raise HTTPException(
@@ -288,6 +317,7 @@ def update_puntaje(
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
+        _verificar_regularidad(db, existing.user_id, mid, puntaje.tipo)
     data = puntaje.model_dump()
     nueva_materia_id = data.pop("materia_id")
     if nueva_materia_id != existing.materia_id:

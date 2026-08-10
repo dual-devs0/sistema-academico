@@ -458,17 +458,11 @@ def alumnos_asistencia(
     return result
 
 
-@router.get("/alumno/{user_id}/porcentaje")
-def porcentaje_asistencia_alumno(
-    user_id: int,
-    materia_id: Optional[int] = Query(None),
-    db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
-):
-    """Porcentaje de asistencia de un alumno (global o por materia)."""
-    if current_user.role != "admin" and current_user.user_id != user_id:
-        raise HTTPException(status_code=403, detail="No autorizado")
-
+def calcular_porcentaje_asistencia(
+    db: Session, user_id: int, materia_id: Optional[int] = None
+) -> dict:
+    """Funcion pura (sin Depends) reutilizada por el endpoint HTTP de abajo y
+    por el gate de regularidad en puntajes_router.py."""
     query = db.query(models.asistencia.Asistencia).filter(
         models.asistencia.Asistencia.user_id == user_id
     )
@@ -492,6 +486,19 @@ def porcentaje_asistencia_alumno(
         "presentes": presentes,
         "porcentaje": round((presentes / total) * 100, 1) if total > 0 else 0.0,
     }
+
+
+@router.get("/alumno/{user_id}/porcentaje")
+def porcentaje_asistencia_alumno(
+    user_id: int,
+    materia_id: Optional[int] = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Porcentaje de asistencia de un alumno (global o por materia)."""
+    if current_user.role != "admin" and current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    return calcular_porcentaje_asistencia(db, user_id, materia_id)
 
 
 @router.get("/{materia_id}/resumen")

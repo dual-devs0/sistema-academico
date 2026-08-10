@@ -402,6 +402,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     if (!selectedMateria) return
     setSavingAll(true)
     let successCount = 0; let errorCount = 0
+    let primerError: string | null = null
     if (modoDirecta) {
       for (const row of alumnos) {
         const valStr = row.vals.directa
@@ -417,7 +418,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
               ? { ...a, ids: { ...a.ids, directa: created.id } } : a))
           }
           successCount++
-        } catch { errorCount++ }
+        } catch (e) { errorCount++; primerError ??= e instanceof Error ? e.message : null }
       }
     } else {
       const tiposMap: { campo: keyof AlumnoRow['vals']; tipo: string }[] = [
@@ -440,7 +441,7 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
                 ? { ...a, ids: { ...a.ids, [campo]: created.id } } : a))
             }
             successCount++
-          } catch { errorCount++ }
+          } catch (e) { errorCount++; primerError ??= e instanceof Error ? e.message : null }
         }
       }
     }
@@ -449,7 +450,8 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
     setSavingAll(false)
     setLastUpdate(new Date().toLocaleTimeString())
     if (errorCount > 0) {
-      emitToast(`Guardado parcial: ${successCount} ok, ${errorCount} errores`, 'warning')
+      const detalle = primerError ? ` — ${primerError}` : ''
+      emitToast(`Guardado parcial: ${successCount} ok, ${errorCount} errores${detalle}`, 'warning')
     } else {
       emitToast(`Todas las notas guardadas (${successCount} registros)`)
     }
