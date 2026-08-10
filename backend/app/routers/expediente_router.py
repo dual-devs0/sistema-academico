@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.expediente import calcular_ppa, calcular_regularidad
-from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos, redondear_half_up
 
 router = APIRouter(prefix="/expediente", tags=["expediente"])
 
@@ -192,8 +192,11 @@ def expediente_alumno(
 
     semestres_out = []
     for periodo, agg in por_periodo.items():
+        # PPA del periodo: entero puro round-half-up, mismo criterio que
+        # services/expediente.py::calcular_ppa (el PPA institucional en
+        # escala 1-5 no tiene decimales).
         ppa_periodo = (
-            round(agg["ponderado"] / agg["creditos_aprobadas"], 2)
+            redondear_half_up(agg["ponderado"] / agg["creditos_aprobadas"])
             if agg["creditos_aprobadas"]
             else None
         )
