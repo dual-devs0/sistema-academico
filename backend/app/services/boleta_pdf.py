@@ -23,8 +23,11 @@ LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "static", "brand
 _env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=True)
 
 
+NOTA_MAXIMA = 5  # Art. 24 Reglamento UCA
+
+
 def _badge_clase(promedio: float) -> str:
-    if promedio >= 8:
+    if promedio >= NOTA_MAXIMA:
         return "badge-alto"
     if promedio >= APROBACION_MINIMA:
         return "badge-medio"
@@ -34,7 +37,7 @@ def _badge_clase(promedio: float) -> str:
 def _kpi_clase(promedio: float | None) -> str:
     if promedio is None:
         return "indigo"
-    if promedio >= 8:
+    if promedio >= NOTA_MAXIMA:
         return "mint"
     if promedio >= APROBACION_MINIMA:
         return "amber"
@@ -42,7 +45,9 @@ def _kpi_clase(promedio: float | None) -> str:
 
 
 def _nota_label(promedio: float, felicitado: bool) -> str:
-    txt = f"{promedio:.2f}".rstrip("0").rstrip(".")
+    # promedio es entero 1-5 (Art. 24) -- felicitado marca "5F" (nota maxima
+    # con distincion), no hace falta el .rstrip decimal de la escala vieja.
+    txt = str(int(round(promedio)))
     return f"{txt}F" if felicitado else txt
 
 
@@ -123,7 +128,7 @@ def _detalle_periodo(sem: dict) -> dict:
         {"label": "Promedio del período", "valor": (f"{promedio_periodo:.2f}" if promedio_periodo is not None else "—"),
          "clase": _kpi_clase(promedio_periodo), "sub": None},
         {"label": "Reprobadas", "valor": reprobadas, "clase": ("coral" if reprobadas else "mint"), "sub": None},
-        {"label": "Nota más alta", "valor": (f"{max_nota:.2f}".rstrip("0").rstrip(".") if max_nota is not None else "—"),
+        {"label": "Nota más alta", "valor": (str(max_nota) if max_nota is not None else "—"),
          "clase": "mint", "sub": (f"{max_count} materia{'s' if max_count != 1 else ''}" if max_count else None)},
     ]
 
