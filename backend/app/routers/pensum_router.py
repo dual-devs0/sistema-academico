@@ -14,7 +14,7 @@ from app.services.pensum import (
     _calcular_estado_cached,
     _tiene_nota_aprobatoria_cached,
 )
-from app.services.puntajes_utils import PESO_DEFAULT_FLOAT
+from app.services.puntajes_utils import APROBACION_MINIMA, PESO_DEFAULT_FLOAT
 
 router = APIRouter(prefix="/pensum", tags=["pensum"])
 
@@ -318,7 +318,7 @@ def _calcular_estado_materia(
     promedio, inscripto_en_activa, reprobado = promedio_y_estado_intento(
         db, alumno_id, materia_id
     )
-    if promedio is not None and promedio >= 6:
+    if promedio is not None and promedio >= APROBACION_MINIMA:
         return "aprobada", [], promedio
     if inscripto_en_activa:
         return "cursando", [], promedio

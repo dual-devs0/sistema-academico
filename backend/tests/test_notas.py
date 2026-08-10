@@ -132,8 +132,9 @@ class TestMateriaDetalle:
         assert data["profesor"] == "Profesor Notas Test"
         assert data["semestre"] == 1
 
-        # Puntos: (15+16+9+32.5) sobre 100 max (20+20+10+50) reescalado a /10 = 7.25
-        assert data["promedio"] == 7.25
+        # Puntos: (15+16+9+32.5)=72.5 sobre 100 max (20+20+10+50) = 72.5%
+        # -> round-half-up = 73 -> nota 3 (Art. 24: 70-79 -> 3)
+        assert data["promedio"] == 3
 
         # Asistencia: 3/4 = 75%
         assert data["asistenciaPct"] == 75.0

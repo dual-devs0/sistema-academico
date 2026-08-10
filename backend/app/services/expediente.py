@@ -1,10 +1,12 @@
 """services/expediente.py — cálculo de PPA (promedio ponderado acumulado)
 y regularidad académica a partir del expediente cerrado (ExpedienteMateria).
 
-Depende de: nada externo (solo modelos ORM). Usado por: services/graduacion.py
-(condición de egreso), routers/expediente_router.py, boleta_router.py.
-Recibe el float 0-10 ya calculado por puntajes_utils.calcular_promedio_final
-al cerrar cada materia — no recalcula puntos, solo agrega/promedia.
+Depende de: nada externo (solo modelos ORM) + puntajes_utils (redondeo).
+Usado por: services/graduacion.py (condición de egreso),
+routers/expediente_router.py, boleta_router.py.
+Recibe el entero 1-5 (Art. 24 Reglamento UCA) ya calculado por
+puntajes_utils.calcular_promedio_final al cerrar cada materia — no recalcula
+puntos, solo agrega/promedia.
 """
 from sqlalchemy.orm import Session
 from app.models.expediente_materia import ExpedienteMateria
@@ -12,9 +14,13 @@ from app.models.oferta_materia import OfertaMateria
 from app.models.inscripcion import Inscripcion
 from app.models.asistencia import Asistencia
 from app.models.materia import Materia
+from app.services.puntajes_utils import APROBACION_MINIMA, redondear_half_up
 
-PPA_UMBRAL_RIESGO = 7.0  # nota: PPA solo promedia 'aprobada' (siempre nota>=6), asi que
-# un umbral de 6.0 nunca dispara -- 7.0 marca "aprobado pero flojo"
+# PPA_UMBRAL_RIESGO: PPA solo promedia 'aprobada' (siempre nota>=APROBACION_MINIMA),
+# asi que un umbral igual a APROBACION_MINIMA nunca dispara -- un escalon arriba
+# marca "aprobado pero flojo" (misma logica que el 7.0 original sobre el 6.0 en
+# la escala vieja 0-10, ahora 3 sobre el 2 en la escala 1-5).
+PPA_UMBRAL_RIESGO = APROBACION_MINIMA + 1
 ASISTENCIA_UMBRAL_RIESGO = 75  # %
 PLAZO_RECURSAR_PERIODOS = 2
 PERIODOS_INACTIVIDAD_BAJA = 3
@@ -23,10 +29,11 @@ PERIODOS_INACTIVIDAD_BAJA = 3
 def calcular_ppa(alumno_id: int, db: Session) -> dict:
     """
     PPA = Sum(nota_final * creditos) / Sum(creditos)
-    sobre expediente_materias aprobadas.
+    sobre expediente_materias aprobadas, redondeado a ENTERO (round-half-up)
+    -- el PPA institucional es un entero puro en escala 1-5, no un decimal.
 
-    Devuelve {"ppa": float|None, "creditos_computados": int}. ppa es None
-    (nunca 0.0) si el alumno no tiene ninguna materia aprobada en su expediente.
+    Devuelve {"ppa": int|None, "creditos_computados": int}. ppa es None
+    (nunca 0) si el alumno no tiene ninguna materia aprobada en su expediente.
     """
     aprobadas = (
         db.query(ExpedienteMateria)
@@ -45,7 +52,7 @@ def calcular_ppa(alumno_id: int, db: Session) -> dict:
 
     ponderado = sum(float(a.nota_final) * a.creditos for a in aprobadas)
     return {
-        "ppa": round(ponderado / creditos_totales, 2),
+        "ppa": redondear_half_up(ponderado / creditos_totales),
         "creditos_computados": creditos_totales,
     }
 

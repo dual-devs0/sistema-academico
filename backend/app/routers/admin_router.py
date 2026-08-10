@@ -8,7 +8,7 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 from app import models, database
 from app.dependencias import require_role
-from app.services.puntajes_utils import promedios_por_alumno
+from app.services.puntajes_utils import APROBACION_MINIMA, promedios_por_alumno
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -82,7 +82,7 @@ def admin_dashboard(
             round(sum(punt_por_alumno.values()) / total_con_notas, 1)
             if total_con_notas > 0 else 0.0
         )
-        aprobados = sum(1 for v in punt_por_alumno.values() if v >= 6)
+        aprobados = sum(1 for v in punt_por_alumno.values() if v >= APROBACION_MINIMA)
         kpis["aprobacion_pct"] = (
             round(aprobados / total_con_notas * 100) if total_con_notas > 0 else 0
         )

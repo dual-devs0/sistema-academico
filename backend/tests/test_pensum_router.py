@@ -263,9 +263,11 @@ def test_avance_alumno_nota_y_reprobada(client, seed, tokens, db):
     assert res.status_code == 200
     por_materia = {a["materia_id"]: a for a in res.json()}
     assert por_materia[aprobada.id]["estado"] == "aprobada"
-    assert por_materia[aprobada.id]["nota"] == 9.0
+    # final1=45/50 = 90% -> nota 4 (Art. 24: 80-90 -> 4)
+    assert por_materia[aprobada.id]["nota"] == 4
     assert por_materia[reprobada.id]["estado"] == "reprobada"
-    assert por_materia[reprobada.id]["nota"] == 3.0
+    # final1=15/50 = 30% -> nota 1 (Art. 24: 0-59 -> 1, reprobado)
+    assert por_materia[reprobada.id]["nota"] == 1
 
 
 def test_avance_alumno_no_autorizado_403(client, seed, tokens):

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 
@@ -95,7 +95,7 @@ def profesor_dashboard(
 
     if promedios_grupo:
         resumen["promedio_general"] = round(sum(promedios_grupo) / len(promedios_grupo), 2)
-        aprob_count = sum(1 for v in promedios_grupo if v >= 6)
+        aprob_count = sum(1 for v in promedios_grupo if v >= APROBACION_MINIMA)
         resumen["porcentaje_aprobacion"] = round(aprob_count / len(promedios_grupo) * 100, 1)
 
     # Asistencia promedio
@@ -210,7 +210,7 @@ def profesor_dashboard(
 
     agenda_hoy.sort(key=lambda x: (x["hora_inicio"] == "—", x["hora_inicio"]))
 
-    # Alertas: alumnos con inasistencia ≥25% o promedio < 6
+    # Alertas: alumnos con inasistencia ≥25% o promedio < APROBACION_MINIMA
     alertas = []
     if alumno_ids_raw:
         asis_agg = {}
@@ -241,7 +241,7 @@ def profesor_dashboard(
         for (uid_a, ofid), stats in asis_agg.items():
             inas_pct = round((1 - stats["pres"] / stats["total"]) * 100) if stats["total"] > 0 else 0
             prom = punt_agg_uid.get(uid_a)
-            if inas_pct >= 25 or (prom is not None and prom < 6):
+            if inas_pct >= 25 or (prom is not None and prom < APROBACION_MINIMA):
                 alertas.append({
                     "alumno_id": uid_a,
                     "alumno_nombre": nombre_map.get(uid_a, f"Alumno #{uid_a}"),
@@ -346,7 +346,7 @@ def mi_historico(
         vals = promedios_por_oferta.get(ofid)
         if vals:
             prom = round(sum(vals) / len(vals), 2)
-            aprob = sum(1 for v in vals if v >= 6)
+            aprob = sum(1 for v in vals if v >= APROBACION_MINIMA)
             pct_aprob = round((aprob / len(vals)) * 100, 1)
         else:
             prom = None

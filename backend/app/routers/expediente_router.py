@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.expediente import calcular_ppa, calcular_regularidad
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/expediente", tags=["expediente"])
 
@@ -66,7 +66,7 @@ def cerrar_materia(
         raise HTTPException(
             status_code=422, detail="El alumno no tiene notas cargadas para esta oferta"
         )
-    condicion = "aprobada" if nota_final >= 6 else "reprobada"
+    condicion = "aprobada" if nota_final >= APROBACION_MINIMA else "reprobada"
 
     existente = (
         db.query(models.expediente_materia.ExpedienteMateria)

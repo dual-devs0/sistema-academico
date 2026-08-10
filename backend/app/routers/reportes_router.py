@@ -14,7 +14,7 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from collections import namedtuple
 from app.services.puntajes_utils import (
-    calcular_promedio_final, get_pesos, promedios_por_alumno, TIPOS_VALIDOS, PESO_DEFAULT_FLOAT,
+    APROBACION_MINIMA, calcular_promedio_final, get_pesos, promedios_por_alumno, TIPOS_VALIDOS, PESO_DEFAULT_FLOAT,
 )
 
 _PuntajeAgg = namedtuple("_PuntajeAgg", ["prom", "cnt"])
@@ -100,8 +100,8 @@ def por_carrera(
         # Puntajes: promedio real por alumno (ponderado por pesos de cada materia) para "en_riesgo"
         proms_alumno = promedios_por_alumno(db, a_ids)
         total_punt = len(proms_alumno)
-        aprobados = sum(1 for v in proms_alumno.values() if v >= 6)
-        en_riesgo = sum(1 for v in proms_alumno.values() if v < 6)
+        aprobados = sum(1 for v in proms_alumno.values() if v >= APROBACION_MINIMA)
+        en_riesgo = sum(1 for v in proms_alumno.values() if v < APROBACION_MINIMA)
         aprob_pct = round((aprobados / total_punt * 100) if total_punt > 0 else 0.0, 1)
 
         result.append({
@@ -177,15 +177,10 @@ def dashboard(
             })
             continue
         promedios = [float(r.prom) for r in rows]
-        d = {
-            "0-3": sum(1 for v in promedios if v < 3),
-            "3-5": sum(1 for v in promedios if 3 <= v < 5),
-            "5-6": sum(1 for v in promedios if 5 <= v < 6),
-            "6-7": sum(1 for v in promedios if 6 <= v < 7),
-            "7-9": sum(1 for v in promedios if 7 <= v < 9),
-            "9-10": sum(1 for v in promedios if 9 <= v <= 10),
-        }
-        aprobados = sum(1 for v in promedios if v >= 6)
+        # Distribucion por escalon real (1-5, Art. 24) -- promedios ya son
+        # enteros 1-5, no rangos 0-10 inventados.
+        d = {str(n): sum(1 for v in promedios if v == n) for n in range(1, 6)}
+        aprobados = sum(1 for v in promedios if v >= APROBACION_MINIMA)
         materia_stats.append({
             "materia_id": m.id,
             "materia_nombre": m.nombre,
@@ -499,7 +494,7 @@ def exportar_trayecto_academico_rue_es(
         promedio = calcular_promedio_final({k: notas.get(k) for k in tipos_validos}, pesos)
         if promedio is None:
             estado = "CURSANDO"
-        elif promedio >= 6:
+        elif promedio >= APROBACION_MINIMA:
             estado = "APROBADO"
         else:
             estado = "REPROBADO"

@@ -6,7 +6,7 @@ recursadas: una materia con notas en más de una OfertaMateria (más de un
 intento). El intento del período más reciente es el "vigente"; con ese se
 arma la tabla por semestre. Las métricas de avance hacia graduación usan
 PensumMateria (mismo criterio de aprobación que pensum_router::creditos_alumno
-— aprobada si CUALQUIER intento, no solo el vigente, dio promedio >= 6).
+— aprobada si CUALQUIER intento, no solo el vigente, dio nota >= APROBACION_MINIMA).
 Depende de: puntajes_utils (promedio real, no AVG crudo). Usado por:
 routers/reporte_notas_router.py (JSON + PDF).
 """
