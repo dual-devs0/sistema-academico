@@ -8,7 +8,6 @@ from . import puntaje_schema as puntaje
 from . import apunte_schema as apunte
 from . import evento_schema as evento
 from . import programa_schema as programa
-from . import foro_schema as foro
 from . import horario_schema as horario
 from . import recordatorio_schema as recordatorio
 from . import pensum_schema as pensum
@@ -34,7 +33,6 @@ __all__ = [
     "apunte",
     "evento",
     "programa",
-    "foro",
     "horario",
     "recordatorio",
     "pensum",

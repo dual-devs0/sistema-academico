@@ -45,7 +45,6 @@ from app.routers import (  # noqa: E402
     notas,
     admin,
     settings,
-    foro as foro_router,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -137,7 +136,6 @@ app.include_router(admin.router)
 app.include_router(settings.router)
 if os.getenv("ENV", "production") == "development":
     app.include_router(test_router.router)
-app.include_router(foro_router.router)
 
 
 @app.get(
