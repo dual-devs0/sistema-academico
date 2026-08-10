@@ -11,7 +11,7 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_alumno, es_profesor_de_materia
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos, promedios_por_alumno
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos, promedios_por_alumno
 # AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
 from app.routers.asistencias_router import _oferta_activa_id
 
@@ -82,7 +82,7 @@ def actualizar_pesos_materia(
 
 def _max_para_tipo(pesos: dict[str, float], tipo: str) -> float:
     if tipo == "directa":
-        return 10  # nota final directa, siempre escala 0-10
+        return 5  # nota final directa, entero 1-5 (Art. 24 Reglamento UCA)
     clave = "final" if tipo.startswith("final") else tipo
     return pesos.get(clave, 100)
 
@@ -574,15 +574,10 @@ def estadisticas_materia(
     total_alumnos = len(promedios)
     total_notas = len(filas)
 
-    distribucion = {
-        "0-3": sum(1 for v in promedios if v < 3),
-        "3-5": sum(1 for v in promedios if 3 <= v < 5),
-        "5-6": sum(1 for v in promedios if 5 <= v < 6),
-        "6-7": sum(1 for v in promedios if 6 <= v < 7),
-        "7-9": sum(1 for v in promedios if 7 <= v < 9),
-        "9-10": sum(1 for v in promedios if 9 <= v <= 10),
-    }
-    aprobados = sum(1 for v in promedios if v >= 6)
+    # Distribucion por escalon real (1-5, Art. 24) -- promedios ya son enteros
+    # 1-5, no rangos 0-10 inventados.
+    distribucion = {str(n): sum(1 for v in promedios if v == n) for n in range(1, 6)}
+    aprobados = sum(1 for v in promedios if v >= APROBACION_MINIMA)
     en_riesgo = total_alumnos - aprobados
 
     return {
@@ -590,8 +585,8 @@ def estadisticas_materia(
         "total_alumnos": total_alumnos,
         "total_notas": total_notas,
         "promedio_grupo": round(sum(promedios) / total_alumnos, 2) if total_alumnos else 0,
-        "nota_maxima": round(max(promedios), 2) if promedios else 0,
-        "nota_minima": round(min(promedios), 2) if promedios else 0,
+        "nota_maxima": max(promedios) if promedios else 0,
+        "nota_minima": min(promedios) if promedios else 0,
         "distribucion": distribucion,
         "aprobados": aprobados,
         "en_riesgo": en_riesgo,
