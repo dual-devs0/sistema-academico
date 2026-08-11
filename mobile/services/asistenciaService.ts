@@ -72,18 +72,15 @@ export async function verifyQrToken(qrToken: string): Promise<QrVerifyResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Materias del día (placeholder: usa /alumno/mis-materias)
-//
-// TODO backend: /alumno/mis-materias-hoy que filtre por día de la semana +
-// horario de la oferta activa. Hoy no existe → devolvemos todas con
-// hora/aula null como mejor esfuerzo.
+// Materias del día — /alumno/mis-materias-hoy filtra por horario real
+// (Horario.dia_semana) de las ofertas activas del alumno.
 // ---------------------------------------------------------------------------
 
-interface MateriaBackend {
+interface MateriaHoyBackend {
   id: number;
   nombre: string;
-  anio: number | null;
-  semestre: number | null;
+  hora: string; // "HH:MM"
+  aula: string | null;
 }
 
 interface AsistenciaBackend {
@@ -94,18 +91,18 @@ interface AsistenciaBackend {
 export async function fetchMateriasHoy(): Promise<MateriaHoy[]> {
   try {
     const [materiasRes, asistRes] = await Promise.all([
-      api.get<MateriaBackend[]>("/alumno/mis-materias"),
+      api.get<MateriaHoyBackend[]>("/alumno/mis-materias-hoy"),
       api.get<AsistenciaBackend[]>("/alumno/mi-asistencia").catch(() => ({ data: [] as AsistenciaBackend[] })),
     ]);
     const asisMap = new Map<number, number>();
     for (const a of asistRes.data) asisMap.set(a.materia_id, a.porcentaje);
-    return materiasRes.data.slice(0, 5).map((m) => {
+    return materiasRes.data.map((m) => {
       const pct = (asisMap.get(m.id) ?? 100) / 100;
       return {
         materiaId: m.id,
         nombre: m.nombre,
-        hora: "—",
-        aula: null,
+        hora: m.hora,
+        aula: m.aula,
         asistenciaPct: pct,
         estado: pct >= 0.75 ? ("ok" as const) : ("riesgo" as const),
       };

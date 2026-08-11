@@ -591,9 +591,9 @@ function MateriaHoyRow({ materia }: { materia: MateriaHoy }) {
       </View>
       <DonutChart
         value={materia.asistenciaPct}
-        size={34}
+        size={40}
         strokeWidth={3}
-        showLabel={false}
+        showLabel
         thresholdColor
       />
     </View>

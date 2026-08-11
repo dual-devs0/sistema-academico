@@ -156,8 +156,19 @@ export default function AsistenciaScan() {
           requestAnimationFrame(tick)
         }
       }, 50)
-    } catch {
-      setErrorMsg('No se pudo acceder a la cámara. Verificá los permisos.')
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : ''
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setErrorMsg('Permiso de cámara denegado. Hacé clic en el ícono de candado/cámara en la barra de direcciones y permití el acceso, luego recargá la página.')
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setErrorMsg('No se detectó ninguna cámara en este dispositivo. Probá escanear desde el celular.')
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setErrorMsg('La cámara está siendo usada por otra aplicación (Zoom, Teams, otra pestaña). Cerrala e intentá de nuevo.')
+      } else if (!window.isSecureContext) {
+        setErrorMsg('El acceso a la cámara requiere HTTPS. Esta página no está en un contexto seguro.')
+      } else {
+        setErrorMsg('No se pudo acceder a la cámara. Verificá los permisos.')
+      }
     }
   }
 

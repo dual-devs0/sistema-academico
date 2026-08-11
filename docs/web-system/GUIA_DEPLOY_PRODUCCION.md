@@ -268,3 +268,15 @@ sección 3, están degradados a propósito en este primer deploy.
   resolver esto arriesga perder trabajo o servir código viejo).
 - Actualizar `CORS_ORIGINS` en Render con la URL real de Vercel tras el primer deploy (paso
   manual, ver sección 1.3).
+- **Configurar envío real de email para reset de contraseña** (hoy en modo mock — el link se
+  loguea en Render pero no llega a ningún usuario). Faltan 3 env vars en Render → Environment
+  (verificado 2026-08-11: `MAIL_PORT`/`MAIL_SERVER`/`MAIL_SSL_TLS`/`MAIL_STARTTLS` ya están, pero
+  falta usuario/contraseña y la URL de destino):
+  - `MAIL_USERNAME` — email remitente (ej. cuenta Gmail con contraseña de aplicación, o el SMTP
+    del proveedor que se use).
+  - `MAIL_PASSWORD` — contraseña/app-password de esa cuenta.
+  - `RESET_PASSWORD_FRONTEND_URL` — debe ser `https://<tu-dominio-vercel>/reset-password` (o el
+    dominio real si ya existe uno propio). Sin esto el link de reset apunta a un dominio
+    inexistente (`https://sistema.uca.edu.py/reset-password`, valor por defecto en el código).
+  - Son env vars puras — no requieren redeploy de código, solo agregarlas en el dashboard de
+    Render y el servicio las toma en el próximo restart.

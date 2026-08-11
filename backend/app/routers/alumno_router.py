@@ -119,6 +119,61 @@ def mis_materias(
     return result
 
 
+@router.get("/mis-materias-hoy")
+def mis_materias_hoy(
+    db: Session = Depends(database.get_db),
+    current_user=Depends(get_current_user),
+):
+    """Materias inscriptas (oferta activa) que tienen un bloque de horario hoy,
+    con hora/aula reales. Usado por el scanner QR mobile."""
+    uid = current_user.user_id
+    hoy_dia_semana = date.today().weekday()  # 0=Lunes, 6=Domingo, igual que Horario.dia_semana
+
+    inscripciones = (
+        db.query(models.inscripcion.Inscripcion)
+        .options(
+            joinedload(models.inscripcion.Inscripcion.oferta)
+            .joinedload(models.oferta_materia.OfertaMateria.materia),
+        )
+        .filter(models.inscripcion.Inscripcion.alumno_id == uid)
+        .all()
+    )
+
+    materias_activas = {}
+    for ins in inscripciones:
+        oferta = ins.oferta
+        if not oferta or not oferta.activa:
+            continue
+        m = oferta.materia
+        if not m:
+            continue
+        materias_activas[m.id] = m
+
+    if not materias_activas:
+        return []
+
+    horarios_hoy = (
+        db.query(models.horario.Horario)
+        .filter(
+            models.horario.Horario.materia_id.in_(materias_activas.keys()),
+            models.horario.Horario.dia_semana == hoy_dia_semana,
+        )
+        .order_by(models.horario.Horario.hora_inicio)
+        .all()
+    )
+
+    result = []
+    for h in horarios_hoy:
+        m = materias_activas[h.materia_id]
+        result.append({
+            "id": m.id,
+            "nombre": m.nombre,
+            "hora": h.hora_inicio.strftime("%H:%M"),
+            "aula": h.aula,
+        })
+    return result
+
+
 @router.get("/mis-periodos")
 def mis_periodos(
     db: Session = Depends(database.get_db),
