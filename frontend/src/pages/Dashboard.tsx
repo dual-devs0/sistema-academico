@@ -630,7 +630,8 @@ function AdminDash({ nombre }: AdminDashProps) {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const load = () => fetchData()
+    load()
     const interval = setInterval(fetchData, 30_000)
     return () => clearInterval(interval)
   }, [fetchData])
