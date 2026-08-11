@@ -27,6 +27,10 @@ class Asistencia(Base):
     presente: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     es_becado: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)  # snapshot
     motivo: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # motivo de ausencia
+    # Puntaje (3 o 4) que el profesor elige al justificar una ausencia -- ver
+    # services/asistencia_utils.py::puntaje_sesion. Null si presente o si la
+    # ausencia no esta justificada (motivo vacio).
+    puntaje_justificacion: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     oferta = relationship("OfertaMateria")
 
