@@ -1,6 +1,6 @@
 // Login público del rol admin (paleta propia, separado del login alumno/profesor). Mismo flujo /auth/login.
-import { useState, useEffect } from 'react'
-import { motion } from 'motion/react'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.webp'
 import { api, decodeToken, setAccessToken, warmUpBackend } from '../lib/api'
@@ -13,8 +13,12 @@ export default function AdminLogin() {
   const [showPass, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [welcomeName, setWelcomeName] = useState('')
+  const [curtainOpen, setCurtainOpen] = useState(false)
+  const welcomeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { warmUpBackend() }, [])
+  useEffect(() => () => { if (welcomeTimer.current) clearTimeout(welcomeTimer.current) }, [])
 
   const semestreActual = `Semestre ${new Date().getMonth() < 6 ? 1 : 2} · ${new Date().getFullYear()}`
 
@@ -34,13 +38,26 @@ export default function AdminLogin() {
       if (decoded?.role !== 'admin') {
         setError('Acceso denegado.')
         setAccessToken(null)
+        setLoading(false)
         return
       }
       setDocTitle('admin', decoded?.username || '')
-      navigate('/dashboard')
+
+      let nombre = decoded?.username || ''
+      try {
+        const perfil = await api.get<{ nombre?: string }>('/users/me')
+        if (perfil.nombre) nombre = perfil.nombre
+      } catch { /* usa fallback */ }
+      setWelcomeName(nombre)
+      setLoading(false)
+      if (window.innerWidth > 960) {
+        setCurtainOpen(true)
+        welcomeTimer.current = setTimeout(() => navigate('/dashboard'), 550)
+      } else {
+        welcomeTimer.current = setTimeout(() => navigate('/dashboard'), 1800)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de conexión')
-    } finally {
       setLoading(false)
     }
   }
@@ -63,6 +80,12 @@ export default function AdminLogin() {
       width: 100vw; height: 100vh;
       display: flex; overflow: hidden;
       position: relative;
+    }
+
+    .welcome-reveal {
+      position: fixed; inset: 0; z-index: 1;
+      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     }
 
     /* RIGHT DECORATIVE PANEL (Background on Mobile) */
@@ -227,7 +250,11 @@ export default function AdminLogin() {
       <div className="admin-root">
         
         {/* DESKTOP LEFT / MOBILE BOTTOM: FORM PANEL */}
-        <div className="panel-form">
+        <motion.div
+          className="panel-form"
+          animate={curtainOpen ? { x: '-100%', opacity: 0 } : { x: 0, opacity: 1 }}
+          transition={{ duration: 0.5, ease: [0.76, 0, 0.24, 1] }}
+        >
           <div className="form-header">
             <img src={logoUCA} alt="UCA Admin" className="form-logo" width={560} height={305} />
           </div>
@@ -299,10 +326,14 @@ export default function AdminLogin() {
                 <button onClick={()=>navigate('/login')} style={{ background:'none', border:'none', color:'#506070', cursor:'pointer', fontSize:11, fontFamily:'inherit', textDecoration:'underline', textUnderlineOffset:2 }}>Portal alumno/profesor</button>
               </span>
             </div>
-        </div>
+        </motion.div>
 
         {/* DESKTOP RIGHT / MOBILE TOP: DECORATIVE PANEL */}
-        <div className="panel-deco">
+        <motion.div
+          className="panel-deco"
+          animate={curtainOpen ? { x: '100%', opacity: 0 } : { x: 0, opacity: 1 }}
+          transition={{ duration: 0.5, ease: [0.76, 0, 0.24, 1] }}
+        >
           <div className="panel-deco-bg" />
           <div className="panel-deco-overlay" />
           <div className="panel-deco-content">
@@ -324,9 +355,52 @@ export default function AdminLogin() {
               </p>
             </motion.div>
           </div>
-        </div>
+        </motion.div>
 
       </div>
+
+      {curtainOpen && (
+        <div className="welcome-reveal">
+          <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.15, type: 'spring', damping: 15 }}
+            style={{ width:80, height:80, borderRadius:'50%', background:'var(--cyan-glow)', border:'1px solid var(--cyan-border)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:8 }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-bright)" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </motion.div>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.3 }}
+            style={{ color:'var(--cyan-bright)', fontSize:13, fontWeight:700, letterSpacing:'0.18em' }}>
+            BIENVENIDO DE VUELTA
+          </motion.p>
+          <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.3 }}
+            style={{ color:'#fff', fontSize:28, fontWeight:800, textAlign:'center', padding:'0 40px' }}>
+            {welcomeName}
+          </motion.p>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {welcomeName && !curtainOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
+            style={{ position:'fixed', inset:0, zIndex:500, background:'var(--bg)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8 }}
+          >
+            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, type: 'spring', damping: 15 }}
+              style={{ width:80, height:80, borderRadius:'50%', background:'var(--cyan-glow)', border:'1px solid var(--cyan-border)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:8 }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-bright)" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </motion.div>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.4 }}
+              style={{ color:'var(--cyan-bright)', fontSize:13, fontWeight:700, letterSpacing:'0.18em' }}>
+              BIENVENIDO DE VUELTA
+            </motion.p>
+            <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.4 }}
+              style={{ color:'#fff', fontSize:28, fontWeight:800, textAlign:'center', padding:'0 40px' }}>
+              {welcomeName}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }

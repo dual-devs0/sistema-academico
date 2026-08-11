@@ -52,8 +52,15 @@ export default function AcademicoLogin() {
   const [error, setError]          = useState('')
   const [showSoporte, setSoporte]  = useState(false)
   const [showRecuperar, setShowRecuperar] = useState(false)
+  const [welcomeName, setWelcomeName] = useState('')
+  // Cortina de salida solo en desktop (>960px, mismo breakpoint que ya usa
+  // el layout para pasar a paneles apilados en mobile) -- en mobile el
+  // layout es una sola columna, deslizar los paneles ahi se veria roto.
+  const [curtainOpen, setCurtainOpen] = useState(false)
+  const welcomeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { warmUpBackend() }, [])
+  useEffect(() => () => { if (welcomeTimer.current) clearTimeout(welcomeTimer.current) }, [])
   const [recEmail, setRecEmail] = useState('')
   const [recLoading, setRecLoading] = useState(false)
   const [recEnviado, setRecEnviado] = useState(false)
@@ -98,14 +105,32 @@ export default function AcademicoLogin() {
       if (rolReal !== rol) {
         setError('Acceso denegado para este rol.')
         setAccessToken(null)
+        setLoading(false)
         return
       }
 
       setDocTitle(rolReal, decoded?.username || '')
-      navigate(redirect || '/dashboard')
+
+      let nombre = decoded?.username || ''
+      try {
+        const perfil = await api.get<{ nombre?: string }>('/users/me')
+        if (perfil.nombre) nombre = perfil.nombre
+      } catch { /* usa fallback */ }
+      setWelcomeName(nombre)
+      setLoading(false)
+      if (window.innerWidth > 960) {
+        // Desktop: cortina -- los paneles se deslizan hacia afuera y
+        // revelan el saludo que ya esta montado detras, despues navega.
+        setCurtainOpen(true)
+        welcomeTimer.current = setTimeout(() => navigate(redirect || '/dashboard'), 550)
+      } else {
+        // Mobile: sin cortina (layout apilado, deslizar se rompe visualmente),
+        // el saludo se muestra como overlay simple encima de todo.
+        welcomeTimer.current = setTimeout(() => navigate(redirect || '/dashboard'), 1800)
+      }
+      return
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de conexión')
-    } finally {
       setLoading(false)
     }
   }
@@ -155,7 +180,12 @@ export default function AcademicoLogin() {
       flex: 1; display: flex; flex-direction: column;
       justify-content: center; align-items: flex-start;
       padding: clamp(28px,4vh,56px) 52px;
-      position: relative; overflow: hidden;
+      position: relative; z-index: 2; overflow: hidden;
+    }
+    .welcome-reveal {
+      position: fixed; inset: 0; z-index: 1;
+      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     }
     .panel-left-bg {
       position:absolute; inset:0; z-index:0;
@@ -204,6 +234,7 @@ export default function AcademicoLogin() {
       display: flex; flex-direction: column;
       align-items: stretch;
       padding: 0;
+      position: relative; z-index: 2;
       overflow: hidden;
     }
     .pr-logo {
@@ -496,7 +527,11 @@ export default function AcademicoLogin() {
       <div className="login-root">
 
         {/* LEFT */}
-        <div className="panel-left">
+        <motion.div
+          className="panel-left"
+          animate={curtainOpen ? { x: '-100%', opacity: 0 } : { x: 0, opacity: 1 }}
+          transition={{ duration: 0.5, ease: [0.76, 0, 0.24, 1] }}
+        >
           <div className="panel-left-bg" />
           <div className="panel-left-overlay" />
           <div className="panel-left-overlay-accent" />
@@ -518,10 +553,14 @@ export default function AcademicoLogin() {
               Accedé a tus calificaciones, asistencia, calendario y boletas desde cualquier dispositivo.
             </p>
           </div>
-        </div>
+        </motion.div>
 
         {/* RIGHT */}
-        <div className="panel-right">
+        <motion.div
+          className="panel-right"
+          animate={curtainOpen ? { x: '100%', opacity: 0 } : { x: 0, opacity: 1 }}
+          transition={{ duration: 0.5, ease: [0.76, 0, 0.24, 1] }}
+        >
           <div className="pr-logo">
             <img src={logoUCA} alt="Universidad Católica" width={560} height={305} style={{ width:210, maxWidth:'100%', height:'auto', opacity:0.95 }} />
           </div>
@@ -829,8 +868,27 @@ export default function AcademicoLogin() {
               <button onClick={()=>navigate('/admin')} style={{ background:'none', border:'none', color:'#506070', cursor:'pointer', fontSize:11, fontFamily:'inherit', textDecoration:'underline', textUnderlineOffset:2 }}>Acceso administradores</button>
             </span>
           </div>
-        </div>
+        </motion.div>
       </div>
+
+      {curtainOpen && (
+        <div className="welcome-reveal">
+          <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.15, type: 'spring', damping: 15 }}
+            style={{ width:80, height:80, borderRadius:'50%', background:accentGlow, border:`1px solid ${accentColor}55`, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:8 }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={accentBright} strokeWidth="2">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+            </svg>
+          </motion.div>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.3 }}
+            style={{ color:accentBright, fontSize:13, fontWeight:700, letterSpacing:'0.18em' }}>
+            BIENVENIDO DE VUELTA
+          </motion.p>
+          <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.3 }}
+            style={{ color:'#fff', fontSize:28, fontWeight:800, textAlign:'center', padding:'0 40px' }}>
+            {welcomeName}
+          </motion.p>
+        </div>
+      )}
 
       {/* ── MODAL RECUPERAR CONTRASEÑA ── */}
       {showRecuperar && (
@@ -980,6 +1038,30 @@ export default function AcademicoLogin() {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {welcomeName && !curtainOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
+            style={{ position:'fixed', inset:0, zIndex:500, background:'#07090d', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8 }}
+          >
+            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, type: 'spring', damping: 15 }}
+              style={{ width:80, height:80, borderRadius:'50%', background:accentGlow, border:`1px solid ${accentColor}55`, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:8 }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={accentBright} strokeWidth="2">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+              </svg>
+            </motion.div>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.4 }}
+              style={{ color:accentBright, fontSize:13, fontWeight:700, letterSpacing:'0.18em' }}>
+              BIENVENIDO DE VUELTA
+            </motion.p>
+            <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.4 }}
+              style={{ color:'#fff', fontSize:28, fontWeight:800, textAlign:'center', padding:'0 40px' }}>
+              {welcomeName}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
