@@ -88,6 +88,9 @@ function ProfesorView() {
   // Motivo modal for absent
   const [motivoModal, setMotivoModal] = useState<AlumnoAsist | null>(null)
   const [motivoText, setMotivoText]   = useState('')
+  // Puntaje de justificacion (3 o 4) — solo aplica si hay motivo cargado.
+  // Sin motivo, la ausencia vale 0 automaticamente (no se puede elegir).
+  const [puntajeJustif, setPuntajeJustif] = useState<3 | 4>(4)
   // Batch edit mode
   const [modoEdicion, setModoEdicion] = useState(false)
   // Staged changes per student { [id]: boolean | null } (null = sin registro)
@@ -198,7 +201,10 @@ function ProfesorView() {
   async function confirmarAusente() {
     if (!motivoModal) return
     const a = motivoModal
-    const q = motivoText.trim() ? `&motivo=${encodeURIComponent(motivoText.trim())}` : ''
+    const tieneMotivo = motivoText.trim().length > 0
+    const q = tieneMotivo
+      ? `&motivo=${encodeURIComponent(motivoText.trim())}&puntaje_justificacion=${puntajeJustif}`
+      : ''
     if (a.asistencia_id) {
       await api.put(`/asistencias/profesor/toggle/${a.asistencia_id}?presente=false${q}`, {})
       setAlumn(prev => prev.map(x => x.id === a.id ? { ...x, presente: false, motivo: motivoText.trim() || null } : x))
@@ -206,7 +212,7 @@ function ProfesorView() {
       await api.post(`/asistencias/profesor/marcar?materia_id=${selMat!.id}&alumno_id=${a.id}&fecha=${fecha}&presente=false${q}`, {})
       refreshAlumnos(selMat!.id, fecha)
     }
-    setMotivoModal(null); setMotivoText('')
+    setMotivoModal(null); setMotivoText(''); setPuntajeJustif(4)
   }
 
   const presentes = alumnos.filter(a => a.presente === true).length
@@ -587,10 +593,31 @@ function ProfesorView() {
               onChange={e => setMotivoText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && confirmarAusente()}
               placeholder="Ej: Enfermedad, falta justificada..."
-              style={{ width:'100%', background:'var(--bg-input)', border:'1px solid var(--border-light)', borderRadius:8, color:'var(--text-primary)', fontSize:13, fontFamily:'inherit', padding:'9px 12px', outline:'none', marginBottom:16 }}
+              style={{ width:'100%', background:'var(--bg-input)', border:'1px solid var(--border-light)', borderRadius:8, color:'var(--text-primary)', fontSize:13, fontFamily:'inherit', padding:'9px 12px', outline:'none', marginBottom:motivoText.trim() ? 12 : 16 }}
             />
+            {motivoText.trim().length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <label style={{ display:'block', fontSize:10, fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Puntaje de la justificación</label>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button type="button" onClick={() => setPuntajeJustif(3)}
+                    style={{ flex:1, padding:8, borderRadius:8, fontSize:13, fontWeight:700, fontFamily:'inherit', cursor:'pointer',
+                      border: puntajeJustif === 3 ? '1px solid var(--accent)' : '1px solid var(--border-light)',
+                      background: puntajeJustif === 3 ? 'var(--accent-muted)' : 'var(--bg-input)',
+                      color: puntajeJustif === 3 ? 'var(--accent-bright)' : 'var(--text-secondary)' }}>
+                    3 — parcial
+                  </button>
+                  <button type="button" onClick={() => setPuntajeJustif(4)}
+                    style={{ flex:1, padding:8, borderRadius:8, fontSize:13, fontWeight:700, fontFamily:'inherit', cursor:'pointer',
+                      border: puntajeJustif === 4 ? '1px solid var(--accent)' : '1px solid var(--border-light)',
+                      background: puntajeJustif === 4 ? 'var(--accent-muted)' : 'var(--bg-input)',
+                      color: puntajeJustif === 4 ? 'var(--accent-bright)' : 'var(--text-secondary)' }}>
+                    4 — casi completa
+                  </button>
+                </div>
+              </div>
+            )}
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => { setMotivoModal(null); setMotivoText('') }}
+              <button onClick={() => { setMotivoModal(null); setMotivoText(''); setPuntajeJustif(4) }}
                 style={{ flex:1, padding:10, background:'var(--bg-hover)', border:'1px solid var(--border-light)', borderRadius:9, color:'var(--text-secondary)', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer' }}>
                 Cancelar
               </button>

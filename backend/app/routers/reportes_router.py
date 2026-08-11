@@ -16,6 +16,7 @@ from collections import namedtuple
 from app.services.puntajes_utils import (
     APROBACION_MINIMA, calcular_promedio_final, get_pesos, promedios_por_alumno, TIPOS_VALIDOS, PESO_DEFAULT_FLOAT,
 )
+from app.services.asistencia_utils import puntaje_asistencia_sql, PUNTAJE_PRESENTE
 
 _PuntajeAgg = namedtuple("_PuntajeAgg", ["prom", "cnt"])
 
@@ -87,15 +88,15 @@ def por_carrera(
                            "asistencia_pct": 0.0, "aprobados_pct": 0.0, "en_riesgo": 0})
             continue
 
-        # Attendance: single aggregate query
+        # Attendance: single aggregate query (puntaje ponderado, no solo presentes)
         asist_stats = db.query(
             func.count(A.id).label("total"),
-            func.sum(case((A.presente, 1), else_=0)).label("presentes"),
+            func.sum(puntaje_asistencia_sql(A)).label("puntos"),
         ).filter(A.user_id.in_(a_ids)).first()
         # AUDIT-FIX B-7: scalar puede ser None
         total_a = (asist_stats.total if asist_stats else 0) or 0
-        pres_a = (asist_stats.presentes if asist_stats else 0) or 0
-        asist_pct = round((pres_a / total_a * 100) if total_a > 0 else 0.0, 1)
+        puntos_a = (asist_stats.puntos if asist_stats else 0) or 0
+        asist_pct = round((puntos_a / total_a / PUNTAJE_PRESENTE * 100) if total_a > 0 else 0.0, 1)
 
         # Puntajes: promedio real por alumno (ponderado por pesos de cada materia) para "en_riesgo"
         proms_alumno = promedios_por_alumno(db, a_ids)
@@ -455,16 +456,16 @@ def exportar_trayecto_academico_rue_es(
         ):
             punt_map.setdefault((cast(int, p.user_id), cast(int, p.oferta_materia_id)), []).append(p)
 
-    # Pre-cache attendance counts per (user_id, oferta_materia_id)
+    # Pre-cache attendance (puntaje ponderado) per (user_id, oferta_materia_id)
     asis_total = {}
-    asis_pres = {}
+    asis_puntos = {}
     if alumno_ids and oferta_ids:
         for r in (
             db.query(
                 models.asistencia.Asistencia.user_id,
                 models.asistencia.Asistencia.oferta_materia_id,
                 func.count(models.asistencia.Asistencia.id).label("total"),
-                func.sum(case((models.asistencia.Asistencia.presente, 1), else_=0)).label("pres"),
+                func.sum(puntaje_asistencia_sql(models.asistencia.Asistencia)).label("puntos"),
             )
             .filter(
                 models.asistencia.Asistencia.user_id.in_(alumno_ids),
@@ -477,7 +478,7 @@ def exportar_trayecto_academico_rue_es(
             .all()
         ):
             asis_total[(r.user_id, r.oferta_materia_id)] = r.total
-            asis_pres[(r.user_id, r.oferta_materia_id)] = r.pres
+            asis_puntos[(r.user_id, r.oferta_materia_id)] = r.puntos
 
     header = ["cedula", "apellidos_nombres", "carrera", "materia", "periodo",
               "nota_final", "estado_materia", "porcentaje_asistencia"]
@@ -501,8 +502,8 @@ def exportar_trayecto_academico_rue_es(
 
         key = (alumno.id, oferta.id)
         tot = asis_total.get(key, 0)
-        pres = asis_pres.get(key, 0)
-        pct = round((pres / tot) * 100, 1) if tot > 0 else ""
+        puntos = asis_puntos.get(key, 0)
+        pct = round(puntos / tot / PUNTAJE_PRESENTE * 100, 1) if tot > 0 else ""
 
         rows.append([
             alumno.cedula or "",

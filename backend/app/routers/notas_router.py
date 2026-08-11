@@ -8,11 +8,13 @@ Endpoints:
 La app mobile consume estos endpoints desde `notasService.ts`.
 """
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import database, models
 from app.dependencias import get_current_user
 from app.services.puntajes_utils import calcular_promedio_final, get_pesos
+from app.services.asistencia_utils import puntaje_asistencia_sql, PUNTAJE_PRESENTE
 
 router = APIRouter(prefix="/notas", tags=["notas"])
 
@@ -82,9 +84,10 @@ def materia_detalle(
             .all()
         )
 
-    # Asistencia
+    # Asistencia (puntaje ponderado: presente=5, justificada=3/4, sin justificar=0)
     total_clases = 0
     presentes = 0
+    puntos_asistencia = 0
     if oferta_id:
         total_clases = (
             db.query(models.asistencia.Asistencia)
@@ -103,8 +106,19 @@ def materia_detalle(
             )
             .count()
         )
+        puntos_asistencia = (
+            db.query(func.sum(puntaje_asistencia_sql(models.asistencia.Asistencia)))
+            .filter(
+                models.asistencia.Asistencia.oferta_materia_id == oferta_id,
+                models.asistencia.Asistencia.user_id == current_user.user_id,
+            )
+            .scalar()
+        ) or 0
 
-    asistencia_pct = round((presentes / total_clases) * 100, 1) if total_clases > 0 else None
+    asistencia_pct = (
+        round(puntos_asistencia / total_clases / PUNTAJE_PRESENTE * 100, 1)
+        if total_clases > 0 else None
+    )
 
     pesos = get_pesos(db, materia_id)
 

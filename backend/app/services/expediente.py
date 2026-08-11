@@ -16,6 +16,7 @@ from app.models.asistencia import Asistencia
 from app.models.materia import Materia
 from app.models.global_settings import GlobalSetting
 from app.services.puntajes_utils import APROBACION_MINIMA, redondear_half_up
+from app.services.asistencia_utils import puntaje_asistencia_sql, PUNTAJE_PRESENTE
 
 # PPA_UMBRAL_RIESGO: PPA solo promedia 'aprobada' (siempre nota>=APROBACION_MINIMA),
 # asi que un umbral igual a APROBACION_MINIMA nunca dispara -- un escalon arriba
@@ -184,23 +185,23 @@ def calcular_regularidad(alumno_id: int, db: Session) -> dict:
             "ppa_acumulado": ppa,
         }
 
+    from sqlalchemy import func
+
     total_asistencias = (
         db.query(Asistencia).filter(Asistencia.user_id == alumno_id).count()
     )
     if total_asistencias:
-        presentes = (
-            db.query(Asistencia)
-            .filter(
-                Asistencia.user_id == alumno_id,
-                Asistencia.presente == True,  # noqa: E712
-            )
-            .count()
-        )
-        pct = round(presentes / total_asistencias * 100)
-        if pct < ASISTENCIA_UMBRAL_RIESGO:
+        suma_puntos = (
+            db.query(func.sum(puntaje_asistencia_sql(Asistencia)))
+            .filter(Asistencia.user_id == alumno_id)
+            .scalar()
+        ) or 0
+        pct = round(suma_puntos / total_asistencias / PUNTAJE_PRESENTE * 100)
+        umbral = asistencia_minima_institucional(db)
+        if pct < umbral:
             return {
                 "estado": "en_riesgo",
-                "motivo": f"Asistencia {pct}% < {ASISTENCIA_UMBRAL_RIESGO}%",
+                "motivo": f"Asistencia {pct}% < {umbral}%",
                 "ppa_acumulado": ppa,
             }
 

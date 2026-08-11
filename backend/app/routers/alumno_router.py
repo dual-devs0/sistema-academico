@@ -12,6 +12,7 @@ from app.dependencias import get_current_user
 from app.security import hash_password
 from app.services.storage import obtener_url_firmada
 from app.services.reporte_notas import construir_reporte_notas
+from app.services.asistencia_utils import puntaje_sesion, PUNTAJE_PRESENTE
 
 router = APIRouter(prefix="/alumno", tags=["alumno"])
 
@@ -197,17 +198,18 @@ def mi_asistencia(
         if mid is None:
             continue
         if mid not in por_materia:
-            por_materia[mid] = {"total": 0, "presentes": 0}
+            por_materia[mid] = {"total": 0, "presentes": 0, "puntos": 0}
         por_materia[mid]["total"] += 1
         if a.presente:
             por_materia[mid]["presentes"] += 1
+        por_materia[mid]["puntos"] += puntaje_sesion(a.presente, a.motivo, a.puntaje_justificacion)
 
     materias = db.query(models.materia.Materia).all()
     mat_map = {m.id: m.nombre for m in materias}
 
     result = []
     for mid, data in por_materia.items():
-        pct = round((data["presentes"] / data["total"]) * 100, 1)
+        pct = round(data["puntos"] / data["total"] / PUNTAJE_PRESENTE * 100, 1)
         result.append(
             {
                 "materia_id": mid,
