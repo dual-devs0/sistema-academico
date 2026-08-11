@@ -47,13 +47,29 @@ DEFAULTS: list[dict] = [
 
 
 def _seed_defaults(db: Session):
+    """Inserta los defaults si la tabla esta vacia. Ademas, re-sincroniza
+    'descripcion' (y 'tipo'/'categoria') de las filas EXISTENTES contra
+    DEFAULTS -- esos textos viven en el codigo fuente (UTF-8 correcto por
+    definicion), asi que si quedaron con mojibake en la DB (ej. un dump/
+    restore con encoding mal manejado, como paso en la migracion
+    Neon->Supabase), se autocorrigen solos en cada arranque sin tocar
+    'value' (eso si es dato real configurado por el admin, no se toca)."""
     GS = models.global_settings.GlobalSetting
-    count = db.query(GS).count()
-    if count > 0:
-        return
+    existentes = {s.key: s for s in db.query(GS).all()}
+    cambios = False
     for d in DEFAULTS:
-        db.add(GS(**d))
-    db.commit()
+        actual = existentes.get(d["key"])
+        if actual is None:
+            db.add(GS(**d))
+            cambios = True
+            continue
+        if actual.descripcion != d["descripcion"] or actual.tipo != d["tipo"] or actual.categoria != d["categoria"]:
+            actual.descripcion = d["descripcion"]
+            actual.tipo = d["tipo"]
+            actual.categoria = d["categoria"]
+            cambios = True
+    if cambios:
+        db.commit()
 
 
 def _to_setting_out(s: models.global_settings.GlobalSetting) -> GlobalSettingOut:
