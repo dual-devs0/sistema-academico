@@ -1,9 +1,9 @@
 // Login público del rol admin (paleta propia, separado del login alumno/profesor). Mismo flujo /auth/login.
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.webp'
-import { api, decodeToken, setAccessToken } from '../lib/api'
+import { api, decodeToken, setAccessToken, warmUpBackend } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
 export default function AdminLogin() {
@@ -13,6 +13,8 @@ export default function AdminLogin() {
   const [showPass, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => { warmUpBackend() }, [])
 
   const semestreActual = `Semestre ${new Date().getMonth() < 6 ? 1 : 2} · ${new Date().getFullYear()}`
 

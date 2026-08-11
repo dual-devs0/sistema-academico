@@ -10,16 +10,17 @@ class PuntajeBase(BaseModel):
     materia_id: int
     tipo: TipoEvaluacion
     valor: float = Field(ge=0, le=50)
-    # Solo válido junto con tipo="directa" — nota final 0-10 cargada directo por el
-    # profesor sin desglose, felicitado=True marca "5F" (5 Felicitado).
+    # Solo válido junto con tipo="directa" — nota final entera 1-5 (Art. 24
+    # Reglamento UCA) cargada directo por el profesor sin desglose,
+    # felicitado=True marca "5F" (5 Felicitado, el maximo real de la escala).
     felicitado: bool = False
 
     @model_validator(mode="after")
     def _felicitado_solo_directa(self):
         if self.felicitado and self.tipo != "directa":
             raise ValueError("'felicitado' solo aplica a notas de tipo 'directa'")
-        if self.tipo == "directa" and self.valor > 10:
-            raise ValueError("La nota directa es una escala de 0 a 10")
+        if self.tipo == "directa" and (self.valor < 1 or self.valor > 5 or self.valor != int(self.valor)):
+            raise ValueError("La nota directa es un entero de 1 a 5")
         return self
 
 

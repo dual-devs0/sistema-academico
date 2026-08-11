@@ -53,6 +53,18 @@ export async function logoutRequest(): Promise<void> {
   await api.post("/auth/logout", {});
 }
 
+export interface CambiarContrasenaPayload {
+  current_password: string;
+  new_password: string;
+}
+
+export async function cambiarContrasenaRequest(
+  payload: CambiarContrasenaPayload,
+): Promise<string> {
+  const { data } = await api.post<{ detail: string }>("/auth/cambiar-contrasena", payload);
+  return data.detail;
+}
+
 /**
  * Recuperación de contraseña. Endpoint existente en el backend
  * (`POST /auth/recuperar-contrasena`, body `{ username_or_email }`).

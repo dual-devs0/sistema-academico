@@ -15,6 +15,7 @@ from app.auth import ALGORITHM, SECRET_KEY
 from app.dependencias import get_current_user
 from app.email_utils import send_alerta_inasistencia_email_bg
 from app.services.autorizacion import es_profesor_de_materia
+from app.services.asistencia_utils import puntaje_asistencia_sql, PUNTAJE_PRESENTE
 from app.schemas.current_user_schema import CurrentUser
 
 
@@ -420,29 +421,32 @@ def alumnos_asistencia(
 
     from sqlalchemy import func, case as sa_case
 
+    A = models.asistencia.Asistencia
     alumno_ids_list = [a.id for a in alumnos]
     # GROUP BY: 1 query total en vez de 2 × N
     conteos_raw = (
         db.query(
-            models.asistencia.Asistencia.user_id,
+            A.user_id,
             func.count().label("total"),
-            func.sum(
-                sa_case((models.asistencia.Asistencia.presente == True, 1), else_=0)
-            ).label("presentes"),
+            func.sum(sa_case((A.presente == True, 1), else_=0)).label("presentes"),  # noqa: E712
+            func.sum(puntaje_asistencia_sql(A)).label("puntos"),
         )
         .filter(
-            models.asistencia.Asistencia.user_id.in_(alumno_ids_list),
-            models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids),
+            A.user_id.in_(alumno_ids_list),
+            A.oferta_materia_id.in_(ofertas_ids),
         )
-        .group_by(models.asistencia.Asistencia.user_id)
+        .group_by(A.user_id)
         .all()
     )
-    conteos = {row.user_id: (row.total, int(row.presentes or 0)) for row in conteos_raw}
+    conteos = {
+        row.user_id: (row.total, int(row.presentes or 0), int(row.puntos or 0))
+        for row in conteos_raw
+    }
 
     result = []
     for a in alumnos:
-        total, presentes = conteos.get(a.id, (0, 0))
-        pct = round((presentes / total) * 100, 1) if total > 0 else 0.0
+        total, presentes, puntos = conteos.get(a.id, (0, 0, 0))
+        pct = round(puntos / total / PUNTAJE_PRESENTE * 100, 1) if total > 0 else 0.0
         result.append(
             schemas.asistencia.AlumnoAsistenciaOut(
                 user_id=a.id,
@@ -458,6 +462,42 @@ def alumnos_asistencia(
     return result
 
 
+def calcular_porcentaje_asistencia(
+    db: Session, user_id: int, materia_id: Optional[int] = None
+) -> dict:
+    """Funcion pura (sin Depends) reutilizada por el endpoint HTTP de abajo y
+    por el gate de regularidad en puntajes_router.py.
+
+    El "porcentaje" es el promedio del puntaje de asistencia por sesion
+    (presente=5, justificada=3/4, sin justificar=0), escalado a 100 -- ver
+    services/asistencia_utils.py. No es un simple presentes/total.
+    """
+    from sqlalchemy import func
+
+    A = models.asistencia.Asistencia
+    query = db.query(A).filter(A.user_id == user_id)
+    if materia_id is not None:
+        ofertas_ids = [
+            o.id
+            for o in db.query(models.oferta_materia.OfertaMateria.id)
+            .filter(models.oferta_materia.OfertaMateria.materia_id == materia_id)
+            .all()
+        ]
+        query = query.filter(A.oferta_materia_id.in_(ofertas_ids))
+
+    total = query.count()
+    presentes = query.filter(A.presente).count()
+    suma_puntos = query.with_entities(func.sum(puntaje_asistencia_sql(A))).scalar() or 0
+    porcentaje = round(suma_puntos / total / PUNTAJE_PRESENTE * 100, 1) if total > 0 else 0.0
+    return {
+        "user_id": user_id,
+        "materia_id": materia_id,
+        "total_clases": total,
+        "presentes": presentes,
+        "porcentaje": porcentaje,
+    }
+
+
 @router.get("/alumno/{user_id}/porcentaje")
 def porcentaje_asistencia_alumno(
     user_id: int,
@@ -468,30 +508,7 @@ def porcentaje_asistencia_alumno(
     """Porcentaje de asistencia de un alumno (global o por materia)."""
     if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
-
-    query = db.query(models.asistencia.Asistencia).filter(
-        models.asistencia.Asistencia.user_id == user_id
-    )
-    if materia_id is not None:
-        ofertas_ids = [
-            o.id
-            for o in db.query(models.oferta_materia.OfertaMateria.id)
-            .filter(models.oferta_materia.OfertaMateria.materia_id == materia_id)
-            .all()
-        ]
-        query = query.filter(
-            models.asistencia.Asistencia.oferta_materia_id.in_(ofertas_ids)
-        )
-
-    total = query.count()
-    presentes = query.filter(models.asistencia.Asistencia.presente).count()
-    return {
-        "user_id": user_id,
-        "materia_id": materia_id,
-        "total_clases": total,
-        "presentes": presentes,
-        "porcentaje": round((presentes / total) * 100, 1) if total > 0 else 0.0,
-    }
+    return calcular_porcentaje_asistencia(db, user_id, materia_id)
 
 
 @router.get("/{materia_id}/resumen")
@@ -537,10 +554,15 @@ def verificar_qr_asistencia(
     """Registra la asistencia del alumno autenticado usando el QR emitido
     por el profesor. Valida:
     - JWT firmado con SECRET_KEY, con `kind == "asistencia_qr"` y sin vencer.
+    - El usuario autenticado tiene rol `alumno`.
     - Alumno inscripto en una oferta de la materia indicada.
     - No hay asistencia registrada para hoy en la misma oferta.
     Devuelve el conteo de presentes/ausentes en la clase de hoy.
     """
+    # 0. Solo alumnos pueden registrar asistencia con QR (defensa en profundidad:
+    #    el frontend ya lo filtra, pero el backend no debe confiar en el cliente).
+    if current_user.role != "alumno":
+        raise HTTPException(status_code=403, detail="Solo alumnos pueden escanear")
     # 1. Decodificar y validar el JWT del QR.
     try:
         payload = jwt.decode(body.qr_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -767,6 +789,7 @@ def profesor_alumnos(
                 presente=asistencia.presente if asistencia else None,
                 es_becado=a.es_becado or False,
                 motivo=getattr(asistencia, "motivo", None) if asistencia else None,
+                puntaje_justificacion=getattr(asistencia, "puntaje_justificacion", None) if asistencia else None,
             )
         )
 
@@ -789,6 +812,10 @@ def generar_qr(
 ):
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, materia_id, current_user.user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado para esta materia")
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == materia_id)
@@ -832,11 +859,14 @@ def profesor_toggle_asistencia(
     asistencia_id: int,
     presente: bool = Query(...),
     motivo: str | None = Query(None),
+    puntaje_justificacion: int | None = Query(None),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
+    if puntaje_justificacion is not None and puntaje_justificacion not in (3, 4):
+        raise HTTPException(status_code=422, detail="puntaje_justificacion debe ser 3 o 4")
     existing = (
         db.query(models.asistencia.Asistencia)
         .filter(models.asistencia.Asistencia.id == asistencia_id)
@@ -844,9 +874,27 @@ def profesor_toggle_asistencia(
     )
     if not existing:
         raise HTTPException(status_code=404, detail="Asistencia no encontrada")
+    oferta = (
+        db.query(models.oferta_materia.OfertaMateria)
+        .filter(models.oferta_materia.OfertaMateria.id == existing.oferta_materia_id)
+        .first()
+    )
+    if current_user.role == "profesor" and (
+        oferta is None
+        or not es_profesor_de_materia(db, oferta.materia_id, current_user.user_id)
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado para esta materia")
     existing.presente = presente
     if motivo is not None:
         existing.motivo = motivo
+    # puntaje_justificacion solo tiene sentido para una ausencia; al marcar
+    # presente se limpia (no puede quedar "justificacion" de algo que no paso).
+    # Si se pasa explicitamente para una ausencia, se actualiza; si no se
+    # pasa, se preserva el valor anterior (evita pisar una eleccion previa).
+    if presente:
+        existing.puntaje_justificacion = None
+    elif puntaje_justificacion is not None:
+        existing.puntaje_justificacion = puntaje_justificacion
     db.commit()
     db.refresh(existing)
     return {"id": existing.id, "presente": existing.presente, "motivo": getattr(existing, "motivo", None)}
@@ -862,11 +910,18 @@ def profesor_marcar_asistencia(
     fecha_str: str = Query(..., alias="fecha"),
     presente: bool = Query(...),
     motivo: str | None = Query(None),
+    puntaje_justificacion: int | None = Query(None),
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
     if current_user.role not in ("admin", "profesor"):
         raise HTTPException(status_code=403, detail="No autorizado")
+    if puntaje_justificacion is not None and puntaje_justificacion not in (3, 4):
+        raise HTTPException(status_code=422, detail="puntaje_justificacion debe ser 3 o 4")
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, materia_id, current_user.user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado para esta materia")
     oferta_id = _oferta_activa_id(db, materia_id)
     if oferta_id is None:
         raise HTTPException(
@@ -877,6 +932,20 @@ def profesor_marcar_asistencia(
     alumno = db.query(models.user.User).filter(models.user.User.id == alumno_id).first()
     if not alumno:
         raise HTTPException(status_code=404, detail="Alumno no encontrado")
+
+    # Verificar que el alumno está inscripto en la oferta activa antes de marcar presente.
+    inscripto = (
+        db.query(models.inscripcion.Inscripcion)
+        .filter(
+            models.inscripcion.Inscripcion.alumno_id == alumno_id,
+            models.inscripcion.Inscripcion.oferta_materia_id == oferta_id,
+        )
+        .first()
+    )
+    if not inscripto:
+        raise HTTPException(
+            status_code=403, detail="El alumno no está inscripto en esta materia"
+        )
 
     existing = (
         db.query(models.asistencia.Asistencia)
@@ -891,6 +960,10 @@ def profesor_marcar_asistencia(
         existing.presente = presente
         if motivo is not None:
             existing.motivo = motivo
+        if presente:
+            existing.puntaje_justificacion = None
+        elif puntaje_justificacion is not None:
+            existing.puntaje_justificacion = puntaje_justificacion
         db.commit()
         db.refresh(existing)
         return {"id": existing.id, "presente": existing.presente, "motivo": getattr(existing, "motivo", None)}
@@ -901,8 +974,10 @@ def profesor_marcar_asistencia(
         fecha=fecha_date,
         presente=presente,
         es_becado=alumno.es_becado or False,
+        motivo=motivo,
+        puntaje_justificacion=None if presente else puntaje_justificacion,
     )
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
-    return {"id": nueva.id, "presente": nueva.presente, "motivo": None}
+    return {"id": nueva.id, "presente": nueva.presente, "motivo": nueva.motivo}

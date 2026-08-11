@@ -17,6 +17,8 @@ class AsistenciaCreate(AsistenciaBase):
 class AsistenciaOut(AsistenciaBase):
     id: int
     materia_nombre: str | None = None
+    motivo: str | None = None
+    puntaje_justificacion: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -109,6 +111,7 @@ class ProfesorAlumnoOut(BaseModel):
     presente: bool | None = None
     es_becado: bool = False
     motivo: str | None = None
+    puntaje_justificacion: int | None = None
 
 
 class ProfesorAlumnosResponse(BaseModel):

@@ -8,6 +8,7 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 from app import models, database
 from app.dependencias import require_role
+from app.services.puntajes_utils import APROBACION_MINIMA, promedios_por_alumno
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -22,7 +23,6 @@ def admin_dashboard(
     U = models.user.User
     M = models.materia.Materia
     O = models.oferta_materia.OfertaMateria
-    P = models.puntaje.Puntaje
     A = models.asistencia.Asistencia
     I = models.inscripcion.Inscripcion
     S = models.tramites.Solicitud
@@ -66,24 +66,6 @@ def admin_dashboard(
     alumnos_por_oferta: set = set()
     punt_por_alumno: dict = {}
     if oferta_ids:
-        punt_agg = (
-            db.query(
-                P.oferta_materia_id,
-                func.avg(P.valor).label("prom"),
-                func.count(P.id).label("cnt"),
-            )
-            .filter(P.oferta_materia_id.in_(oferta_ids))
-            .group_by(P.oferta_materia_id)
-            .all()
-        )
-        total_notas = sum(r.cnt for r in punt_agg)
-        suma_ponderada = sum(
-            (float(r.prom) * r.cnt) for r in punt_agg if r.prom is not None
-        )
-        kpis["promedio_general"] = (
-            round(suma_ponderada / total_notas, 1) if total_notas > 0 else 0.0
-        )
-
         alumnos_por_oferta = set()
         for row in db.query(I.alumno_id).filter(
             I.oferta_materia_id.in_(oferta_ids)
@@ -91,16 +73,16 @@ def admin_dashboard(
             alumnos_por_oferta.add(row[0])
         kpis["alumnos_activos"] = len(alumnos_por_oferta)
 
-        # Aprobación
-        punt_por_alumno = {}
-        for r in db.query(
-            P.user_id,
-            func.avg(P.valor).label("prom"),
-        ).filter(P.oferta_materia_id.in_(oferta_ids)).group_by(P.user_id).all():
-            punt_por_alumno[r.user_id] = float(r.prom) if r.prom else 0.0
-
+        # promedio_general / aprobacion_pct: promedio real por alumno (pesos
+        # reales por materia, no un AVG crudo que mezclaria escalas distintas
+        # -- parcial max 20, final max 50, directa 0-10 -- ver puntajes_utils.
+        punt_por_alumno = promedios_por_alumno(db, list(alumnos_por_oferta))
         total_con_notas = len(punt_por_alumno)
-        aprobados = sum(1 for v in punt_por_alumno.values() if v >= 6)
+        kpis["promedio_general"] = (
+            round(sum(punt_por_alumno.values()) / total_con_notas, 1)
+            if total_con_notas > 0 else 0.0
+        )
+        aprobados = sum(1 for v in punt_por_alumno.values() if v >= APROBACION_MINIMA)
         kpis["aprobacion_pct"] = (
             round(aprobados / total_con_notas * 100) if total_con_notas > 0 else 0
         )

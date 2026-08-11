@@ -5,18 +5,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated as RNAnimated,
   ActivityIndicator,
-  Alert,
-  Image,
   PanResponder,
   Pressable,
-  RefreshControl,
   Text,
   View,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import Animated, { FadeInDown, FadeIn, SlideInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeIn, FadeOut, Easing, SlideInDown } from "react-native-reanimated";
 import { useTabBarScroll } from "../../hooks/useHideOnScroll";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
@@ -28,8 +26,8 @@ import {
   fontFamily, fontSize, radius, spacing,
 } from "../../constants/design";
 import {
+  computePromedioSemestre,
   fetchNotasCompleto,
-  PUNTAJE_POR_TIPO,
   type MateriaCard,
   type NotasCompleto,
 } from "../../services/notasService";
@@ -41,20 +39,6 @@ import {
 } from "../../services/boletaService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function puntajeTotalMateria(m: MateriaCard): number {
-  return m.desglose.reduce((acc, d) => {
-    if (d.tipo === "final" || d.tipo.startsWith("final")) return acc;
-    return acc + (d.puntajeLogrado ?? 0);
-  }, 0);
-}
-
-function puntajeMaximoMateria(m: MateriaCard): number {
-  return m.desglose.reduce((acc, d) => {
-    if (d.tipo === "final" || d.tipo.startsWith("final")) return acc;
-    return acc + (d.puntajeActividad ?? PUNTAJE_POR_TIPO[d.tipo] ?? 0);
-  }, 0);
-}
 
 function donutColor(pct: number): string {
   if (pct >= 90) return "#22c55e";
@@ -74,9 +58,11 @@ type Vista = "asistencia" | "calificaciones";
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CursosTab() {
-  const { colors } = useTheme();
+  const { colors, effective } = useTheme();
+const isDark = effective === "dark";
 const router = useRouter();
-  const { contentBottomPadding } = useTabBarScroll();
+  useTabBarScroll();
+  const [headerH, setHeaderH] = useState(0);
   const [data, setData] = useState<NotasCompleto | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [semestre, setSemestre] = useState<number | null>(null);
@@ -91,6 +77,16 @@ const router = useRouter();
   const [boletaScope, setBoletaScope] = useState<BoletaScope>("global");
   const [boletaAnio, setBoletaAnio] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
+
+  // ── Toast ──
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(msg: string) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  }
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const load = useCallback(async () => {
     try {
@@ -143,22 +139,7 @@ const router = useRouter();
 
     for (const sem of data.semestresDisponibles) {
       const materiasSem = data.materias.filter((m) => m.semestre === sem);
-      const conNota = materiasSem.filter((m) =>
-        m.desglose.some((d) => d.puntajeLogrado != null)
-      );
-      const promedio =
-        conNota.length > 0
-          ? conNota.reduce((acc, m) => {
-            const pts = m.desglose.reduce(
-              (a, d) => a + (d.puntajeLogrado ?? 0), 0
-            );
-            const max = m.desglose.reduce(
-              (a, d) => a + (d.puntajeActividad ?? 0), 0
-            );
-            return acc + (max > 0 ? (pts / max) * 10 : 0);
-          }, 0) / conNota.length
-          : null;
-
+      const promedio = computePromedioSemestre(data.materias, sem);
       const primerAnio = materiasSem[0]?.anio ?? new Date().getFullYear();
       map.set(sem, { anio: primerAnio, promedio });
     }
@@ -185,12 +166,9 @@ const router = useRouter();
       await descargarBoletaPdf(boletaScope, {
         anio: boletaScope === "anio" ? boletaAnio : undefined,
       });
-      Alert.alert("Boleta lista", "La boleta se generó y se abrió el menú de compartir.");
+      showToast("La boleta se generó y se abrió el menú de compartir.");
     } catch (e) {
-      Alert.alert(
-        "Error",
-        e instanceof Error ? e.message : "No se pudo descargar la boleta.",
-      );
+      showToast(e instanceof Error ? e.message : "No se pudo descargar la boleta.");
     } finally {
       setDownloading(false);
     }
@@ -198,7 +176,18 @@ const router = useRouter();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <ScreenHeader title="Cursos" name={nombre} hideAvatar />
+      <View onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
+        <ScreenHeader
+          title="Cursos"
+          name={nombre}
+          hideAvatar
+          rightExtra={
+            vista === "calificaciones" ? (
+              <DownloadHeaderButton onPress={openBoleta} />
+            ) : undefined
+          }
+        />
+      </View>
 
       {loading ? (
         <LoadingBody />
@@ -232,7 +221,13 @@ const router = useRouter();
           </View>
 
           {/* ── Toggle Asistencia / Calificaciones ── */}
-          <VistaToggle vista={vista} onChange={setVista} />
+          <VistaToggle
+            vista={vista}
+            onChange={(v) => {
+              setVista(v);
+              setBoletaOpen(false);
+            }}
+          />
 
           {/* ── Trigger row: Visualizando + botón semestres ──
               Portado del boceto (semestre_sheet_final.html .trigger-row):
@@ -280,51 +275,66 @@ const router = useRouter();
             onClose={() => setModalVisible(false)}
           />
 
-          {/* ── Botón Boleta (solo en Calificaciones) ── */}
-          {vista === "calificaciones" && (
-            <Pressable
-              onPress={openBoleta}
-              hitSlop={8}
-              style={({ pressed }) => ({
-                position: "absolute",
-                right: spacing.xs,
-                bottom: contentBottomPadding + 44,
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed ? 0.85 : 1,
-                shadowColor: colors.cyan,
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.45,
-                shadowRadius: 12,
-                elevation: 8,
-                zIndex: 50,
-              })}
-            >
-              <Image
-                source={require("../../assets/boton-descargar.png")}
-                style={{ width: 72, height: 72 }}
-                resizeMode="contain"
-              />
-            </Pressable>
+          {/* ── Popover Boleta anclado bajo el botón del header ── */}
+          {vista === "calificaciones" && boletaOpen && (
+            <BoletaPopover
+              top={headerH + spacing.xs}
+              scope={boletaScope}
+              anio={boletaAnio}
+              anios={anios}
+              downloading={downloading}
+              onScopeChange={setBoletaScope}
+              onAnioChange={setBoletaAnio}
+              onDownload={handleDescargarBoleta}
+              onClose={() => setBoletaOpen(false)}
+            />
           )}
 
-          {/* ── Bottom Sheet descarga Boleta PDF ── */}
-          <BoletaSheet
-            visible={boletaOpen}
-            scope={boletaScope}
-            anio={boletaAnio}
-            anios={anios}
-            downloading={downloading}
-            onScopeChange={setBoletaScope}
-            onAnioChange={setBoletaAnio}
-            onDownload={handleDescargarBoleta}
-            onClose={() => setBoletaOpen(false)}
-          />
+          {/* ── Overlay semitransparente p/ cerrar popover al tocar afuera ── */}
+          {vista === "calificaciones" && boletaOpen && (
+            <Pressable
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+                backgroundColor: isDark ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.25)",
+              }}
+              onPress={() => setBoletaOpen(false)}
+            />
+          )}
         </>
       )}
+
+      {toast ? (
+        <Animated.View
+          entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}
+          style={{
+            position: "absolute",
+            left: spacing.xl,
+            right: spacing.xl,
+            bottom: spacing["3xl"],
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.md,
+            padding: spacing.md,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowRadius: 12,
+            shadowOpacity: 0.3,
+            elevation: 6,
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontFamily: fontFamily.interSemibold, fontSize: 13, flex: 1 }}>
+            {toast}
+          </Text>
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -418,8 +428,6 @@ function MateriaCard({
   const { colors } = useTheme();
   const pct = materia.asistenciaPct ?? 0;
   const color = donutColor(pct);
-  const logrado = puntajeTotalMateria(materia);
-  const maximo = puntajeMaximoMateria(materia);
 
   return (
     <GlassCard
@@ -478,9 +486,9 @@ function MateriaCard({
   );
 }
 
-function DownloadIcon({ color }: { color: string }) {
+function DownloadIcon({ color, size = 20 }: { color: string; size?: number }) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12 3v12m0 0l-4-4m4 4l4-4"
         stroke={color}
@@ -498,10 +506,33 @@ function DownloadIcon({ color }: { color: string }) {
   );
 }
 
-// ─── Bottom Sheet descarga Boleta PDF (Global / Por año / Semestre actual) ─────
+function DownloadHeaderButton({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      style={({ pressed }) => ({
+        width: 42,
+        height: 42,
+        borderRadius: radius.pill,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        opacity: pressed ? 0.75 : 1,
+      })}
+    >
+      <DownloadIcon color={colors.cyan} size={22} />
+    </Pressable>
+  );
+}
 
-function BoletaSheet({
-  visible,
+// ─── Popover descarga Boleta PDF (Global / Por año / Semestre actual) ──────────
+
+function BoletaPopover({
+  top,
   scope,
   anio,
   anios,
@@ -511,7 +542,7 @@ function BoletaSheet({
   onDownload,
   onClose,
 }: {
-  visible: boolean;
+  top: number;
   scope: BoletaScope;
   anio: number | null;
   anios: number[];
@@ -524,235 +555,210 @@ function BoletaSheet({
   const { colors, effective } = useTheme();
   const isDark = effective === "dark";
 
-  if (!visible) return null;
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={onClose}
+    <Animated.View
+      entering={FadeInDown.duration(220)}
+      style={{
+        position: "absolute",
+        top,
+        right: spacing.lg,
+        zIndex: 8,
+        width: 280,
+        backgroundColor: isDark ? "#151b28" : colors.surfaceElevated,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingVertical: spacing.md,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: isDark ? 0.55 : 0.22,
+        shadowRadius: 18,
+        elevation: 18,
+      }}
     >
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        style={{ flex: 1, backgroundColor: isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.sm,
+        }}
       >
-        <Pressable style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }} onPress={onClose} />
-
-        <Animated.View
-          entering={SlideInDown.duration(280)}
-          style={{
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            borderTopWidth: 1,
-            borderColor: colors.border,
-            paddingBottom: 24,
-          }}
-        >
-          <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 6 }}>
-            <View style={{ width: 34, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
-          </View>
-
-          <View
+        <View>
+          <Text
             style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              paddingHorizontal: 20,
-              paddingBottom: 12,
+              color: colors.textSecondary,
+              fontFamily: fontFamily.interMedium,
+              fontSize: 10,
+              letterSpacing: 1.2,
+              marginBottom: 3,
             }}
           >
-            <View>
+            BOLETA DE CALIFICACIONES
+          </Text>
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontFamily: fontFamily.interSemibold,
+              fontSize: 16,
+            }}
+          >
+            Descargar PDF
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          style={({ pressed }) => ({
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: isDark ? "#1e2128" : colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            opacity: pressed ? 0.75 : 1,
+          })}
+        >
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>✕</Text>
+        </Pressable>
+      </View>
+
+      <View style={{ height: 1, backgroundColor: colors.border }} />
+
+      <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: 6 }}>
+        {BOLETA_SCOPES.map((o) => {
+          const active = scope === o.scope;
+          return (
+            <Pressable
+              key={o.scope}
+              onPress={() => onScopeChange(o.scope)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingVertical: 11,
+                paddingHorizontal: 12,
+                borderRadius: 12,
+                backgroundColor: active
+                  ? isDark ? "#0e1e26" : colors.cyanDim
+                  : "transparent",
+                borderWidth: 1,
+                borderColor: active ? colors.cyan : "transparent",
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
               <Text
                 style={{
-                  color: colors.textSecondary,
-                  fontFamily: fontFamily.interMedium,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  marginBottom: 3,
+                  color: active ? colors.cyan : colors.textPrimary,
+                  fontFamily: fontFamily.interSemibold,
+                  fontSize: 13,
                 }}
               >
-                BOLETA DE CALIFICACIONES
+                {o.label}
               </Text>
+            </Pressable>
+          );
+        })}
+
+        {scope === "anio" && (
+          <>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontFamily: fontFamily.interMedium,
+                fontSize: 10,
+                letterSpacing: 1,
+                marginTop: spacing.sm,
+                marginBottom: 4,
+              }}
+            >
+              AÑO
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+              {anios.length === 0 ? (
+                <Text style={{ color: colors.textSecondary, fontFamily: fontFamily.inter, fontSize: 12 }}>
+                  No hay años disponibles.
+                </Text>
+              ) : (
+                anios.map((a) => {
+                  const activeYear = anio === a;
+                  return (
+                    <Pressable
+                      key={a}
+                      onPress={() => onAnioChange(a)}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: spacing.lg,
+                        paddingVertical: spacing.sm,
+                        borderRadius: radius.pill,
+                        backgroundColor: activeYear ? colors.cyan : colors.glassBg,
+                        borderWidth: 1,
+                        borderColor: activeYear ? colors.cyan : colors.border,
+                        opacity: pressed ? 0.85 : 1,
+                      })}
+                    >
+                      <Text
+                        style={{
+                          color: activeYear ? "#0a0e17" : colors.textSecondary,
+                          fontFamily: fontFamily.monoMedium,
+                          fontSize: 12,
+                        }}
+                      >
+                        {a}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          </>
+        )}
+
+        <Pressable
+          onPress={onDownload}
+          disabled={downloading || (scope === "anio" && anio == null)}
+          style={({ pressed }) => ({
+            marginTop: spacing.lg,
+            borderRadius: 999,
+            overflow: "hidden",
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <LinearGradient
+            colors={
+              downloading || (scope === "anio" && anio == null)
+                ? isDark ? ["#1a2030", "#171c29"] : ["#e2e8f0", "#e2e8f0"]
+                : ["#06b6d4", "#0891b2"]
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              paddingVertical: 14,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {downloading ? (
+              <ActivityIndicator color={colors.textPrimary} />
+            ) : (
               <Text
                 style={{
-                  color: colors.textPrimary,
-                  fontFamily: fontFamily.interSemibold,
-                  fontSize: 17,
+                  color: scope === "anio" && anio == null ? colors.textSecondary : "#ffffff",
+                  fontFamily: fontFamily.interBold,
+                  fontSize: 14.5,
                 }}
               >
                 Descargar PDF
               </Text>
-            </View>
-
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => ({
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                backgroundColor: isDark ? "#1e2128" : colors.glassBg,
-                borderWidth: 1,
-                borderColor: colors.border,
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                marginTop: 2,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>✕</Text>
-            </Pressable>
-          </View>
-
-          <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 20 }} />
-
-          <View style={{ paddingHorizontal: 20, paddingTop: 14, gap: 6 }}>
-            {BOLETA_SCOPES.map((o) => {
-              const active = scope === o.scope;
-              return (
-                <Pressable
-                  key={o.scope}
-                  onPress={() => onScopeChange(o.scope)}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingVertical: 12,
-                    paddingHorizontal: 12,
-                    borderRadius: 12,
-                    backgroundColor: active
-                      ? isDark ? "#0e1e26" : colors.cyanDim
-                      : "transparent",
-                    borderWidth: 1,
-                    borderColor: active ? colors.cyan : "transparent",
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Text
-                    style={{
-                      color: active ? colors.cyan : colors.textPrimary,
-                      fontFamily: fontFamily.interSemibold,
-                      fontSize: 13,
-                    }}
-                  >
-                    {o.label}
-                  </Text>
-                  {active && (
-                    <View
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 9,
-                        backgroundColor: colors.cyan,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Svg width={10} height={8} viewBox="0 0 10 8" fill="none">
-                        <Path
-                          d="M1 4L3.5 6.5L9 1"
-                          stroke="#0a0e17"
-                          strokeWidth={1.8}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </Svg>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-
-            {/* Selector de año si se eligió "Por año" */}
-            {scope === "anio" && (
-              <>
-                <Text
-                  style={{
-                    color: colors.textSecondary,
-                    fontFamily: fontFamily.interMedium,
-                    fontSize: 11,
-                    letterSpacing: 1,
-                    marginTop: spacing.sm,
-                    marginBottom: 4,
-                  }}
-                >
-                  AÑO
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
-                  {anios.length === 0 ? (
-                    <Text style={{ color: colors.textSecondary, fontFamily: fontFamily.inter, fontSize: 12 }}>
-                      No hay años disponibles.
-                    </Text>
-                  ) : (
-                    anios.map((a) => {
-                      const activeYear = anio === a;
-                      return (
-                        <Pressable
-                          key={a}
-                          onPress={() => onAnioChange(a)}
-                          style={({ pressed }) => ({
-                            paddingHorizontal: spacing.lg,
-                            paddingVertical: spacing.sm,
-                            borderRadius: radius.pill,
-                            backgroundColor: activeYear ? colors.cyan : colors.glassBg,
-                            borderWidth: 1,
-                            borderColor: activeYear ? colors.cyan : colors.border,
-                            opacity: pressed ? 0.85 : 1,
-                          })}
-                        >
-                          <Text
-                            style={{
-                              color: activeYear ? "#0a0e17" : colors.textSecondary,
-                              fontFamily: fontFamily.monoMedium,
-                              fontSize: 12,
-                            }}
-                          >
-                            {a}
-                          </Text>
-                        </Pressable>
-                      );
-                    })
-                  )}
-                </View>
-              </>
             )}
-
-            <Pressable
-              onPress={onDownload}
-              disabled={downloading || (scope === "anio" && anio == null)}
-              style={({ pressed }) => ({
-                marginTop: spacing.lg,
-                paddingVertical: 16,
-                borderRadius: 999,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: downloading || (scope === "anio" && anio == null)
-                  ? isDark ? "#1a2030" : colors.glassBg
-                  : colors.cyan,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              {downloading ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <Text
-                  style={{
-                    color: scope === "anio" && anio == null ? colors.textSecondary : "#0a0e17",
-                    fontFamily: fontFamily.interBold,
-                    fontSize: 14.5,
-                  }}
-                >
-                  Descargar PDF
-                </Text>
-              )}
-            </Pressable>
-          </View>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
+          </LinearGradient>
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -1285,7 +1291,6 @@ function CalificacionesView({
       ) : (
         materias.map((m, i) => {
           const isOpen = expanded === m.materiaId;
-          const total = m.desglose.reduce((a, d) => a + (d.nota != null ? d.nota * d.peso : 0), 0);
 
           return (
             <Animated.View
@@ -1335,7 +1340,7 @@ function CalificacionesView({
                           letterSpacing: -0.5,
                         }}
                       >
-                        {total > 0 ? total.toFixed(1) : "—"}
+                        {m.promedio != null ? m.promedio.toFixed(1) : "—"}
                       </Text>
                       <Text
                         style={{
@@ -1390,12 +1395,7 @@ function CalificacionesView({
                             </Text>
                             <Text
                               style={{
-                                color:
-                                  d.nota == null
-                                    ? colors.textSecondary
-                                    : d.nota >= 6
-                                      ? colors.cyan
-                                      : colors.error,
+                                color: d.nota == null ? colors.textSecondary : colors.textPrimary,
                                 fontFamily: fontFamily.monoMedium,
                                 fontSize: fontSize.caption,
                                 minWidth: 32,

@@ -241,7 +241,7 @@ def update_user(
     new_password = update_data.get("password")
 
     if current_user.role != "admin":
-        for forbidden in ("role", "carrera_id", "es_becado", "activo", "fecha_ingreso", "cedula", "cv"):
+        for forbidden in ("role", "carrera_id", "es_becado", "activo", "fecha_ingreso", "cedula", "cv", "password"):
             update_data.pop(forbidden, None)
 
     if "password" in update_data:

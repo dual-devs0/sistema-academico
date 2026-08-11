@@ -13,6 +13,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.graduacion import ProcesoGraduacion, EtapaTesis
+from app.models.global_settings import GlobalSetting
 from app.models.users import User
 from app.models.carrera import Carrera
 from app.models.pensum_materia import PensumMateria
@@ -21,8 +22,24 @@ from app.models.expediente_materia import ExpedienteMateria
 from app.models.pasantia import Pasantia
 from app.services.expediente import calcular_ppa
 from app.services.pasantia import pasantia_completada_por_alumno
+from app.services.puntajes_utils import APROBACION_MINIMA, redondear_half_up
 
-PPA_MINIMO_INSTITUCIONAL = 6.0
+
+def ppa_minimo_institucional(db: Session) -> int:
+    """PPA minimo para graduarse, leido de GlobalSetting (categoria academico,
+    key "ppa_minimo") -- configurable por el admin en Ajustes Globales, no
+    hardcodeado. Fallback a APROBACION_MINIMA (el minimo de aprobacion de una
+    materia individual) si el setting todavia no existe en la DB -- ver
+    settings_router.py::_seed_defaults, que recien inserta los defaults la
+    primera vez que se abre Ajustes Globales.
+    """
+    setting = db.query(GlobalSetting).filter_by(key="ppa_minimo").first()
+    if setting and setting.value:
+        try:
+            return redondear_half_up(float(setting.value))
+        except ValueError:
+            pass
+    return APROBACION_MINIMA
 
 
 # Verifica créditos + PPA + pasantía completada. Si retorna un falso
@@ -30,6 +47,7 @@ PPA_MINIMO_INSTITUCIONAL = 6.0
 # proceso de graduación sin estar habilitado — validar cada condición por
 # separado en el dict de retorno, no solo el booleano agregado.
 def verificar_condicion_egreso(alumno_id: int, db: Session) -> dict:
+    ppa_minimo = ppa_minimo_institucional(db)
     alumno = db.query(User).filter(User.id == alumno_id).first()
     if not alumno:
         return {
@@ -38,7 +56,7 @@ def verificar_condicion_egreso(alumno_id: int, db: Session) -> dict:
             "creditos_totales": 0,
             "cumple_ppa": False,
             "ppa_actual": None,
-            "ppa_minimo": PPA_MINIMO_INSTITUCIONAL,
+            "ppa_minimo": ppa_minimo,
             "cumple_pasantia": False,
             "pasantia_exigida": False,
             "pasantia_completada": False,
@@ -72,7 +90,7 @@ def verificar_condicion_egreso(alumno_id: int, db: Session) -> dict:
 
     ppa_info = calcular_ppa(alumno_id, db)
     ppa_actual = ppa_info["ppa"]
-    cumple_ppa = ppa_actual is not None and ppa_actual >= PPA_MINIMO_INSTITUCIONAL
+    cumple_ppa = ppa_actual is not None and ppa_actual >= ppa_minimo
 
     pasantia_completada = pasantia_completada_por_alumno(alumno_id, db)
     pasantia_exigida = False  # se puede extender si carrera define exigencia
@@ -87,7 +105,7 @@ def verificar_condicion_egreso(alumno_id: int, db: Session) -> dict:
         )
     if not cumple_ppa:
         motivos.append(
-            f"PPA mínimo no alcanzado: {ppa_actual or 0:.2f}/{PPA_MINIMO_INSTITUCIONAL}"
+            f"PPA mínimo no alcanzado: {ppa_actual or 0}/{ppa_minimo}"
         )
     if pasantia_exigida and not pasantia_completada:
         motivos.append("Pasantía no completada")
@@ -98,7 +116,7 @@ def verificar_condicion_egreso(alumno_id: int, db: Session) -> dict:
         "creditos_totales": creditos_totales,
         "cumple_ppa": cumple_ppa,
         "ppa_actual": ppa_actual,
-        "ppa_minimo": PPA_MINIMO_INSTITUCIONAL,
+        "ppa_minimo": ppa_minimo,
         "cumple_pasantia": not pasantia_exigida or pasantia_completada,
         "pasantia_exigida": pasantia_exigida,
         "pasantia_completada": pasantia_completada,
@@ -119,6 +137,7 @@ def listar_candidatos(
     Condición de egreso calculada con queries agregadas por lote (no una por
     alumno) para evitar N+1 en cohortes grandes.
     """
+    ppa_minimo = ppa_minimo_institucional(db)
     query = db.query(User).filter(User.role == "alumno")
     if carrera_id is not None:
         query = query.filter(User.carrera_id == carrera_id)
@@ -225,15 +244,14 @@ def listar_candidatos(
 
         creditos_ppa = sum(a.creditos for a in aprobadas)
         ppa_actual = (
-            round(
+            redondear_half_up(
                 sum(float(a.nota_final) * a.creditos for a in aprobadas)
-                / creditos_ppa,
-                2,
+                / creditos_ppa
             )
             if creditos_ppa > 0
             else None
         )
-        cumple_ppa = ppa_actual is not None and ppa_actual >= PPA_MINIMO_INSTITUCIONAL
+        cumple_ppa = ppa_actual is not None and ppa_actual >= ppa_minimo
 
         pasantia_completada = alumno.id in alumnos_pasantia_completada
         pasantia_exigida = False
@@ -247,7 +265,7 @@ def listar_candidatos(
             "creditos_aprobados": creditos_aprobados,
             "creditos_totales": creditos_totales,
             "ppa_actual": ppa_actual,
-            "ppa_minimo": PPA_MINIMO_INSTITUCIONAL,
+            "ppa_minimo": ppa_minimo,
             "pasantia_completada": pasantia_completada,
             "puede_graduarse": puede_graduarse,
         }

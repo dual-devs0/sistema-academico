@@ -6,6 +6,7 @@ class MateriaBase(BaseModel):
 
 
 class MateriaCreate(MateriaBase):
+    codigo: str | None = None
     carrera_id: int | None = None
     anio: int | None = None
     semestre: int | None = None

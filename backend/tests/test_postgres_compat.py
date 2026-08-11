@@ -39,15 +39,28 @@ pytestmark = pytest.mark.skipif(
 
 
 def _host_base(url: str) -> str | None:
-    """Hostname sin el sufijo '-pooler' en el subdominio -- un endpoint pooler
-    de Neon es la MISMA branch fisica que su endpoint directo, solo comparar
-    el FQDN tal cual no detecta el caso real que causo perdida de datos en
-    produccion (ep-x vs ep-x-pooler.<mismo dominio>)."""
+    """Identificador de "a que proyecto/branch fisica apunta esta URL", para
+    detectar si DATABASE_URL y TEST_DATABASE_URL son en realidad la misma DB.
+    Comparar el FQDN tal cual no alcanza en ninguno de los dos proveedores:
+    - Supabase: todas las URLs de pooler de una region comparten el mismo
+      hostname (aws-0-<region>.pooler.supabase.com) -- lo que identifica el
+      proyecto es el usuario "postgres.<ref>", no el host.
+    - Neon (legacy, mantenido por compat con TEST_DATABASE_URL viejas): un
+      endpoint pooler es la MISMA branch fisica que su endpoint directo,
+      solo difieren en el sufijo "-pooler" del subdominio (ep-x vs
+      ep-x-pooler.<mismo dominio>).
+    """
     from urllib.parse import urlparse
 
-    host = urlparse(url).hostname
+    parsed = urlparse(url)
+    host = parsed.hostname
     if not host:
         return None
+
+    user = parsed.username or ""
+    if "." in user:
+        return user.split(".", 1)[1]  # Supabase: <ref> del usuario "postgres.<ref>"
+
     partes = host.split(".", 1)
     subdominio = (
         partes[0][: -len("-pooler")] if partes[0].endswith("-pooler") else partes[0]
@@ -77,7 +90,7 @@ def pg_engine():
             conn.execute(text("SELECT 1"))
     except OperationalError as e:
         pytest.skip(
-            f"neondb_test inalcanzable (compute suspendido u otro problema de infra): {e}"  # noqa: E501
+            f"TEST_DATABASE_URL inalcanzable (proyecto pausado u otro problema de infra): {e}"  # noqa: E501
         )
 
     # create_all es no-op si las tablas ya existen (creadas por Alembic)

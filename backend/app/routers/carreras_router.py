@@ -17,7 +17,14 @@ def create_carrera(
 ):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    new_carrera = models.carrera.Carrera(nombre=carrera.nombre)
+    existing = db.query(models.carrera.Carrera).filter(models.carrera.Carrera.nombre == carrera.nombre).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe una carrera con ese nombre")
+    new_carrera = models.carrera.Carrera(
+        nombre=carrera.nombre,
+        duracion_semestres=carrera.duracion_semestres,
+        creditos_totales=carrera.creditos_totales,
+    )
     db.add(new_carrera)
     db.commit()
     db.refresh(new_carrera)

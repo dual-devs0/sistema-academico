@@ -1017,10 +1017,15 @@ type NotaMateriaCursos = {
 
 const PESOS_DEFAULT_CURSOS = { parcial1: 20, parcial2: 20, practico: 10, final: 50 }
 
+// Escala oficial UC (Art. 24 Reglamento de Estudiante): nota final entera 1-5,
+// aprobado >= 2, destacado = nota maxima real (5) -- ver Puntajes.tsx::estadoDe
+const NOTA_MAXIMA = 5
+const APROBACION_MINIMA = 2
+
 function estadoNota(p: number | null): { label: string; bg: string; color: string } {
   if (p === null) return { label: 'SIN NOTAS', bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' }
-  if (p >= 9) return { label: 'PROMOCIONADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
-  if (p >= 6) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
+  if (p >= NOTA_MAXIMA) return { label: 'DESTACADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
+  if (p >= APROBACION_MINIMA) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
   return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
 }
 
@@ -1069,7 +1074,7 @@ function MateriaCard({ m }: { m: MateriaCardData }) {
     <div className={`mat-card${pendienteP2 ? ' warn' : ''}`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
         <div style={{ fontSize: 14.5, fontWeight: 800, paddingRight: 8 }}>{m.materia_nombre}</div>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : p === null ? 'var(--text-muted)' : p >= 9 ? 'var(--accent-bright)' : p >= 7.5 ? 'var(--success)' : p >= 6 ? 'var(--warning)' : 'var(--danger)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: m.felicitado ? '#fbbf24' : p === null ? 'var(--text-muted)' : p >= NOTA_MAXIMA ? 'var(--accent-bright)' : p >= 3 ? 'var(--success)' : p >= APROBACION_MINIMA ? 'var(--warning)' : 'var(--danger)' }}>
           {m.felicitado && <i className="ti ti-star" style={{ fontSize: 16, marginRight: 3, verticalAlign: -1 }} />}
           {p === null ? '—' : m.felicitado ? `${p}F` : p}
         </span>
@@ -1134,7 +1139,7 @@ function CalificacionesTab({ userId }: { userId: number }) {
 
   const proms = materias.map(m => m.promedio).filter((p): p is number => p !== null)
   const promGeneral = proms.length ? Math.round(proms.reduce((a, b) => a + b, 0) / proms.length * 100) / 100 : 0
-  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= 6).length
+  const aprobadas = materias.filter(m => (m.promedio ?? 0) >= APROBACION_MINIMA).length
   const pctAprob = materias.length ? Math.round((aprobadas / materias.length) * 100) : 0
   const ringC = 2 * Math.PI * 34
   const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
@@ -1144,9 +1149,9 @@ function CalificacionesTab({ userId }: { userId: number }) {
   return (
     <div>
       <div className="exp-stats" style={{ marginBottom: 22 }}>
-        <div className="kpi-card" style={{ borderLeft: `3px solid ${promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444'}` }}>
+        <div className="kpi-card" style={{ borderLeft: `3px solid ${promGeneral >= 3 ? '#22c55e' : promGeneral >= APROBACION_MINIMA ? '#f59e0b' : '#ef4444'}` }}>
           <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-star" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-          <span className="kpi-value" style={{ fontSize: 36, color: promGeneral >= 7 ? '#22c55e' : promGeneral >= 6 ? '#f59e0b' : '#ef4444' }}>{promGeneral.toFixed(2)}<span className="kpi-unit"> / 10</span></span>
+          <span className="kpi-value" style={{ fontSize: 36, color: promGeneral >= 3 ? '#22c55e' : promGeneral >= APROBACION_MINIMA ? '#f59e0b' : '#ef4444' }}>{promGeneral.toFixed(2)}<span className="kpi-unit"> / {NOTA_MAXIMA}</span></span>
         </div>
         <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', gap: 18, borderLeft: `3px solid ${pctAprob >= 80 ? '#22c55e' : pctAprob >= 60 ? '#f59e0b' : '#ef4444'}` }}>
           <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>

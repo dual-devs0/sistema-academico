@@ -153,7 +153,7 @@ export default function Estadisticas() {
         const materiasConStats = await Promise.all(
           dash.materias.map(async m => {
             let total_notas = 0
-            let distribucion: Record<string, number> = { '0-3': 0, '3-5': 0, '5-6': 0, '6-7': 0, '7-9': 0, '9-10': 0 }
+            let distribucion: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
             let aprobados = 0
             let en_riesgo = 0
             let asistencia = 0
@@ -244,21 +244,21 @@ export default function Estadisticas() {
     .map(m => ({ name: truncate(m.materia_nombre), promedio: m.promedio_grupo }))
 
   // ── Pie chart: distribución global ──
+  // distribucion viene por escalon real 1-5 (Art. 24 Reglamento UC), no
+  // rangos 0-10 -- ver backend puntajes_router.py/reportes_router.py.
   const pieData = useMemo(() => {
     if (!data) return []
-    const b = { excelente: 0, bueno: 0, regular: 0, riesgo: 0 }
+    const b = { destacado: 0, aprobado: 0, reprobado: 0 }
     for (const m of data.materias) {
       const d = m.distribucion
-      b.excelente += d['9-10'] ?? 0
-      b.bueno     += d['7-9']  ?? 0
-      b.regular   += d['6-7']  ?? 0
-      b.riesgo    += (d['5-6'] ?? 0) + (d['3-5'] ?? 0) + (d['0-3'] ?? 0)
+      b.destacado += d['5'] ?? 0
+      b.aprobado  += (d['2'] ?? 0) + (d['3'] ?? 0) + (d['4'] ?? 0)
+      b.reprobado += d['1'] ?? 0
     }
     return [
-      { name: 'Excelente (≥9)', value: b.excelente, color: GREEN  },
-      { name: 'Bueno (≥7)',     value: b.bueno,     color: CYAN   },
-      { name: 'Regular (≥6)',   value: b.regular,   color: YELLOW },
-      { name: 'En riesgo (<6)', value: b.riesgo,    color: RED    },
+      { name: 'Destacado (5)',  value: b.destacado, color: GREEN  },
+      { name: 'Aprobado (2-4)', value: b.aprobado,  color: CYAN   },
+      { name: 'Reprobado (1)',  value: b.reprobado, color: RED    },
     ].filter(d => d.value > 0)
   }, [data])
 
@@ -274,7 +274,7 @@ export default function Estadisticas() {
       value: loading ? '—' : String(promVal),
       color: CYAN,
       bg:    'var(--accent-muted)',
-      bar:   Math.min(promVal / 10 * 100, 100),
+      bar:   Math.min(promVal / 5 * 100, 100),
     },
     {
       label: 'Aprobación',
@@ -386,7 +386,7 @@ export default function Estadisticas() {
                     <BarChart data={barData} margin={{ top:4, right:8, left:-20, bottom:0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#2a3040" vertical={false} />
                       <XAxis dataKey="name" tick={axisStyle} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 10]} tick={axisStyle} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={axisStyle} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={tooltipStyle} cursor={{ fill:'#2a304055' }} formatter={(value) => [String(value ?? ''), 'Promedio']} />
                       <Bar dataKey="promedio" fill={CYAN} radius={[5, 5, 0, 0]} maxBarSize={40} />
                     </BarChart>

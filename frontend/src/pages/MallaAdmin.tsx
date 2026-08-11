@@ -61,10 +61,14 @@ export default function MallaAdmin() {
   const [confirmCorr, setConfirmCorr] = useState<number | null>(null)
   const [modalMateria, setModalMateria] = useState(false)
   const [modalCorr, setModalCorr] = useState(false)
+  const [modalCarrera, setModalCarrera] = useState(false)
   const [saving, setSaving] = useState(false)
   const [subjectFilter, setSubjectFilter] = useState('')
   const [draftMateria, setDraftMateria] = useState({ materia_id: '', semestre: '1', creditos: '4', es_electiva: false })
+  const [nuevaMateria, setNuevaMateria] = useState(false)
+  const [draftNuevaMateria, setDraftNuevaMateria] = useState({ nombre: '', codigo: '' })
   const [draftCorr, setDraftCorr] = useState({ materia_id: '', prerrequisito_id: '', tipo: 'aprobada' })
+  const [draftCarrera, setDraftCarrera] = useState({ nombre: '', duracion_semestres: '', creditos_totales: '' })
   const [editPensumId, setEditPensumId] = useState<number | null>(null)
   const [draftEdit, setDraftEdit] = useState({ semestre: 1, creditos: 4, es_electiva: false })
 
@@ -129,11 +133,39 @@ export default function MallaAdmin() {
 
   function abrirModalMateria() {
     setDraftMateria({ materia_id: '', semestre: String(Math.max(1, semestres.length + 1)), creditos: '4', es_electiva: false })
+    setNuevaMateria(false)
+    setDraftNuevaMateria({ nombre: '', codigo: '' })
     setModalMateria(true)
   }
 
   async function guardarMateria() {
-    if (carreraId === null || !draftMateria.materia_id) { emitToast('Seleccioná una materia', 'warning'); return }
+    if (carreraId === null) return
+    if (nuevaMateria) {
+      if (!draftNuevaMateria.nombre.trim()) { emitToast('Ingresá el nombre de la materia', 'warning'); return }
+      setSaving(true)
+      try {
+        const creada = await api.post<{ id: number }>('/materias/', {
+          nombre: draftNuevaMateria.nombre.trim(),
+          codigo: draftNuevaMateria.codigo.trim() || undefined,
+          carrera_id: carreraId,
+          semestre: Number(draftMateria.semestre),
+          creditos: Number(draftMateria.creditos),
+        })
+        await agregarMateriaAMalla(carreraId, {
+          materia_id: creada.id,
+          semestre: Number(draftMateria.semestre),
+          creditos: Number(draftMateria.creditos),
+          es_electiva: draftMateria.es_electiva,
+        })
+        emitToast('Materia creada y agregada a la malla')
+        setModalMateria(false)
+        cargar()
+      } catch (e) {
+        emitToast(e instanceof Error ? e.message : 'Error al crear materia', 'error')
+      } finally { setSaving(false) }
+      return
+    }
+    if (!draftMateria.materia_id) { emitToast('Seleccioná una materia', 'warning'); return }
     setSaving(true)
     try {
       await agregarMateriaAMalla(carreraId, {
@@ -147,6 +179,25 @@ export default function MallaAdmin() {
       cargar()
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Error al agregar materia', 'error')
+    } finally { setSaving(false) }
+  }
+
+  async function guardarCarrera() {
+    if (!draftCarrera.nombre.trim()) { emitToast('Ingresá el nombre de la carrera', 'warning'); return }
+    setSaving(true)
+    try {
+      const creada = await api.post<{ id: number }>('/carreras/', {
+        nombre: draftCarrera.nombre.trim(),
+        duracion_semestres: draftCarrera.duracion_semestres ? Number(draftCarrera.duracion_semestres) : undefined,
+        creditos_totales: draftCarrera.creditos_totales ? Number(draftCarrera.creditos_totales) : undefined,
+      })
+      emitToast('Carrera creada')
+      setModalCarrera(false)
+      const cs = await api.get<Carrera[]>('/carreras/')
+      setCarreras(cs)
+      setCarreraId(creada.id)
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Error al crear carrera', 'error')
     } finally { setSaving(false) }
   }
 
@@ -246,10 +297,16 @@ export default function MallaAdmin() {
             <h1 className="page-title" style={{ fontSize: 28 }}>Malla Curricular</h1>
             <p className="page-subtitle">Materias por semestre, créditos y correlatividades de cada carrera.</p>
           </div>
-          <select className="input-uca" style={{ maxWidth: 280, fontSize: 14, fontWeight: 600 }}
-            value={carreraId ?? ''} onChange={e => { setCarreraId(Number(e.target.value)); setSubjectFilter('') }}>
-            {carreras.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <select className="input-uca" style={{ maxWidth: 280, fontSize: 14, fontWeight: 600 }}
+              value={carreraId ?? ''} onChange={e => { setCarreraId(Number(e.target.value)); setSubjectFilter('') }}>
+              {carreras.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+            <button className="btn-ghost" style={{ border: '1px solid var(--border-subtle)' }}
+              onClick={() => { setDraftCarrera({ nombre: '', duracion_semestres: '', creditos_totales: '' }); setModalCarrera(true) }}>
+              <i className="ti ti-plus" /> Nueva carrera
+            </button>
+          </div>
         </header>
 
         {/* Stats */}
@@ -509,23 +566,40 @@ export default function MallaAdmin() {
               </button>
             </div>
             <div style={{ marginBottom: 14 }}>
-              <p className="mono-label" style={{ marginBottom: 6 }}>Materia</p>
-              <select className="input-uca" value={draftMateria.materia_id}
-                onChange={e => {
-                  const m = materiasDisponibles.find(x => x.id === Number(e.target.value))
-                  setDraftMateria(d => ({
-                    ...d, materia_id: e.target.value,
-                    creditos: m?.creditos ? String(m.creditos) : d.creditos,
-                    semestre: m?.semestre ? String(m.semestre) : d.semestre,
-                  }))
-                }} style={{ marginBottom: 12 }}>
-                <option value="">Seleccionar materia…</option>
-                {materiasDisponibles.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.codigo ? `${m.codigo} — ` : ''}{m.nombre}
-                  </option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <p className="mono-label" style={{ margin: 0 }}>Materia</p>
+                <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }}
+                  onClick={() => setNuevaMateria(v => !v)}>
+                  {nuevaMateria ? 'Elegir existente' : '+ Crear materia nueva'}
+                </button>
+              </div>
+              {nuevaMateria ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
+                  <input className="input-uca" placeholder="Nombre de la materia"
+                    value={draftNuevaMateria.nombre}
+                    onChange={e => setDraftNuevaMateria(d => ({ ...d, nombre: e.target.value }))} />
+                  <input className="input-uca" placeholder="Código (opcional)"
+                    value={draftNuevaMateria.codigo}
+                    onChange={e => setDraftNuevaMateria(d => ({ ...d, codigo: e.target.value }))} />
+                </div>
+              ) : (
+                <select className="input-uca" value={draftMateria.materia_id}
+                  onChange={e => {
+                    const m = materiasDisponibles.find(x => x.id === Number(e.target.value))
+                    setDraftMateria(d => ({
+                      ...d, materia_id: e.target.value,
+                      creditos: m?.creditos ? String(m.creditos) : d.creditos,
+                      semestre: m?.semestre ? String(m.semestre) : d.semestre,
+                    }))
+                  }} style={{ marginBottom: 12 }}>
+                  <option value="">Seleccionar materia…</option>
+                  {materiasDisponibles.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.codigo ? `${m.codigo} — ` : ''}{m.nombre}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div>
@@ -547,8 +621,8 @@ export default function MallaAdmin() {
             </label>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
               <button className="btn-ghost" onClick={() => setModalMateria(false)}>Cancelar</button>
-              <button className="btn-primary" disabled={saving || !draftMateria.materia_id} onClick={guardarMateria}>
-                {saving ? 'Guardando…' : 'Agregar a la malla'}
+              <button className="btn-primary" disabled={saving || (nuevaMateria ? !draftNuevaMateria.nombre.trim() : !draftMateria.materia_id)} onClick={guardarMateria}>
+                {saving ? 'Guardando…' : nuevaMateria ? 'Crear y agregar' : 'Agregar a la malla'}
               </button>
             </div>
           </div>
@@ -607,6 +681,49 @@ export default function MallaAdmin() {
               <button className="btn-ghost" onClick={() => setModalCorr(false)}>Cancelar</button>
               <button className="btn-primary" disabled={saving || !draftCorr.materia_id || !draftCorr.prerrequisito_id} onClick={guardarCorr}>
                 {saving ? 'Guardando…' : 'Crear correlatividad'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nueva carrera */}
+      {modalCarrera && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)',
+          zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div className="card card-elevated" style={{ width: '100%', maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="ti ti-school" style={{ color: 'var(--accent)' }} />
+                Nueva carrera
+              </h3>
+              <button onClick={() => setModalCarrera(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 20 }}>
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <p className="mono-label" style={{ marginBottom: 6 }}>Nombre</p>
+              <input className="input-uca" value={draftCarrera.nombre}
+                onChange={e => setDraftCarrera(d => ({ ...d, nombre: e.target.value }))} placeholder="Ej: Ingeniería Informática" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+              <div>
+                <p className="mono-label" style={{ marginBottom: 6 }}>Duración (semestres)</p>
+                <input className="input-uca" type="number" min={1} max={20} value={draftCarrera.duracion_semestres}
+                  onChange={e => setDraftCarrera(d => ({ ...d, duracion_semestres: e.target.value }))} />
+              </div>
+              <div>
+                <p className="mono-label" style={{ marginBottom: 6 }}>Créditos totales</p>
+                <input className="input-uca" type="number" min={1} value={draftCarrera.creditos_totales}
+                  onChange={e => setDraftCarrera(d => ({ ...d, creditos_totales: e.target.value }))} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
+              <button className="btn-ghost" onClick={() => setModalCarrera(false)}>Cancelar</button>
+              <button className="btn-primary" disabled={saving || !draftCarrera.nombre.trim()} onClick={guardarCarrera}>
+                {saving ? 'Guardando…' : 'Crear carrera'}
               </button>
             </div>
           </div>

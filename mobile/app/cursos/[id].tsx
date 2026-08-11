@@ -1,4 +1,4 @@
-// Alumno y Profesor. Detalle de una materia (notas, asistencia). Contiene fallback a DUMMY_MATERIAS —
+// Alumno y Profesor. Detalle de una materia (notas, asistencia).
 import { colors } from "../../constants/design";
 import { useTheme } from "../../hooks/useTheme";
 import { useEffect, useState, useCallback } from "react";
@@ -12,61 +12,6 @@ import Svg, { Path, Circle } from "react-native-svg";
 import { DonutChart } from "../../components/ui/DonutChart";
 import { fontFamily, fontSize, spacing } from "../../constants/design";
 import { fetchMateriaDetalle, PUNTAJE_POR_TIPO, type MateriaDetalle } from "../../services/notasService";
-
-// ─── Datos dummy ──────────────────────────────────────────────────────────────
-
-const DUMMY_MATERIAS: Record<number, MateriaDetalle> = {
-  1: {
-    materiaId: 1, nombre: "Programación I", profesor: "Ing. Pérez", semestre: 1,
-    asistenciaPct: 92, totalClases: 40, presentes: 37,
-    desglose: [
-      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 88, fecha: "2026-04-15", hora: "17:00", profesor: "Ing. Pérez" },
-      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 8, puntajeActividad: 100, puntajeLogrado: 80, fecha: "2026-06-10", hora: "17:00", profesor: "Ing. Pérez" },
-      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 10, puntajeActividad: 50, puntajeLogrado: 48, fecha: "2026-05-20", hora: null, profesor: "Ing. Pérez" },
-      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 7.5, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-    ],
-  },
-  2: {
-    materiaId: 2, nombre: "Matemática I", profesor: "Lic. González", semestre: 1,
-    asistenciaPct: 78, totalClases: 40, presentes: 31,
-    desglose: [
-      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 5, puntajeActividad: 100, puntajeLogrado: 52, fecha: "2026-04-16", hora: "17:00", profesor: "Lic. González" },
-      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 7, puntajeActividad: 100, puntajeLogrado: 70, fecha: "2026-06-11", hora: "17:00", profesor: "Lic. González" },
-      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 6, puntajeActividad: 50, puntajeLogrado: 30, fecha: "2026-05-21", hora: null, profesor: "Lic. González" },
-      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 6.5, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-    ],
-  },
-  3: {
-    materiaId: 3, nombre: "Inglés Técnico", profesor: "Prof. Martínez", semestre: 1,
-    asistenciaPct: 95, totalClases: 30, presentes: 28,
-    desglose: [
-      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 92, fecha: "2026-04-14", hora: "15:00", profesor: "Prof. Martínez" },
-      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 9, puntajeActividad: 100, puntajeLogrado: 90, fecha: "2026-06-09", hora: "15:00", profesor: "Prof. Martínez" },
-      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 9, puntajeActividad: 40, puntajeLogrado: 36, fecha: "2026-05-19", hora: null, profesor: "Prof. Martínez" },
-      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 9, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-    ],
-  },
-  4: {
-    materiaId: 4, nombre: "Base de Datos", profesor: "Ing. López", semestre: 2,
-    asistenciaPct: 85, totalClases: 36, presentes: 30,
-    desglose: [
-      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 7, puntajeActividad: 100, puntajeLogrado: 72, fecha: "2026-04-10", hora: "17:00", profesor: "Ing. López" },
-      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 6, puntajeActividad: 100, puntajeLogrado: 60, fecha: "2026-06-12", hora: "17:00", profesor: "Ing. López" },
-      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 8, puntajeActividad: 60, puntajeLogrado: 48, fecha: "2026-05-22", hora: null, profesor: "Ing. López" },
-      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: 7, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-    ],
-  },
-  5: {
-    materiaId: 5, nombre: "Álgebra Lineal", profesor: "Lic. Fernández", semestre: 2,
-    asistenciaPct: 65, totalClases: 40, presentes: 26,
-    desglose: [
-      { tipo: "parcial1", label: "Parcial 1", peso: 0.25, nota: 4, puntajeActividad: 100, puntajeLogrado: 40, fecha: "2026-04-17", hora: "17:00", profesor: "Lic. Fernández" },
-      { tipo: "parcial2", label: "Parcial 2", peso: 0.25, nota: 5, puntajeActividad: 100, puntajeLogrado: 50, fecha: "2026-06-13", hora: "17:00", profesor: "Lic. Fernández" },
-      { tipo: "practico", label: "Trabajo Práctico", peso: 0.2, nota: 6, puntajeActividad: 40, puntajeLogrado: 24, fecha: "2026-05-23", hora: null, profesor: "Lic. Fernández" },
-      { tipo: "final1", label: "Final — 1.ª Oportunidad", peso: 0.3, nota: null, puntajeActividad: null, puntajeLogrado: null, fecha: null, hora: null, profesor: null },
-    ],
-  },
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,12 +56,7 @@ const { id } = useLocalSearchParams<{ id: string }>();
       const d = await fetchMateriaDetalle(Number(id));
       setDetalle(d);
     } catch {
-      const dummy = DUMMY_MATERIAS[Number(id)];
-      if (dummy) {
-        setDetalle(dummy);
-      } else {
-        setError("No se pudo cargar el detalle.");
-      }
+      setError("No se pudo cargar el detalle.");
     }
   }, [id]);
 
@@ -374,8 +314,55 @@ const { id } = useLocalSearchParams<{ id: string }>();
           </View>
         </Animated.View>
 
+        {/* ── Nota final cargada directo por el profesor (bypassa desglose) ── */}
+        {detalle.directa != null && (
+          <Animated.View entering={FadeInDown.delay(120).duration(300)}>
+            <View
+              style={{
+                backgroundColor: "#13151A",
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: detalle.felicitado ? "#fbbf24" : colors.border,
+                overflow: "hidden",
+                padding: 20,
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                {detalle.felicitado && (
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="#fbbf24">
+                    <Path d="M12 2l2.9 6.6 7.1.7-5.4 4.7 1.6 7-6.2-3.7L5.8 21l1.6-7-5.4-4.7 7.1-.7L12 2z" />
+                  </Svg>
+                )}
+                <Text
+                  style={{
+                    color: detalle.felicitado ? "#fbbf24" : colors.textPrimary,
+                    fontFamily: fontFamily.interSemibold,
+                    fontSize: 36,
+                    letterSpacing: -1,
+                  }}
+                >
+                  {detalle.directa}{detalle.felicitado ? "F" : ""}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontFamily: fontFamily.inter,
+                  fontSize: 11,
+                  letterSpacing: 0.8,
+                  textTransform: "uppercase",
+                }}
+              >
+                Nota final (carga directa)
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
         {/* ── Evaluaciones en orden correcto ── */}
-        {desgloseOrdenado.map((d, i) => {
+        {detalle.directa == null && desgloseOrdenado.map((d, i) => {
           const meta = TIPO_META[d.tipo] ?? { label: d.tipo, eyebrow: "EVALUACIÓN", color: colors.cyan };
           const maxPts = d.puntajeActividad ?? PUNTAJE_POR_TIPO[d.tipo] ?? 0;
           const tieneNota = d.puntajeLogrado != null;

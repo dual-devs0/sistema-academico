@@ -7,7 +7,7 @@ frontend web React y app móvil Expo/React Native, para los roles Alumno, Profes
 
 | Capa | Tecnología |
 |---|---|
-| Backend | FastAPI + SQLAlchemy + Alembic + PostgreSQL (Neon) + JWT |
+| Backend | FastAPI + SQLAlchemy + Alembic + PostgreSQL (Supabase) + JWT |
 | Frontend web | React 19 + TypeScript + Vite + Tailwind v4 |
 | Mobile | Expo SDK 57 + React Native + expo-router + NativeWind v4 |
 | Auth | JWT (access en body + refresh en cookie httpOnly) + CSRF double-submit + rate limiting |

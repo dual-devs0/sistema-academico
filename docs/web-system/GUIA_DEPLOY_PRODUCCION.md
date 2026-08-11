@@ -1,5 +1,14 @@
 # Guía de Deploy a Producción — Render (backend) + Vercel (frontend)
 
+> **ESTADO ACTUAL: ya deployado y en producción.** Esta guía documenta el PRIMER deploy
+> (2026-07-24), cuando no había nada creado todavía. Ese deploy ya se hizo — Render, Vercel y la
+> base de datos están corriendo (la DB migró de Neon a Supabase el 2026-08-08, ver
+> [`MIGRACION_NEON_A_SUPABASE.md`](MIGRACION_NEON_A_SUPABASE.md)). El contenido de abajo queda
+> como referencia histórica y como runbook reusable: la sección 5 (diagnóstico de fallas) y la
+> sección 4 (smoke test) siguen aplicando tal cual para futuros redeploys o incidentes. Las
+> secciones 1.1 y 2.3 que hablan de "crear la instancia de Neon" son las únicas puramente
+> históricas — la DB activa hoy es el pooler de Supabase, no Neon.
+
 > **Qué es esto:** UCA V2 es un sistema de gestión académica (backend FastAPI + PostgreSQL,
 > frontend React + Vite) para universidades paraguayas. Esta guía asume que quien la ejecuta no
 > tuvo contexto previo del proyecto — si necesitás más contexto general antes de arrancar, el
@@ -72,6 +81,11 @@ Neon real en este entorno (sin Postgres local ni acceso a la cuenta del usuario)
 migraciones sí se verificó estructuralmente sana (37 migraciones, un solo head, sin bifurcaciones)
 en la auditoría del 2026-07-24 ([`AUDITORIA_2026-07-24.md`](../auditorias/AUDITORIA_2026-07-24.md)).
 
+> **Plan de migración a Supabase (2026-08-08) — candidato, no modo de cambio**: la base de datos
+> puede migrarse de Neon a Supabase (Postgres→Postgres, sin cambios de código; el backend queda en
+> Render y el frontend en Vercel). Pasos, `DATABASE_URL` del pooler de Supabase y gotchas (IP
+> allowlist, `sslmode=require`, CORS) en [`MIGRACION_NEON_A_SUPABASE.md`](MIGRACION_NEON_A_SUPABASE.md).
+
 ### 1.2 Render — backend
 
 1. Ir a [render.com](https://render.com), crear cuenta si no existe.
@@ -138,7 +152,7 @@ en la auditoría del 2026-07-24 ([`AUDITORIA_2026-07-24.md`](../auditorias/AUDIT
 
 | Variable | De dónde sale |
 |---|---|
-| `DATABASE_URL` | Connection string de la instancia Neon de producción (sección 1.1) |
+| `DATABASE_URL` | Connection string de la instancia Neon de producción (sección 1.1) — **o pooler de Supabase** si se aplica el plan de migración (ver [`MIGRACION_NEON_A_SUPABASE.md`](MIGRACION_NEON_A_SUPABASE.md)) |
 | `CORS_ORIGINS` | URL real que asigne Vercel tras el primer deploy (sección 1.3) — hasta entonces, dejar temporalmente `http://localhost:5173` y actualizar después |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | Cuenta Gmail real de envío (app password, no la contraseña normal) — confirmar que es la cuenta de producción, no la de dev |
 | `R2_ENDPOINT_URL` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET_NAME` | Cuenta Cloudflare R2 — **no están en `render.yaml` todavía, agregarlas a mano en el dashboard de Render** (bloqueante conocido, ya documentado antes de esta auditoría: sin esto, subida de fotos/apuntes/comprobantes/informes de pasantía falla) |
@@ -198,10 +212,11 @@ específicamente, no asumir que pasa solo porque el resto del backend levantó b
 
 Con el backend en Render y el frontend en Vercel ya desplegados:
 
-1. **Bootstrap del primer admin** (una sola vez, ver sección 1.1 punto 4):
+1. **Bootstrap del primer admin** (una sola vez, ver sección 1.1 punto 4) — **ya ejecutado**, se
+   deja el comando para referencia si hiciera falta un nuevo ambiente:
    ```bash
    cd backend
-   DATABASE_URL="<connection string de Neon de producción>" python scripts/seed_usuarios.py
+   DATABASE_URL="<connection string del pooler Transaction de Supabase>" python scripts/seed_usuarios.py
    ```
    Crea 3 usuarios: `admin@uca.edu.py` / `Admin1234!` (admin), `12345678` / `Alumno1234!` (alumno),
    `prof@uca.edu.py` / `Profesor1234!` (profesor).

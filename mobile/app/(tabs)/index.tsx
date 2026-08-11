@@ -323,7 +323,7 @@ function Body({
               label="Promedio General"
               value={`${promedio != null ? promedio.toFixed(1) : "—"}`}
               valueColor={colors.cyan}
-              status={promedio != null && promedio >= 6 ? `${materiasCount} materias` : `${materiasCount} materias`}
+              status={`${materiasCount} materias`}
               bgColor="rgba(251,191,36,0.15)"
               onPress={onOpenExamenes}
             />

@@ -65,5 +65,5 @@ export const resolverSolicitud = (
   if (motivo_rechazo) form.append('motivo_rechazo', motivo_rechazo)
   if (archivo) form.append('archivo', archivo)
 
-  return api.upload<Solicitud>(`/tramites/solicitudes/${solicitudId}/resolver`, form)
+  return api.uploadPut<Solicitud>(`/tramites/solicitudes/${solicitudId}/resolver`, form)
 }

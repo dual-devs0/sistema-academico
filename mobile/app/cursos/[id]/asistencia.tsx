@@ -12,51 +12,6 @@ import Svg, { Path } from "react-native-svg";
 import { fontFamily, fontSize, radius, spacing } from "../../../constants/design";
 import { fetchAsistenciaDetalle, type AsistenciaRegistro } from "../../../services/notasService";
 
-// ─── Datos dummy ──────────────────────────────────────────────────────────────
-
-const DUMMY_ASISTENCIA: Record<number, { nombre: string; registros: AsistenciaRegistro[] }> = {
-  1: {
-    nombre: "Programación I",
-    registros: [
-      { fecha: "2026-03-02", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-03-05", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-03-09", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-03-12", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Ausente" },
-      { fecha: "2026-03-16", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-03-19", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Justificado" },
-      { fecha: "2026-03-23", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-03-26", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-03-30", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Feriado" },
-      { fecha: "2026-04-02", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-04-06", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-04-09", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Ausente" },
-      { fecha: "2026-04-13", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-04-16", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Ausente" },
-      { fecha: "2026-04-20", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Feriado" },
-      { fecha: "2026-04-23", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-04-27", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-04-30", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Ausente" },
-      { fecha: "2026-05-04", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-05-07", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-05-11", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-05-14", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-05-18", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Ausente" },
-      { fecha: "2026-05-21", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Justificado" },
-      { fecha: "2026-05-25", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-05-28", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-01", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Feriado" },
-      { fecha: "2026-06-04", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-08", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-11", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-15", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Ausente" },
-      { fecha: "2026-06-18", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-22", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-25", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-      { fecha: "2026-06-29", tipoClase: "P", horasCatedra: 4, asistenciaCargada: "Presente" },
-    ],
-  },
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const MESES = [
@@ -111,13 +66,7 @@ const { id } = useLocalSearchParams<{ id: string }>();
       setRegistros(res.registros);
       setMateriaNombre(res.nombre);
     } catch {
-      const dummy = DUMMY_ASISTENCIA[Number(id)];
-      if (dummy) {
-        setRegistros(dummy.registros);
-        setMateriaNombre(dummy.nombre);
-      } else {
-        setError("No se pudo cargar la asistencia.");
-      }
+      setError("No se pudo cargar la asistencia.");
     }
   }, [id]);
 
@@ -161,6 +110,19 @@ const { id } = useLocalSearchParams<{ id: string }>();
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }} edges={["top"]}>
         <ActivityIndicator color={colors.cyan} size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <View style={{ padding: spacing.xl }}>
+          <Text style={{ color: colors.error, fontFamily: fontFamily.interSemibold }}>{error}</Text>
+          <Pressable onPress={load} style={{ marginTop: spacing.md }}>
+            <Text style={{ color: colors.cyan }}>Reintentar</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }

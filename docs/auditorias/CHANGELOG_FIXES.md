@@ -1,7 +1,64 @@
 # CHANGELOG_FIXES.md
 
 > Generado automáticamente por la auditoría del 2026-07-23
-> Última modificación: 2026-07-24
+> Última modificación: 2026-08-07
+
+## 2026-08-07 — Seguridad QR de asistencia: solo alumnos inscriptos pueden escanear (Plan Fases 1-3)
+
+### Antes (cómo estaba)
+El flujo de código QR de asistencia ya rechazaba a quien no estaba inscripto
+en el backend (`POST /asistencias/qr/verificar` devolvía `403`), pero con
+gaps de autorización por rol y de pertenencia de materia:
+- `POST /asistencias/qr/verificar` no exigía explícitamente rol `alumno` — la
+  defensa dependía del filtro del frontend (no confiar en el cliente).
+- `GET /asistencias/qr/{materia_id}` (generador) permitía que **cualquier**
+  profesor/admin generara QR de cualquier materia, aunque no la dictara.
+- `PUT /profesor/toggle/{id}` y `POST /profesor/marcar` no validaban que el
+  profesor dictara esa materia, ni que el alumno estuviera inscripto en la
+  oferta antes de marcar presente → un profesor podía alterar asistencia de
+  materias ajenas.
+
+### Después (cómo quedó)
+- `POST /asistencias/qr/verificar`: guard de rol `current_user.role != "alumno"`
+  → `403 "Solo alumnos pueden escanear"` antes de decodificar el JWT.
+- `GET /asistencias/qr/{materia_id}`: profesor solo genera QR de materias que
+  dicta (`es_profesor_de_materia`); admin exento.
+- `PUT /profesor/toggle/{id}`: deriva `materia_id` desde la oferta del registro
+  y exige pertenencia al profesor (admin exento).
+- `POST /profesor/marcar`: pertenencia de materia + verificación de
+  inscripción del alumno en la oferta activa antes de registrar presente.
+
+Escenario objetivo (profesor comparte el QR en WhatsApp):
+- Alumno inscripto de esa materia → `200`, presente.
+- Alumno de otra materia o foráneo → `403 "No estás inscripto en esta materia"`.
+- Usuario sin sesión → redirige a login, nunca llega al POST.
+- QR expirado (>15 min) → `400`.
+
+### Cambio realizado
+- `backend/app/routers/asistencias_router.py` — guards de rol (`verificar`) y
+  de pertenencia de materia (generador, `toggle`, `marcar`) + validación de
+  inscripción en `marcar`. Reusa el helper existente `es_profesor_de_materia`
+  (`app/services/autorizacion.py`).
+- `backend/tests/test_asistencias_qr.py` — 6 tests nuevos de regresión:
+  profesor no escanea, admin no escanea, profesor genera su materia OK,
+  profesor en materia ajena → 403 (generador y `marcar` y `toggle`),
+  marcar alumno no inscripto → 403. Helper `_materia_ajena()` para crear una
+  materia que el profesor del seed no dicta.
+- Frontend (`frontend/src/pages/AsistenciaScan.tsx`) — verificado, sin cambios:
+  ya muestra el `403 "No estás inscripto"` y bloquea a no-alumnos antes del POST.
+
+### Para qué sirve
+El QR compartido por WhatsApp es inútil para cualquiera que no esté inscripto
+en la materia, y un profesor no puede generar ni alterar asistencia de materias
+que no dicta. Backend defiende por sí solo, sin depender del cliente.
+
+### Verificación
+- `backend/tests/test_asistencias_qr.py`: 13/13 passed.
+- Suite backend completa: **307 passed, 4 skipped** — sin regresiones.
+
+### Cambios que debe encontrar un revisor
+- `backend/app/routers/asistencias_router.py` — 4 endpoints con guards nuevos.
+- `backend/tests/test_asistencias_qr.py` — 6 tests de seguridad nuevos.
 
 ## 2026-07-24 — Fix: COOKIE_SECURE nunca declarada en CI (hallazgo #9, ver AUDITORIA_2026-07-24.md)
 

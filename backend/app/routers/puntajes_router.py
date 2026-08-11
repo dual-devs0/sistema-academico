@@ -11,11 +11,39 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.email_utils import send_new_grade_email_bg
 from app.services.autorizacion import es_profesor_de_alumno, es_profesor_de_materia
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos, promedios_por_alumno
+from app.services.expediente import asistencia_minima_institucional
 # AUDIT-FIX B-3: referencia corregida post-merge — _oferta_activa_id vive en asistencias_router
-from app.routers.asistencias_router import _oferta_activa_id
+from app.routers.asistencias_router import _oferta_activa_id, calcular_porcentaje_asistencia
 
 router = APIRouter(prefix="/puntajes", tags=["puntajes"])
+
+_TIPOS_NOTA_FINAL = {"final1", "final2", "final3", "directa"}
+
+
+def _verificar_regularidad(db: Session, user_id: int, materia_id: int, tipo: str) -> None:
+    """Gate de regularidad (Art. 24 Reglamento UCA): un profesor no puede cargar
+    la nota final de un alumno si su asistencia esta por debajo del minimo
+    institucional. Solo aplica a las notas que definen aprobado/reprobado
+    (final1/2/3, directa) -- los parciales y el practico se cargan libremente
+    durante el cursado. Un admin puede forzar la carga igual (override
+    explicito), por eso el llamador solo invoca esto para role == "profesor".
+    """
+    if tipo not in _TIPOS_NOTA_FINAL:
+        return
+    asistencia = calcular_porcentaje_asistencia(db, user_id, materia_id)
+    if asistencia["total_clases"] == 0:
+        return  # sin clases registradas todavia, no hay base para juzgar regularidad
+    minimo = asistencia_minima_institucional(db)
+    if asistencia["porcentaje"] < minimo:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"El alumno no cumple el minimo de asistencia requerido "
+                f"({asistencia['porcentaje']}% de {minimo}% ) -- no se puede "
+                f"cargar la nota final. Un admin puede forzar la carga."
+            ),
+        )
 
 
 @router.get("/pesos/{materia_id}", response_model=schemas.puntaje.PesoEvaluacionOut)
@@ -82,7 +110,7 @@ def actualizar_pesos_materia(
 
 def _max_para_tipo(pesos: dict[str, float], tipo: str) -> float:
     if tipo == "directa":
-        return 10  # nota final directa, siempre escala 0-10
+        return 5  # nota final directa, entero 1-5 (Art. 24 Reglamento UCA)
     clave = "final" if tipo.startswith("final") else tipo
     return pesos.get(clave, 100)
 
@@ -133,6 +161,7 @@ def create_puntaje(
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
+        _verificar_regularidad(db, puntaje.user_id, puntaje.materia_id, puntaje.tipo)
     oferta_id = _oferta_activa_id(db, puntaje.materia_id)
     if oferta_id is None:
         raise HTTPException(
@@ -161,6 +190,20 @@ def create_puntaje(
             detail=f"Ya existe una nota de tipo '{puntaje.tipo}' "
             "para este alumno en esta materia",
         )
+    # "directa" y desglose (parcial/practico/final) son mutuamente excluyentes
+    # -- calcular_promedio_final le da precedencia absoluta a "directa" si
+    # existe, asi que dejar la del modo contrario tirada silenciosamente
+    # anula cualquier nota nueva cargada en el otro modo. Se borra al vuelo.
+    tipo_contrario = (
+        models.puntaje.Puntaje.tipo != "directa"
+        if puntaje.tipo == "directa"
+        else models.puntaje.Puntaje.tipo == "directa"
+    )
+    db.query(models.puntaje.Puntaje).filter(
+        models.puntaje.Puntaje.user_id == puntaje.user_id,
+        models.puntaje.Puntaje.oferta_materia_id == oferta_id,
+        tipo_contrario,
+    ).delete(synchronize_session=False)
     new_puntaje = models.puntaje.Puntaje(
         user_id=puntaje.user_id,
         oferta_materia_id=oferta_id,
@@ -274,6 +317,7 @@ def update_puntaje(
             raise HTTPException(
                 status_code=403, detail="No sos el profesor titular de esta materia"
             )
+        _verificar_regularidad(db, existing.user_id, mid, puntaje.tipo)
     data = puntaje.model_dump()
     nueva_materia_id = data.pop("materia_id")
     if nueva_materia_id != existing.materia_id:
@@ -290,6 +334,20 @@ def update_puntaje(
             status_code=422,
             detail=f"El valor máximo para '{data['tipo']}' en esta materia es {maximo}",
         )
+    if data["tipo"] != existing.tipo:
+        # Mismo motivo que en create_puntaje: "directa" y desglose son
+        # mutuamente excluyentes, se limpia el modo contrario al cambiar tipo.
+        tipo_contrario = (
+            models.puntaje.Puntaje.tipo != "directa"
+            if data["tipo"] == "directa"
+            else models.puntaje.Puntaje.tipo == "directa"
+        )
+        db.query(models.puntaje.Puntaje).filter(
+            models.puntaje.Puntaje.user_id == existing.user_id,
+            models.puntaje.Puntaje.oferta_materia_id == existing.oferta_materia_id,
+            models.puntaje.Puntaje.id != existing.id,
+            tipo_contrario,
+        ).delete(synchronize_session=False)
     for key, value in data.items():
         setattr(existing, key, value)
     existing.editado_por = user.id
@@ -546,15 +604,10 @@ def estadisticas_materia(
     total_alumnos = len(promedios)
     total_notas = len(filas)
 
-    distribucion = {
-        "0-3": sum(1 for v in promedios if v < 3),
-        "3-5": sum(1 for v in promedios if 3 <= v < 5),
-        "5-6": sum(1 for v in promedios if 5 <= v < 6),
-        "6-7": sum(1 for v in promedios if 6 <= v < 7),
-        "7-9": sum(1 for v in promedios if 7 <= v < 9),
-        "9-10": sum(1 for v in promedios if 9 <= v <= 10),
-    }
-    aprobados = sum(1 for v in promedios if v >= 6)
+    # Distribucion por escalon real (1-5, Art. 24) -- promedios ya son enteros
+    # 1-5, no rangos 0-10 inventados.
+    distribucion = {str(n): sum(1 for v in promedios if v == n) for n in range(1, 6)}
+    aprobados = sum(1 for v in promedios if v >= APROBACION_MINIMA)
     en_riesgo = total_alumnos - aprobados
 
     return {
@@ -562,8 +615,8 @@ def estadisticas_materia(
         "total_alumnos": total_alumnos,
         "total_notas": total_notas,
         "promedio_grupo": round(sum(promedios) / total_alumnos, 2) if total_alumnos else 0,
-        "nota_maxima": round(max(promedios), 2) if promedios else 0,
-        "nota_minima": round(min(promedios), 2) if promedios else 0,
+        "nota_maxima": max(promedios) if promedios else 0,
+        "nota_minima": min(promedios) if promedios else 0,
         "distribucion": distribucion,
         "aprobados": aprobados,
         "en_riesgo": en_riesgo,
@@ -579,13 +632,15 @@ def promedio_puntajes(
 ):
     if current_user.role != "admin" and current_user.user_id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
-    puntajes = (
+    # Promedio real (pesos reales por materia, promedio de promedios) -- no un
+    # AVG crudo sobre todos los tipos/materias, que mezclaria escalas
+    # distintas (parcial max 20, final max 50, directa 0-10) sin sentido.
+    promedios = promedios_por_alumno(db, [user_id])
+    if user_id not in promedios:
+        raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
+    total_puntajes = (
         db.query(models.puntaje.Puntaje)
         .filter(models.puntaje.Puntaje.user_id == user_id)
-        .all()
+        .count()
     )
-    if not puntajes:
-        raise HTTPException(status_code=404, detail="No se encontraron puntajes para este usuario")
-    valores = [float(str(p.valor)) for p in puntajes]
-    promedio = round(sum(valores) / len(valores), 2)
-    return {"user_id": user_id, "promedio": promedio, "total_puntajes": len(puntajes)}
+    return {"user_id": user_id, "promedio": promedios[user_id], "total_puntajes": total_puntajes}

@@ -14,6 +14,7 @@
  */
 
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 // En Expo, las variables de entorno se pasan mediante app.json extra o
 // mediante dotenv. Para compatibilidad, intentamos ambas fuentes.
@@ -40,3 +41,34 @@ export const API_BASE: string =
 
 export const APP_NAME = "UCA Móvil";
 export const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
+
+// Nombre legible del sistema operativo + modelo del dispositivo (si el
+// sistema operativo lo expone). Fallback simple y seguro.
+const ANDROID_API_TO_VERSION: Record<string, string> = {
+  "33": "13",
+  "34": "14",
+  "35": "15",
+  "36": "16",
+};
+
+export function getDeviceLabel(): string {
+  const isAndroid = Platform.OS === "android";
+  let osLabel = Platform.OS === "ios" ? "iOS" : isAndroid ? "Android" : Platform.OS;
+
+  if (isAndroid) {
+    const api = String(Platform.Version);
+    osLabel = ANDROID_API_TO_VERSION[api]
+      ? `Android ${ANDROID_API_TO_VERSION[api]}`
+      : `Android (API ${api})`;
+  }
+
+  const deviceName = Constants.platform?.android?.model;
+  const model =
+    isAndroid && deviceName
+      ? deviceName
+      : Platform.OS === "ios"
+        ? Constants.deviceName ?? undefined
+        : undefined;
+
+  return model ? `${osLabel} • ${model}` : osLabel;
+}

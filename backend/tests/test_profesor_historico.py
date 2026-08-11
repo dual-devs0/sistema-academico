@@ -70,7 +70,10 @@ def test_historico_agrupa_por_periodo(client, seed, tokens, db):
     assert periodos.index("2026-1") < periodos.index("2025-2")
 
     cat_2025 = next(p for p in data if p["periodo"] == "2025-2")["catedras"][0]
-    assert cat_2025["promedio_grupo"] == 5.0
+    # parcial1=5.0 sobre max 20 (pesos default) -> 25% -> nota 1 (Art. 24:
+    # 0-59 -> 1), igual que calcula boleta/alumno para esa misma nota -- no
+    # el AVG crudo (5.0) que usaba la version vieja de este endpoint.
+    assert cat_2025["promedio_grupo"] == 1
     assert cat_2025["porcentaje_aprobacion"] == 0.0
 
 

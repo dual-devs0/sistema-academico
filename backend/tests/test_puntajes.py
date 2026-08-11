@@ -1,8 +1,33 @@
+from datetime import date, timedelta
+
 from app.models.puntaje import Puntaje
+from app.models.asistencia import Asistencia
 
 
 def auth(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def _seed_asistencias(db, seed, presentes: int, ausentes: int):
+    inicio = date(2026, 3, 1)
+    dia = 0
+    for _ in range(presentes):
+        db.add(Asistencia(
+            user_id=seed["alumno"].id,
+            oferta_materia_id=seed["oferta"].id,
+            fecha=inicio + timedelta(days=dia),
+            presente=True,
+        ))
+        dia += 1
+    for _ in range(ausentes):
+        db.add(Asistencia(
+            user_id=seed["alumno"].id,
+            oferta_materia_id=seed["oferta"].id,
+            fecha=inicio + timedelta(days=dia),
+            presente=False,
+        ))
+        dia += 1
+    db.commit()
 
 
 def _seed_puntajes(db, seed):
@@ -57,6 +82,74 @@ def test_create_puntaje(client, seed, tokens):
     assert data["materia_id"] == seed["materia"].id
     assert data["tipo"] == "parcial2"
     assert float(data["valor"]) == 7.5
+
+
+def test_profesor_bloqueado_nota_final_sin_asistencia_minima(client, seed, tokens, db):
+    """Regularidad (Art. 24): profesor no puede cargar nota final con <75% asistencia."""
+    _seed_asistencias(db, seed, presentes=5, ausentes=10)  # 33%
+
+    payload = {
+        "user_id": seed["alumno"].id,
+        "materia_id": seed["materia"].id,
+        "tipo": "directa",
+        "valor": 4,
+    }
+    res = client.post("/puntajes/", json=payload, headers=auth(tokens["profesor"]))
+    assert res.status_code == 403
+    assert "asistencia" in res.json()["detail"].lower()
+
+
+def test_profesor_permitido_nota_final_con_asistencia_suficiente(client, seed, tokens, db):
+    _seed_asistencias(db, seed, presentes=9, ausentes=1)  # 90%
+
+    payload = {
+        "user_id": seed["alumno"].id,
+        "materia_id": seed["materia"].id,
+        "tipo": "directa",
+        "valor": 4,
+    }
+    res = client.post("/puntajes/", json=payload, headers=auth(tokens["profesor"]))
+    assert res.status_code == 200
+
+
+def test_profesor_permitido_parcial_sin_asistencia_minima(client, seed, tokens, db):
+    """El gate solo aplica a notas finales, no a parciales/practico."""
+    _seed_asistencias(db, seed, presentes=2, ausentes=10)  # 17%
+
+    payload = {
+        "user_id": seed["alumno"].id,
+        "materia_id": seed["materia"].id,
+        "tipo": "parcial1",
+        "valor": 15,
+    }
+    res = client.post("/puntajes/", json=payload, headers=auth(tokens["profesor"]))
+    assert res.status_code == 200
+
+
+def test_admin_puede_forzar_nota_final_sin_asistencia_minima(client, seed, tokens, db):
+    """Un admin puede forzar la carga aunque el alumno no cumpla el minimo."""
+    _seed_asistencias(db, seed, presentes=1, ausentes=10)  # 9%
+
+    payload = {
+        "user_id": seed["alumno"].id,
+        "materia_id": seed["materia"].id,
+        "tipo": "directa",
+        "valor": 3,
+    }
+    res = client.post("/puntajes/", json=payload, headers=auth(tokens["admin"]))
+    assert res.status_code == 200
+
+
+def test_profesor_permitido_nota_final_sin_registros_de_asistencia(client, seed, tokens):
+    """Sin clases registradas todavia no hay base para juzgar regularidad -- no bloquea."""
+    payload = {
+        "user_id": seed["alumno"].id,
+        "materia_id": seed["materia"].id,
+        "tipo": "directa",
+        "valor": 4,
+    }
+    res = client.post("/puntajes/", json=payload, headers=auth(tokens["profesor"]))
+    assert res.status_code == 200
 
 
 def test_estadisticas_materia_sin_notas_no_rompe(client, seed, tokens):

@@ -45,7 +45,6 @@ from app.routers import (  # noqa: E402
     notas,
     admin,
     settings,
-    foro as foro_router,
 )
 
 # Schema management es exclusivo de Alembic (backend/alembic/versions/) --
@@ -104,6 +103,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health", include_in_schema=False)
+def health():
+    """Sin auth, sin DB -- usado por el keep-alive de GitHub Actions para
+    evitar el cold start del plan free de Render (duerme tras 15min sin
+    trafico). No usar para healthcheck de infra que necesite verificar la DB."""
+    return {"status": "ok"}
+
+
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(users.router)
@@ -137,7 +144,6 @@ app.include_router(admin.router)
 app.include_router(settings.router)
 if os.getenv("ENV", "production") == "development":
     app.include_router(test_router.router)
-app.include_router(foro_router.router)
 
 
 @app.get(
@@ -155,9 +161,18 @@ def root():
     responses={200: {"description": "Información de versión de la app mobile"}},
 )
 def version():
+    # Configurable vía .env para no tocar código en cada release:
+    #   MOBILE_LATEST_VERSION, MOBILE_MIN_VERSION, MOBILE_UPDATE_URL,
+    #   MOBILE_RELEASE_NOTES
     return {
-        "latestVersion": "1.0.0",
-        "minVersion": "1.0.0",
-        "updateUrl": "https://expo.dev/accounts/cabrvix/projects/uca-movil/builds",
-        "releaseNotes": "Primera versión del sistema académico móvil UCA Caacupé.",
+        "latestVersion": os.getenv("MOBILE_LATEST_VERSION", "1.0.0"),
+        "minVersion": os.getenv("MOBILE_MIN_VERSION", "1.0.0"),
+        "updateUrl": os.getenv(
+            "MOBILE_UPDATE_URL",
+            "https://expo.dev/accounts/cabrvix/projects/uca-movil/builds",
+        ),
+        "releaseNotes": os.getenv(
+            "MOBILE_RELEASE_NOTES",
+            "Primera versión del sistema académico móvil UCA Caacupé.",
+        ),
     }

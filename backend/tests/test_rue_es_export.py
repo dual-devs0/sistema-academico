@@ -91,6 +91,7 @@ def test_trayecto_academico_incluye_inscripcion_y_notas(client, seed, tokens, db
     row = body_rows[0]
     assert row[1] == seed["alumno"].nombre
     assert row[3] == seed["materia"].nombre
-    assert row[5] == "8.0"
+    # final1=40/50 = 80% -> nota 4 (Art. 24: 80-90 -> 4)
+    assert row[5] == "4"
     assert row[6] == "APROBADO"
     assert row[7] == "100.0"

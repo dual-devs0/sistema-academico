@@ -29,7 +29,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function BackExitGuard() {
   const router = useRouter();
-  const { status } = useAuth();
+  const { status, logout } = useAuth();
 
   useEffect(() => {
     const onBack = () => {
@@ -38,14 +38,17 @@ function BackExitGuard() {
           goToFirstTab?.();
           return true;
         }
-        BackHandler.exitApp();
+        // Salir de la app cerrando la sesión (seguridad: no guardar sesiones
+        // al cierre). La limpieza local es async y no bloquea la salida: se
+        // dispara y luego se mata el proceso.
+        void logout().finally(() => BackHandler.exitApp());
         return true;
       }
       return false;
     };
     const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
     return () => sub.remove();
-  }, [router, status]);
+  }, [router, status, logout]);
 
   return null;
 }
@@ -121,6 +124,7 @@ function AppGate({ fontsReady }: { fontsReady: boolean }) {
             />
             <Stack.Screen name="cuenta" />
             <Stack.Screen name="examenes" />
+            <Stack.Screen name="cambiar-contrasena" />
             <Stack.Screen name="cursos/[id]" />
           </Stack>
         </AuthGate>
@@ -154,7 +158,7 @@ export default function RootLayout() {
   });
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#1a3569" }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#083D74" }}>
       <ThemeProvider>
         <AuthProvider>
           <ThemeStatusBar />

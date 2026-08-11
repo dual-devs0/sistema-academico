@@ -1,9 +1,9 @@
 // Login público (alumno/profesor). Auth vía POST /auth/login, setea access token en memoria + refresh/csrf en cookie.
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useInView } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.webp'
-import { api, decodeToken, setAccessToken } from '../lib/api'
+import { api, decodeToken, setAccessToken, warmUpBackend } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
 type Rol = 'alumno' | 'profesor'
@@ -52,6 +52,8 @@ export default function AcademicoLogin() {
   const [error, setError]          = useState('')
   const [showSoporte, setSoporte]  = useState(false)
   const [showRecuperar, setShowRecuperar] = useState(false)
+
+  useEffect(() => { warmUpBackend() }, [])
   const [recEmail, setRecEmail] = useState('')
   const [recLoading, setRecLoading] = useState(false)
   const [recEnviado, setRecEnviado] = useState(false)
@@ -299,14 +301,6 @@ export default function AcademicoLogin() {
     }
     .sx-forgot { font-size:11px; color:var(--accent); text-decoration:none; }
     .sx-forgot:hover { text-decoration:underline; }
-
-    .sx-demo {
-      display:flex; align-items:center; gap:8px;
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:7px; padding:7px 11px; margin-bottom:10px; width:100%;
-    }
-    .sx-demo p { font-size:10px; color:var(--text-2); line-height:1.4; }
-    .sx-demo strong { color:var(--text-1); font-weight:600; }
 
     .sx-btn-primary {
       width:100%; height:39px;
@@ -657,18 +651,6 @@ export default function AcademicoLogin() {
                       </button>
                     </div>
                   </div>
-
-                  {!showDocExtranjero && (
-                    <div className="sx-demo">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                      </svg>
-                      <p>
-                        <strong>Alumno:</strong> 12345678 · Alumno1234! &nbsp;
-                        <strong>Profesor:</strong> prof@uca.edu.py · Profesor1234!
-                      </p>
-                    </div>
-                  )}
 
                   <button className="sx-btn-primary" type="submit" disabled={loading} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                     {loading ? (

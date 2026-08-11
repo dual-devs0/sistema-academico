@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.schemas.current_user_schema import CurrentUser
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos
 
 router = APIRouter(prefix="/profesor", tags=["profesor"])
 
@@ -66,29 +67,36 @@ def profesor_dashboard(
     ]
     resumen["total_alumnos"] = len(alumno_ids_raw)
 
-    # Promedio general
-    punt_rows = (
-        db.query(P.oferta_materia_id, func.avg(P.valor).label("prom"), func.count(P.id).label("cnt"))
-        .filter(P.oferta_materia_id.in_(oferta_ids))
-        .group_by(P.oferta_materia_id)
-        .all()
-    )
-    total_notas = sum(r.cnt for r in punt_rows)
-    suma_ponderada = sum(float(r.prom) * r.cnt for r in punt_rows if r.prom is not None)
-    if total_notas > 0:
-        resumen["promedio_general"] = round(suma_ponderada / total_notas, 2)
+    # Promedio general / % aprobacion: promedio real por (oferta, alumno) con
+    # los pesos reales de cada materia -- no un AVG crudo que mezclaria
+    # escalas distintas (parcial max 20, final max 50, directa 0-10).
+    materia_por_oferta = {o.id: o.materia_id for o in ofertas}
+    pesos_cache: dict[int, dict] = {}
 
-    # % aprobación
-    prom_rows = (
-        db.query(P.oferta_materia_id, P.user_id, func.avg(P.valor).label("prom"))
-        .filter(P.oferta_materia_id.in_(oferta_ids))
-        .group_by(P.oferta_materia_id, P.user_id)
-        .all()
-    )
-    total_est = len(prom_rows)
-    aprob_count = sum(1 for r in prom_rows if r.prom is not None and r.prom >= 6)
-    if total_est > 0:
-        resumen["porcentaje_aprobacion"] = round(aprob_count / total_est * 100, 1)
+    def pesos_de(materia_id: int) -> dict:
+        if materia_id not in pesos_cache:
+            pesos_cache[materia_id] = get_pesos(db, materia_id)
+        return pesos_cache[materia_id]
+
+    notas_por_grupo: dict[tuple[int, int], dict] = {}
+    for p in db.query(P).filter(P.oferta_materia_id.in_(oferta_ids)).all():
+        notas_por_grupo.setdefault((p.oferta_materia_id, p.user_id), {})[p.tipo] = float(p.valor)
+
+    promedios_grupo = []
+    promedios_por_oferta: dict[int, list[float]] = {}
+    promedios_por_usuario: dict[int, list[float]] = {}
+    for (oferta_id, user_id), notas in notas_por_grupo.items():
+        mid = materia_por_oferta.get(oferta_id)
+        prom = calcular_promedio_final(notas, pesos_de(mid) if mid else None)
+        if prom is not None:
+            promedios_grupo.append(prom)
+            promedios_por_oferta.setdefault(oferta_id, []).append(prom)
+            promedios_por_usuario.setdefault(user_id, []).append(prom)
+
+    if promedios_grupo:
+        resumen["promedio_general"] = round(sum(promedios_grupo) / len(promedios_grupo), 2)
+        aprob_count = sum(1 for v in promedios_grupo if v >= APROBACION_MINIMA)
+        resumen["porcentaje_aprobacion"] = round(aprob_count / len(promedios_grupo) * 100, 1)
 
     # Asistencia promedio
     asis_row = (
@@ -115,9 +123,10 @@ def profesor_dashboard(
         if ofid is not None:
             alumno_por_oferta[ofid] = cnt
 
-    prom_por_oferta: dict[int, float | None] = {}
-    for r in punt_rows:
-        prom_por_oferta[r.oferta_materia_id] = round(float(r.prom), 2) if r.prom is not None else None
+    prom_por_oferta: dict[int, float | None] = {
+        oferta_id: round(sum(vals) / len(vals), 2)
+        for oferta_id, vals in promedios_por_oferta.items()
+    }
 
     horarios_por_materia: dict[int, list[dict]] = {}
     for h in db.query(H).filter(H.materia_id.in_(materia_ids)).all():
@@ -201,7 +210,7 @@ def profesor_dashboard(
 
     agenda_hoy.sort(key=lambda x: (x["hora_inicio"] == "—", x["hora_inicio"]))
 
-    # Alertas: alumnos con inasistencia ≥25% o promedio < 6
+    # Alertas: alumnos con inasistencia ≥25% o promedio < APROBACION_MINIMA
     alertas = []
     if alumno_ids_raw:
         asis_agg = {}
@@ -216,13 +225,12 @@ def profesor_dashboard(
             key = (r.user_id, r.oferta_materia_id)
             asis_agg[key] = {"total": r.total or 0, "pres": r.pres or 0}
 
-        punt_agg_uid: dict[int, float] = {}
-        for r in db.query(P.user_id, func.avg(P.valor).label("prom")).filter(
-            P.user_id.in_(alumno_ids_raw),
-            P.oferta_materia_id.in_(oferta_ids),
-        ).group_by(P.user_id).all():
-            if r.prom is not None:
-                punt_agg_uid[r.user_id] = float(r.prom)
+        # Promedio real por alumno (promedio de sus promedios por oferta,
+        # cada uno con los pesos reales) -- no un AVG crudo cross-materia.
+        punt_agg_uid: dict[int, float] = {
+            uid: sum(vals) / len(vals)
+            for uid, vals in promedios_por_usuario.items()
+        }
 
         nombre_map: dict[int, str] = {}
         for u in db.query(U.id, U.nombre).filter(U.id.in_(alumno_ids_raw)).all():
@@ -233,7 +241,7 @@ def profesor_dashboard(
         for (uid_a, ofid), stats in asis_agg.items():
             inas_pct = round((1 - stats["pres"] / stats["total"]) * 100) if stats["total"] > 0 else 0
             prom = punt_agg_uid.get(uid_a)
-            if inas_pct >= 25 or (prom is not None and prom < 6):
+            if inas_pct >= 25 or (prom is not None and prom < APROBACION_MINIMA):
                 alertas.append({
                     "alumno_id": uid_a,
                     "alumno_nombre": nombre_map.get(uid_a, f"Alumno #{uid_a}"),
@@ -303,6 +311,13 @@ def mi_historico(
 
     oferta_ids = [o.id for o in ofertas]
     materia_ids = [o.materia_id for o in ofertas]
+    materia_por_oferta = {o.id: o.materia_id for o in ofertas}
+    pesos_cache: dict[int, dict] = {}
+
+    def pesos_de(materia_id: int) -> dict:
+        if materia_id not in pesos_cache:
+            pesos_cache[materia_id] = get_pesos(db, materia_id)
+        return pesos_cache[materia_id]
 
     # Student count per oferta (single query)
     alumno_counts: dict[int, int] = {oid: cnt for oid, cnt in
@@ -313,18 +328,26 @@ def mi_historico(
         if oid is not None
     }
 
-    # Avg puntaje + pass rate per oferta (single query per student)
+    # Promedio real + tasa de aprobacion por oferta (pesos reales de la
+    # materia, no un AVG crudo que mezclaria parcial/practico/final/directa).
+    notas_por_grupo: dict[tuple[int, int], dict] = {}
+    for p in db.query(P).filter(P.oferta_materia_id.in_(oferta_ids)).all():
+        notas_por_grupo.setdefault((p.oferta_materia_id, p.user_id), {})[p.tipo] = float(p.valor)
+
+    promedios_por_oferta: dict[int, list[float]] = {}
+    for (oferta_id, _user_id), notas in notas_por_grupo.items():
+        mid = materia_por_oferta.get(oferta_id)
+        prom = calcular_promedio_final(notas, pesos_de(mid) if mid else None)
+        if prom is not None:
+            promedios_por_oferta.setdefault(oferta_id, []).append(prom)
+
     punt_agg = {}
     for ofid in oferta_ids:
-        rows = db.query(P.user_id, func.avg(P.valor).label("prom")).filter(
-            P.oferta_materia_id == ofid
-        ).group_by(P.user_id).all()
-        if rows:
-            vals = [r.prom for r in rows]
-            prom = round(sum(vals) / len(vals), 2) if vals else None
-            aprob = sum(1 for r in rows if r.prom >= 6)
-            total = len(rows)
-            pct_aprob = round((aprob / total) * 100, 1) if total > 0 else 0.0
+        vals = promedios_por_oferta.get(ofid)
+        if vals:
+            prom = round(sum(vals) / len(vals), 2)
+            aprob = sum(1 for v in vals if v >= APROBACION_MINIMA)
+            pct_aprob = round((aprob / len(vals)) * 100, 1)
         else:
             prom = None
             pct_aprob = None

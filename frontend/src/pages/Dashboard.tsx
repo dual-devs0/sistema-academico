@@ -33,8 +33,7 @@ function saludoDelDia(): { texto: string; icon: string } {
 
 const estadoBadge: Record<string, { bg: string; color: string }> = {
   REGULAR:        { bg: 'var(--success-subtle)', color: 'var(--success)' },
-  PROMOCIONANDO:  { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
-  PROMOCIONADO:   { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
+  DESTACADO:      { bg: 'var(--accent-muted)', color: 'var(--accent-bright)' },
   APROBADO:       { bg: 'var(--info-subtle)', color: 'var(--info)' },
   REPROBADO:      { bg: 'var(--danger-subtle)', color: 'var(--danger)' },
   'SIN CURSAR':   { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-secondary)' },
@@ -615,28 +614,26 @@ function AdminDash({ nombre }: AdminDashProps) {
   const navigate = useNavigate()
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [tab, setTab] = useState<'gestion' | 'alertas' | 'usuarios'>('gestion')
 
-  useEffect(() => {
-    let mounted = true
-    const fetchData = async () => {
-      try {
-        const res = await obtenerDashboardAdmin()
-        if (mounted) {
-          setData(res)
-          setLoading(false)
-        }
-      } catch {
-        if (mounted) setLoading(false)
-      }
-    }
-    fetchData()
-    const interval = setInterval(fetchData, 30_000)
-    return () => {
-      mounted = false
-      clearInterval(interval)
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await obtenerDashboardAdmin()
+      setData(res)
+      setError(false)
+      setLoading(false)
+    } catch {
+      setError(true)
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 30_000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const modulos = [
     { icon: 'ti-users', color: 'var(--info)', titulo: 'Usuarios y Roles', sub: 'CRUD completo de usuarios', path: '/usuarios', badge: data?.resumen?.total_alumnos },
@@ -650,7 +647,7 @@ function AdminDash({ nombre }: AdminDashProps) {
     { icon: 'ti-certificate-2', color: 'var(--accent)', titulo: 'Graduación', sub: 'Candidatos y procesos', path: '/graduacion-admin' },
     { icon: 'ti-briefcase', color: 'var(--warning)', titulo: 'Pasantías', sub: 'Solicitudes y tutorías', path: '/pasantias-admin' },
     { icon: 'ti-arrows-shuffle', color: 'var(--purple)', titulo: 'Equivalencias', sub: 'Convalidación de materias', path: '/equivalencias-admin' },
-    { icon: 'ti-file-description', color: 'var(--success)', titulo: 'Trámites', sub: 'Solicitudes pendientes', path: '/tramites', badge: data?.resumen.tramites_pendientes },
+    { icon: 'ti-file-description', color: 'var(--success)', titulo: 'Trámites', sub: 'Solicitudes pendientes', path: '/tramites', badge: data?.resumen?.tramites_pendientes },
     { icon: 'ti-calendar', color: 'var(--orange)', titulo: 'Calendario', sub: 'Eventos académicos', path: '/calendario' },
   ]
 
@@ -677,8 +674,18 @@ function AdminDash({ nombre }: AdminDashProps) {
     )
   }
 
-  const r = data!.resumen
-  const k = data!.kpis
+  if (error || !data) {
+    return (
+      <div style={{ textAlign: 'center', padding: 48 }}>
+        <i className="ti ti-alert-circle" style={{ fontSize: 32, color: '#ef4444', marginBottom: 12 }} />
+        <div style={{ color: '#ef4444', fontSize: 14, marginBottom: 8 }}>No se pudo cargar el dashboard</div>
+        <button className="ag-btn" onClick={() => { setLoading(true); fetchData() }}>Reintentar</button>
+      </div>
+    )
+  }
+
+  const r = data.resumen
+  const k = data.kpis
 
   return (
     <>
@@ -922,7 +929,8 @@ export default function Dashboard() {
       const rows: MateriaRow[] = misMaterias.map(m => {
         const n = notaMap.get(m.id)
         const prom = n?.promedio ?? null
-        const estado = prom === null ? 'EN CURSO' : prom >= 9 ? 'PROMOCIONANDO' : prom >= 6 ? 'REGULAR' : 'REPROBADO'
+        // Escala oficial UC (Art. 24): nota final entera 1-5, aprobado >= 2, destacado = 5 (nota maxima real)
+        const estado = prom === null ? 'EN CURSO' : prom >= 5 ? 'DESTACADO' : prom >= 2 ? 'REGULAR' : 'REPROBADO'
         return {
           nombre: m.nombre, profesor: m.profesor || '—', ultimaNota: prom, estado,
           parcial1: n?.parcial1 ?? null, parcial2: n?.parcial2 ?? null, practico: n?.practico ?? null, final: n?.final ?? null,

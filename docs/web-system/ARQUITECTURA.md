@@ -15,7 +15,7 @@
 
 **Frontend** — `frontend/package.json`: React 19.2.7 + TypeScript 6.0.2 + Vite 8.1 + Tailwind 4.3.1 + React Router 7.18
 
-**Base de datos:** PostgreSQL vía Neon (branches separadas dev/test). Tests usan SQLite in-memory (`tests/conftest.py`) vía `Base.metadata.create_all()`; el schema real de Postgres se gestiona **solo** con Alembic (`backend/alembic/versions/`).
+**Base de datos:** PostgreSQL vía Supabase (pooler de conexión). Migrado desde Neon en 2026-08 — ver `docs/web-system/MIGRACION_NEON_A_SUPABASE.md` para el historial. Tests usan SQLite in-memory (`tests/conftest.py`) vía `Base.metadata.create_all()`; el schema real de Postgres se gestiona **solo** con Alembic (`backend/alembic/versions/`).
 
 ## Autenticación
 

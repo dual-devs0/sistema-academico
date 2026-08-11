@@ -13,10 +13,11 @@ const POLL_MS = 30_000
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+// Escala oficial UC (Art. 24): nota final entera 1-5, aprobado >= 2
 function promColor(val: number | null): string {
   if (val === null) return 'var(--text-muted)'
-  if (val >= 9) return '#639922'
-  if (val >= 7) return '#BA7517'
+  if (val >= 5) return '#639922'
+  if (val >= 3) return '#BA7517'
   return '#ef4444'
 }
 
@@ -570,7 +571,7 @@ export default function MisMaterias() {
                               <div style={{ width: 80, height: 6, borderRadius: 999, background: 'var(--bg-input)' }}>
                                 <div style={{
                                   height: 6, borderRadius: 999, background: c.promedio_grupo !== null ? promColor(c.promedio_grupo) : '#2a3040',
-                                  width: `${c.promedio_grupo !== null ? Math.round(c.promedio_grupo / 10 * 100) : 0}%`,
+                                  width: `${c.promedio_grupo !== null ? Math.round(c.promedio_grupo / 5 * 100) : 0}%`,
                                   transition: 'width .5s ease',
                                 }} />
                               </div>

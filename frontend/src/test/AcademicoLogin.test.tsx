@@ -14,6 +14,7 @@ vi.mock('../lib/api', () => ({
   },
   setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
   decodeToken: (...args: unknown[]) => mockDecodeToken(...args),
+  warmUpBackend: () => {},
 }))
 
 beforeEach(() => {

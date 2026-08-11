@@ -15,6 +15,7 @@ pip install -r requeriments.txt
 # 3. Correr migraciones (crea tablas en DB)
 alembic upgrade head
 
+
 # 4. Sembrar datos de prueba
 python seed_usuarios.py
 

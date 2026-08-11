@@ -55,7 +55,8 @@ def test_cerrar_materia_admin_ok(client, seed, tokens, db):
     assert body["materia_nombre"] == "Cerrar OK"
     assert body["creditos"] == 6
     assert body["condicion"] == "aprobada"
-    assert body["nota_final"] == 8.0
+    # final1=40/50 = 80% -> nota 4 (Art. 24: 80-90 -> 4)
+    assert body["nota_final"] == 4
 
 
 def test_cerrar_materia_no_admin_403(client, seed, tokens, db):
@@ -153,7 +154,8 @@ def test_cerrar_materia_es_upsert_rectificacion(client, seed, tokens, db):
     assert r2.status_code == 200
     assert r2.json()["id"] == id1
     assert r2.json()["condicion"] == "aprobada"
-    assert r2.json()["nota_final"] == 9.0
+    # final1=45/50 = 90% -> nota 4 (Art. 24: 80-90 -> 4)
+    assert r2.json()["nota_final"] == 4
 
 
 def test_ppa_self_or_admin_403(client, seed, tokens):
@@ -187,7 +189,8 @@ def test_ppa_endpoint_ok(client, seed, tokens, db):
         f"/expediente/alumno/{seed['alumno'].id}/ppa", headers=auth(tokens["alumno"])
     )
     assert res.status_code == 200
-    assert res.json() == {"ppa": 8.0, "creditos_computados": 4}
+    # final1=40/50 = 80% -> nota 4 -> ppa = 4*4creditos/4creditos = 4
+    assert res.json() == {"ppa": 4, "creditos_computados": 4}
 
 
 def test_expediente_alumno_endpoint(client, seed, tokens, db):

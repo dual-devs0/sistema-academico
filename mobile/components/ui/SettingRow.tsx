@@ -16,6 +16,7 @@ type Variant = "toggle" | "chevron" | "plain";
 
 interface Props {
   glyph?: string;
+  icon?: React.ReactNode;
   label: string;
   hint?: string;
   variant?: Variant;
@@ -28,6 +29,7 @@ interface Props {
 
 export function SettingRow({
   glyph,
+  icon,
   label,
   hint,
   variant = "plain",
@@ -54,7 +56,20 @@ const inner = (
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      {glyph ? (
+      {icon ? (
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: "rgba(0,180,216,0.1)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {icon}
+        </View>
+      ) : glyph ? (
         <View
           style={{
             width: 32,

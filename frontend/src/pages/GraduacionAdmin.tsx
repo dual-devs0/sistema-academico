@@ -256,7 +256,7 @@ export default function GraduacionAdmin() {
         )
       },
     },
-    { header: 'PPA', render: c => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>{c.ppa_actual?.toFixed(2) ?? '—'}</span> },
+    { header: 'PPA', render: c => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>{c.ppa_actual ?? '—'}</span> },
     {
       header: 'Pasantía',
       render: c => (
@@ -412,7 +412,7 @@ export default function GraduacionAdmin() {
                   {modalCandidato.creditos_aprobados >= modalCandidato.creditos_totales ? 'OK' : 'Falta'}
                 </span>
               </div>
-              <div>PPA: {modalCandidato.ppa_actual?.toFixed(2) ?? '—'} / mínimo {modalCandidato.ppa_minimo}
+              <div>PPA: {modalCandidato.ppa_actual ?? '—'} / mínimo {modalCandidato.ppa_minimo}
                 <span className={`gr-badge ${(modalCandidato.ppa_actual ?? 0) >= modalCandidato.ppa_minimo ? 'ok' : 'fail'}`} style={{ marginLeft: 8 }}>
                   {(modalCandidato.ppa_actual ?? 0) >= modalCandidato.ppa_minimo ? 'OK' : 'Falta'}
                 </span>

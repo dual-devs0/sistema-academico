@@ -14,7 +14,7 @@ from app.models.puntaje import Puntaje
 from app.models.oferta_materia import OfertaMateria
 from app.models.inscripcion import Inscripcion
 from app import models as m
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos, PESO_DEFAULT_FLOAT
+from app.services.puntajes_utils import APROBACION_MINIMA, calcular_promedio_final, get_pesos, PESO_DEFAULT_FLOAT
 
 
 def _dia_nombre(d: int) -> str:
@@ -81,7 +81,7 @@ def verificar_solapamiento_inscripcion(
 
 
 def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> bool:
-    """True si el alumno tiene promedio ponderado >= 6 en CUALQUIER oferta de la materia."""  # noqa: E501
+    """True si el alumno tiene nota final >= APROBACION_MINIMA en CUALQUIER oferta de la materia."""  # noqa: E501
     ofertas_ids = [
         o.id
         for o in db.query(OfertaMateria.id)
@@ -103,7 +103,7 @@ def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> boo
     pesos = get_pesos(db, materia_id)
     for notas in por_oferta.values():
         promedio = calcular_promedio_final(notas, pesos)
-        if promedio is not None and promedio >= 6:
+        if promedio is not None and promedio >= APROBACION_MINIMA:
             return True
     return False
 
@@ -111,9 +111,9 @@ def _tiene_nota_aprobatoria(db: Session, alumno_id: int, materia_id: int) -> boo
 def promedio_y_estado_intento(
     db: Session, alumno_id: int, materia_id: int
 ) -> tuple[float | None, bool, bool]:
-    """Para una materia: (mejor promedio ponderado entre ofertas, si está
+    """Para una materia: (mejor nota final entre ofertas, si está
     inscripto en una oferta ACTIVA, si tiene un intento en oferta ya CERRADA
-    con promedio < 6 — es decir, reprobado)."""
+    con nota < APROBACION_MINIMA — es decir, reprobado)."""
     ofertas = (
         db.query(OfertaMateria).filter(OfertaMateria.materia_id == materia_id).all()
     )
@@ -153,7 +153,7 @@ def promedio_y_estado_intento(
             continue
         if mejor_promedio is None or promedio > mejor_promedio:
             mejor_promedio = promedio
-        if promedio < 6 and not activa_por_oferta.get(oferta_id, True):
+        if promedio < APROBACION_MINIMA and not activa_por_oferta.get(oferta_id, True):
             reprobado_en_oferta_cerrada = True
 
     return mejor_promedio, inscripto_en_activa, reprobado_en_oferta_cerrada
@@ -170,7 +170,7 @@ def _tiene_nota_aprobatoria_cached(
     for oferta in ofertas_por_materia.get(materia_id, []):
         notas = puntajes_por_oferta.get(oferta.id, {})
         promedio = calcular_promedio_final(notas, pesos)
-        if promedio is not None and promedio >= 6:
+        if promedio is not None and promedio >= APROBACION_MINIMA:
             return True
     return False
 
@@ -199,10 +199,10 @@ def _calcular_estado_cached(
         if promedio is not None:
             if mejor_promedio is None or promedio > mejor_promedio:
                 mejor_promedio = promedio
-            if promedio < 6 and not activa_por_oferta_id.get(oferta.id, True):
+            if promedio < APROBACION_MINIMA and not activa_por_oferta_id.get(oferta.id, True):
                 reprobado_en_cerrada = True
 
-    if mejor_promedio is not None and mejor_promedio >= 6:
+    if mejor_promedio is not None and mejor_promedio >= APROBACION_MINIMA:
         return "aprobada", [], mejor_promedio
     if inscripto_en_activa:
         return "cursando", [], mejor_promedio

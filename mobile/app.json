@@ -4,11 +4,23 @@
     "slug": "uca-movil",
     "owner": "cabrvix",
     "extra": {
-      "apiBase": "http://192.168.100.12:8000",
+      "apiBase": "https://uca-v2-backend.onrender.com",
       "router": {},
       "eas": {
         "projectId": "8099d7e4-3d70-4edf-82b4-d0c2ff73e6fd"
+      },
+      "updates": {
+        "enabled": true,
+        "checkAutomatically": "ON_LOAD"
       }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8099d7e4-3d70-4edf-82b4-d0c2ff73e6fd",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD"
     },
     "version": "1.0.0",
     "orientation": "portrait",
@@ -47,6 +59,7 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
+      "expo-updates",
       [
         "expo-camera",
         {
@@ -62,13 +75,23 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1a3569",
+          "backgroundColor": "#083D74",
+          "image": "./assets/splash-transparent.png",
           "resizeMode": "contain"
         }
       ],
       "expo-video",
       "expo-status-bar",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -34,6 +34,7 @@ import { AxiosError } from "axios";
 import { CurveBackground } from "../../components/CurveBackground";
 import { useAuth } from "../../hooks/useAuth";
 import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
+import { warmUpBackend } from "../../services/api";
 import { fetchPerfil } from "../../services/dashboardService";
 import { fontFamily, spacing } from "../../constants/design";
 import SelectField, { SelectOption } from "../../components/ui/SelectField";
@@ -196,6 +197,7 @@ export default function LoginScreen() {
   const [foreignOpen, setForeignOpen] = useState(false);
   const [foreignDocType, setForeignDocType] = useState("");
   const [foreignCountry, setForeignCountry] = useState("");
+  const [foreignCountryText, setForeignCountryText] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -228,6 +230,8 @@ export default function LoginScreen() {
     if (welcomeTimer.current) clearTimeout(welcomeTimer.current);
   }, []);
 
+  useEffect(() => { warmUpBackend(); }, []);
+
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => setKbOpen(true));
     const hide = Keyboard.addListener("keyboardDidHide", () => setKbOpen(false));
@@ -255,6 +259,7 @@ export default function LoginScreen() {
   const canSubmitForgot = fpDoc.trim().length > 0 && fpMatricula.trim().length > 0 && !fpSending;
 
   async function handleLogin() {
+    Keyboard.dismiss();
     if (!canSubmitLogin) return;
     setSubmitting(true);
     setErrorMsg(null);
@@ -285,6 +290,7 @@ export default function LoginScreen() {
   }
 
   async function handleRegister() {
+    Keyboard.dismiss();
     if (!canSubmitReg) return;
     setSubmitting(true);
     setErrorMsg(null);
@@ -293,7 +299,9 @@ export default function LoginScreen() {
         documento: regDoc.trim(),
         matricula: regMatricula.trim(),
         ...(foreignOpen && foreignDocType ? { tipo_documento_extranjero: foreignDocType } : {}),
-        ...(foreignOpen && foreignCountry ? { pais_documento: foreignCountry } : {}),
+        ...(foreignOpen && foreignCountry
+          ? { pais_documento: foreignCountry === "OTRO" && foreignCountryText.trim() ? foreignCountryText.trim() : foreignCountry }
+          : {}),
       });
       showToast(detail);
       setRegDoc("");
@@ -301,6 +309,7 @@ export default function LoginScreen() {
       setForeignOpen(false);
       setForeignDocType("");
       setForeignCountry("");
+      setForeignCountryText("");
       setTab("login");
     } catch (err) {
       const axErr = err as AxiosError<{ detail?: string }>;
@@ -374,6 +383,19 @@ export default function LoginScreen() {
     }
   }
 
+  function handleForeignTogglePress() {
+    setForeignOpen((v) => {
+      const next = !v;
+      if (!next) {
+        // Se está cerrando la sección: limpiar lo que haya quedado elegido.
+        setForeignDocType("");
+        setForeignCountry("");
+        setForeignCountryText("");
+      }
+      return next;
+    });
+  }
+
   return (
     <WaveBackground title={TITLE} heroHeight={heroH}>
       <StatusBar barStyle="dark-content" />
@@ -405,9 +427,6 @@ export default function LoginScreen() {
               >
                 <BackArrowIcon color={P.headerTitle} />
               </View>
-              <Text style={{ color: P.headerTitle, fontFamily: fontFamily.interBold, fontSize: 15, marginLeft: spacing.sm }}>
-                Volver
-              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -517,6 +536,16 @@ export default function LoginScreen() {
                           placeholder="Seleccioná un país"
                           onSelect={(opt) => setForeignCountry(opt.value)}
                         />
+                        {foreignCountry === "OTRO" ? (
+                          <LabeledInput
+                            label="Escribí el país"
+                            value={foreignCountryText}
+                            onChangeText={setForeignCountryText}
+                            placeholder="Nombre del país"
+                            autoCapitalize="words"
+                            autoCorrect={false}
+                          />
+                        ) : null}
                       </Animated.View>
                     ) : null}
 
@@ -574,6 +603,16 @@ export default function LoginScreen() {
                           placeholder="Seleccioná un país"
                           onSelect={(opt) => setForeignCountry(opt.value)}
                         />
+                        {foreignCountry === "OTRO" ? (
+                          <LabeledInput
+                            label="Escribí el país"
+                            value={foreignCountryText}
+                            onChangeText={setForeignCountryText}
+                            placeholder="Nombre del país"
+                            autoCapitalize="words"
+                            autoCorrect={false}
+                          />
+                        ) : null}
                       </Animated.View>
                     ) : null}
 
@@ -593,7 +632,7 @@ export default function LoginScreen() {
                   active={foreignOpen}
                   icon={<GlobeIcon />}
                   label={"Documento\nextranjero"}
-                  onPress={() => setForeignOpen((v) => !v)}
+                  onPress={handleForeignTogglePress}
                 />
                 <QuickTile
                   icon={<FingerprintIcon />}

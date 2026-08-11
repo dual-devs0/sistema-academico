@@ -11,7 +11,8 @@ from app.models import evento_calendario
 from app.dependencias import get_current_user
 from app.security import hash_password
 from app.services.storage import obtener_url_firmada
-from app.services.puntajes_utils import calcular_promedio_final, get_pesos
+from app.services.reporte_notas import construir_reporte_notas
+from app.services.asistencia_utils import puntaje_sesion, PUNTAJE_PRESENTE
 
 router = APIRouter(prefix="/alumno", tags=["alumno"])
 
@@ -148,46 +149,20 @@ def mis_notas(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    user_id = current_user.user_id
-    puntajes = (
-        db.query(models.puntaje.Puntaje)
-        .options(joinedload(models.puntaje.Puntaje.oferta))
-        .filter(models.puntaje.Puntaje.user_id == user_id)
-        .all()
-    )
-    materias = db.query(models.materia.Materia).all()
-    mat_map = {m.id: m.nombre for m in materias}
-
-    por_materia: dict[int, dict] = {}
-    for p in puntajes:
-        mid = p.materia_id
-        if mid is None:
-            continue
-        if mid not in por_materia:
-            por_materia[mid] = {
-                "materia_id": mid,
-                "materia_nombre": mat_map.get(mid, "—"),
-                "parcial1": None,
-                "parcial2": None,
-                "practico": None,
-                "final1": None,
-                "final2": None,
-                "final3": None,
-                "directa": None,
-                "felicitado": False,
-            }
-        if p.tipo in por_materia[mid]:
-            por_materia[mid][p.tipo] = float(p.valor)
-            if p.tipo == "directa":
-                por_materia[mid]["felicitado"] = bool(p.felicitado)
-
-    result = []
-    for mid, data in por_materia.items():
-        pesos = get_pesos(db, mid)
-        prom = calcular_promedio_final(data, pesos)
-        result.append({**data, "promedio": prom, "pesos": pesos})
-
-    return result
+    """
+    Notas por materia del alumno, una fila por materia (el intento VIGENTE si
+    hubo recursada). Reusa construir_reporte_notas -- el mismo motor que arma
+    la boleta oficial -- para que este endpoint nunca calcule un promedio
+    distinto al de la boleta cuando el alumno recurso alguna materia.
+    """
+    reporte = construir_reporte_notas(db, current_user.user_id)
+    if not reporte:
+        return []
+    return [
+        materia
+        for semestre in reporte["semestres"]
+        for materia in semestre["materias"]
+    ]
 
 
 @router.get("/mi-asistencia")
@@ -223,17 +198,18 @@ def mi_asistencia(
         if mid is None:
             continue
         if mid not in por_materia:
-            por_materia[mid] = {"total": 0, "presentes": 0}
+            por_materia[mid] = {"total": 0, "presentes": 0, "puntos": 0}
         por_materia[mid]["total"] += 1
         if a.presente:
             por_materia[mid]["presentes"] += 1
+        por_materia[mid]["puntos"] += puntaje_sesion(a.presente, a.motivo, a.puntaje_justificacion)
 
     materias = db.query(models.materia.Materia).all()
     mat_map = {m.id: m.nombre for m in materias}
 
     result = []
     for mid, data in por_materia.items():
-        pct = round((data["presentes"] / data["total"]) * 100, 1)
+        pct = round(data["puntos"] / data["total"] / PUNTAJE_PRESENTE * 100, 1)
         result.append(
             {
                 "materia_id": mid,

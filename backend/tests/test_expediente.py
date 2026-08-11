@@ -1,5 +1,6 @@
 from datetime import date
 from app.services.expediente import calcular_ppa, calcular_regularidad
+from app.services.puntajes_utils import APROBACION_MINIMA
 from app.models.materia import Materia
 from app.models.oferta_materia import OfertaMateria
 from app.models.expediente_materia import ExpedienteMateria
@@ -22,7 +23,7 @@ def _materia_con_oferta(db, seed, nombre, periodo="2026-1"):
 
 
 def _cerrar(db, alumno_id, oferta, nota, creditos, condicion=None, admin_id=1):
-    cond = condicion or ("aprobada" if nota >= 6 else "reprobada")
+    cond = condicion or ("aprobada" if nota >= APROBACION_MINIMA else "reprobada")
     reg = ExpedienteMateria(
         alumno_id=alumno_id,
         oferta_materia_id=oferta.id,
@@ -44,51 +45,52 @@ def test_ppa_sin_materias_aprobadas_es_none(seed, db):
 
 def test_ppa_una_materia_aprobada(seed, db):
     _, oferta = _materia_con_oferta(db, seed, "PPA Uno")
-    _cerrar(db, seed["alumno"].id, oferta, nota=8.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta, nota=4, creditos=4)
     resultado = calcular_ppa(seed["alumno"].id, db)
-    assert resultado == {"ppa": 8.0, "creditos_computados": 4}
+    assert resultado == {"ppa": 4, "creditos_computados": 4}
 
 
 def test_ppa_pondera_por_creditos_distintos(seed, db):
     _, oferta1 = _materia_con_oferta(db, seed, "PPA Chica", periodo="2026-1")
     _, oferta2 = _materia_con_oferta(db, seed, "PPA Grande", periodo="2026-1")
-    _cerrar(db, seed["alumno"].id, oferta1, nota=10.0, creditos=2)
-    _cerrar(db, seed["alumno"].id, oferta2, nota=6.0, creditos=8)
+    _cerrar(db, seed["alumno"].id, oferta1, nota=5, creditos=2)
+    _cerrar(db, seed["alumno"].id, oferta2, nota=3, creditos=8)
     resultado = calcular_ppa(seed["alumno"].id, db)
-    # (10*2 + 6*8) / 10 = 6.8 -- distinto de un promedio simple (10+6)/2=8
-    assert resultado == {"ppa": 6.8, "creditos_computados": 10}
+    # (5*2 + 3*8) / 10 = 3.4 -> round-half-up = 3 -- distinto de un promedio
+    # simple (5+3)/2=4
+    assert resultado == {"ppa": 3, "creditos_computados": 10}
 
 
 def test_ppa_recalcula_tras_rectificacion(seed, db):
     _, oferta = _materia_con_oferta(db, seed, "PPA Rectificar")
-    registro = _cerrar(db, seed["alumno"].id, oferta, nota=7.0, creditos=4)
-    assert calcular_ppa(seed["alumno"].id, db)["ppa"] == 7.0
+    registro = _cerrar(db, seed["alumno"].id, oferta, nota=3, creditos=4)
+    assert calcular_ppa(seed["alumno"].id, db)["ppa"] == 3
 
-    registro.nota_final = 9.0
+    registro.nota_final = 5
     db.commit()
-    assert calcular_ppa(seed["alumno"].id, db)["ppa"] == 9.0
+    assert calcular_ppa(seed["alumno"].id, db)["ppa"] == 5
 
 
 def test_ppa_ignora_reprobadas(seed, db):
     _, oferta = _materia_con_oferta(db, seed, "PPA Reprobada")
-    _cerrar(db, seed["alumno"].id, oferta, nota=3.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta, nota=1, creditos=4)
     resultado = calcular_ppa(seed["alumno"].id, db)
     assert resultado == {"ppa": None, "creditos_computados": 0}
 
 
 def test_regularidad_activo_sin_condiciones_de_riesgo(seed, db):
     _, oferta = _materia_con_oferta(db, seed, "Reg Activo")
-    _cerrar(db, seed["alumno"].id, oferta, nota=8.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta, nota=4, creditos=4)
     resultado = calcular_regularidad(seed["alumno"].id, db)
     assert resultado["estado"] == "activo"
     assert resultado["motivo"] is None
 
 
 def test_regularidad_en_riesgo_por_ppa_bajo(seed, db):
-    # Aprobada (nota=6.0 >= 6) pero por debajo del umbral de riesgo (7.0) --
-    # "aprobado pero flojo", no requiere manipular condicion a mano.
+    # Aprobada (nota=2 >= APROBACION_MINIMA=2) pero por debajo del umbral de
+    # riesgo (3) -- "aprobado pero flojo", no requiere manipular condicion a mano.
     _, oferta = _materia_con_oferta(db, seed, "Reg PPA Bajo")
-    _cerrar(db, seed["alumno"].id, oferta, nota=6.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta, nota=2, creditos=4)
     resultado = calcular_regularidad(seed["alumno"].id, db)
     assert resultado["estado"] == "en_riesgo"
     assert "PPA" in resultado["motivo"]
@@ -96,7 +98,7 @@ def test_regularidad_en_riesgo_por_ppa_bajo(seed, db):
 
 def test_regularidad_en_riesgo_por_asistencia_baja(seed, db):
     _, oferta = _materia_con_oferta(db, seed, "Reg Asistencia")
-    _cerrar(db, seed["alumno"].id, oferta, nota=8.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta, nota=4, creditos=4)
     for i in range(10):
         db.add(
             Asistencia(
@@ -120,7 +122,7 @@ def test_regularidad_irregular_materia_reprobada_fuera_de_plazo(seed, db):
     reprobada, oferta_vieja = _materia_con_oferta(
         db, seed, "Reg Irregular Base", periodo="2023-1"
     )
-    _cerrar(db, seed["alumno"].id, oferta_vieja, nota=3.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta_vieja, nota=1, creditos=4)
 
     _materia_con_oferta(db, seed, "Reg Irregular Media 1", periodo="2023-2")
     _materia_con_oferta(db, seed, "Reg Irregular Media 2", periodo="2024-1")
@@ -141,7 +143,7 @@ def test_regularidad_no_irregular_si_reprobada_fue_recursada_y_aprobada(seed, db
     materia, oferta_vieja = _materia_con_oferta(
         db, seed, "Reg Recursada", periodo="2024-1"
     )
-    _cerrar(db, seed["alumno"].id, oferta_vieja, nota=3.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta_vieja, nota=1, creditos=4)
 
     oferta_nueva = OfertaMateria(
         materia_id=materia.id,
@@ -152,7 +154,7 @@ def test_regularidad_no_irregular_si_reprobada_fue_recursada_y_aprobada(seed, db
     db.add(oferta_nueva)
     db.commit()
     db.refresh(oferta_nueva)
-    _cerrar(db, seed["alumno"].id, oferta_nueva, nota=8.0, creditos=4)
+    _cerrar(db, seed["alumno"].id, oferta_nueva, nota=4, creditos=4)
     db.add(Inscripcion(alumno_id=seed["alumno"].id, oferta_materia_id=oferta_nueva.id))
     db.commit()
 

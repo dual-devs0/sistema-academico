@@ -85,7 +85,7 @@ export function SplashAnimated({ onReady, onFinish, authReady }: SplashAnimatedP
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={["#132852", "#1a3569", "#0d1b33"]}
+        colors={["#083D74", "#0A4A8A", "#062F5E"]}
         locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
       />

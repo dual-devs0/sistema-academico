@@ -161,6 +161,24 @@ export async function fetchPerfil(): Promise<UserInfo> {
   return data;
 }
 
+/**
+ * Sube una foto de perfil (multipart) → POST /users/me/foto.
+ * Devuelve la URL firmada del archivo subido.
+ */
+export async function subirFotoPerfil(uri: string, mime: string): Promise<string> {
+  const name = uri.split("/").pop()?.split("?")[0] ?? "foto.jpg";
+  const form = new FormData();
+  form.append("foto", {
+    uri,
+    name,
+    type: mime,
+  } as unknown as Blob);
+  const { data } = await api.post<{ url: string }>("/users/me/foto", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.url;
+}
+
 export async function fetchResumen(): Promise<MiResumen> {
   const { data } = await api.get<MiResumen>("/alumno/mi-resumen");
   return data;

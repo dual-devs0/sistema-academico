@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Modal,
-  Platform,
   Pressable,
   Text,
   View,
   Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useTheme } from "../../hooks/useTheme";
-import { APP_NAME, APP_VERSION } from "../../config";
+import { APP_NAME, APP_VERSION, getDeviceLabel } from "../../config";
 import { fontFamily, spacing, radius, fontSize } from "../../constants/design";
-import { checkVersion, compareVersions, type VersionInfo } from "../../services/versionService";
+import {
+  checkForUpdate,
+  downloadAndReloadUpdate,
+  type UpdateStatus,
+} from "../../services/updateService";
 
 interface InfoAppModalProps {
   visible: boolean;
@@ -20,20 +24,19 @@ interface InfoAppModalProps {
 export function InfoAppModal({ visible, onClose }: InfoAppModalProps) {
   const { colors, effective } = useTheme();
   const isDark = effective === "dark";
-  const [remote, setRemote] = useState<VersionInfo | null>(null);
+  const [state, setState] = useState<UpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
-  const [status, setStatus] = useState<"idle" | "checking" | "up-to-date" | "update-available">("idle");
+  const [applying, setApplying] = useState(false);
+  const [otaError, setOtaError] = useState<string | null>(null);
 
   const doCheck = useCallback(async () => {
     setChecking(true);
-    setStatus("checking");
+    setOtaError(null);
     try {
-      const info = await checkVersion();
-      setRemote(info);
-      const cmp = compareVersions(APP_VERSION, info.latestVersion);
-      setStatus(cmp === "up-to-date" ? "up-to-date" : "update-available");
+      const res = await checkForUpdate();
+      setState(res);
     } catch {
-      setStatus("idle");
+      setState(null);
     } finally {
       setChecking(false);
     }
@@ -42,6 +45,30 @@ export function InfoAppModal({ visible, onClose }: InfoAppModalProps) {
   useEffect(() => {
     if (visible) doCheck();
   }, [visible, doCheck]);
+
+  const hasUpdate = state ? state.otaAvailable || state.backendNewer : false;
+
+  const onUpdatePress = async () => {
+    if (state?.otaAvailable) {
+      setApplying(true);
+      setOtaError(null);
+      const res = await downloadAndReloadUpdate();
+      if (!res.ok) {
+        setOtaError(
+          res.reason === "ota-disabled"
+            ? "Este celular necesita una versión nueva. Abrí el enlace para descargarla."
+            : res.reason === "no-update"
+              ? "No hay una actualización OTA descargable ahora."
+              : "No se pudo descargar la actualización. Intentá de nuevo.",
+        );
+      }
+      setApplying(false);
+      return;
+    }
+    if (state?.updateUrl) {
+      Linking.openURL(state.updateUrl);
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -99,11 +126,7 @@ export function InfoAppModal({ visible, onClose }: InfoAppModalProps) {
           <View style={{ gap: spacing.md }}>
             <InfoRow label="App" value={APP_NAME} colors={colors} />
             <InfoRow label="Versión actual" value={APP_VERSION} colors={colors} />
-            <InfoRow
-              label="Dispositivo"
-              value={`${Platform.OS} ${Platform.Version}`}
-              colors={colors}
-            />
+            <InfoRow label="Dispositivo" value={getDeviceLabel()} colors={colors} />
 
             <View
               style={{
@@ -114,72 +137,12 @@ export function InfoAppModal({ visible, onClose }: InfoAppModalProps) {
             />
 
             {checking ? (
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  fontFamily: fontFamily.inter,
-                  fontSize: fontSize.caption,
-                  textAlign: "center",
-                }}
-              >
-                Verificando actualizaciones...
-              </Text>
-            ) : status === "up-to-date" ? (
-              <Text
-                style={{
-                  color: "#22c55e",
-                  fontFamily: fontFamily.interSemibold,
-                  fontSize: fontSize.caption,
-                  textAlign: "center",
-                }}
-              >
-                ✓ Tenés la versión más reciente
-              </Text>
-            ) : status === "update-available" && remote ? (
-              <View style={{ gap: spacing.md }}>
-                <Text
-                  style={{
-                    color: colors.cyan,
-                    fontFamily: fontFamily.interSemibold,
-                    fontSize: fontSize.caption,
-                    textAlign: "center",
-                  }}
-                >
-                  Nueva versión disponible: {remote.latestVersion}
-                </Text>
-                {remote.releaseNotes ? (
-                  <Text
-                    style={{
-                      color: colors.textSecondary,
-                      fontFamily: fontFamily.inter,
-                      fontSize: fontSize.caption,
-                      textAlign: "center",
-                    }}
-                  >
-                    {remote.releaseNotes}
-                  </Text>
-                ) : null}
-                <Pressable
-                  onPress={() => remote.updateUrl && Linking.openURL(remote.updateUrl)}
-                  style={{
-                    backgroundColor: colors.cyan,
-                    borderRadius: radius.md,
-                    paddingVertical: spacing.md,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontFamily: fontFamily.interSemibold,
-                      fontSize: fontSize.body,
-                    }}
-                  >
-                    Actualizar app
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
+              <StatusBadge
+                colors={colors}
+                text="Verificando actualizaciones…"
+                accent={colors.textSecondary}
+              />
+            ) : !state ? (
               <Pressable
                 onPress={doCheck}
                 style={{
@@ -201,11 +164,145 @@ export function InfoAppModal({ visible, onClose }: InfoAppModalProps) {
                   Buscar actualizaciones
                 </Text>
               </Pressable>
+            ) : !hasUpdate ? (
+              <StatusBadge
+                colors={colors}
+                text={`✓ Tenés la versión más reciente (${APP_VERSION})`}
+                accent="#22c55e"
+                bg="rgba(34,197,94,0.1)"
+                border="rgba(34,197,94,0.3)"
+              />
+            ) : (
+              <View style={{ gap: spacing.md }}>
+                <StatusBadge
+                  colors={colors}
+                  text={
+                    state.otaAvailable
+                      ? "Actualización OTA disponible. Descargala y recargá."
+                      : `Nueva versión disponible: ${state.latestVersion ?? "—"}`
+                  }
+                  accent={colors.cyan}
+                  bg="rgba(0,180,216,0.1)"
+                  border="rgba(0,180,216,0.3)"
+                />
+                {state.releaseNotes ? (
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontFamily: fontFamily.inter,
+                      fontSize: fontSize.caption,
+                      textAlign: "center",
+                    }}
+                  >
+                    {state.releaseNotes}
+                  </Text>
+                ) : null}
+                {otaError ? (
+                  <Text
+                    style={{
+                      color: colors.error,
+                      fontFamily: fontFamily.inter,
+                      fontSize: fontSize.caption,
+                      textAlign: "center",
+                    }}
+                  >
+                    {otaError}
+                  </Text>
+                ) : null}
+                {state.otaAvailable ? (
+                  <Pressable
+                    onPress={onUpdatePress}
+                    disabled={applying}
+                    style={{
+                      backgroundColor: colors.cyan,
+                      borderRadius: radius.md,
+                      paddingVertical: spacing.md,
+                      alignItems: "center",
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      gap: spacing.sm,
+                      opacity: applying ? 0.7 : 1,
+                    }}
+                  >
+                    {applying ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : null}
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontFamily: fontFamily.interSemibold,
+                        fontSize: fontSize.body,
+                      }}
+                    >
+                      {applying ? "Descargando…" : "Actualizar y recargar"}
+                    </Text>
+                  </Pressable>
+                ) : state.updateUrl ? (
+                  <Pressable
+                    onPress={onUpdatePress}
+                    style={{
+                      backgroundColor: colors.cyan,
+                      borderRadius: radius.md,
+                      paddingVertical: spacing.md,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontFamily: fontFamily.interSemibold,
+                        fontSize: fontSize.body,
+                      }}
+                    >
+                      Actualizar app
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             )}
           </View>
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+function StatusBadge({
+  colors,
+  text,
+  accent,
+  bg = "rgba(0,180,216,0.1)",
+  border = "rgba(0,180,216,0.3)",
+}: {
+  colors: ReturnType<typeof useTheme>["colors"];
+  text: string;
+  accent: string;
+  bg?: string;
+  border?: string;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: bg,
+        borderWidth: 1,
+        borderColor: border,
+        borderRadius: radius.pill,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        alignItems: "center",
+      }}
+    >
+      <Text
+        style={{
+          color: accent,
+          fontFamily: fontFamily.interSemibold,
+          fontSize: fontSize.caption,
+          textAlign: "center",
+        }}
+      >
+        {text}
+      </Text>
+    </View>
   );
 }
 
