@@ -529,31 +529,36 @@ export default function AcademicoLogin() {
           <div className="pr-scroll">
             <div className="sx-tabs">
               {(['login','registro'] as Tab[]).map(t => (
-                <button key={t} className={`sx-tab${tab===t?' active':''}`} onClick={() => { setTab(t); setError('') }}>
+                <button key={t} className={`sx-tab${tab===t?' active':''}`} onClick={() => { setTab(t); setError(''); if (t === 'registro') setRol('alumno') }}>
                   {t==='login' ? 'Iniciar sesión' : 'Registrarme'}
                 </button>
               ))}
             </div>
 
-            {/* ── ROL SWITCHER ── */}
-            <div className="rol-switch">
-              <button className={`rol-btn ${rol === 'alumno' ? 'active' : ''}`} onClick={() => { setRol('alumno'); setError('') }}>
-                Alumno
-              </button>
-              <button className={`rol-btn ${rol === 'profesor' ? 'active' : ''}`} onClick={() => { setRol('profesor'); setError('') }}>
-                Profesor
-              </button>
-            </div>
+            {/* ── ROL SWITCHER — solo en login. En registro, el profesor no se */}
+            {/* autoregistra (el admin lo precrea), asi que siempre es alumno. */}
+            {tab === 'login' && (
+              <div className="rol-switch">
+                <button className={`rol-btn ${rol === 'alumno' ? 'active' : ''}`} onClick={() => { setRol('alumno'); setError('') }}>
+                  Alumno
+                </button>
+                <button className={`rol-btn ${rol === 'profesor' ? 'active' : ''}`} onClick={() => { setRol('profesor'); setError('') }}>
+                  Profesor
+                </button>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
-              <motion.div key={rol} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+              <motion.div key={tab === 'registro' ? 'registro' : rol} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
                 <h2 className="form-title">
-                  {rol === 'alumno' ? 'Portal del Alumno' : 'Portal del Profesor'}
+                  {tab === 'registro' ? 'Registro de Alumno' : rol === 'alumno' ? 'Portal del Alumno' : 'Portal del Profesor'}
                 </h2>
                 <p className="form-sub">
-                  {rol === 'alumno'
-                    ? 'Accedé a tus puntajes, asistencia y boleta'
-                    : 'Gestioná calificaciones y asistencia de tus cursos'}
+                  {tab === 'registro'
+                    ? 'Los profesores son dados de alta por administración'
+                    : rol === 'alumno'
+                      ? 'Accedé a tus puntajes, asistencia y boleta'
+                      : 'Gestioná calificaciones y asistencia de tus cursos'}
                 </p>
               </motion.div>
             </AnimatePresence>
