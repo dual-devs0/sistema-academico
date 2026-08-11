@@ -32,6 +32,18 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+// Ping sin auth para "despertar" el backend (Render free tier duerme tras
+// 15min de inactividad). Se dispara al montar la pantalla de login, antes
+// de que el usuario termine de escribir usuario/contraseña, para que el
+// cold start ocurra en paralelo en vez de bloquear el submit. Fire-and-forget.
+export function warmUpBackend(): void {
+  try {
+    fetch(`${API_BASE}/health`)?.catch(() => {});
+  } catch {
+    // fetch puede no existir (entorno de test) o fallar sync -- no bloquear el login por esto
+  }
+}
+
 type AccessGetter = () => string | null;
 type AccessSetter = (token: string | null) => void;
 type RefreshFn = () => Promise<string>;

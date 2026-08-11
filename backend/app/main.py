@@ -103,6 +103,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health", include_in_schema=False)
+def health():
+    """Sin auth, sin DB -- usado por el keep-alive de GitHub Actions para
+    evitar el cold start del plan free de Render (duerme tras 15min sin
+    trafico). No usar para healthcheck de infra que necesite verificar la DB."""
+    return {"status": "ok"}
+
+
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(users.router)

@@ -1,9 +1,9 @@
 // Login público (alumno/profesor). Auth vía POST /auth/login, setea access token en memoria + refresh/csrf en cookie.
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useInView } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import logoUCA from '../assets/uc_logo_sist_academico.webp'
-import { api, decodeToken, setAccessToken } from '../lib/api'
+import { api, decodeToken, setAccessToken, warmUpBackend } from '../lib/api'
 import { setDocTitle } from '../lib/docTitle'
 
 type Rol = 'alumno' | 'profesor'
@@ -52,6 +52,8 @@ export default function AcademicoLogin() {
   const [error, setError]          = useState('')
   const [showSoporte, setSoporte]  = useState(false)
   const [showRecuperar, setShowRecuperar] = useState(false)
+
+  useEffect(() => { warmUpBackend() }, [])
   const [recEmail, setRecEmail] = useState('')
   const [recLoading, setRecLoading] = useState(false)
   const [recEnviado, setRecEnviado] = useState(false)

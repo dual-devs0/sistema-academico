@@ -34,6 +34,7 @@ import { AxiosError } from "axios";
 import { CurveBackground } from "../../components/CurveBackground";
 import { useAuth } from "../../hooks/useAuth";
 import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
+import { warmUpBackend } from "../../services/api";
 import { fetchPerfil } from "../../services/dashboardService";
 import { fontFamily, spacing } from "../../constants/design";
 import SelectField, { SelectOption } from "../../components/ui/SelectField";
@@ -228,6 +229,8 @@ export default function LoginScreen() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     if (welcomeTimer.current) clearTimeout(welcomeTimer.current);
   }, []);
+
+  useEffect(() => { warmUpBackend(); }, []);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => setKbOpen(true));
