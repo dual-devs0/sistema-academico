@@ -903,7 +903,7 @@ export default function AcademicoLogin() {
             {recEnviado ? (
               <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{duration:0.3}}>
                 <div className="modal-title">Revisá tu correo</div>
-                <div className="modal-sub">Si el usuario existe, recibirás un email con tu nueva contraseña.</div>
+                <div className="modal-sub">Si el usuario existe, recibirás un email con instrucciones para restablecer tu contraseña. El enlace expira en 60 minutos.</div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 0',color:'#34d399'}}>
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>

@@ -1,3 +1,17 @@
+"""Envío de emails transaccionales (background tasks).
+
+Compatibilidad: mantiene las firmas públicas existentes (send_*_email_bg) —
+los tests de test_email.py y los routers dependen de ellas. Internamente
+delega en app/email_provider.py según EMAIL_PROVIDER:
+
+- mock          → solo log (default sin credenciales, y en dev/test)
+- resend        → API de Resend (prioridad 1)
+- sendgrid      → API de SendGrid (prioridad 2)
+- smtp          → fastapi-mail (prioridad 3, config MAIL_*/SMTP_*)
+
+El flujo SMTP legado (fm + _send_with_retry) se conserva intacto para no
+cambiar el comportamiento de test_email.py.
+"""
 import asyncio
 import logging
 import os
@@ -6,6 +20,20 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType, NameEmail
 from pydantic import SecretStr
+
+from app.email_provider import (
+    ACTIVE_PROVIDER,
+    EMAIL_FROM,
+    EMAIL_FROM_NAME,
+    send_email,
+)
+from app.email_templates import (
+    render_admin_password_reset_email,
+    render_alerta_inasistencia_email,
+    render_new_grade_email,
+    render_reset_password_email,
+    render_welcome_email,
+)
 
 load_dotenv()
 
@@ -25,6 +53,8 @@ conf = ConnectionConfig(
 )
 
 fm = FastMail(conf)
+
+RESET_TOKEN_EXPIRATION_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRATION_MINUTES", "60"))
 
 
 def _credentials_configured() -> bool:
@@ -56,7 +86,53 @@ async def _send_with_retry(
                 )
 
 
-RESET_PASSWORD_FRONTEND_URL = os.getenv("RESET_PASSWORD_FRONTEND_URL", "https://sistema.uca.edu.py/reset-password")
+def _is_smtp_or_mock() -> bool:
+    """True cuando el flujo SMTP legado aplica (o mock sin credenciales)."""
+    return ACTIVE_PROVIDER in ("smtp", "mock")
+
+
+def _queue_smtp(
+    background_tasks: BackgroundTasks,
+    subject: str,
+    email_to: str,
+    html: str,
+) -> None:
+    message = MessageSchema(
+        subject=subject,
+        recipients=[NameEmail(name=EMAIL_FROM_NAME, email=email_to)],
+        body=html,
+        subtype=MessageType.html,
+    )
+    background_tasks.add_task(_send_with_retry, message)
+
+
+def _mock_or_smtp(
+    background_tasks: BackgroundTasks,
+    email_to: str,
+    subject: str,
+    html: str,
+) -> bool:
+    """Maneja los casos mock/smtp. Retorna True si se resolvió (no continuar)."""
+    if _is_smtp_or_mock() and not _credentials_configured():
+        logger.info("Mock Email sent to %s: %s | %s", email_to, subject, html)
+        return True
+    if _is_smtp_or_mock():
+        _queue_smtp(background_tasks, subject, email_to, html)
+        return True
+    return False
+
+
+RESET_PASSWORD_FRONTEND_URL = os.getenv(
+    "RESET_PASSWORD_FRONTEND_URL",
+    os.getenv(
+        "FRONTEND_URL",
+        "https://sistema.uca.edu.py/reset-password",
+    ),
+)
+
+
+def _reset_link(token: str) -> str:
+    return f"{RESET_PASSWORD_FRONTEND_URL}?token={token}"
 
 
 def send_password_reset_email_bg(
@@ -64,23 +140,11 @@ def send_password_reset_email_bg(
     email_to: str,
     user_name: str,
 ) -> None:
-    if not _credentials_configured():
-        logger.info("Mock Email sent to %s: Password was reset by admin", email_to)
+    subject = "UCA - Restablecimiento de contraseña"
+    html = render_admin_password_reset_email(user_name)
+    if _mock_or_smtp(background_tasks, email_to, subject, html):
         return
-
-    html = f"""
-    <h3>Hola {user_name},</h3>
-    <p>Un administrador ha restablecido tu contraseña en el Sistema Académico UCA.</p>
-    <p>Usá la opción <b>"Recuperar contraseña"</b> en la pantalla de inicio de sesión para establecer una nueva.</p>
-    <p>Si no solicitaste este cambio, contactá al administrador del sistema.</p>
-    """
-    message = MessageSchema(
-        subject="UCA - Restablecimiento de contraseña",
-        recipients=[NameEmail(name="", email=email_to)],
-        body=html,
-        subtype=MessageType.html,
-    )
-    background_tasks.add_task(_send_with_retry, message)
+    background_tasks.add_task(send_email, email_to, subject, html)
 
 
 def send_reset_link_email_bg(
@@ -89,28 +153,24 @@ def send_reset_link_email_bg(
     user_name: str,
     token: str,
 ) -> None:
-    reset_link = f"{RESET_PASSWORD_FRONTEND_URL}?token={token}"
-    if not _credentials_configured():
-        logger.info("Mock Email sent to %s: Reset link %s", email_to, reset_link)
+    subject = "UCA - Restablecimiento de contraseña"
+    if _mock_or_smtp(
+        background_tasks,
+        email_to,
+        subject,
+        render_reset_password_email(
+            user_name, _reset_link(token), RESET_TOKEN_EXPIRATION_MINUTES
+        ),
+    ):
         return
-
-    html = f"""
-    <h3>Hola {user_name},</h3>
-    <p>Recibimos una solicitud para restablecer tu contraseña en el Sistema Académico UCA.</p>
-    <p>Hacé clic en el siguiente enlace para crear una nueva contraseña:</p>
-    <p><a href="{reset_link}" style="display:inline-block;padding:12px 24px;background:#1a56db;color:white;text-decoration:none;border-radius:6px;font-weight:bold;">Restablecer contraseña</a></p>
-    <p>O copiá este enlace en tu navegador:</p>
-    <p>{reset_link}</p>
-    <p>Este enlace expira en 1 hora.</p>
-    <p>Si no solicitaste este cambio, ignorá este mensaje.</p>
-    """
-    message = MessageSchema(
-        subject="UCA - Restablecimiento de contraseña",
-        recipients=[NameEmail(name="", email=email_to)],
-        body=html,
-        subtype=MessageType.html,
+    background_tasks.add_task(
+        send_email,
+        email_to,
+        subject,
+        render_reset_password_email(
+            user_name, _reset_link(token), RESET_TOKEN_EXPIRATION_MINUTES
+        ),
     )
-    background_tasks.add_task(_send_with_retry, message)
 
 
 def send_welcome_email_bg(
@@ -118,23 +178,11 @@ def send_welcome_email_bg(
     email_to: str,
     user_name: str,
 ) -> None:
-    if not _credentials_configured():
-        logger.info("Mock Email sent to %s: Welcome %s", email_to, user_name)
+    subject = "UCA - Bienvenido al Sistema Académico"
+    html = render_welcome_email(user_name)
+    if _mock_or_smtp(background_tasks, email_to, subject, html):
         return
-
-    html = f"""
-    <h3>Bienvenido/a {user_name},</h3>
-    <p>Tu cuenta en el Sistema Académico UCA ha sido creada.</p>
-    <p>Usá la opción <b>"Recuperar contraseña"</b> en la pantalla de inicio de sesión para establecer tu contraseña.</p>
-    <p>Si tenés dudas, contactá a la administración del sistema.</p>
-    """
-    message = MessageSchema(
-        subject="UCA - Bienvenido al Sistema Académico",
-        recipients=[NameEmail(name="", email=email_to)],
-        body=html,
-        subtype=MessageType.html,
-    )
-    background_tasks.add_task(_send_with_retry, message)
+    background_tasks.add_task(send_email, email_to, subject, html)
 
 
 def send_new_grade_email_bg(
@@ -145,26 +193,20 @@ def send_new_grade_email_bg(
     tipo_nota: str,
     valor_nota: float,
 ) -> None:
-    if not _credentials_configured():
-        logger.info(
-            "Mock Email sent to %s: Grade %s in %s (%s)",
-            email_to, valor_nota, materia_name, tipo_nota,
-        )
+    subject = f"UCA - Nueva calificación en {materia_name}"
+    if _mock_or_smtp(
+        background_tasks,
+        email_to,
+        subject,
+        render_new_grade_email(user_name, materia_name, tipo_nota, valor_nota),
+    ):
         return
-
-    html = f"""
-    <h3>Hola {user_name},</h3>
-    <p>Se ha cargado una nueva nota en <b>{materia_name}</b>.</p>
-    <p>Tipo de evaluación: {tipo_nota}</p>
-    <p>Calificación: <b>{valor_nota}</b></p>
-    """
-    message = MessageSchema(
-        subject=f"UCA - Nueva calificación en {materia_name}",
-        recipients=[NameEmail(name="", email=email_to)],
-        body=html,
-        subtype=MessageType.html,
+    background_tasks.add_task(
+        send_email,
+        email_to,
+        subject,
+        render_new_grade_email(user_name, materia_name, tipo_nota, valor_nota),
     )
-    background_tasks.add_task(_send_with_retry, message)
 
 
 def send_alerta_inasistencia_email_bg(
@@ -176,24 +218,22 @@ def send_alerta_inasistencia_email_bg(
 ) -> None:
     if not emails_to:
         return
-    if not _credentials_configured():
-        logger.info(
-            "Mock Email sent to %s: Alerta inasistencia %s en %s (%.1f%%)",
-            emails_to, alumno_nombre, materia_nombre, porcentaje,
+    subject = f"UCA - Alerta de inasistencia crítica en {materia_nombre}"
+    html = render_alerta_inasistencia_email(alumno_nombre, materia_nombre, porcentaje)
+    if _is_smtp_or_mock():
+        if not _credentials_configured():
+            logger.info(
+                "Mock Email sent to %s: Alerta inasistencia %s en %s (%.1f%%)",
+                emails_to, alumno_nombre, materia_nombre, porcentaje,
+            )
+            return
+        message = MessageSchema(
+            subject=subject,
+            recipients=[NameEmail(name="", email=e) for e in emails_to],
+            body=html,
+            subtype=MessageType.html,
         )
+        background_tasks.add_task(_send_with_retry, message)
         return
-
-    html = f"""
-    <h3>Alerta de inasistencia crítica</h3>
-    <p>El alumno <b>{alumno_nombre}</b> superó el 25% de faltas en
-    <b>{materia_nombre}</b>.</p>
-    <p>Porcentaje de inasistencia actual: <b>{porcentaje}%</b></p>
-    <p>Según reglamento, esto puede implicar pérdida de regularidad en la materia.</p>
-    """
-    message = MessageSchema(
-        subject=f"UCA - Alerta de inasistencia crítica en {materia_nombre}",
-        recipients=[NameEmail(name="", email=e) for e in emails_to],
-        body=html,
-        subtype=MessageType.html,
-    )
-    background_tasks.add_task(_send_with_retry, message)
+    for e in emails_to:
+        background_tasks.add_task(send_email, e, subject, html)

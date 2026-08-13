@@ -8,9 +8,11 @@ load_dotenv()  # carga .env antes de que cualquier módulo lea os.getenv
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
-from slowapi import _rate_limit_exceeded_handler  # noqa: E402
-from slowapi.errors import RateLimitExceeded  # noqa: E402
-from app.rate_limiter import limiter  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
+from app.rate_limiting import (  # noqa: E402
+    RateLimitMiddleware,
+    metrics_text,
+)
 from app.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
 from app.middleware.csrf import CSRFMiddleware  # noqa: E402
 from app.jobs.reintento_facturacion import ciclo_reintentos  # noqa: E402
@@ -85,14 +87,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 origins = [
     o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 ]
 logger.info("CORS origins: %s", origins)
 
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
@@ -109,6 +109,14 @@ def health():
     evitar el cold start del plan free de Render (duerme tras 15min sin
     trafico). No usar para healthcheck de infra que necesite verificar la DB."""
     return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics(response: Response):
+    """Métricas de observabilidad del rate limiter (formato Prometheus text).
+    Excluido del rate limiting por defecto (RATE_LIMIT_EXCLUDE_PATHS)."""
+    response.headers["Content-Type"] = "text/plain; version=0.0.4"
+    return metrics_text()
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

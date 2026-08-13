@@ -50,6 +50,7 @@ from app.models import (  # noqa: F401, E402
     peso_evaluacion,
     password_reset_token,
     token_blacklist,
+    audit_log,
 )
 
 target_metadata = Base.metadata

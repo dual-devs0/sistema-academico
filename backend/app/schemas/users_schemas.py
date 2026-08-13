@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime, date
+import re
 
 
 class UserBase(BaseModel):
@@ -44,17 +45,46 @@ class RefreshRequest(BaseModel):
 
 
 class RecuperarRequest(BaseModel):
-    username_or_email: str
+    username_or_email: str = Field(min_length=1, max_length=200)
+
+    @field_validator("username_or_email")
+    @classmethod
+    def validar_email_o_usuario(cls, v: str) -> str:
+        value = v.strip()
+        if "@" in value:
+            if not re.match(
+                r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value
+            ):
+                raise ValueError("El email no es válido.")
+        return value
 
 
 class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str = Field(min_length=6, max_length=100)
+    token: str = Field(min_length=10, max_length=500)
+    new_password: str = Field(min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def contraseña_fuerte(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError(
+                "La contraseña debe tener al menos 8 caracteres e incluir letras y números."
+            )
+        return v
 
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=6, max_length=100)
+    new_password: str = Field(min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def contraseña_fuerte(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError(
+                "La contraseña debe tener al menos 8 caracteres e incluir letras y números."
+            )
+        return v
 
 
 class RegistroRequest(BaseModel):

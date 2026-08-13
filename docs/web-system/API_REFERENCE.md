@@ -9,7 +9,7 @@
 | POST | `/auth/login` | público | `{username, password}` → `{access_token, token_type}` + cookies `refresh_token` (httpOnly) y `csrf_token`. Rate-limit 5 intentos fallidos/15min por `username:ip` *(nuevo, 2026-07-13)* — 429 si se excede, se resetea en login exitoso |
 | POST | `/auth/refresh` | público (cookie) | Rota refresh token, emite access token nuevo. Flujo cookie exige header `X-CSRF-Token` igual a la cookie `csrf_token` *(nuevo, 2026-07-13)* — 403 si falta o no coincide. Flujo mobile (refresh token en el body) no requiere CSRF |
 | POST | `/auth/logout` | público (cookie) | Revoca refresh token en DB, borra cookies `refresh_token` y `csrf_token` |
-| POST | `/auth/recuperar-contrasena` | público | Rate-limit 3/15min. Genera password temporal, envía por email |
+| POST | `/auth/recuperar-contrasena` | público | `{username_or_email}` → siempre 200 genérico (anti-enumeración). Crea token de un solo uso (hasheado) y envía email con link de reset. Rate-limit categoría `PASSWORD_RESET` (default 6/15min) |
 
 ## `/users` — `users_router.py`
 

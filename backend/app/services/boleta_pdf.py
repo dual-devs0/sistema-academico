@@ -13,7 +13,6 @@ import os
 from datetime import datetime, timezone
 
 from jinja2 import Environment, FileSystemLoader
-from weasyprint import HTML
 
 from app.services.puntajes_utils import APROBACION_MINIMA
 
@@ -196,4 +195,9 @@ def render_boleta_pdf(reporte: dict, scope: str, anio: int | None = None, semest
 
     template = _env.get_template("boleta_pdf.html")
     html_str = template.render(**context)
+    # Import lazy: WeasyPrint exige libs de sistema (Pango/GTK) que pueden no
+    # estar en entornos sin esas dependencias; el error solo debe aparecer al
+    # renderizar, no al importar el módulo.
+    from weasyprint import HTML
+
     return HTML(string=html_str).write_pdf()

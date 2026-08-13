@@ -3,13 +3,23 @@ contraseña, registro (activación de cuenta pre-creada por admin).
 
 Emite JWT de acceso (body) + refresh token httpOnly cookie + csrf_token
 (body, no sensible). Depende de: app.auth (JWT), app.security (hash de
-password), app.rate_limiter, app.middleware.csrf (exento acá vía
-CSRF_EXEMPT_PATHS, valida CSRF manual en /refresh). Usado por: frontend
-lib/api.ts, mobile services/authService.ts.
+password), app.middleware.csrf (exento acá vía CSRF_EXEMPT_PATHS, valida
+CSRF manual en /refresh). Usado por: frontend lib/api.ts, mobile
+services/authService.ts.
 
 Contiene 2 de los 7 fixes de AUDITORIA_2026-07-24.md — ver comentarios
 puntuales en cada función (#4 user enumeration, y el JWT blacklist en
 logout ya documentado en dependencias.py).
+
+Flujo de recuperación de contraseña (producción):
+- Token criptográficamente seguro (secrets.token_urlsafe(32)).
+- Solo se persiste su SHA-256 (hash), nunca el crudo.
+- Expiración configurable (RESET_TOKEN_EXPIRATION_MINUTES, default 60).
+- Un solo uso (flag `used`) + los tokens viejos del usuario se invalidan
+  al generar uno nuevo (un link viejo muere apenas se pide otro).
+- Al consumirse, se revocan TODOS los refresh tokens del usuario
+  (invalidación de sesiones) y se registra auditoría.
+- Respuesta siempre genérica — nunca revela si el usuario existe.
 """
 import hashlib
 import os
@@ -35,16 +45,28 @@ from app.auth import (
     create_refresh_token,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
+from app.audit import log_audit
 from app.dependencias import get_current_user
-from app.email_utils import send_reset_link_email_bg, send_welcome_email_bg
+from app.email_utils import (
+    send_reset_link_email_bg,
+    send_welcome_email_bg,
+    RESET_TOKEN_EXPIRATION_MINUTES,
+)
 from app.models.refresh_token import RefreshToken
 from app.models.password_reset_token import PasswordResetToken
 from app.models.token_blacklist import TokenBlacklist
-from app.rate_limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+
+
+def _client_ip(request: Request) -> str:
+    """IP del cliente, priorizando los headers de proxy estándar."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 _password_reset_attempts: dict[str, list[float]] = {}
 _PASSWORD_RESET_MAX_ATTEMPTS = 3
@@ -190,7 +212,6 @@ def login(
 # explícito (mobile). Si esto falla en aceptar un token revocado, un refresh
 # robado sigue siendo válido indefinidamente.
 @router.post("/refresh")
-@limiter.limit("10/minute")
 def refresh(
     request: Request,
     response: Response,
@@ -305,7 +326,6 @@ def logout(
 # enumerar cuentas válidas por status code. Ahora responde 200 siempre,
 # exista o no el usuario. Ver CHANGELOG_FIXES.md.
 @router.post("/recuperar-contrasena")
-@limiter.limit("3/15minutes")
 def recuperar_contrasena(
     request: Request,
     req: schemas.user.RecuperarRequest,
@@ -324,13 +344,23 @@ def recuperar_contrasena(
     )
 
     if db_user:
+        # Token criptográficamente seguro; solo se guarda su SHA-256.
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        # Invalida links viejos al generar uno nuevo: borra los tokens de
+        # reset no usados de este usuario (un solo reset vigente a la vez).
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.usuario_id == db_user.id,
+            PasswordResetToken.used == False,  # noqa: E712
+        ).delete()
+        db.flush()
 
         reset_token = PasswordResetToken(
             usuario_id=db_user.id,
             token_hash=token_hash,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(minutes=RESET_TOKEN_EXPIRATION_MINUTES),
         )
         db.add(reset_token)
         db.commit()
@@ -341,17 +371,33 @@ def recuperar_contrasena(
             send_reset_link_email_bg(
                 background_tasks, user_email, user_name, raw_token
             )
+            log_audit(
+                db,
+                "password_reset_requested",
+                usuario_id=db_user.id,
+                usuario=db_user.username,
+                ip=_client_ip(request),
+                detalle=f"expira_min={RESET_TOKEN_EXPIRATION_MINUTES}",
+            )
+        else:
+            log_audit(
+                db,
+                "password_reset_requested_sin_email",
+                usuario_id=db_user.id,
+                usuario=db_user.username,
+                ip=_client_ip(request),
+            )
 
     # Respuesta genérica siempre — evita user enumeration (existencia de
     # cuenta no debe ser distinguible por status code ni por contenido).
     return {"detail": "Si el usuario existe, recibirás un email con instrucciones."}
 
 
-# Consume el token de PasswordResetToken (hash + expiry 1h + used) emitido
-# por recuperar_contrasena. Si no valida expiry/used, un link viejo podría
-# reusarse para resetear la contraseña.
+# Consume el token de PasswordResetToken (hash + expiry configurable + used)
+# emitido por recuperar_contrasena. Si no valida expiry/used, un link viejo
+# podría reusarse para resetear la contraseña. Al consumirse revoca todas las
+# sesiones (refresh tokens) del usuario.
 @router.post("/reset-password")
-@limiter.limit("10/minute")
 def reset_password(
     request: Request,
     req: schemas.user.ResetPasswordRequest,
@@ -370,6 +416,12 @@ def reset_password(
     )
 
     if not reset_token:
+        log_audit(
+            db,
+            "password_reset_failed",
+            ip=_client_ip(request),
+            detalle="token_invalido_o_expirado",
+        )
         raise HTTPException(
             status_code=400,
             detail="Token inválido o expirado. Solicitá un nuevo restablecimiento de contraseña.",
@@ -385,13 +437,32 @@ def reset_password(
 
     setattr(db_user, 'hashed_password', security.hash_password(req.new_password))
     setattr(reset_token, 'used', True)
+    # Borra cualquier otro token de reset pendiente: imposible reutilizar.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.usuario_id == db_user.id,
+        PasswordResetToken.id != reset_token.id,
+        PasswordResetToken.used == False,  # noqa: E712
+    ).delete()
+    # Invalidación de sesiones: revoca TODOS los refresh tokens del usuario.
+    db.query(RefreshToken).filter(
+        RefreshToken.usuario_id == db_user.id,
+        RefreshToken.revocado == False,  # noqa: E712
+    ).update({RefreshToken.revocado: True})
     db.commit()
+
+    log_audit(
+        db,
+        "password_reset_completed",
+        usuario_id=db_user.id,
+        usuario=db_user.username,
+        ip=_client_ip(request),
+        detalle="sesiones_revocadas",
+    )
 
     return {"detail": "Contraseña actualizada correctamente."}
 
 
 @router.post("/cambiar-contrasena")
-@limiter.limit("10/minute")
 def cambiar_contrasena(
     request: Request,
     req: schemas.user.ChangePasswordRequest,
@@ -413,16 +484,30 @@ def cambiar_contrasena(
     if not security.verify_password(
         req.current_password, str(db_user.hashed_password)
     ):
+        log_audit(
+            db,
+            "password_change_failed",
+            usuario_id=db_user.id,
+            usuario=db_user.username,
+            ip=_client_ip(request),
+        )
         raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
 
     setattr(db_user, 'hashed_password', security.hash_password(req.new_password))
     db.commit()
 
+    log_audit(
+        db,
+        "password_changed",
+        usuario_id=db_user.id,
+        usuario=db_user.username,
+        ip=_client_ip(request),
+    )
+
     return {"detail": "Contraseña actualizada correctamente."}
 
 
 @router.post("/registro")
-@limiter.limit("3/hour")
 def solicitar_registro(
     request: Request,
     req: schemas.user.RegistroRequest,

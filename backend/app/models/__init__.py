@@ -28,6 +28,7 @@ from . import global_settings
 from . import peso_evaluacion
 from . import password_reset_token
 from . import token_blacklist
+from . import audit_log
 
 __all__ = [
     "user",
@@ -60,5 +61,6 @@ __all__ = [
     "peso_evaluacion",
     "password_reset_token",
     "token_blacklist",
+    "audit_log",
 ]
 
