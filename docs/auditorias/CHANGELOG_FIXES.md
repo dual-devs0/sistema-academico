@@ -1,7 +1,83 @@
 # CHANGELOG_FIXES.md
 
 > Generado automáticamente por la auditoría del 2026-07-23
-> Última modificación: 2026-08-07
+> Última modificación: 2026-08-12
+
+## 2026-08-12 — Pre-producción: email REAL de recuperación + rate limiting GLOBAL (Tarea 1 y Tarea 2)
+
+Dos entregables de puesta en producción, con tests dedicados y sin romper la
+suite existente (393 passed; los únicos fallos locales son 4 tests de PDF por
+falta de GTK/WeasyPrint en Windows — en CI/Linux pasan).
+
+### Tarea 1 — Email real para recuperación de contraseña
+
+**Antes:** el "email" era un log sintético; la contraseña no se podía recuperar.
+
+**Después:**
+- Nuevo `backend/app/email_provider.py`: proveedor intercambiable
+  `EMAIL_PROVIDER=auto|mock|resend|sendgrid|smtp` con degradación elegante:
+  `send_email()` reintenta con backoff (`EMAIL_MAX_ATTEMPTS`) y **nunca
+  lanza** — si el proveedor falla, el request responde igual.
+- Nuevo `backend/app/email_templates.py`: templates HTML profesionales y
+  responsivos (monograma, botón "Restablecer contraseña", enlace de respaldo,
+  expiración visible, aviso de seguridad) para reset, welcome, nueva
+  contraseña admin, nueva nota y alerta de inasistencia.
+- `backend/app/email_utils.py` reescrito conservando firmas públicas
+  (`send_reset_link_email_bg`, `send_welcome_email_bg`, ...) — ningún test
+  existente se rompió.
+- Flujo de reset endurecido en `backend/app/routers/auth_router.py`:
+  - Token `secrets.token_urlsafe(32)`; en BD **solo SHA-256** (nunca plano).
+  - Un solo link vigente: pedir uno nuevo invalida los anteriores.
+  - Expiración configurable `RESET_TOKEN_EXPIRATION_MINUTES` (default 60).
+  - Al consumirse: marca `used`, borra pendientes y **revoca todos los
+    refresh tokens** del usuario (cierra sesiones).
+  - Respuesta siempre genérica (200): nunca revela si el usuario existe.
+  - Auditoría por evento (`password_reset_requested`, `password_reset_completed`,
+    `password_changed`, ...) en nueva tabla `audit_log`
+    (migración `e9f8d7c6b5a4_add_audit_log_and_password_reset_improvements`,
+    aplica con `alembic upgrade head`).
+- Schemas: `RecuperarRequest` valida email con regex si contiene `@`;
+  contraseñas nuevas exigen ≥8 caracteres con letras Y números.
+- Frontend (`frontend/src/pages/ResetPassword.tsx`, modal en `AcademicoLogin.tsx`)
+  y mobile (`mobile/app/(auth)/login.tsx` + `services/authService.ts`): flujo
+  completo forgot → email → token → nueva contraseña, con validación fuerte
+  igual al backend y mensaje genérico anti-enumeración.
+- Tests: `backend/tests/test_password_reset.py` (19 tests, todos verdes).
+
+### Tarea 2 — Rate limiting global para TODA la API
+
+**Antes:** slowapi solo en /auth — el resto de la API no tenía protección.
+
+**Después:** nuevo `backend/app/rate_limiting.py` (elimina `app/rate_limiter.py`
+de slowapi; `requeriments.txt`: slowapi → `redis>=5.0`):
+- Sliding window log exacto, multi-bucket por request: IP (X-Forwarded-For),
+  usuario autenticado (JWT decodificado) y API key (`X-API-Key` en `API_KEYS`);
+  se exigen TODOS los buckets.
+- Almacenamiento: Redis (sorted sets, pipeline, timeouts 1.5s) con
+  **degradación elegante a memoria local** si Redis cae — jamás derriba la API.
+- Categorías con límites independientes (AUTH_LOGIN, AUTH_REGISTER,
+  PASSWORD_RESET, UPLOADS, QR, REPORTS, SEARCH, HEAVY_ENDPOINTS, ADMIN,
+  EXPORTS, IMPORTS; GET→READ, mutaciones→WRITE), cada una configurable con
+  `RATE_LIMIT_<CATEGORIA>=N/minutes`.
+- Respuesta 429 consistente `{"success":false,"error":{"code":"RATE_LIMIT_EXCEEDED","message":"Too many requests."}}`
+  + headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`.
+- Exclusiones configurables (defaults `/health,/version,/metrics,/` y
+  `/static,/docs,/openapi.json,/redoc`); OPTIONS/HEAD exentos.
+- Observabilidad: nuevo endpoint `GET /metrics` (Prometheus text:
+  totales bloqueados/permitidos, top endpoints, top IPs, promedio por minuto)
+  y estado en `/health` intacto.
+- Se corrigió además un deadlock real detectado por los tests:
+  `_metrics_lock` ahora es `RLock` (metrics_snapshot llamaba un helper que
+  re-adquiría el Lock y colgaba `/metrics`).
+- Tests: `backend/tests/test_rate_limiting.py` (15 tests, todos verdes),
+  incluyendo límites por categoría, exclusión, buckets por IP/usuario/API key
+  y degradación a memoria con Redis caído.
+
+### Configuración nueva (ver backend/.env.example y render.yaml)
+`EMAIL_PROVIDER, RESEND_API_KEY, SENDGRID_API_KEY, SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD,
+EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_MAX_ATTEMPTS, EMAIL_MOCK, RESET_TOKEN_EXPIRATION_MINUTES,
+FRONTEND_URL, RESET_PASSWORD_FRONTEND_URL, REDIS_URL, REDIS_TOKEN, API_KEYS,
+RATE_LIMIT_EXCLUDE_PATHS, RATE_LIMIT_EXCLUDE_PREFIXES, RATE_LIMIT_<CATEGORIA>`.
 
 ## 2026-08-07 — Seguridad QR de asistencia: solo alumnos inscriptos pueden escanear (Plan Fases 1-3)
 

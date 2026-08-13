@@ -22,8 +22,8 @@ export default function ResetPassword() {
       setError('Token de restablecimiento no encontrado en la URL.')
       return
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+      setError('La contraseña debe tener al menos 8 caracteres e incluir letras y números.')
       return
     }
     if (password !== confirm) {
@@ -89,7 +89,7 @@ export default function ResetPassword() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Mínimo 6 caracteres"
+            placeholder="Mínimo 8 caracteres con números"
             autoComplete="new-password"
             style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
           />

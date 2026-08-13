@@ -12,7 +12,7 @@ frontend web React y app móvil Expo/React Native, para los roles Alumno, Profes
 | Mobile | Expo SDK 57 + React Native + expo-router + NativeWind v4 |
 | Auth | JWT (access en body + refresh en cookie httpOnly) + CSRF double-submit + rate limiting |
 | Storage | Cloudflare R2 (S3-compatible) |
-| Email | SMTP (Gmail) + fastapi-mail |
+| Email | Resend / SendGrid / SMTP (proveedor intercambiable, degrada con gracia) + templates HTML propios |
 | Pagos | Stripe Checkout Sessions |
 | PDF/QR | ReportLab, WeasyPrint, qrcode |
 

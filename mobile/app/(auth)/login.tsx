@@ -33,7 +33,7 @@ import * as SecureStore from "expo-secure-store";
 import { AxiosError } from "axios";
 import { CurveBackground } from "../../components/CurveBackground";
 import { useAuth } from "../../hooks/useAuth";
-import { loginRequest, recuperarContrasenaRequest, registroRequest } from "../../services/authService";
+import { loginRequest, recuperarContrasenaRequest, registroRequest, resetPasswordRequest } from "../../services/authService";
 import { warmUpBackend } from "../../services/api";
 import { fetchPerfil } from "../../services/dashboardService";
 import { fontFamily, spacing } from "../../constants/design";
@@ -146,7 +146,7 @@ function BackArrowIcon({ color = P.headerTitle }: { color?: string }) {
 }
 
 type Tab = "login" | "register";
-type Screen = "main" | "forgot";
+type Screen = "main" | "forgot" | "reset";
 type BioType = "Face ID" | "Huella digital" | "Biométrico";
 
 const TITLE = "PORTAL ACADÉMICO";
@@ -208,8 +208,15 @@ export default function LoginScreen() {
   const [welcomeCarrera, setWelcomeCarrera] = useState<string | null>(null);
 
   const [fpDoc, setFpDoc] = useState("");
-  const [fpMatricula, setFpMatricula] = useState("");
   const [fpSending, setFpSending] = useState(false);
+
+  const [rpToken, setRpToken] = useState("");
+  const [rpPass, setRpPass] = useState("");
+  const [rpConfirm, setRpConfirm] = useState("");
+  const [rpSending, setRpSending] = useState(false);
+  const [rpDone, setRpDone] = useState(false);
+  const rpPassRef = useRef<TextInput>(null);
+  const rpConfirmRef = useRef<TextInput>(null);
 
   // Collapsa el header cuando el teclado está abierto para que los campos
   // (Documento / Contraseña) queden siempre visibles sobre el teclado.
@@ -256,7 +263,9 @@ export default function LoginScreen() {
 
   const canSubmitLogin = username.trim().length > 0 && password.length > 0 && !submitting;
   const canSubmitReg = regDoc.trim().length > 0 && regMatricula.trim().length > 0 && !submitting;
-  const canSubmitForgot = fpDoc.trim().length > 0 && fpMatricula.trim().length > 0 && !fpSending;
+  const canSubmitForgot = fpDoc.trim().length > 0 && !fpSending;
+  const hasStrongPassword = rpPass.length >= 8 && /[a-zA-Z]/.test(rpPass) && /\d/.test(rpPass);
+  const canSubmitReset = rpToken.trim().length > 0 && hasStrongPassword && rpPass === rpConfirm && !rpSending && !rpDone;
 
   async function handleLogin() {
     Keyboard.dismiss();
@@ -323,7 +332,7 @@ export default function LoginScreen() {
     if (!canSubmitForgot) return;
     setFpSending(true);
     try {
-      const detail = await recuperarContrasenaRequest(fpDoc.trim(), fpMatricula.trim());
+      const detail = await recuperarContrasenaRequest(fpDoc.trim());
       showToast(detail);
     } catch (err) {
       const axErr = err as AxiosError<{ detail?: string }>;
@@ -331,8 +340,26 @@ export default function LoginScreen() {
     } finally {
       setFpSending(false);
       setFpDoc("");
-      setFpMatricula("");
       setScreen("main");
+    }
+  }
+
+  async function handleResetSend() {
+    Keyboard.dismiss();
+    if (!canSubmitReset) return;
+    setRpSending(true);
+    try {
+      const detail = await resetPasswordRequest({
+        token: rpToken.trim(),
+        new_password: rpPass,
+      });
+      showToast(detail);
+      setRpDone(true);
+    } catch (err) {
+      const axErr = err as AxiosError<{ detail?: string }>;
+      setErrorMsg(axErr.response?.data?.detail ?? "No se pudo restablecer la contraseña. Verificá el token.");
+    } finally {
+      setRpSending(false);
     }
   }
 
@@ -402,7 +429,7 @@ export default function LoginScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
         <View style={{ height: heroH }} />
 
-        {screen === "forgot" ? (
+        {screen !== "main" ? (
           <View style={{ position: "absolute", top: insets.top + spacing.sm, left: spacing.xl, zIndex: 10 }}>
             <Pressable
               onPress={() => setScreen("main")}
@@ -647,39 +674,138 @@ export default function LoginScreen() {
               </View>
             </KeyboardAvoidingView>
           </>
-        ) : (
+        ) : screen === "forgot" ? (
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingBottom: spacing["3xl"] }}>
               <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 26, textAlign: "center" }}>
                 Recuperar contraseña
               </Text>
               <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing.xl }}>
-                Le enviaremos un correo electrónico con su nueva contraseña.
+                Ingresá tu documento de identidad o email. Si el usuario existe, recibirás un email con instrucciones y un enlace para restablecer tu contraseña.
               </Text>
 
               <View style={{ gap: spacing.md }}>
                 <LabeledInput
                   value={fpDoc}
                   onChangeText={setFpDoc}
-                  placeholder="Nro. de Documento"
-                  keyboardType="numeric"
+                  placeholder="Nro. de Documento o Email"
                   autoCapitalize="none"
                   autoCorrect={false}
-                />
-                <LabeledInput
-                  value={fpMatricula}
-                  onChangeText={setFpMatricula}
-                  placeholder="Matrícula"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
+                  returnKeyType="go"
+                  onSubmitEditing={handleForgotSend}
                 />
                 <GradientButton
-                  label="Recuperar"
+                  label="Enviar instrucciones"
                   disabled={!canSubmitForgot}
                   loading={fpSending}
                   onPress={handleForgotSend}
                 />
               </View>
+
+              <Pressable
+                onPress={() => { setScreen("reset"); setErrorMsg(null); setRpDone(false); }}
+                style={{ marginTop: spacing.lg, alignItems: "center" }}
+              >
+                <Text style={{ color: P.accent, fontFamily: fontFamily.interSemibold, fontSize: 13.5, textDecorationLine: "underline" }}>
+                  Ya tengo el token del email
+                </Text>
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
+        ) : (
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: spacing.xl, paddingBottom: spacing["3xl"] }}>
+              {rpDone ? (
+                <Animated.View entering={FadeIn.duration(250)} style={{ alignItems: "center", gap: spacing.md }}>
+                  <View style={{
+                    width: 84, height: 84, borderRadius: 42,
+                    backgroundColor: "rgba(52,211,153,0.12)", borderWidth: 2, borderColor: "rgba(52,211,153,0.35)",
+                    alignItems: "center", justifyContent: "center",
+                  }}>
+                    <CheckIcon />
+                  </View>
+                  <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 22, textAlign: "center" }}>
+                    Contraseña actualizada
+                  </Text>
+                  <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center" }}>
+                    Ya podés iniciar sesión con tu nueva contraseña.
+                  </Text>
+                  <GradientButton
+                    label="Volver al ingreso"
+                    disabled={false}
+                    loading={false}
+                    onPress={() => { setScreen("main"); setRpDone(false); setRpToken(""); setRpPass(""); setRpConfirm(""); setErrorMsg(null); }}
+                    showArrow
+                  />
+                </Animated.View>
+              ) : (
+                <Animated.View entering={FadeIn.duration(250)}>
+                  <Text style={{ color: P.white, fontFamily: fontFamily.interBold, fontSize: 26, textAlign: "center" }}>
+                    Restablecer contraseña
+                  </Text>
+                  <Text style={{ color: P.mutedText, fontFamily: fontFamily.inter, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing.xl }}>
+                    Ingresá el token del email que recibiste y definí tu nueva contraseña (mínimo 8 caracteres con letras y números).
+                  </Text>
+
+                  <View style={{ gap: spacing.md }}>
+                    <LabeledInput
+                      value={rpToken}
+                      onChangeText={setRpToken}
+                      placeholder="Token del email"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="next"
+                      onSubmitEditing={() => rpPassRef.current?.focus()}
+                    />
+                    <LabeledInput
+                      ref={rpPassRef}
+                      value={rpPass}
+                      onChangeText={setRpPass}
+                      placeholder="Nueva contraseña"
+                      secureTextEntry
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="next"
+                      onSubmitEditing={() => rpConfirmRef.current?.focus()}
+                    />
+                    <LabeledInput
+                      ref={rpConfirmRef}
+                      value={rpConfirm}
+                      onChangeText={setRpConfirm}
+                      placeholder="Repetí la contraseña"
+                      secureTextEntry
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="go"
+                      onSubmitEditing={handleResetSend}
+                    />
+
+                    {!rpPass || rpPass === rpConfirm ? null : (
+                      <Text style={{ color: P.error, fontFamily: fontFamily.inter, fontSize: 12.5, textAlign: "center" }}>
+                        Las contraseñas no coinciden.
+                      </Text>
+                    )}
+                    {rpPass.length >= 8 || !rpPass ? null : (
+                      <Text style={{ color: P.error, fontFamily: fontFamily.inter, fontSize: 12.5, textAlign: "center" }}>
+                        La contraseña debe tener al menos 8 caracteres.
+                      </Text>
+                    )}
+                    {rpPass.length >= 8 && (!/[a-zA-Z]/.test(rpPass) || !/\d/.test(rpPass)) ? (
+                      <Text style={{ color: P.error, fontFamily: fontFamily.inter, fontSize: 12.5, textAlign: "center" }}>
+                        Debe incluir letras y números.
+                      </Text>
+                    ) : null}
+                    {errorMsg ? <ErrorText msg={errorMsg} /> : null}
+
+                    <GradientButton
+                      label="Restablecer"
+                      disabled={!canSubmitReset}
+                      loading={rpSending}
+                      onPress={handleResetSend}
+                    />
+                  </View>
+                </Animated.View>
+              )}
             </View>
           </KeyboardAvoidingView>
         )}

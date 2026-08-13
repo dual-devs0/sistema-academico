@@ -70,15 +70,33 @@ export async function cambiarContrasenaRequest(
  * (`POST /auth/recuperar-contrasena`, body `{ username_or_email }`).
  * Por seguridad, el backend responde el mismo mensaje genérico exista o
  * no el usuario — nunca revela si un username/email está registrado.
+ * El email enviado contiene un enlace de un solo uso (válido por
+ * RESET_TOKEN_EXPIRATION_MINUTES, 60 por defecto) y nunca la contraseña.
  */
 export async function recuperarContrasenaRequest(
   usernameOrEmail: string,
-  matricula?: string
 ): Promise<string> {
   const { data } = await api.post<{ detail: string }>("/auth/recuperar-contrasena", {
     username_or_email: usernameOrEmail,
-    matricula: matricula || undefined,
   });
+  return data.detail;
+}
+
+/**
+ * Completa el restablecimiento de contraseña con el token recibido por
+ * email (`POST /auth/reset-password`, body `{ token, new_password }`).
+ * El backend exige contraseña fuerte: mínimo 8 caracteres con letras Y
+ * números. El token es de un solo uso y expira (60 min por defecto).
+ */
+export interface ResetPasswordPayload {
+  token: string;
+  new_password: string;
+}
+
+export async function resetPasswordRequest(
+  payload: ResetPasswordPayload,
+): Promise<string> {
+  const { data } = await api.post<{ detail: string }>("/auth/reset-password", payload);
   return data.detail;
 }
 

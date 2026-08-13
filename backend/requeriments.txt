@@ -14,7 +14,9 @@ passlib[bcrypt]
 # rompe con bcrypt>=4.1 (ValueError en TODO hash/verify). Ver CHANGELOG_FIXES.md.
 bcrypt==4.0.1
 python-dotenv
-slowapi  # FIX AUDITORIA_2026-07-24 #2: usado en main.py/rate_limiter.py, faltaba declarar
+
+# Rate limiting global (redis opcional, fallback a memoria local)
+redis>=5.0
 
 # Manejo de PDFs
 pymupdf
