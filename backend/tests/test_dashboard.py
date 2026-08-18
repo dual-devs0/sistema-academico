@@ -9,7 +9,7 @@ Este endpoint compone en una sola llamada:
 """
 
 import pytest
-from datetime import date
+from datetime import date, timedelta
 
 from app.models.users import User
 from app.models.materia import Materia
@@ -56,11 +56,11 @@ def dashboard_seed(db):
             presente=(i < 2),
         ))
 
-    # Evento futuro
+    # Evento futuro (relativo a hoy, no hardcodeado, para que no venza con el tiempo)
     db.add(EventoCalendario(
         titulo="Parcial Estructuras I",
         tipo="parcial",
-        fecha=date(2026, 8, 15),
+        fecha=date.today() + timedelta(days=30),
         materia_id=materia.id,
         carrera_id=carrera.id,
         descripcion="Tema 1-5",
