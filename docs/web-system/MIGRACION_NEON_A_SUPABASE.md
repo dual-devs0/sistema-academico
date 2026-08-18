@@ -223,7 +223,8 @@ curl -s https://<backend>.onrender.com/docs >/dev/null && echo OK
 - [x] `pytest` contra Supabase OK (**315 passed**, incluido `test_postgres_compat.py` sobre el pooler).
 - [x] Render: set `DATABASE_URL` → pooler Supabase + `CORS_ORIGINS` (redploy) ✓.
 - [x] Verificación producción: `/docs` 200 (175 endpoints); login alumno real `03000000` (Luis Davalos) + `GET /boleta/resumen` con notas reales (promedio 5.11, 5 materias); `GET /boleta/pdf?scope=global` → PDF `%PDF-1.7` (331 KB); `GET /profesor/materias` (Carlos Méndez, 3 materias). Passwords de verificación restauradas a su hash original tras el test.
-- [ ] Activar PITR en Supabase (si plan pagado); revisar auto-suspend del backend y `health` ping (§9).
+- [x] Revisado auto-suspend del backend y `health` ping (§9): `.github/workflows/keep-alive.yml` pinguea `/health` cada 10 min desde 2026-08. Reduce el cold-start del plan free de Render, no lo elimina (para eso hay que pasar a plan pago).
+- [ ] Activar PITR en Supabase (requiere plan pagado — ver panel de Supabase, `Database > Backups`). Pendiente de decisión de costo, sin fecha.
 - [x] Rollback crudo definido y documentado — `DATABASE_URL` de Neon (pooler): `postgresql://neondb_owner:...@ep-quiet-pond-act3vu5a-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`. Neon queda como **snapshot histórico de rollback** (con todos los datos del dump intactos).
 
 ---

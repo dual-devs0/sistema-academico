@@ -98,6 +98,9 @@ def create_apunte(
 ):
     data = apunte.model_dump()
     data["user_id"] = current_user.user_id
+    # aprobado no es asignable por el cliente: solo /apuntes/{id}/aprobar (admin)
+    # puede marcarlo, si no cualquier alumno se autoaprueba el apunte al crearlo.
+    data["aprobado"] = current_user.role == "admin" and data.get("aprobado") is True
     new_apunte = models.apunte.Apunte(**data)
     db.add(new_apunte)
     db.commit()
