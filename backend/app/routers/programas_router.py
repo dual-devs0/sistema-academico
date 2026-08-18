@@ -7,8 +7,19 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app import models, schemas, database
 from app.dependencias import get_current_user
+from app.services.autorizacion import es_profesor_de_materia
 
 router = APIRouter(prefix="/programas", tags=["programas"])
+
+
+def _verificar_acceso_materia(db: Session, materia_id: int, current_user) -> None:
+    if current_user.role == "admin":
+        return
+    if current_user.role == "profesor" and es_profesor_de_materia(
+        db, materia_id, current_user.user_id
+    ):
+        return
+    raise HTTPException(status_code=403, detail="No autorizado")
 
 
 @router.post("/", response_model=schemas.programa.ProgramaOut)
@@ -17,8 +28,7 @@ def create_programa(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user.role not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
+    _verificar_acceso_materia(db, programa.materia_id, current_user)
     new_programa = models.programa.Programa(
         materia_id=programa.materia_id,
         semana=programa.semana,
@@ -64,8 +74,6 @@ def update_programa(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user.role not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.programa.Programa)
         .filter(models.programa.Programa.id == programa_id)
@@ -73,6 +81,8 @@ def update_programa(
     )
     if not existing:
         raise HTTPException(status_code=404, detail="Programa no encontrado")
+    _verificar_acceso_materia(db, existing.materia_id, current_user)
+    _verificar_acceso_materia(db, programa.materia_id, current_user)
     existing.materia_id = programa.materia_id
     existing.semana = programa.semana
     existing.titulo = programa.titulo
@@ -88,8 +98,6 @@ def delete_programa(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user.role not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
     existing = (
         db.query(models.programa.Programa)
         .filter(models.programa.Programa.id == programa_id)
@@ -97,6 +105,7 @@ def delete_programa(
     )
     if not existing:
         raise HTTPException(status_code=404, detail="Programa no encontrado")
+    _verificar_acceso_materia(db, existing.materia_id, current_user)
     db.delete(existing)
     db.commit()
     return {"detail": "Eliminado"}
@@ -110,8 +119,6 @@ def bulk_save_programa(
     current_user=Depends(get_current_user),
 ):
     """Replace all programa items for a materia."""
-    if current_user.role not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == materia_id)
@@ -119,6 +126,7 @@ def bulk_save_programa(
     )
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
+    _verificar_acceso_materia(db, materia_id, current_user)
     db.query(models.programa.Programa).filter(
         models.programa.Programa.materia_id == materia_id
     ).delete()

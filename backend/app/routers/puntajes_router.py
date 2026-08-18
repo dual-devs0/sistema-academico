@@ -320,6 +320,7 @@ def update_puntaje(
         _verificar_regularidad(db, existing.user_id, mid, puntaje.tipo)
     data = puntaje.model_dump()
     nueva_materia_id = data.pop("materia_id")
+    data.pop("user_id", None)  # no reasignable: mass assignment hubiera permitido robar la nota a otro alumno
     if nueva_materia_id != existing.materia_id:
         nuevo_oferta_id = _oferta_activa_id(db, nueva_materia_id)
         if nuevo_oferta_id is None:

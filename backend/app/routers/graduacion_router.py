@@ -37,6 +37,11 @@ from app.models.graduacion import ProcesoGraduacion, VerificacionSolvencia, Etap
 router = APIRouter(prefix="/graduacion", tags=["graduacion"])
 
 
+def _verificar_acceso_alumno(alumno_id: int, current_user) -> None:
+    if current_user.role != "admin" and current_user.user_id != alumno_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+
 def _enriquecer_proceso(proceso: ProcesoGraduacion, db: Session) -> ProcesoGraduacion:
     """Adjunta nombres reales de alumno/tutor al objeto para el response_model."""
     completo = (
@@ -87,6 +92,7 @@ def listar_etapas(
     proceso = db.query(ProcesoGraduacion).filter(ProcesoGraduacion.id == id).first()
     if not proceso:
         raise HTTPException(status_code=404, detail="Proceso no encontrado")
+    _verificar_acceso_alumno(proceso.alumno_id, current_user)
     return (
         db.query(EtapaTesis)
         .filter(EtapaTesis.proceso_id == id)
@@ -105,6 +111,7 @@ def check_condicion_egreso(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    _verificar_acceso_alumno(id, current_user)
     return verificar_condicion_egreso(id, db)
 
 
@@ -186,6 +193,7 @@ def listar_solvencia(
     proceso = db.query(ProcesoGraduacion).filter(ProcesoGraduacion.id == id).first()
     if not proceso:
         raise HTTPException(status_code=404, detail="Proceso no encontrado")
+    _verificar_acceso_alumno(proceso.alumno_id, current_user)
     return (
         db.query(VerificacionSolvencia)
         .filter(
@@ -206,4 +214,5 @@ def documentos_cones(
     proceso = db.query(ProcesoGraduacion).filter(ProcesoGraduacion.id == id).first()
     if not proceso:
         raise HTTPException(status_code=404, detail="Proceso no encontrado")
+    _verificar_acceso_alumno(proceso.alumno_id, current_user)
     return {"mensaje": "Endpoint pendiente de integración con CONES"}  # placeholder

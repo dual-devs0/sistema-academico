@@ -14,7 +14,7 @@ from app import database, models, schemas
 from app.auth import ALGORITHM, SECRET_KEY
 from app.dependencias import get_current_user
 from app.email_utils import send_alerta_inasistencia_email_bg
-from app.services.autorizacion import es_profesor_de_materia
+from app.services.autorizacion import es_profesor_de_materia, es_profesor_de_alumno
 from app.services.asistencia_utils import puntaje_asistencia_sql, PUNTAJE_PRESENTE
 from app.schemas.current_user_schema import CurrentUser
 
@@ -234,6 +234,26 @@ def list_asistencias(
         query = query.filter(
             models.asistencia.Asistencia.user_id == current_user.user_id
         )
+    elif current_user.role == "profesor":
+        if user_id is not None:
+            if not es_profesor_de_alumno(db, current_user.user_id, user_id):
+                raise HTTPException(status_code=403, detail="No autorizado")
+            query = query.filter(models.asistencia.Asistencia.user_id == user_id)
+        else:
+            query = query.filter(
+                models.asistencia.Asistencia.user_id.in_(
+                    db.query(models.inscripcion.Inscripcion.alumno_id)
+                    .join(
+                        models.oferta_materia.OfertaMateria,
+                        models.oferta_materia.OfertaMateria.id
+                        == models.inscripcion.Inscripcion.oferta_materia_id,
+                    )
+                    .filter(
+                        models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id,
+                        models.oferta_materia.OfertaMateria.activa == True,
+                    )
+                )
+            )
     else:
         if user_id is not None:
             query = query.filter(models.asistencia.Asistencia.user_id == user_id)
@@ -276,6 +296,7 @@ def update_asistencia(
     _verificar_profesor_materia(db, existing.materia_id, current_user)
     data = asistencia.model_dump()
     nueva_materia_id = data.pop("materia_id")
+    data.pop("user_id", None)  # no reasignable: mass assignment hubiera permitido robar la asistencia a otro alumno
     if nueva_materia_id != existing.materia_id:
         nuevo_oferta_id = _oferta_activa_id(db, nueva_materia_id)
         if nuevo_oferta_id is None:

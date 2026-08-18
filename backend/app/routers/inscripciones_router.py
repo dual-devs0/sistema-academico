@@ -13,6 +13,7 @@ from app import models, schemas, database
 from app.dependencias import get_current_user
 from app.services.pensum import validar_correlatividades
 from app.services.financiero import verificar_deuda_inscripcion, registrar_override_mora
+from app.services.autorizacion import es_profesor_de_materia
 
 
 class PromocionarBody(BaseModel):
@@ -169,7 +170,7 @@ def desinscribir(
     )
     if not ins:
         raise HTTPException(status_code=404, detail="Inscripcion no encontrada")
-    if current_user.role == "alumno" and ins.alumno_id != current_user.user_id:
+    if current_user.role != "admin" and ins.alumno_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     db.delete(ins)
     db.commit()
@@ -182,6 +183,12 @@ def alumnos_por_materia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    if current_user.role == "profesor" and not es_profesor_de_materia(
+        db, materia_id, current_user.user_id
+    ):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    elif current_user.role not in ("admin", "profesor"):
+        raise HTTPException(status_code=403, detail="No autorizado")
     oferta = _oferta_activa_o_404(db, materia_id)
     inscripciones = (
         db.query(models.inscripcion.Inscripcion)
@@ -234,6 +241,16 @@ def list_inscripciones(
     )
     if current_user.role == "alumno":
         q = q.filter(models.inscripcion.Inscripcion.alumno_id == current_user.user_id)
+    elif current_user.role == "profesor":
+        q = q.join(
+            models.oferta_materia.OfertaMateria,
+            models.oferta_materia.OfertaMateria.id
+            == models.inscripcion.Inscripcion.oferta_materia_id,
+        ).filter(
+            models.oferta_materia.OfertaMateria.profesor_id == current_user.user_id
+        )
+        if alumno_id:
+            q = q.filter(models.inscripcion.Inscripcion.alumno_id == alumno_id)
     elif alumno_id:
         q = q.filter(models.inscripcion.Inscripcion.alumno_id == alumno_id)
     rows = q.all()

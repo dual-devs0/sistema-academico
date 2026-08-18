@@ -257,11 +257,13 @@ def get_comprobante(
     if not pago:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
 
-    # Alumno solo puede ver comprobantes de sus propias cuotas
+    # Alumno solo puede ver comprobantes de sus propias cuotas; otros roles requieren admin
     if current_user.role == "alumno":
         cuota = db.query(Cuota).filter(Cuota.id == pago.cuota_id).first()
         if not cuota or cuota.alumno_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="No autorizado")
+    elif current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
 
     comp = db.query(Comprobante).filter(Comprobante.pago_id == pago_id).first()
     if not comp:
@@ -481,7 +483,7 @@ async def pago_online_webhook(
 def pago_online_confirm(
     body: PagoOnlineConfirmRequest,
     db: Session = Depends(database.get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("admin")),
 ):
     pago = db.query(PagoOnline).filter(
         PagoOnline.transaction_id == body.transaction_id

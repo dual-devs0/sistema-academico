@@ -1,6 +1,6 @@
 // Alumno, Profesor y Admin (contenido por rol). Datos personales, cambio de password, condición de beca (alumno). Depende de: /users/{id}, /alumno/mis-notas, /alumno/mi-asistencia.
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { api, getCurrentUser, getAccessToken, emitToast, emitAvatarUpdated } from '../lib/api'
+import { api, getCurrentUser, emitToast, emitAvatarUpdated } from '../lib/api'
 import { getBecasActivas, type BecaActiva } from '../services/finanzasService'
 import { getCondicionEgreso, type CondicionEgreso } from '../services/graduacionService'
 import { obtenerMiHistorico, type PeriodoHistorico } from '../services/historicoService'
@@ -149,12 +149,7 @@ function NotificacionesPush() {
       if (reg) {
         const sub = await reg.pushManager.getSubscription()
         if (sub) {
-          const token = getAccessToken()
-          await fetch('/api/notificaciones/subscribe', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          })
+          await api.delete('/notificaciones/subscribe', { endpoint: sub.endpoint })
           await sub.unsubscribe()
         }
       }
@@ -309,10 +304,7 @@ function PerfilPersonal({ role, userId }: { role: string; userId: number }) {
     try {
       const form = new FormData()
       form.append('foto', file)
-      const token = getAccessToken()
-      const res = await fetch('/api/users/me/foto', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Error al subir la foto')
-      const data = await res.json()
+      const data = await api.upload<{ url: string }>('/users/me/foto', form)
       setFotoUrl(data.url)
       emitAvatarUpdated(data.url)
       emitToast('Foto de perfil actualizada')
@@ -565,10 +557,7 @@ function PerfilProfesor({ userId }: { userId: number }) {
     try {
       const form = new FormData()
       form.append('foto', file)
-      const token = getAccessToken()
-      const res = await fetch('/api/users/me/foto', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Error al subir la foto')
-      const data = await res.json()
+      const data = await api.upload<{ url: string }>('/users/me/foto', form)
       setFotoUrl(data.url)
       emitAvatarUpdated(data.url)
       emitToast('Foto de perfil actualizada')

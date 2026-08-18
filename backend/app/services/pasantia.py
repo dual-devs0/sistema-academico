@@ -77,21 +77,32 @@ def aprobar_pasantia(pasantia_id: int, tutor_id: int, db: Session) -> Pasantia:
     return pasantia
 
 
-def actualizar_horas(pasantia_id: int, horas_completadas: int, db: Session) -> Pasantia:
+def actualizar_horas(
+    pasantia_id: int, horas_completadas: int, db: Session, current_user
+) -> Pasantia:
     pasantia = db.query(Pasantia).filter(Pasantia.id == pasantia_id).first()
     if not pasantia:
         raise ValueError("Pasantía no encontrada")
+    if current_user.role != "admin" and current_user.user_id != pasantia.tutor_academico_id:
+        raise PermissionError("No autorizado")
     pasantia.horas_completadas = horas_completadas
     db.flush()
     return pasantia
 
 
 def subir_informe(
-    pasantia_id: int, tipo: str, storage_key: Optional[str], db: Session
+    pasantia_id: int, tipo: str, storage_key: Optional[str], db: Session, current_user
 ) -> InformePasantia:
     pasantia = db.query(Pasantia).filter(Pasantia.id == pasantia_id).first()
     if not pasantia:
         raise ValueError("Pasantía no encontrada")
+    autorizado = (
+        current_user.role == "admin"
+        or current_user.user_id == pasantia.alumno_id
+        or current_user.user_id == pasantia.tutor_academico_id
+    )
+    if not autorizado:
+        raise PermissionError("No autorizado")
     informe = InformePasantia(
         pasantia_id=pasantia_id,
         tipo=tipo,
@@ -113,10 +124,12 @@ def rechazar_pasantia(pasantia_id: int, db: Session, motivo: str | None = None) 
     return pasantia
 
 
-def finalizar_pasantia(pasantia_id: int, db: Session) -> Pasantia:
+def finalizar_pasantia(pasantia_id: int, db: Session, current_user) -> Pasantia:
     pasantia = db.query(Pasantia).filter(Pasantia.id == pasantia_id).first()
     if not pasantia:
         raise ValueError("Pasantía no encontrada")
+    if current_user.role != "admin" and current_user.user_id != pasantia.tutor_academico_id:
+        raise PermissionError("No autorizado")
     if pasantia.horas_completadas < pasantia.horas_requeridas:
         raise ValueError(
             f"Horas incompletas: {pasantia.horas_completadas}"

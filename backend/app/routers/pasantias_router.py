@@ -183,10 +183,15 @@ def actualizar_horas_endpoint(
     current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
-        pasantia = actualizar_horas(id, horas_completadas=data.horas_completadas, db=db)
+        pasantia = actualizar_horas(
+            id, horas_completadas=data.horas_completadas, db=db, current_user=current_user
+        )
         db.commit()
         db.refresh(pasantia)
         return pasantia
+    except PermissionError as e:
+        db.rollback()
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e))
@@ -208,10 +213,15 @@ def subir_informe_endpoint(
         storage_key = None
         if archivo:
             storage_key = subir_archivo(archivo.file.read(), archivo.filename or "informe.pdf", "informes_pasantia")
-        informe = subir_informe(id, tipo=tipo, storage_key=storage_key, db=db)
+        informe = subir_informe(
+            id, tipo=tipo, storage_key=storage_key, db=db, current_user=current_user
+        )
         db.commit()
         db.refresh(informe)
         return informe
+    except PermissionError as e:
+        db.rollback()
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e))
@@ -241,10 +251,13 @@ def finalizar_pasantia_endpoint(
     current_user=Depends(require_role(["admin", "profesor"])),
 ):
     try:
-        pasantia = finalizar_pasantia(id, db=db)
+        pasantia = finalizar_pasantia(id, db=db, current_user=current_user)
         db.commit()
         db.refresh(pasantia)
         return pasantia
+    except PermissionError as e:
+        db.rollback()
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e))
