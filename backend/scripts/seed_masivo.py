@@ -227,10 +227,16 @@ inscs = db.query(Inscripcion).limit(17000).all()
 p_count = 0
 batch = []
 admin_id = admin.id
+# Escala de puntos por tipo (pesos default 20/20/10/50 = 100 pts, ver app.models.peso_evaluacion.PESO_DEFAULT).
+# Se genera un rendimiento por alumno-materia (45%-100% del máximo) para que haya
+# aprobados, regulares y destacados, no todos reprobados.
+PUNTOS_MAX = {"parcial1": 20, "parcial2": 20, "practico": 10}
 for ins in inscs:
+    rendimiento = random.uniform(0.45, 1.0)
     for t in ["parcial1","parcial2","practico"]:
+        valor = PUNTOS_MAX[t] * min(1.0, max(0.0, rendimiento + random.uniform(-0.1, 0.1)))
         batch.append({"user_id": ins.alumno_id, "oferta_materia_id": ins.oferta_materia_id,
-                      "tipo": t, "valor": round(random.uniform(2.0,10.0),2), "editado_por": admin_id})
+                      "tipo": t, "valor": round(valor, 1), "editado_por": admin_id})
         p_count += 1
     if len(batch) >= BATCH*5:
         bulk_ignore(Puntaje.__table__, batch); batch = []
