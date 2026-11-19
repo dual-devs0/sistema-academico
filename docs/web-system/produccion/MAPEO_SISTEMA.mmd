@@ -1,0 +1,62 @@
+graph TB
+    subgraph CLIENTS["Clientes"]
+        WEB["Frontend Web<br/>React 19 + TS + Vite<br/>frontend/src/lib/api.ts"]
+        MOBILE["Mobile App<br/>React Native / Expo<br/>mobile/services/api.ts"]
+    end
+
+    subgraph BACKEND["Backend — FastAPI + SQLAlchemy + PostgreSQL (backend/app/main.py)"]
+        AUTH["Auth<br/>auth_router, users_router<br/>settings_router"]
+        ACAD["Académico<br/>materia_router, inscripciones_router<br/>asistencias_router, puntajes_router<br/>notas_router, horarios_router<br/>pensum_router, carreras_router<br/>programas_router, examenes_router<br/>profesor_router, alumno_router"]
+        FIN["Financiero<br/>finanzas_router, becas_router<br/>+ Stripe / guarani.app"]
+        TRAM["Trámites / Graduación<br/>Pasantías / Equivalencias<br/>tramites_router, graduacion_router<br/>pasantias_router, equivalencias_router<br/>expediente_router, boleta_router"]
+        REP["Reportes / Admin<br/>admin_router, reportes_router<br/>eventos_router, notificaciones_router<br/>apuntes_router"]
+
+        SVC["Servicios de dominio<br/>(backend/app/services/*.py)<br/>autorizacion · pensum · financiero<br/>puntajes_utils · expediente · graduacion<br/>tramites · equivalencia · pasantia<br/>storage · pagos_online · facturacion_electronica<br/>notificaciones_push · boleta_data/pdf · reporte_notas"]
+
+        DB[("PostgreSQL<br/>vía SQLAlchemy + Alembic")]
+    end
+
+    subgraph EXT["Servicios externos"]
+        STRIPE["Stripe Checkout"]
+        GUARANI["guarani.app<br/>(facturación electrónica)"]
+        R2["Cloudflare R2 / S3<br/>(storage de archivos)"]
+        PUSH["Web Push (VAPID)"]
+    end
+
+    WEB -->|"fetch /api/* + Bearer + CSRF"| AUTH
+    WEB --> ACAD
+    WEB --> FIN
+    WEB --> TRAM
+    WEB --> REP
+
+    MOBILE -->|"axios + Bearer + CSRF<br/>(alumno-only, sin admin/profesor)"| AUTH
+    MOBILE --> ACAD
+    MOBILE --> FIN
+    MOBILE --> TRAM
+
+    AUTH --> SVC
+    ACAD --> SVC
+    FIN --> SVC
+    TRAM --> SVC
+    REP --> SVC
+
+    SVC --> DB
+
+    FIN -.-> STRIPE
+    FIN -.-> GUARANI
+    TRAM -.-> R2
+    REP -.-> R2
+    AUTH -.-> R2
+    REP -.-> PUSH
+
+    classDef client fill:#3b82f6,stroke:#1e40af,color:#fff
+    classDef domain fill:#8b5cf6,stroke:#5b21b6,color:#fff
+    classDef svc fill:#f59e0b,stroke:#b45309,color:#fff
+    classDef db fill:#10b981,stroke:#047857,color:#fff
+    classDef ext fill:#6b7280,stroke:#374151,color:#fff
+
+    class WEB,MOBILE client
+    class AUTH,ACAD,FIN,TRAM,REP domain
+    class SVC svc
+    class DB db
+    class STRIPE,GUARANI,R2,PUSH ext

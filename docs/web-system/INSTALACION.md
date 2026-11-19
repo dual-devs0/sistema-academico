@@ -166,3 +166,12 @@ frontend/   React 19 + TypeScript + Vite (src/pages, src/components)
 
 Ver [ARQUITECTURA.md](ARQUITECTURA.md) para arquitectura técnica y
 [API_REFERENCE.md](API_REFERENCE.md) para el detalle de cada endpoint por rol.
+
+## 9. Variables de entorno — referencia completa
+
+La sección 3 cubre las variables mínimas para levantar el proyecto. Para el
+listado completo de TODAS las variables realmente leídas por el backend
+(`os.getenv`/`os.environ` en `backend/app/`), qué pasa si cada una falta, y
+los placeholders conocidos (`STRIPE_SECRET_KEY`, VAPID keys, etc.) que
+degradan una funcionalidad en vez de romper el arranque, ver
+[VARIABLES_ENTORNO.md](VARIABLES_ENTORNO.md).
