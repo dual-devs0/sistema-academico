@@ -1124,16 +1124,16 @@ export default function Finanzas() {
 
   return (
     <div style={{ maxWidth: 1060, margin: '0 auto', padding: '28px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <h1 className="page-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <i className="ti ti-building-bank" style={{ color: 'var(--accent-bright)' }} /> Panel Financiero
-        </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">Conceptos, cuotas, pagos y becas</div>
+          <h1 className="page-title">Panel Financiero</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {lastUpdate && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
-              <i className="ti ti-refresh" style={{ fontSize: 14 }} />
-              <span>{lastUpdate.toLocaleTimeString()}</span>
-            </div>
+            <span className="mono-label" style={{ fontSize: 10.5 }}>
+              <i className="ti ti-refresh" /> {lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' })}
+            </span>
           )}
           <button className="btn-ghost" onClick={handleRefresh} disabled={refreshing} style={{ padding: '9px 14px', fontSize: 12 }}>
             <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />

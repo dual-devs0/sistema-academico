@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { emitToast } from '../lib/api'
 import {
   obtenerUsuario, obtenerMateriasProfesor,
-  actualizarUsuario, eliminarUsuario,
   type UserApi, type ProfesorMateria,
 } from '../services/asignacionesService'
+import { actualizarUsuario, eliminarUsuario } from '../services/usersService'
 
 type Props = {
   userId: number

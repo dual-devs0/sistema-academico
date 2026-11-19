@@ -98,20 +98,23 @@ export default function BoletaPage() {
         </div>
       ) : (
         <>
-          <SummaryCards resumen={data?.resumen ?? null} loading={loading} />
+          <SummaryCards resumen={data?.resumen ?? null} loading={loading} periodosCount={data?.periodos.length} selloVerificado={selloVisible ? true : undefined} />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-            <FilterBar filtro={filtro} onChange={setFiltro} />
-            {data && (
-              <PeriodSelect
-                filtro={filtro}
-                periodos={data.periodos}
-                selectedAnio={effectiveAnio}
-                selectedPeriodoKey={effectivePeriodoKey}
-                onChangeAnio={setSelectedAnio}
-                onChangePeriodo={setSelectedPeriodoKey}
-              />
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <FilterBar filtro={filtro} onChange={setFiltro} />
+              {data && (
+                <PeriodSelect
+                  filtro={filtro}
+                  periodos={data.periodos}
+                  selectedAnio={effectiveAnio}
+                  selectedPeriodoKey={effectivePeriodoKey}
+                  onChangeAnio={setSelectedAnio}
+                  onChangePeriodo={setSelectedPeriodoKey}
+                />
+              )}
+            </div>
+            {data && <span className="mono-label">{data.periodos.length} período{data.periodos.length === 1 ? '' : 's'}</span>}
           </div>
 
           <SemesterAccordion periodos={periodosFiltrados} loading={loading} />

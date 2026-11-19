@@ -1,12 +1,16 @@
 // Alumno. Condición de egreso propia (créditos+PPA+pasantía) y estado del proceso de tesis. Depende de: /graduacion/alumno/{id}/*.
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { Skeleton } from 'boneyard-js/react'
 import { getCondicionEgreso, type CondicionEgreso } from '../services/graduacionService'
 
 const POLL_MS = 30000
 
+type Requisito = { label: string; sub: string; cumplido: boolean; parcial?: boolean; metric: string; metricColor?: string }
+
 export default function GraduacionAlumno() {
+  const navigate = useNavigate()
   const [condicion, setCondicion] = useState<CondicionEgreso | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -39,29 +43,50 @@ export default function GraduacionAlumno() {
     ? Math.round(((condicion.creditos_aprobados ?? 0) / condicion.creditos_totales) * 100)
     : 0
 
+  const requisitos: Requisito[] = condicion ? [
+    {
+      label: 'Créditos aprobados', sub: `${condicion.creditos_aprobados ?? 0}/${condicion.creditos_totales ?? '?'}`,
+      cumplido: condicion.cumple_creditos, parcial: !condicion.cumple_creditos && creditosPct > 0,
+      metric: `${condicion.creditos_aprobados ?? 0}/${condicion.creditos_totales ?? '—'}`,
+    },
+    {
+      label: 'PPA mínimo', sub: `mín. ${condicion.ppa_minimo ?? '—'}`,
+      cumplido: condicion.cumple_ppa, metric: String(condicion.ppa_actual ?? '—'),
+      metricColor: condicion.cumple_ppa ? 'var(--success)' : 'var(--danger)',
+    },
+    {
+      label: 'Pasantía', sub: condicion.pasantia_exigida ? 'exigida por el plan' : 'no exigida por el plan',
+      cumplido: !!condicion.pasantia_completada, metric: condicion.pasantia_completada ? 'Completada' : condicion.pasantia_exigida ? 'Pendiente' : 'N/A',
+    },
+    {
+      label: 'Tesina / TFG', sub: condicion.tesina_aprobada ? 'aprobada' : 'sin iniciar',
+      cumplido: !!condicion.tesina_aprobada, metric: condicion.tesina_aprobada ? 'Aprobada' : 'Pendiente',
+    },
+  ] : []
+  const cumplidos = requisitos.filter(r => r.cumplido).length
+
+  const faltantes: string[] = []
+  if (condicion && !condicion.cumple_creditos) faltantes.push(`${(condicion.creditos_totales ?? 0) - (condicion.creditos_aprobados ?? 0)} créditos`)
+  if (condicion && !condicion.cumple_ppa) faltantes.push('alcanzar el PPA mínimo')
+  if (condicion && condicion.pasantia_exigida && !condicion.pasantia_completada) faltantes.push('la pasantía obligatoria')
+  if (condicion && !condicion.tesina_aprobada) faltantes.push('la tesina')
+
   return (
     <Skeleton name="graduacion-alumno" loading={loading}>
     <div>
       <style>{'@keyframes gaSpin{to{transform:rotate(360deg)}}'}</style>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
-        <h1 className="page-title" style={{ marginBottom: 0 }}>Mi Graduación</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {lastUpdate && (
-            <span className="mono-label" style={{ fontSize: 11 }}>
-              <i className="ti ti-clock" style={{ marginRight: 4 }} />
-              {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
-          <button type="button" className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}>
-            <i className="ti ti-refresh" style={refreshing ? { animation: 'gaSpin 1s linear infinite' } : {}} />
-            {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">Condición de egreso</div>
+          <h1 className="page-title">Mi graduación</h1>
         </div>
+        <button type="button" className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+          <i className="ti ti-refresh" style={refreshing ? { animation: 'gaSpin 1s linear infinite' } : {}} />
+          {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+        </button>
       </div>
-      <p className="page-subtitle" style={{ marginBottom: 20 }}>
-        Verificá tu condición de egreso y gestioná tu proceso de graduación.
-      </p>
 
       {error && (
         <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 12.5, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -71,195 +96,63 @@ export default function GraduacionAlumno() {
 
       {condicion ? (
         <>
-          <div className="card" style={{
-            marginBottom: 20, padding: 22, position: 'relative', overflow: 'hidden',
-            background: condicion.puede_graduarse ? 'linear-gradient(135deg, rgba(34,197,94,0.08), transparent 70%)' : 'linear-gradient(135deg, rgba(239,68,68,0.06), transparent 70%)',
-            borderColor: condicion.puede_graduarse ? 'rgba(34,197,94,0.3)' : 'var(--border-subtle)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <span style={{
-                  width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: condicion.puede_graduarse ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
-                  color: condicion.puede_graduarse ? '#22c55e' : 'var(--text-muted)',
-                  fontSize: 22, flexShrink: 0,
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'stretch', marginBottom: 24 }}>
+            <div className="kpi-dominant">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span className="mono-label">Requisitos cumplidos</span>
+                <span className="badge" style={{
+                  background: condicion.puede_graduarse ? 'var(--success-subtle)' : 'var(--danger-subtle)',
+                  color: condicion.puede_graduarse ? 'var(--success)' : 'var(--danger)',
                 }}>
-                  <i className={`ti ${condicion.puede_graduarse ? 'ti-certificate' : 'ti-notebook'}`} />
+                  {condicion.puede_graduarse ? 'ELEGIBLE' : 'NO ELEGIBLE'}
                 </span>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: condicion.puede_graduarse ? '#22c55e' : 'var(--text-primary)' }}>
-                    {condicion.puede_graduarse ? '¡Podés solicitar tu graduación!' : 'Aún no cumplís los requisitos'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
+                <span className="kpi-dominant-value">{cumplidos}</span>
+                <span style={{ fontSize: 20, color: 'var(--text-secondary)', fontWeight: 600, paddingBottom: 10 }}>de {requisitos.length}</span>
+              </div>
+              <div>
+                {requisitos.map(r => (
+                  <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: '1px solid var(--border-subtle)' }}>
+                    <span style={{
+                      width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      background: r.cumplido ? 'var(--success-subtle)' : r.parcial ? 'var(--warning-subtle)' : 'rgba(255,255,255,.04)',
+                      color: r.cumplido ? 'var(--success)' : r.parcial ? 'var(--warning)' : 'var(--text-muted)',
+                    }}>
+                      <i className={`ti ${r.cumplido ? 'ti-check' : 'ti-minus'}`} style={{ fontSize: 13 }} />
+                    </span>
+                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>{r.label}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.sub}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: r.metricColor ?? (r.cumplido ? 'var(--success)' : 'var(--text-muted)'), width: 90, textAlign: 'right' }}>{r.metric}</span>
                   </div>
-                  <div className="mono-label" style={{ fontSize: 12, marginTop: 2 }}>Condición de egreso</div>
-                </div>
+                ))}
               </div>
-              <span className="badge" style={{
-                padding: '6px 16px', fontSize: 12, fontWeight: 800,
-                background: condicion.puede_graduarse ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                color: condicion.puede_graduarse ? '#22c55e' : '#ef4444',
-                border: `1px solid ${condicion.puede_graduarse ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-              }}>
-                <i className={`ti ${condicion.puede_graduarse ? 'ti-shield-check' : 'ti-x'}`} style={{ marginRight: 4 }} />
-                {condicion.puede_graduarse ? 'ELEGIBLE' : 'NO ELEGIBLE'}
-              </span>
             </div>
-            {condicion.motivo && (
-              <div style={{
-                marginTop: 14, padding: '10px 14px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8,
-                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', fontSize: 12.5,
-              }}>
-                <i className="ti ti-alert-triangle" style={{ flexShrink: 0 }} />
-                {condicion.motivo}
-              </div>
-            )}
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginBottom: 20 }}>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${creditosPct >= 100 ? '#22c55e' : creditosPct >= 75 ? 'var(--accent-bright)' : '#f59e0b'}` }}>
-              <div className="kpi-top"><span className="mono-label">Créditos Aprobados</span><i className="ti ti-certificate" style={{ color: creditosPct >= 100 ? '#22c55e' : 'var(--accent)', fontSize: 15 }} /></div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span className="kpi-value" style={{ fontSize: 24 }}>{condicion.creditos_aprobados ?? 0}</span>
-                <span className="kpi-unit">/ {condicion.creditos_totales ?? '—'}</span>
-              </div>
-              <div className="progress-track" style={{ marginTop: 8 }}>
-                <div className="progress-fill" style={{ width: `${creditosPct}%`, background: creditosPct >= 100 ? '#22c55e' : undefined }} />
-              </div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${(condicion.ppa_actual ?? 0) >= (condicion.ppa_minimo ?? 0) ? '#22c55e' : '#ef4444'}` }}>
-              <div className="kpi-top"><span className="mono-label">PPA Actual</span><i className="ti ti-trending-up" style={{ color: (condicion.ppa_actual ?? 0) >= (condicion.ppa_minimo ?? 0) ? '#22c55e' : '#ef4444', fontSize: 15 }} /></div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span className="kpi-value" style={{ fontSize: 24, color: (condicion.ppa_actual ?? 0) >= (condicion.ppa_minimo ?? 0) ? '#22c55e' : '#ef4444' }}>
-                  {condicion.ppa_actual ?? '—'}
-                </span>
-                <span className="kpi-unit">mín: {condicion.ppa_minimo ?? '—'}</span>
-              </div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${condicion.pasantia_completada ? '#22c55e' : '#f59e0b'}` }}>
-              <div className="kpi-top"><span className="mono-label">Pasantía</span><i className="ti ti-briefcase" style={{ color: condicion.pasantia_completada ? '#22c55e' : '#f59e0b', fontSize: 15 }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="kpi-value" style={{ fontSize: 24, color: condicion.pasantia_completada ? '#22c55e' : '#f59e0b' }}>
-                  {condicion.pasantia_completada ? '✓' : '—'}
-                </span>
-                <div>
-                  <span style={{ fontSize: 12, fontWeight: 700 }}>{condicion.pasantia_completada ? 'Completada' : 'Pendiente'}</span>
-                  {!condicion.pasantia_exigida && <div className="mono-label" style={{ fontSize: 10 }}>No exigida</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {condicion.puede_graduarse ? (
+                <div className="card" style={{ borderColor: 'rgba(34,197,94,.28)', padding: '20px 22px', flex: 1 }}>
+                  <div className="mono-label" style={{ color: 'var(--success)', marginBottom: 12 }}>Próximos pasos</div>
+                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                    Acercate a la oficina de graduaciones para iniciar el trámite formal de egreso. Necesitás tu documento
+                    de identidad, el formulario de solicitud y el comprobante de pago de los aranceles correspondientes.
+                  </p>
                 </div>
-              </div>
-            </div>
-            <div className="kpi-card" style={{ borderLeft: `3px solid ${condicion.tesina_aprobada ? '#22c55e' : 'var(--border-light)'}` }}>
-              <div className="kpi-top"><span className="mono-label">Tesina / TFG</span><i className="ti ti-file-text" style={{ color: condicion.tesina_aprobada ? '#22c55e' : 'var(--text-muted)', fontSize: 15 }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="kpi-value" style={{ fontSize: 24, color: condicion.tesina_aprobada ? '#22c55e' : 'var(--text-muted)' }}>
-                  {condicion.tesina_aprobada ? '✓' : '○'}
-                </span>
-                <div>
-                  <span style={{ fontSize: 12, fontWeight: 700 }}>{condicion.tesina_aprobada ? 'Aprobada' : 'Pendiente'}</span>
+              ) : (
+                <div className="card" style={{ borderColor: 'rgba(239,68,68,.28)', padding: '20px 22px', flex: 1 }}>
+                  <div className="mono-label" style={{ color: 'var(--danger)', marginBottom: 12 }}>Qué te falta</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                    {faltantes.length ? faltantes.join(', ') + '.' : condicion.motivo || 'Consultá con administración.'}
+                  </div>
                 </div>
-              </div>
+              )}
+              <button type="button" disabled={!condicion.puede_graduarse} onClick={() => navigate('/tramites')}
+                className={condicion.puede_graduarse ? 'btn-primary' : 'btn-ghost'}
+                style={{ padding: 16, fontSize: 13, cursor: condicion.puede_graduarse ? 'pointer' : 'not-allowed', opacity: condicion.puede_graduarse ? 1 : 0.6 }}>
+                <i className="ti ti-certificate" style={{ fontSize: 17 }} /> Solicitar graduación
+              </button>
             </div>
           </div>
-
-          {!condicion.puede_graduarse && (
-            <div className="card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <i className="ti ti-list-check" style={{ color: 'var(--accent-bright)', fontSize: 16 }} />
-                <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>Requisitos pendientes</h3>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {!condicion.cumple_creditos && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-                  }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, flexShrink: 0 }}>
-                      <i className="ti ti-x" />
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>Completar créditos</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 1 }}>
-                        {condicion.creditos_aprobados ?? 0} de {condicion.creditos_totales ?? '?'} créditos aprobados
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!condicion.cumple_ppa && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-                  }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, flexShrink: 0 }}>
-                      <i className="ti ti-x" />
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>Alcanzar PPA mínimo</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 1 }}>
-                        PPA actual: {condicion.ppa_actual ?? '—'} · Mínimo requerido: {condicion.ppa_minimo}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!condicion.pasantia_completada && condicion.pasantia_exigida && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-                  }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, flexShrink: 0 }}>
-                      <i className="ti ti-x" />
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>Completar pasantía profesional</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 1 }}>Requisito obligatorio para egreso</div>
-                    </div>
-                  </div>
-                )}
-                {!condicion.tesina_aprobada && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-                  }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, flexShrink: 0 }}>
-                      <i className="ti ti-x" />
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>Aprobar tesina / TFG</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 1 }}>Trabajo final de grado pendiente</div>
-                    </div>
-                  </div>
-                )}
-                {condicion.puede_graduarse === false && !condicion.motivo && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)',
-                  }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontSize: 12, flexShrink: 0 }}>
-                      <i className="ti ti-help" />
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>Consultar con administración</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 1 }}>Comunicate con la oficina de graduaciones para más detalles.</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {condicion.puede_graduarse && (
-            <div className="card" style={{
-              padding: 20, background: 'linear-gradient(135deg, rgba(34,197,94,0.06), transparent 70%)',
-              borderColor: 'rgba(34,197,94,0.25)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <i className="ti ti-info-circle" style={{ color: '#22c55e', fontSize: 18 }} />
-                <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>Próximos pasos</h3>
-              </div>
-              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '8px 0 0', lineHeight: 1.6 }}>
-                Acercate a la oficina de graduaciones para iniciar el trámite formal de egreso.
-                Necesitás presentar tu documento de identidad, el formulario de solicitud de graduación,
-                y el comprobante de pago de los aranceles correspondientes.
-              </p>
-            </div>
-          )}
         </>
       ) : (
         <div className="card" style={{ textAlign: 'center', padding: 52, color: 'var(--text-secondary)' }}>

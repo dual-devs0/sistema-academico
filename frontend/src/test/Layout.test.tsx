@@ -45,21 +45,24 @@ function renderLayout(role: string | null) {
 }
 
 describe('Layout — menú por rol', () => {
-  it('rol admin renderiza 17 side items', () => {
+  it('rol admin renderiza 11 side items visibles', () => {
     renderLayout('admin')
+  // Recursos y Trámites arrancan colapsados (sidebar rediseñada): solo cuentan los ítems visibles
     const sideItems = document.querySelectorAll('button.side-item')
-    expect(sideItems.length).toBe(16)
+    expect(sideItems.length).toBe(11)
   })
 
-  it('rol alumno renderiza 16 side items', () => {
+  it('rol alumno renderiza 11 side items visibles', () => {
     renderLayout('alumno')
+  // Recursos y Trámites arrancan colapsados (sidebar rediseñada): solo cuentan los ítems visibles
     const sideItems = document.querySelectorAll('button.side-item')
-    expect(sideItems.length).toBe(16)
+    expect(sideItems.length).toBe(11)
   })
 
-  it('rol profesor renderiza 8 side items', () => {
+  it('rol profesor renderiza 7 side items visibles', () => {
     renderLayout('profesor')
+  // Recursos y Trámites arrancan colapsados (sidebar rediseñada): solo cuentan los ítems visibles
     const sideItems = document.querySelectorAll('button.side-item')
-    expect(sideItems.length).toBe(8)
+    expect(sideItems.length).toBe(7)
   })
 })

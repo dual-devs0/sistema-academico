@@ -92,10 +92,3 @@ export async function obtenerMateriasProfesor(id: number): Promise<ProfesorMater
   return api.get<ProfesorMateria[]>(`/users/${id}/materias`)
 }
 
-export async function actualizarUsuario(id: number, data: Record<string, unknown>): Promise<UserApi> {
-  return api.patch<UserApi>(`/users/${id}`, data)
-}
-
-export async function eliminarUsuario(id: number): Promise<void> {
-  return api.delete(`/users/${id}`)
-}

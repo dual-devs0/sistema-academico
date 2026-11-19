@@ -59,7 +59,7 @@ describe('Dashboard', () => {
     // El sidebar debe renderizar 16 items
     await waitFor(() => {
       const sideItems = document.querySelectorAll('button.side-item')
-      expect(sideItems.length).toBe(16)
+      expect(sideItems.length).toBe(11) // Recursos y Trámites colapsados por defecto
     })
   })
 
@@ -74,7 +74,7 @@ describe('Dashboard', () => {
     )
     await waitFor(() => {
       const sideItems = document.querySelectorAll('button.side-item')
-      expect(sideItems.length).toBe(8)
+      expect(sideItems.length).toBe(7) // Recursos colapsado por defecto
     })
   })
 
@@ -89,7 +89,7 @@ describe('Dashboard', () => {
     )
     await waitFor(() => {
       const sideItems = document.querySelectorAll('button.side-item')
-      expect(sideItems.length).toBe(16)
+      expect(sideItems.length).toBe(11) // Recursos y Trámites colapsados por defecto
     })
   })
 })

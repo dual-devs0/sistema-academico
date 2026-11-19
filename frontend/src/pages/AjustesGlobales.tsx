@@ -387,13 +387,15 @@ export default function AjustesGlobales() {
     <div>
       <style>{css}</style>
 
-      <div className="ag-header">
-        <h2 className="ag-title"><i className="ti ti-settings" /> Ajustes Globales</h2>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">Configuración del sistema</div>
+          <h1 className="page-title"><i className="ti ti-settings" /> Ajustes Globales</h1>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {lastUpdate && (
-            <span className="ag-last-upd">
-              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" /></svg>
-              {lastUpdate.toLocaleTimeString('es-PY')}
+            <span className="mono-label" style={{ fontSize: 10.5 }}>
+              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
           <button className="ag-btn ghost sm" onClick={handleExport}><i className="ti ti-download" /> Exportar</button>

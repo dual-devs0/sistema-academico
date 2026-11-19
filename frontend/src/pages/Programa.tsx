@@ -5,6 +5,7 @@ import { api, getCurrentUser } from '../lib/api'
 import { MOBILE_BREAKPOINT, SHELL_PADDING } from '../styles/responsiveTokens'
 import { Skeleton } from 'boneyard-js/react'
 import AsistenciaAlumnoPanel from '../components/AsistenciaAlumnoPanel'
+import { PageHead } from '../components/common/PageKpi'
 
 type TipoEval = 'parcial' | 'tp' | 'entrega' | null
 
@@ -722,12 +723,14 @@ export default function Programa() {
       <>
         <style>{css}</style>
         <div className="tem-root">
-          <header className="topbar">
-            <h1>Cursos</h1>
-          </header>
           <div className="content">
-            <CursosTabs tab={tab} setTab={setTab} />
-            {tab === 'asistencia' ? <AsistenciaTab /> : <CalificacionesTab userId={Number(user?.user_id ?? 0)} />}
+            {tab === 'asistencia'
+              ? <AsistenciaAlumnoPanel tabs={<CursosTabs tab={tab} setTab={setTab} />} />
+              : <>
+                  <PageHead eyebrow="Cursos · historial de notas" title="Calificaciones" />
+                  <CursosTabs tab={tab} setTab={setTab} />
+                  <CalificacionesTab userId={Number(user?.user_id ?? 0)} />
+                </>}
           </div>
         </div>
       </>
@@ -740,8 +743,8 @@ export default function Programa() {
         <>
           <style>{css}</style>
           <div className="tem-root">
-            <header className="topbar"><h1>Cursos</h1></header>
             <div className="content">
+              <PageHead eyebrow="Cursos · programa de clases" title="Temario" />
               <CursosTabs tab={tab} setTab={setTab} />
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'50vh', color:'var(--text-muted)', flexDirection:'column', gap:16, textAlign:'center', padding:24 }}>
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2a3040" strokeWidth="1.5">
@@ -764,22 +767,15 @@ export default function Programa() {
           <style>{css}</style>
           <div className="tem-root">
 
-            <header className="topbar">
-              <h1>Programa de clases</h1>
-              <div className="rol-badge" style={
-                ROL==='profesor'
-                  ? {background:'#3b82f615',color:'#3b82f6',border:'1px solid #3b82f630'}
-                  : {background:'var(--accent-muted)',color:'var(--accent)',border:'1px solid var(--accent-hover)'}
-              }>
-                {ROL==='profesor'
-                  ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Modo Profesor</>
-                  : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/></svg> Vista Alumno</>
-                }
-              </div>
-            </header>
+
 
             <div className="content">
 
+              <PageHead eyebrow="Cursos · programa de clases" title="Temario" actions={
+                <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
+                  <i className="ti ti-school" /> {data.length} materia{data.length === 1 ? '' : 's'}
+                </span>
+              } />
               <CursosTabs tab={tab} setTab={setTab} />
 
               {/* Dropdown mobile */}
@@ -952,8 +948,9 @@ export default function Programa() {
 type TabCursos = 'temario' | 'asistencia' | 'calificaciones'
 
 const tabsCss = `
-  .cur-tabs { display:flex; gap:6px; margin-bottom:18px; position:sticky; top:56px; z-index:15; background:var(--bg-base); padding-top:12px; margin-top:-12px; }
-  .cur-tab { padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; border:1px solid #2a3040; background:transparent; color:var(--text-secondary); cursor:pointer; transition:all .15s; }
+  .cur-tabs { display:inline-flex; gap:4px; margin-bottom:24px; padding:4px; border-radius:12px; background:var(--bg-surface); border:1px solid var(--border-subtle); flex-wrap:wrap; }
+  .cur-tab { padding:7px 16px; border-radius:9px; font-size:12.5px; font-weight:700; border:1px solid transparent; background:transparent; color:var(--text-secondary); cursor:pointer; transition:all .15s; font-family:inherit; }
+  .cur-tab:hover:not(.active) { color:var(--text-primary); background:var(--bg-hover); }
   .cur-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .asis-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; }
   .asis-card { background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; padding:18px 14px; text-align:center; cursor:pointer; transition:all .18s; position:relative; overflow:hidden; }
@@ -1027,10 +1024,6 @@ function estadoNota(p: number | null): { label: string; bg: string; color: strin
   if (p >= NOTA_MAXIMA) return { label: 'DESTACADO', bg: 'var(--accent-muted)', color: 'var(--accent-bright)' }
   if (p >= APROBACION_MINIMA) return { label: 'APROBADO', bg: 'var(--success-subtle)', color: 'var(--success)' }
   return { label: 'REPROBADO', bg: 'var(--danger-subtle)', color: 'var(--danger)' }
-}
-
-function AsistenciaTab() {
-  return <AsistenciaAlumnoPanel />
 }
 
 /* ─── Chip de período (detalle de semestres anteriores) en Calificaciones ─── */

@@ -15,11 +15,13 @@ const estadoBadge: Record<string, { bg: string; color: string; label: string }> 
 }
 
 const css = `
-  .malla-leyenda { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
-  .malla-leyenda-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:600; }
+  .malla-hero { display:flex; align-items:center; gap:48px; flex-wrap:wrap; padding:24px 26px; margin-bottom:24px; }
+  .malla-hero-bar { height:10px; border-radius:999px; background:var(--bg-elevated); overflow:hidden; display:flex; }
+  .malla-hero-legend { display:flex; gap:24px; flex-wrap:wrap; }
+  .malla-hero-legend-item { display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--text-secondary); }
   .malla-semestre-header { display:flex; align-items:baseline; justify-content:space-between; cursor:pointer; user-select:none; }
   .malla-alumno-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; }
-  .malla-card { position:relative; padding:14px 16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); border-left-width:3px; background:var(--bg-surface); }
+  .malla-card { position:relative; padding:16px 18px; border-radius:14px; border:1px solid var(--border-subtle); border-left-width:3px; background:var(--bg-surface); }
   .malla-card.bloqueada { opacity:0.6; background:var(--bg-base); }
   .malla-card-codigo { font-family:var(--font-mono); font-size:9.5px; color:var(--text-muted); letter-spacing:0.05em; margin-bottom:3px; display:block; }
   .malla-card-requiere { font-size:10.5px; color:var(--text-muted); margin-top:6px; }
@@ -84,6 +86,13 @@ export default function MallaAlumno() {
   }, [avance])
 
   const pct = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
+  const conteoPorEstado = useMemo(() => {
+    const c: Record<string, number> = { aprobada: 0, cursando: 0, pendiente: 0, bloqueada: 0, reprobada: 0 }
+    avance.forEach(a => { c[a.estado] = (c[a.estado] ?? 0) + 1 })
+    return c
+  }, [avance])
+  const creditosCursando = useMemo(() => avance.filter(a => a.estado === 'cursando').reduce((s, a) => s + a.creditos, 0), [avance])
+  const pctCursando = creditos?.creditos_totales ? Math.round((creditosCursando / creditos.creditos_totales) * 100) : 0
 
   function toggleColapsado(sem: number) {
     setColapsados(prev => {
@@ -97,19 +106,16 @@ export default function MallaAlumno() {
     <>
       <style>{css}</style>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 className="page-title">Mi Progreso Académico</h1>
-          <p className="page-subtitle" style={{ marginBottom: 18 }}>Estado de tu malla curricular y créditos acumulados.</p>
+          <div className="page-eyebrow">Malla curricular · créditos acumulados</div>
+          <h1 className="page-title">Mi progreso académico</h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {lastUpdate && (
-            <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
-          )}
-          <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}>
-            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
-        </div>
+        <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+          <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+          {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+        </button>
       </div>
 
       {error && (
@@ -119,25 +125,29 @@ export default function MallaAlumno() {
       )}
 
       {creditos && (
-        <div className="card" style={{ marginBottom: 24, padding: '18px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-            <span className="mono-label">Créditos acumulados</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800 }}>
-              {creditos.creditos_acumulados} / {creditos.creditos_totales ?? '—'}
-              {creditos.creditos_totales ? <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}> ({pct}%)</span> : null}
-            </span>
+        <div className="card malla-hero">
+          <div style={{ flexShrink: 0 }}>
+            <div className="mono-label" style={{ marginBottom: 14 }}>Créditos acumulados</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 56, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: .9 }}>{creditos.creditos_acumulados}</span>
+              <span style={{ fontSize: 16, color: 'var(--text-secondary)', fontWeight: 600, paddingBottom: 6 }}>/ {creditos.creditos_totales ?? '—'}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--accent-bright)', paddingBottom: 8 }}>{pct}%</span>
+            </div>
           </div>
-          <div className="progress-track"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
-        </div>
-      )}
-
-      {!loading && avance.length > 0 && (
-        <div className="malla-leyenda">
-          {(['aprobada', 'cursando', 'reprobada', 'pendiente', 'bloqueada'] as const).map(estado => (
-            <span key={estado} className="malla-leyenda-chip" style={{ background: estadoBadge[estado].bg, color: estadoBadge[estado].color }}>
-              {estadoBadge[estado].label}
-            </span>
-          ))}
+          <div style={{ flex: 1, minWidth: 260, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="malla-hero-bar">
+              <div style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+              <div style={{ width: `${pctCursando}%`, background: 'var(--accent-hover)' }} />
+            </div>
+            <div className="malla-hero-legend">
+              {(['aprobada', 'cursando', 'pendiente', 'bloqueada', 'reprobada'] as const).map(estado => (
+                <div key={estado} className="malla-hero-legend-item">
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: bordeEstado[estado], flexShrink: 0 }} />
+                  {estadoBadge[estado].label} <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 700 }}>{String(conteoPorEstado[estado] ?? 0).padStart(2, '0')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -158,9 +168,13 @@ export default function MallaAlumno() {
                 style={{ marginBottom: 10 }}
                 onClick={() => todasBloqueadas && toggleColapsado(sem)}
               >
-                <h2 style={{ fontSize: 15, fontWeight: 800 }}>
-                  Semestre {sem} — {totalCreditos} créditos ({materias.length} materias)
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                  <h2 style={{ fontSize: 15, fontWeight: 800 }}>Semestre {sem}</h2>
+                  <span className="mono-label">
+                    {totalCreditos} créditos · {materias.length} materia{materias.length === 1 ? '' : 's'}
+                    {materias.some(m => m.estado === 'cursando') ? ' · en curso' : todasBloqueadas ? ' · bloqueado' : materias.every(m => m.estado === 'aprobada') ? ' · completado' : ''}
+                  </span>
+                </div>
                 {todasBloqueadas && (
                   <i className={`ti ${colapsado ? 'ti-chevron-down' : 'ti-chevron-up'}`} style={{ color: 'var(--text-muted)' }} />
                 )}

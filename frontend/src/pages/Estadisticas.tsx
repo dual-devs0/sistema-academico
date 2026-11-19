@@ -30,23 +30,23 @@ const css = `
 
   .est-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .est-kpi {
-    background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px;
+    background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius);
     padding:16px; display:flex; flex-direction:column; gap:10px;
     transition:border-color .15s;
   }
   .est-kpi:hover { border-color:var(--border-light); }
   .est-kpi-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .est-kpi-icon svg { width:16px; height:16px; }
-  .est-kpi-val  { font-size:28px; font-weight:900; line-height:1; }
+  .est-kpi-val  { font-family:var(--font-mono); font-size:28px; font-weight:800; letter-spacing:-0.02em; line-height:1; }
   .est-kpi-lbl  { font-size:11px; color:var(--text-muted); margin-top:1px; }
-  .est-kpi-bar  { height:4px; background:#2a3040; border-radius:2px; overflow:hidden; }
+  .est-kpi-bar  { height:4px; background:var(--border-subtle); border-radius:2px; overflow:hidden; }
   .est-kpi-fill { height:100%; border-radius:2px; }
 
   .est-charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   .est-card {
-    background:var(--bg-surface); border:1px solid #2a3040; border-radius:14px; overflow:hidden;
+    background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius); overflow:hidden;
   }
-  .est-card-hdr { padding:14px 18px 12px; border-bottom:1px solid #2a3040; }
+  .est-card-hdr { padding:14px 18px 12px; border-bottom:1px solid var(--border-subtle); }
   .est-card-hdr h3 { font-size:13px; font-weight:700; color:var(--text-primary); margin:0; }
   .est-card-hdr p  { font-size:11px; color:var(--text-muted); margin:3px 0 0; }
   .est-card-body { padding:16px 18px; }
@@ -304,28 +304,20 @@ export default function Estadisticas() {
       <style>{css}</style>
       <div className="est-root">
 
-        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '4px 24px 0', flexWrap: 'wrap', gap: 12 }}>
+        <header className="page-head" style={{ padding: '4px 24px 0' }}>
           <div>
-            <h1 className="page-title" style={{ fontSize: 27 }}>
+            <div className="page-eyebrow">
+              {esProfesor ? 'Rendimiento y asistencia de tus materias' : 'KPIs institucionales'}
+            </div>
+            <h1 className="page-title">
               {esProfesor ? 'Estadísticas de Cátedra' : 'Estadísticas Institucionales'}
             </h1>
-            <p className="page-subtitle">
-              {esProfesor
-                ? 'Rendimiento, asistencia y alertas de tus materias activas.'
-                : 'Vista completa de KPIs institucionales y estabilidad académica.'}
-            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {lastUpdate && (
-              <span className="est-last-upd">
-                <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-                {lastUpdate.toLocaleTimeString('es-PY')}
-              </span>
-            )}
-            <button className="btn-ghost" onClick={() => load(true)} disabled={refreshing}>
-              <i className="ti ti-refresh" /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-            </button>
-          </div>
+          <button className="btn-ghost" onClick={() => load(true)} disabled={refreshing}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+            {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
         </header>
 
         <div className="est-content">

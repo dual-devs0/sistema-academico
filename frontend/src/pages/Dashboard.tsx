@@ -41,40 +41,39 @@ const estadoBadge: Record<string, { bg: string; color: string }> = {
 }
 
 const css = `
-  .dash-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
-  .dash-grid { display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start; }
-  .greet-banner {
-    position:relative; overflow:hidden;
-    background:linear-gradient(100deg, var(--bg-surface) 55%, var(--accent-muted));
-    border:1px solid var(--border-subtle); border-radius:var(--radius-lg);
-    padding:22px 26px; margin-bottom:22px;
-    display:flex; align-items:center; justify-content:space-between; gap:16px;
-  }
-  .greet-icon {
-    width:64px; height:64px; border-radius:18px; flex-shrink:0;
-    background:linear-gradient(135deg, var(--accent), var(--accent-bright));
-    display:flex; align-items:center; justify-content:center;
-    font-size:26px; color:#fff; box-shadow:0 10px 30px var(--accent-hover);
-  }
-  .spark { display:flex; align-items:flex-end; gap:3px; height:26px; }
-  .spark span { width:5px; border-radius:2px; background:var(--accent); opacity:.75; }
+  .dash-live-events { display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--text-secondary); }
+  .dash-live-dot { width:8px; height:8px; border-radius:50%; background:var(--success); animation:pulse-dot 1.6s infinite; display:inline-block; flex-shrink:0; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .dash-kpis { display:grid; grid-template-columns:repeat(4,1fr); grid-auto-rows:auto; gap:16px; margin-bottom:32px; }
+  .dash-kpis .kpi-dominant { grid-column:span 2; grid-row:span 2; }
+  .dash-kpis .kpi-banner { grid-column:span 2; }
+
+  .dash-grid { display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start; }
+  .dash-section-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:16px; }
+  .dash-section-head h2 { font-size:16px; font-weight:800; color:var(--text-primary); margin:0; }
+
   .ring { position:relative; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .ring svg { position:absolute; inset:0; transform:rotate(-90deg); }
-  .tl-item { display:flex; gap:12px; padding:12px 0; position:relative; }
-  .tl-dot {
-    width:26px; height:26px; border-radius:50%; flex-shrink:0; z-index:1;
-    display:flex; align-items:center; justify-content:center;
-    background:var(--bg-elevated); border:2px solid var(--border-light); color:var(--text-muted); font-size:11px;
+
+  .tl-row { display:flex; gap:16px; padding:16px 22px; border-left:2px solid transparent; }
+  .tl-row.next { background:rgba(14,165,233,.06); border-left-color:var(--accent); }
+  .tl-time { font-family:var(--font-mono); font-size:13px; font-weight:800; color:var(--text-muted); width:44px; flex-shrink:0; padding-top:1px; }
+  .tl-row.next .tl-time { color:var(--accent-bright); }
+  .tl-badge {
+    display:inline-flex; align-items:center; gap:5px; margin-top:8px; padding:3px 9px; border-radius:999px;
+    font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.08em;
   }
-  .tl-dot.live { background:var(--accent-muted); border-color:var(--accent); color:var(--accent-bright); }
-  .tl-line { position:absolute; left:12px; top:36px; bottom:-12px; width:2px; background:var(--border-subtle); }
+
   .dash-access-card {
-    cursor:pointer; text-align:left; display:flex; align-items:center; gap:14px;
-    padding:16px 18px; border:1px solid var(--border-subtle); transition:border-color .15s;
+    cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:10px;
+    padding:16px; border:1px solid var(--border-subtle); border-radius:14px; background:var(--bg-surface); transition:border-color .15s, transform .1s;
   }
-  .dash-access-card:hover { border-color:var(--accent-hover); }
-  .dash-access-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .dash-access-icon i { font-size:20px; }
+  .dash-access-card:hover { border-color:var(--accent-hover); transform:translateY(-1px); }
+  .dash-access-icon { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:var(--bg-elevated); color:var(--accent-bright); flex-shrink:0; }
+  .dash-access-icon i { font-size:17px; }
+  .dash-access-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px; }
+
   .kpi-grid-6 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
   .modulo-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; margin-bottom:24px; }
   .modulo-card {
@@ -86,8 +85,8 @@ const css = `
   .modulo-card i { font-size:24px; }
   .modulo-card span { font-size:12.5px; font-weight:700; }
   .modulo-card small { font-size:10.5px; color:var(--text-secondary); }
-  @media(max-width:1024px){ .dash-grid { grid-template-columns:1fr; } .dash-kpis { grid-template-columns:repeat(2,1fr); } .kpi-grid-6 { grid-template-columns:repeat(2,1fr); } }
-  @media(max-width:560px){ .dash-kpis { grid-template-columns:1fr 1fr; gap:10px; } .greet-banner{ padding:16px 18px; } .greet-icon{ display:none; } .kpi-grid-6 { grid-template-columns:1fr 1fr; } .modulo-grid { grid-template-columns:repeat(2,1fr); } }
+  @media(max-width:1024px){ .dash-grid { grid-template-columns:1fr; } .dash-kpis { grid-template-columns:repeat(2,1fr); } .dash-kpis .kpi-dominant { grid-column:span 2; } .dash-kpis .kpi-banner { grid-column:span 2; } .kpi-grid-6 { grid-template-columns:repeat(2,1fr); } .dash-access-grid { grid-template-columns:repeat(2,1fr); } }
+  @media(max-width:560px){ .dash-kpis { grid-template-columns:1fr; gap:10px; } .dash-kpis .kpi-dominant { grid-column:span 1; grid-row:span 1; } .dash-kpis .kpi-banner { grid-column:span 1; flex-wrap:wrap; } .page-head { padding-left:12px; } .kpi-grid-6 { grid-template-columns:1fr 1fr; } .modulo-grid { grid-template-columns:repeat(2,1fr); } .dash-access-grid { grid-template-columns:1fr 1fr; } }
   .skeleton { background:var(--bg-elevated); border-radius:var(--radius-md); animation:pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
 
@@ -131,9 +130,10 @@ function SkeletonCard({ height = 100 }: { height?: number }) {
   return <div className="skeleton" style={{ height }} />
 }
 
-function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos, cuotasPendientes, cuotasVencidas, hayCuotas, condicion, loading, error, refreshing, lastUpdate, onRefresh }:
+function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, asistDetalle, creditos, cuotasPendientes, cuotasVencidas, hayCuotas, condicion, loading, error, refreshing, lastUpdate, onRefresh }:
   {
-    nombre: string; materias: MateriaRow[]; eventos: EventoRow[]; promedio: number | null; asistencia: number | null; creditos: CreditosAlumnoOut | null
+    nombre: string; materias: MateriaRow[]; eventos: EventoRow[]; promedio: number | null; asistencia: number | null
+    asistDetalle: { total: number; presentes: number } | null; creditos: CreditosAlumnoOut | null
     cuotasPendientes: number; cuotasVencidas: number; hayCuotas: boolean; condicion: CondicionEgreso | null
     loading: boolean; error: string; refreshing: boolean; lastUpdate: Date | null; onRefresh: () => void
   }) {
@@ -141,16 +141,37 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos,
   const enCurso = materias.length
   const pctCreditos = creditos?.creditos_totales ? Math.round((creditos.creditos_acumulados / creditos.creditos_totales) * 100) : 0
   const saludo = saludoDelDia()
+
+  const conNota = materias.filter((m): m is MateriaRow & { ultimaNota: number } => m.ultimaNota !== null)
+  const mejorMateria = conNota.length ? conNota.reduce((a, b) => (b.ultimaNota > a.ultimaNota ? b : a)) : null
+  const aReforzar = conNota.length > 1 ? conNota.reduce((a, b) => (b.ultimaNota < a.ultimaNota ? b : a)) : null
+  const faltanCreditos = creditos?.creditos_totales != null ? creditos.creditos_totales - creditos.creditos_acumulados : null
+  const proximoEvento = eventos[0] ?? null
+  const faltasAsist = asistDetalle ? asistDetalle.total - asistDetalle.presentes : null
+  const fechaHoy = new Date().toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long' })
+  const fechaHoyCap = fechaHoy.charAt(0).toUpperCase() + fechaHoy.slice(1)
+  const montoCuota = cuotasVencidas > 0 ? cuotasVencidas : cuotasPendientes
+
   return (
     <>
-      <div className="greet-banner">
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 2, letterSpacing: -0.3 }}>{saludo.texto}, {nombre}</div>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', opacity: 0.9 }}>
-            {loading ? 'Cargando tu día…' : eventos.length > 0 ? `Tenés ${eventos.length} evento${eventos.length > 1 ? 's' : ''} hoy.` : 'Sin eventos programados para hoy.'}
-          </div>
+      <div className="page-head" style={{ marginBottom: 32 }}>
+        <div>
+          <div className="page-eyebrow">{fechaHoyCap}</div>
+          <div className="page-title">{saludo.texto}, {nombre}</div>
         </div>
-        <div className="greet-icon"><i className="ti ti-graduation-cap" style={{ fontSize: 26 }} /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {!loading && (
+            <span className="dash-live-events">
+              <span className="dash-live-dot" />
+              {eventos.length > 0
+                ? `${eventos.length} evento${eventos.length > 1 ? 's' : ''} hoy${proximoEvento ? ` · próximo ${proximoEvento.hora}` : ''}`
+                : 'Sin eventos hoy'}
+            </span>
+          )}
+          <button className="btn-ghost" onClick={onRefresh} disabled={refreshing} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'var(--font-mono)', fontSize: 11.5, padding: '8px 14px' }}>
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -159,75 +180,84 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos,
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        {lastUpdate && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} style={{ fontSize: 13 }} />
-            {lastUpdate.toLocaleTimeString('es-PY')}
-          </span>
-        )}
-        <button className="btn-ghost" onClick={onRefresh} disabled={refreshing} style={{ padding: '6px 12px', fontSize: 11.5 }}>
-          <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-        </button>
-      </div>
-
       <div className="dash-kpis">
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="mono-label">Promedio General</span>
-          </div>
-          <span className="kpi-value">{loading ? '—' : promedio !== null ? promedio.toFixed(1) : '—'}</span>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="mono-label">Asistencia</span>
-            <i className="ti ti-calendar-check" style={{ color: 'var(--accent)', fontSize: 15 }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Ring pct={asistencia ?? 0} />
-            <span className="kpi-value">{asistencia !== null ? asistencia : '—'}<span className="kpi-unit">%</span></span>
-          </div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="mono-label">Materias en Curso</span>
-            <i className="ti ti-book" style={{ color: 'var(--accent)', fontSize: 15 }} />
-          </div>
-          <span className="kpi-value">{String(enCurso).padStart(2, '0')}</span>
-          <span className="kpi-unit" style={{ marginLeft: 8 }}>activas</span>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="mono-label">{cuotasVencidas > 0 ? 'Cuotas Vencidas' : 'Cuotas Pendientes'}</span>
-            <i className="ti ti-coin" style={{ color: cuotasVencidas > 0 ? 'var(--danger)' : 'var(--warning)', fontSize: 15 }} />
-          </div>
-          {hayCuotas ? (
-            <span className="kpi-value" style={{ fontSize: 20 }}>
-              Gs. {(cuotasVencidas > 0 ? cuotasVencidas : cuotasPendientes).toLocaleString('es-PY')}
-            </span>
-          ) : (
-            <span className="kpi-value" style={{ fontSize: 15, color: 'var(--text-secondary)' }}>Sin cuotas</span>
-          )}
-        </div>
-        {creditos && (
-          <div className="kpi-card">
-            <div className="kpi-top">
-              <span className="mono-label">Créditos de Carrera</span>
-              <i className="ti ti-hierarchy-3" style={{ color: 'var(--accent)', fontSize: 15 }} />
+        <div className="kpi-dominant">
+          <span className="mono-label">Promedio General</span>
+          <span className="kpi-dominant-value">{loading ? '—' : promedio !== null ? promedio.toFixed(1) : '—'}</span>
+          <div className="kpi-dominant-foot">
+            <div>
+              <div className="mono-label" style={{ marginBottom: 4 }}>Materias</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>
+                {String(enCurso).padStart(2, '0')} <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>activas</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-              <span className="kpi-value">{creditos.creditos_acumulados}</span>
-              <span className="kpi-unit">/ {creditos.creditos_totales ?? '—'}</span>
+            {mejorMateria && (
+              <div>
+                <div className="mono-label" style={{ marginBottom: 4 }}>Mejor materia</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{mejorMateria.nombre} <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-bright)' }}>{mejorMateria.ultimaNota}</span></div>
+              </div>
+            )}
+            {aReforzar && (
+              <div>
+                <div className="mono-label" style={{ marginBottom: 4 }}>A reforzar</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{aReforzar.nombre} <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--warning)' }}>{aReforzar.ultimaNota}</span></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Asistencia</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Ring pct={asistencia ?? 0} />
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+                {asistencia !== null ? asistencia : '—'}<span style={{ fontSize: 15, color: 'var(--text-secondary)' }}>%</span>
+              </div>
+              {faltasAsist !== null && asistDetalle && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 4 }}>{faltasAsist} falta{faltasAsist === 1 ? '' : 's'} de {asistDetalle.total} clases</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {creditos && (
+          <div className="kpi-secondary">
+            <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Créditos de carrera</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 12 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{creditos.creditos_acumulados}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-secondary)', fontWeight: 600 }}>/ {creditos.creditos_totales ?? '—'}</span>
+              <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--accent-bright)' }}>{pctCreditos}%</span>
             </div>
             <div className="progress-track"><div className="progress-fill" style={{ width: `${pctCreditos}%` }} /></div>
+            {faltanCreditos !== null && (
+              <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 10 }}>Faltan {faltanCreditos} para graduarte</div>
+            )}
+          </div>
+        )}
+
+        {hayCuotas && (
+          <div className={`kpi-banner${cuotasVencidas === 0 ? ' pending' : ''}`}>
+            <span className="kpi-banner-icon" style={{ background: cuotasVencidas > 0 ? 'var(--danger-subtle)' : 'var(--warning-subtle)', color: cuotasVencidas > 0 ? 'var(--danger)' : 'var(--warning)' }}>
+              <i className="ti ti-alert-triangle" style={{ fontSize: 20 }} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="mono-label" style={{ color: cuotasVencidas > 0 ? 'var(--danger)' : 'var(--warning)', marginBottom: 5 }}>
+                {cuotasVencidas > 0 ? 'Cuota vencida' : 'Cuota pendiente'}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>Gs. {montoCuota.toLocaleString('es-PY')}</div>
+            </div>
+            <button className="btn-primary" onClick={() => navigate('/mis-cuotas')} style={{ flexShrink: 0 }}>
+              Ver mis cuotas <i className="ti ti-arrow-right" />
+            </button>
           </div>
         )}
       </div>
 
       <div className="dash-grid">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h2 style={{ fontSize: 19, fontWeight: 800 }}>Calificaciones por Materia</h2>
+          <div className="dash-section-head">
+            <h2>Calificaciones por materia</h2>
             <button onClick={() => navigate('/programa?tab=calificaciones')} style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               Ver todas →
             </button>
@@ -315,89 +345,69 @@ function AlumnoDash({ nombre, materias, eventos, promedio, asistencia, creditos,
               })}
             </div>
           </div>
+
+          <div className="dash-access-grid">
+            <button type="button" onClick={() => navigate('/mi-graduacion')} className="dash-access-card">
+              <span className="dash-access-icon"><i className={`ti ${condicion?.puede_graduarse ? 'ti-certificate' : 'ti-graduation-cap'}`} /></span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Mi Graduación</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+                  {faltanCreditos !== null ? `Faltan ${faltanCreditos} créditos` : condicion?.motivo || 'Verificá tu condición'}
+                </div>
+              </div>
+            </button>
+            <button type="button" onClick={() => navigate('/mis-equivalencias')} className="dash-access-card">
+              <span className="dash-access-icon"><i className="ti ti-arrows-exchange" /></span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Equivalencias</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>Convalidación</div>
+              </div>
+            </button>
+            <button type="button" onClick={() => navigate('/mis-pasantias')} className="dash-access-card">
+              <span className="dash-access-icon"><i className="ti ti-briefcase" /></span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Pasantías</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>Prácticas profesionales</div>
+              </div>
+            </button>
+            <button type="button" onClick={() => navigate('/tramites')} className="dash-access-card">
+              <span className="dash-access-icon"><i className="ti ti-file-description" /></span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Trámites</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>Solicitudes y gestiones</div>
+              </div>
+            </button>
+          </div>
         </div>
 
         <div>
-          <h2 style={{ fontSize: 19, fontWeight: 800, marginBottom: 12 }}>Timeline de Hoy</h2>
-          <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="dash-section-head">
+            <h2>Hoy</h2>
+            <span className="mono-label">{eventos.length} evento{eventos.length === 1 ? '' : 's'}</span>
+          </div>
+          <div className="card" style={{ padding: '8px 0', overflow: 'hidden' }}>
             {loading ? (
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', fontSize: 13 }}>Cargando…</div>
             ) : eventos.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', fontSize: 13 }}>Sin eventos hoy.</div>
             ) : eventos.map((ev, i) => (
-              <div key={i} className="tl-item">
-                {i < eventos.length - 1 && <div className="tl-line" />}
-                <div className="tl-dot">
-                  <i className="ti ti-clock" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span className="mono-label">{ev.hora}</span>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 3 }}>{ev.titulo}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{ev.lugar}</div>
+              <div key={i} className={`tl-row${i === 0 ? ' next' : ''}`}>
+                <div className="tl-time">{ev.hora}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{ev.titulo}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{ev.lugar}</div>
+                  {i === 0 && (
+                    <span className="tl-badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>PRÓXIMA</span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
+          <button type="button" onClick={() => navigate('/asistencia/scan')} className="card"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', color: 'var(--text-primary)', fontWeight: 700, padding: 14, fontSize: 13, cursor: 'pointer', marginTop: 16 }}>
+            <i className="ti ti-qrcode" style={{ fontSize: 17, color: 'var(--accent-bright)' }} /> Escanear QR de asistencia
+          </button>
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, marginTop: 20 }}>
-        <button type="button" onClick={() => navigate('/mi-graduacion')}
-          className="card dash-access-card" style={{ borderColor: condicion?.puede_graduarse ? 'var(--success)' : undefined }}>
-          <span className="dash-access-icon" style={{
-            background: condicion?.puede_graduarse ? 'rgba(16,185,129,.15)' : 'var(--accent-muted)',
-            color: condicion?.puede_graduarse ? 'var(--success)' : 'var(--accent-bright)',
-          }}>
-            <i className={`ti ${condicion?.puede_graduarse ? 'ti-certificate' : 'ti-graduation-cap'}`} />
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, display:'flex', alignItems:'center', gap:8 }}>
-              Mi Graduación
-              {condicion && (
-                <span className="badge" style={{
-                  background: condicion.puede_graduarse ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)',
-                  color: condicion.puede_graduarse ? 'var(--success)' : 'var(--danger)',
-                  border: `1px solid ${condicion.puede_graduarse ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.3)'}`,
-                }}>
-                  {condicion.puede_graduarse ? 'ELEGIBLE' : 'PENDIENTE'}
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-              {condicion?.puede_graduarse
-                ? '¡Podés solicitar tu graduación!'
-                : condicion?.motivo || 'Verificá tu condición de egreso'}
-            </div>
-          </div>
-          <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} />
-        </button>
-        <button type="button" onClick={() => navigate('/mis-equivalencias')}
-          className="card dash-access-card">
-          <span className="dash-access-icon" style={{ background: 'rgba(168,85,247,.15)', color: '#a855f7' }}><i className="ti ti-arrows-exchange" /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Equivalencias</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Solicitud de convalidación de materias</div>
-          </div>
-          <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} />
-        </button>
-        <button type="button" onClick={() => navigate('/mis-pasantias')}
-          className="card dash-access-card">
-          <span className="dash-access-icon" style={{ background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}><i className="ti ti-briefcase" /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Pasantías</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Gestioná tus prácticas profesionales</div>
-          </div>
-          <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} />
-        </button>
-        <button type="button" onClick={() => navigate('/tramites')}
-          className="card dash-access-card">
-          <span className="dash-access-icon" style={{ background: 'rgba(34,197,94,.15)', color: '#22c55e' }}><i className="ti ti-file-description" /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Trámites</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Solicitudes y gestiones académicas</div>
-          </div>
-          <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} />
-        </button>
       </div>
     </>
   )
@@ -431,57 +441,71 @@ function ProfesorDash({ nombre, data, loading, refreshing, error, lastUpdate, on
     )
   }
 
-  const kpis = [
-    { label: 'Materias', value: String(r?.materias_activas ?? 0).padStart(2, '0'), icon: 'ti-book', color: 'var(--accent)' },
-    { label: 'Alumnos', value: String(r?.total_alumnos ?? 0), icon: 'ti-users', color: 'var(--accent)' },
-    { label: 'Asistencia', value: r?.asistencia_promedio != null ? `${r.asistencia_promedio}%` : '—', icon: 'ti-clock', color: 'var(--success)' },
-    { label: 'Aprobación', value: r?.porcentaje_aprobacion != null ? `${r.porcentaje_aprobacion}%` : '—', icon: 'ti-trending-up', color: r?.porcentaje_aprobacion != null && r.porcentaje_aprobacion < 60 ? '#ef4444' : 'var(--info)' },
-  ]
-
   const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
   const horariosStr = (h: { dia: number; hora_inicio: string; hora_fin: string; aula: string | null }[]) =>
     h.map(d => `${diasSemana[d.dia] ?? '?'} ${d.hora_inicio.slice(0, 5)}-${d.hora_fin.slice(0, 5)}`).join(', ') || '—'
 
+  const fechaHoy = new Date().toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long' })
+  const fechaHoyCap = fechaHoy.charAt(0).toUpperCase() + fechaHoy.slice(1)
+  const aprobacionColor = r?.porcentaje_aprobacion != null && r.porcentaje_aprobacion < 60 ? 'var(--danger)' : 'var(--success)'
+
   return (
     <>
-      <div className="greet-banner">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>¡Hola, {nombre}!</div>
-            <div style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
-              {r?.materias_activas ? `Tienes ${r.materias_activas} curso(s) activo(s) y ${r.total_alumnos} alumno(s) en total.` : 'Bienvenido a tu panel docente.'}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {lastUpdate && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)' }}>
-                <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" /></svg>
-                {lastUpdate.toLocaleTimeString('es-PY')}
-              </span>
-            )}
-            <button className="btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => onRefresh(true)} disabled={refreshing}>
-              <i className="ti ti-refresh" /> {refreshing ? '…' : 'Actualizar'}
-            </button>
-          </div>
+      <div className="page-head" style={{ marginBottom: 32 }}>
+        <div>
+          <div className="page-eyebrow">{fechaHoyCap}</div>
+          <div className="page-title">¡Hola, {nombre}!</div>
         </div>
-        <div className="greet-icon"><i className="ti ti-school" /></div>
+        <button className="btn-ghost" onClick={() => onRefresh(true)} disabled={refreshing}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'var(--font-mono)', fontSize: 11.5, padding: '8px 14px' }}>
+          <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+          {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+        </button>
       </div>
 
       <div className="dash-kpis">
-        {kpis.map(k => (
-          <div className="kpi-card" key={k.label}>
-            <div className="kpi-top"><span className="mono-label">{k.label}</span><i className={k.icon} style={{ color: k.color, fontSize: 15 }} /></div>
-            <span className="kpi-value" style={{ color: k.color }}>{k.value}</span>
+        <div className="kpi-dominant" style={{ gridColumn: 'span 2', gridRow: 'span 2' }}>
+          <span className="mono-label">Aprobación general</span>
+          <div className="kpi-dominant-value" style={{ color: aprobacionColor }}>
+            {r?.porcentaje_aprobacion != null ? `${r.porcentaje_aprobacion}%` : '—'}
           </div>
-        ))}
+          <div className="kpi-dominant-foot">
+            <div>
+              <div className="mono-label" style={{ marginBottom: 4 }}>Materias activas</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>{String(r?.materias_activas ?? 0).padStart(2, '0')}</div>
+            </div>
+            <div>
+              <div className="mono-label" style={{ marginBottom: 4 }}>Total alumnos</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>{r?.total_alumnos ?? 0}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Asistencia promedio</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Ring pct={r?.asistencia_promedio ?? 0} />
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+              {r?.asistencia_promedio != null ? r.asistencia_promedio : '—'}<span style={{ fontSize: 15, color: 'var(--text-secondary)' }}>%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Alertas activas</span>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: alertas.length > 0 ? 'var(--warning)' : 'var(--text-primary)', lineHeight: 1 }}>
+            {alertas.length}
+          </div>
+          {alertas.length > 0 && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 10 }}>alumnos con alta inasistencia</div>}
+        </div>
       </div>
 
       <div className="dash-grid">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h2 style={{ fontSize: 19, fontWeight: 800 }}>Cursos Activos</h2>
-            <button onClick={() => navigate('/puntajes')} className="btn-ghost" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700 }}>
+          <div className="dash-section-head">
+            <h2>Cursos activos</h2>
+            <button onClick={() => navigate('/puntajes')} style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               Gestionar notas →
             </button>
           </div>
@@ -576,23 +600,25 @@ function ProfesorDash({ nombre, data, loading, refreshing, error, lastUpdate, on
         </div>
 
         <div>
-          <h2 style={{ fontSize: 19, fontWeight: 800, marginBottom: 12 }}>Agenda de Hoy</h2>
-          <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="dash-section-head">
+            <h2>Agenda de hoy</h2>
+            <span className="mono-label">{agenda.length} actividad{agenda.length === 1 ? '' : 'es'}</span>
+          </div>
+          <div className="card" style={{ padding: '8px 0', overflow: 'hidden' }}>
             {agenda.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-secondary)', fontSize: 12 }}>
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', fontSize: 13 }}>
                 Sin actividades para hoy.
               </div>
             ) : (
               agenda.map((ev, i) => (
-                <div key={i} className="tl-item">
-                  {i < agenda.length - 1 && <div className="tl-line" />}
-                  <div className={`tl-dot${ev.tipo === 'clase' ? ' live' : ev.tipo === 'evento' ? '' : ''}`}>
-                    <i className={ev.tipo === 'recordatorio' ? 'ti ti-notebook' : 'ti ti-clock'} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <span className="mono-label">{ev.hora_inicio}{ev.hora_fin ? ` - ${ev.hora_fin}` : ''}</span>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{ev.titulo}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ev.aula}{ev.materia ? ` · ${ev.materia}` : ''}</div>
+                <div key={i} className={`tl-row${ev.tipo === 'clase' && i === 0 ? ' next' : ''}`}>
+                  <div className="tl-time">{ev.hora_inicio}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{ev.titulo}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{ev.aula}{ev.materia ? ` · ${ev.materia}` : ''}</div>
+                    {ev.tipo === 'clase' && i === 0 && (
+                      <span className="tl-badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>PRÓXIMA</span>
+                    )}
                   </div>
                 </div>
               ))
@@ -687,76 +713,71 @@ function AdminDash({ nombre }: AdminDashProps) {
 
   const r = data.resumen
   const k = data.kpis
+  const pctBecados = r.total_alumnos ? Math.round(r.total_becados / r.total_alumnos * 100) : 0
 
   return (
     <>
-      {/* Hero */}
-      <div className="card" style={{ display: 'flex', gap: 22, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="avatar-initials" style={{ width: 84, height: 84, borderRadius: 20, fontSize: 28 }}>
-          {(nombre || '?').slice(0, 2).toUpperCase()}
+      <div className="page-head" style={{ marginBottom: 32 }}>
+        <div>
+          <div className="page-eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span className="live-dot" /> Sistema operativo
+          </div>
+          <div className="page-title">Hola, {nombre}</div>
         </div>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: 24, fontWeight: 900 }}>{nombre}</h1>
-            <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>Administrador</span>
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 520, marginBottom: 12 }}>
-            Panel de control del sistema académico UCA. Gestión de usuarios, materias, finanzas y más.
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => navigate('/usuarios')}>
-              <i className="ti ti-users" /> Gestionar Usuarios
-            </button>
-            <button className="btn-ghost" onClick={() => navigate('/reportes')}>
-              <i className="ti ti-report-analytics" /> Reportes
-            </button>
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="mono-label">Sistema</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'flex-end' }}>
-            <span className="live-dot" /> OPERATIVO
-          </div>
-          <div className="mono-label" style={{ marginTop: 8 }}>Alumnos activos</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--accent-bright)' }}>{k.alumnos_activos.toLocaleString('es-PY')}</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn-primary" onClick={() => navigate('/usuarios')}>
+            <i className="ti ti-users" /> Gestionar usuarios
+          </button>
+          <button className="btn-ghost" onClick={() => navigate('/reportes')}>
+            <i className="ti ti-report-analytics" /> Reportes
+          </button>
         </div>
       </div>
 
-      {/* KPIs Reales (3 columns) */}
-      <div className="kpi-grid-6">
-        <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Total Alumnos</span><i className="ti ti-users" style={{ color: 'var(--info)', fontSize: 15 }} /></div>
-          <span className="kpi-value">{r.total_alumnos.toLocaleString('es-PY')}</span>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Profesores</span><i className="ti ti-school" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-          <span className="kpi-value">{r.total_profesores.toLocaleString('es-PY')}</span>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Materias</span><i className="ti ti-book" style={{ color: 'var(--warning)', fontSize: 15 }} /></div>
-          <span className="kpi-value">{r.total_materias.toLocaleString('es-PY')}</span>
-          {r.materias_sin_oferta > 0 && (
-            <div className="mono-label" style={{ color: 'var(--warning)', marginTop: 4 }}>{r.materias_sin_oferta} sin oferta</div>
-          )}
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Alumnos Becados</span><i className="ti ti-affiliate" style={{ color: 'var(--success)', fontSize: 15 }} /></div>
-          <span className="kpi-value">{r.total_becados.toLocaleString('es-PY')}</span>
-          <div className="progress-track" style={{ marginTop: 6 }}>
-            <div className="progress-fill" style={{ width: `${r.total_alumnos ? Math.round(r.total_becados / r.total_alumnos * 100) : 0}%`, background: 'var(--success)' }} />
+      <div className="dash-kpis" style={{ marginBottom: 32 }}>
+        <div className="kpi-dominant" style={{ gridColumn: 'span 2', gridRow: 'span 2' }}>
+          <span className="mono-label">Aprobación general</span>
+          <div className="kpi-dominant-value" style={{ color: k.aprobacion_pct < 60 ? 'var(--danger)' : 'var(--success)' }}>{k.aprobacion_pct}%</div>
+          <div className="kpi-dominant-foot">
+            <div>
+              <div className="mono-label" style={{ marginBottom: 4 }}>Promedio general</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>{k.promedio_general.toFixed(1)}</div>
+            </div>
+            <div>
+              <div className="mono-label" style={{ marginBottom: 4 }}>Materias</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 800, color: r.materias_sin_oferta > 0 ? 'var(--warning)' : 'var(--text-primary)' }}>
+                {r.total_materias.toLocaleString('es-PY')}
+                {r.materias_sin_oferta > 0 && <span style={{ fontSize: 11, color: 'var(--warning)', fontWeight: 600, marginLeft: 6 }}>{r.materias_sin_oferta} sin oferta</span>}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Promedio General</span><i className="ti ti-chart-bar" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-          <span className="kpi-value">{k.promedio_general.toFixed(1)}</span>
-          <div className="mono-label">Aprobación: {k.aprobacion_pct}%</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-top"><span className="mono-label">Asistencia Global</span><i className="ti ti-calendar-check" style={{ color: 'var(--accent)', fontSize: 15 }} /></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Asistencia global</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <Ring pct={k.asistencia_pct} />
-            <span className="kpi-value">{k.asistencia_pct}<span className="kpi-unit">%</span></span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{k.asistencia_pct}<span style={{ fontSize: 15, color: 'var(--text-secondary)' }}>%</span></div>
           </div>
+        </div>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Alumnos becados</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{r.total_becados.toLocaleString('es-PY')}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{pctBecados}%</span>
+          </div>
+          <div className="progress-track" style={{ marginTop: 14 }}><div className="progress-fill" style={{ width: `${pctBecados}%`, background: 'var(--success)' }} /></div>
+        </div>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Total alumnos</span>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{r.total_alumnos.toLocaleString('es-PY')}</div>
+        </div>
+
+        <div className="kpi-secondary">
+          <span className="mono-label" style={{ display: 'block', marginBottom: 16 }}>Profesores</span>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{r.total_profesores.toLocaleString('es-PY')}</div>
         </div>
       </div>
 
@@ -899,6 +920,7 @@ export default function Dashboard() {
   const [alCreditos, setAlCreditos] = useState<CreditosAlumnoOut | null>(null)
   const [alCuotasPendientes, setAlCuotasPendientes] = useState(0)
   const [alCuotasVencidas, setAlCuotasVencidas] = useState(0)
+  const [alAsistDetalle, setAlAsistDetalle] = useState<{ total: number; presentes: number } | null>(null)
   const [alHayCuotas, setAlHayCuotas] = useState(false)
   const [alNombre, setAlNombre] = useState<string | null>(null)
   const [alCondicion, setAlCondicion] = useState<CondicionEgreso | null>(null)
@@ -925,6 +947,7 @@ export default function Dashboard() {
       const totalClases = misAsistencias.reduce((a, x) => a + x.total_clases, 0)
       const totalPresentes = misAsistencias.reduce((a, x) => a + x.presentes, 0)
       setAlAsistencia(totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : null)
+      setAlAsistDetalle(totalClases > 0 ? { total: totalClases, presentes: totalPresentes } : null)
 
       const notaMap = new Map(misNotas.map(n => [n.materia_id, n]))
       const rows: MateriaRow[] = misMaterias.map(m => {
@@ -1008,7 +1031,7 @@ export default function Dashboard() {
         ? <AdminDash nombre={nombre} />
         : user?.role === 'profesor'
           ? <ProfesorDash nombre={nombre} data={profData} loading={profLoading} refreshing={profRefreshing} error={profError} lastUpdate={profLastUpdate} onRefresh={cargarProfesor} />
-          : <AlumnoDash nombre={alNombre || nombre} materias={alMaterias} eventos={alEventos} promedio={alPromedio} asistencia={alAsistencia} creditos={alCreditos}
+          : <AlumnoDash nombre={alNombre || nombre} materias={alMaterias} eventos={alEventos} promedio={alPromedio} asistencia={alAsistencia} asistDetalle={alAsistDetalle} creditos={alCreditos}
               cuotasPendientes={alCuotasPendientes} cuotasVencidas={alCuotasVencidas} hayCuotas={alHayCuotas} condicion={alCondicion}
               loading={alLoading} error={alError} refreshing={alRefreshing} lastUpdate={alLastUpdate} onRefresh={() => cargarAlumno(true)} />}
     </>

@@ -292,12 +292,12 @@ export default function MallaAdmin() {
     <>
       <style>{css}</style>
       <div className="w-full">
-        <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <header className="page-head">
           <div>
-            <h1 className="page-title" style={{ fontSize: 28 }}>Malla Curricular</h1>
-            <p className="page-subtitle">Materias por semestre, créditos y correlatividades de cada carrera.</p>
+            <div className="page-eyebrow">Pensum y correlatividades</div>
+            <h1 className="page-title">Malla Curricular</h1>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <select className="input-uca" style={{ maxWidth: 280, fontSize: 14, fontWeight: 600 }}
               value={carreraId ?? ''} onChange={e => { setCarreraId(Number(e.target.value)); setSubjectFilter('') }}>
               {carreras.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}

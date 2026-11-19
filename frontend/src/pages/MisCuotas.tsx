@@ -2,78 +2,38 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getCurrentUser, emitToast } from '../lib/api'
 import { Skeleton } from 'boneyard-js/react'
+import { PageHead, KpiRow, RefreshButton } from '../components/common/PageKpi'
 import { getCuotasAlumno, getBecasActivas, initPagoOnline, formatGs, type Cuota, type BecaActiva } from '../services/finanzasService'
 
 const POLL_MS = 30000
 
 const css = `
-  .mc-header { display:flex; align-items:center; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
-  .mc-title { font-size:22px; font-weight:700; color:var(--text-primary); }
-  .mc-filters { display:flex; gap:10px; flex-wrap:wrap; }
-  .mc-filter-btn {
-    padding:6px 16px; border-radius:999px; font-size:13px; font-weight:600;
-    border:1.5px solid var(--border-subtle); background:transparent;
-    color:var(--text-secondary); cursor:pointer; transition:all .18s;
+  .mc-list { background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); overflow:hidden; }
+  .mc-row {
+    display:grid; grid-template-columns:minmax(0,1fr) 110px 150px 150px; gap:16px; align-items:center;
+    padding:14px 20px; border-top:1px solid var(--border-subtle);
   }
-  .mc-filter-btn.active { background:var(--accent-bright); color:#fff; border-color:var(--accent-bright); }
-  .mc-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
-  .mc-kpi {
-    background:var(--bg-elevated); border:1px solid var(--border-subtle);
-    border-radius:14px; padding:16px 20px;
-  }
-  .mc-kpi-label { font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
-  .mc-kpi-value { font-size:22px; font-weight:800; color:var(--text-primary); }
-  .mc-kpi-value.danger { color:#ef4444; }
-  .mc-kpi-value.success { color:#10b981; }
-  .mc-list { display:flex; flex-direction:column; gap:12px; }
-  .mc-card {
-    background:var(--bg-elevated); border:1px solid var(--border-subtle);
-    border-radius:16px; padding:18px 22px;
-    display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center;
-    transition:border-color .18s;
-  }
-  .mc-card:hover { border-color:var(--accent-muted); }
-  .mc-card.vencida { border-left:3px solid #ef4444; }
-  .mc-card.pagada { border-left:3px solid #10b981; opacity:.8; }
-  .mc-card.pendiente { border-left:3px solid #f59e0b; }
-  .mc-periodo { font-size:15px; font-weight:700; color:var(--text-primary); }
-  .mc-concepto { font-size:12px; color:var(--text-secondary); margin-top:3px; }
-  .mc-beca-tag {
-    display:inline-flex; align-items:center; gap:5px;
-    padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600;
-    margin-top:6px;
-  }
-  .mc-beca-tag.externa { background:rgba(167,139,250,0.15); color:#a78bfa; border:1px solid rgba(167,139,250,0.3); }
-  .mc-beca-tag.institucional { background:rgba(34,211,238,0.12); color:#22d3ee; border:1px solid rgba(34,211,238,0.3); }
+  .mc-row:first-child { border-top:none; }
+  .mc-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; margin-top:6px; }
+  .mc-periodo { font-size:13.5px; font-weight:700; color:var(--text-primary); }
+  .mc-sub { font-size:11.5px; color:var(--text-secondary); margin-top:2px; }
+  .mc-estado { font-family:var(--font-mono); font-size:11px; font-weight:700; }
   .mc-montos { text-align:right; }
-  .mc-monto-original { font-size:12px; color:var(--text-secondary); text-decoration:line-through; }
-  .mc-monto-pagar { font-size:18px; font-weight:800; color:var(--text-primary); }
-  .mc-descuento { font-size:11px; color:#10b981; font-weight:600; margin-top:2px; }
-  .mc-estado-badge {
-    padding:4px 12px; border-radius:999px; font-size:11px; font-weight:700;
-    text-transform:uppercase; letter-spacing:.05em;
-  }
-  .mc-estado-badge.pendiente { background:rgba(245,158,11,.15); color:#f59e0b; }
-  .mc-estado-badge.vencida { background:rgba(239,68,68,.15); color:#ef4444; }
-  .mc-estado-badge.pagada { background:rgba(16,185,129,.15); color:#10b981; }
-  .mc-estado-badge.anulada { background:rgba(156,163,175,.15); color:#9ca3af; }
-  .mc-vence { font-size:11px; color:var(--text-secondary); margin-top:4px; }
-  .mc-comprobante { margin-top:8px; font-size:12px; }
+  .mc-monto-original { font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted); text-decoration:line-through; }
+  .mc-monto-pagar { font-family:var(--font-mono); font-size:15px; font-weight:800; color:var(--text-primary); }
+  .mc-accion { display:flex; justify-content:flex-end; }
   .mc-comprobante-link {
-    color:#10b981; font-weight:700; text-decoration:none;
+    color:var(--success); font-weight:700; text-decoration:none; font-size:11.5px;
     display:inline-flex; align-items:center; gap:5px;
   }
   .mc-comprobante-link:hover { text-decoration:underline; }
-  .mc-comprobante-pendiente { color:var(--text-secondary); font-style:italic; }
-  .mc-pagar-btn {
-    padding:7px 18px; border-radius:999px; font-size:12px; font-weight:700;
-    border:none; cursor:pointer; transition:all .18s;
-    background:var(--accent-bright); color:#fff;
+  .mc-comprobante-pendiente { color:var(--text-muted); font-size:11px; font-style:italic; text-align:right; }
+  .mc-empty { text-align:center; padding:48px; color:var(--text-secondary); font-size:14px; }
+  @media(max-width:760px){
+    .mc-row { grid-template-columns:1fr auto; }
+    .mc-estado { grid-column:2; grid-row:1; text-align:right; }
+    .mc-montos { text-align:left; }
   }
-  .mc-pagar-btn:hover { opacity:.85; transform:translateY(-1px); }
-  .mc-pagar-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-  .mc-empty { text-align:center; padding:48px; color:var(--text-secondary); font-size:15px; }
-  @media(max-width:700px){ .mc-summary { grid-template-columns:1fr; } .mc-card { grid-template-columns:1fr; } .mc-montos { text-align:left; } }
 `
 
 type EstadoFilter = 'todos' | 'pendiente' | 'vencida' | 'pagada'
@@ -142,6 +102,25 @@ export default function MisCuotas() {
     .reduce((s, c) => s + parseFloat(c.monto_descuento), 0)
 
   const vencidas = cuotas.filter(c => c.estado === 'vencida').length
+  const abiertas = cuotas
+    .filter(c => c.estado === 'pendiente' || c.estado === 'vencida')
+    .sort((x, y) => x.fecha_vencimiento.localeCompare(y.fecha_vencimiento))
+  const proxima = abiertas.find(c => c.estado === 'vencida') ?? abiertas[0] ?? null
+  const primeraVencida = abiertas.find(c => c.estado === 'vencida') ?? null
+  const diasDesde = (f: string) => Math.max(0, Math.floor((Date.now() - new Date(f).getTime()) / 86400000))
+
+  async function pagar(cuota: Cuota) {
+    setPagandoId(cuota.id)
+    try {
+      const returnUrl = `${window.location.origin}/mis-cuotas`
+      const res = await initPagoOnline(cuota.id, `${returnUrl}?stripe=success`, `${returnUrl}?stripe=cancel`)
+      window.location.href = res.redirect_url
+    } catch {
+      emitToast('Error al iniciar pago', 'error')
+    } finally {
+      setPagandoId(null)
+    }
+  }
 
   function estadoLabel(estado: string) {
     const map: Record<string, string> = {
@@ -155,30 +134,9 @@ export default function MisCuotas() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ maxWidth: 860, margin: '0 auto', padding: '28px 16px' }}>
-        <div className="mc-header" style={{ justifyContent: 'space-between' }}>
-          <div className="mc-title"><i className="ti ti-credit-card" style={{ marginRight: 8, color: 'var(--accent-bright)' }} /> Mis Cuotas</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {lastUpdate && (
-              <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
-            )}
-            <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargarCuotas(true)}>
-              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-            </button>
-          </div>
-        </div>
-
-        <div className="mc-filters" style={{ marginBottom: 18 }}>
-          {(['todos', 'pendiente', 'vencida', 'pagada'] as EstadoFilter[]).map(f => (
-            <button
-              key={f}
-              className={`mc-filter-btn${filtro === f ? ' active' : ''}`}
-              onClick={() => setFiltro(f)}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
+      <div>
+        <PageHead eyebrow="Estado de cuenta · facturación" title="Mis cuotas"
+          actions={<RefreshButton onClick={() => cargarCuotas(true)} refreshing={refreshing} lastUpdate={lastUpdate} />} />
 
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12.5, color: 'var(--danger)', marginBottom: 16 }}>
@@ -199,24 +157,51 @@ export default function MisCuotas() {
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="mc-summary">
-          <div className="mc-kpi">
-            <div className="mc-kpi-label">Total pendiente</div>
-            <div className={`mc-kpi-value${vencidas > 0 ? ' danger' : ''}`}>
-              {formatGs(totalPendiente)}
-            </div>
+        {/* Dato dominante: total pendiente; vencidas y ahorro subordinados */}
+        <KpiRow
+          dominant={{
+            label: <span style={{ color: vencidas > 0 ? 'var(--danger)' : undefined }}>Total pendiente</span>,
+            value: formatGs(totalPendiente).replace(/^Gs\.?\s*/, ''),
+            unit: 'Gs.',
+            compact: true,
+            tone: vencidas > 0 ? 'danger' : 'default',
+            badge: primeraVencida ? (
+              <span className="badge" style={{ background: 'var(--danger-subtle)', color: 'var(--danger)' }}>
+                <i className="ti ti-alert-triangle" /> {vencidas} vencida{vencidas === 1 ? '' : 's'} · {diasDesde(primeraVencida.fecha_vencimiento)} días
+              </span>
+            ) : undefined,
+            children: proxima ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <button type="button" className="btn-primary" disabled={pagandoId === proxima.id} onClick={() => pagar(proxima)}>
+                  <i className="ti ti-credit-card" /> {pagandoId === proxima.id ? 'Procesando…' : proxima.estado === 'vencida' ? 'Pagar cuota vencida' : 'Pagar próxima cuota'}
+                </button>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{abiertas.length} cuota{abiertas.length === 1 ? '' : 's'} abierta{abiertas.length === 1 ? '' : 's'} de {cuotas.length}</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--success)' }}><i className="ti ti-circle-check" /> Sin cuotas pendientes</div>
+            ),
+          }}
+          secondary={[
+            {
+              label: 'Cuotas vencidas', value: String(vencidas).padStart(2, '0'), alert: vencidas > 0, tone: vencidas > 0 ? 'danger' : 'success',
+              sub: primeraVencida ? `${primeraVencida.periodo} · ${formatGs(primeraVencida.monto_a_pagar)}` : 'Al día',
+            },
+            {
+              label: 'Ahorro por becas', value: formatGs(totalDescuento).replace(/^Gs\.?\s*/, ''), tone: totalDescuento > 0 ? 'success' : 'default',
+              sub: becas.length > 0 ? becas.map(b => `${b.beca_nombre} ${parseFloat(b.porcentaje_descuento)}%`).join(' · ') : 'Sin becas activas',
+            },
+          ]}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(['todos', 'pendiente', 'vencida', 'pagada'] as EstadoFilter[]).map(f => (
+              <button key={f} type="button" className={`pill-tab${filtro === f ? ' active' : ''}`} onClick={() => setFiltro(f)}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
           </div>
-          <div className="mc-kpi">
-            <div className="mc-kpi-label">Cuotas vencidas</div>
-            <div className={`mc-kpi-value${vencidas > 0 ? ' danger' : ' success'}`}>
-              {vencidas}
-            </div>
-          </div>
-          <div className="mc-kpi">
-            <div className="mc-kpi-label">Ahorro becas</div>
-            <div className="mc-kpi-value success">{formatGs(totalDescuento)}</div>
-          </div>
+          <span className="mono-label">{cuotasFiltradas.length} cuota{cuotasFiltradas.length === 1 ? '' : 's'}</span>
         </div>
 
         {/* Becas activas resumen */}
@@ -264,77 +249,46 @@ export default function MisCuotas() {
                 : '0'
               const tieneDescuento = parseFloat(cuota.monto_descuento) > 0
 
+              const estadoColor = { pendiente: 'var(--warning)', vencida: 'var(--danger)', pagada: 'var(--success)', anulada: 'var(--text-secondary)' }[cuota.estado] ?? 'var(--text-secondary)'
+
+              const venceTxt = cuota.estado === 'vencida'
+                ? `Venció hace ${diasDesde(cuota.fecha_vencimiento)} días`
+                : cuota.estado === 'pagada' ? `Vencimiento ${new Date(cuota.fecha_vencimiento).toLocaleDateString('es-PY')}`
+                : `Vence ${new Date(cuota.fecha_vencimiento).toLocaleDateString('es-PY')}`
+
               return (
-                <div key={cuota.id} className={`mc-card ${cuota.estado}`}>
-                  <div>
-                    <div className="mc-periodo">Cuota {cuota.periodo}</div>
-                    <div className="mc-vence">
-                      Vence: {new Date(cuota.fecha_vencimiento).toLocaleDateString('es-PY')}
-                    </div>
-                    {/* Badge beca con trazabilidad */}
-                    {tieneDescuento && cuota.beca_nombre && (
-                      <div className={`mc-beca-tag ${cuota.es_beca_externa ? 'externa' : 'institucional'}`}>
-                        <i className={`ti ${cuota.es_beca_externa ? 'ti-building-bank' : 'ti-school'}`} />
-                        {cuota.beca_nombre} — {cuota.fuente_beca} ({descuentoPct}% desc.)
+                <div key={cuota.id} className="mc-row" style={{ opacity: cuota.estado === 'pagada' ? .8 : 1 }}>
+                  <div style={{ display: 'flex', gap: 12, minWidth: 0 }}>
+                    <span className="mc-dot" style={{ background: estadoColor }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="mc-periodo">Cuota {cuota.periodo}</div>
+                      <div className="mc-sub">
+                        {venceTxt}
+                        {tieneDescuento && cuota.beca_nombre && <> · {cuota.beca_nombre} {descuentoPct}%</>}
                       </div>
-                    )}
+                    </div>
                   </div>
+                  <span className="mc-estado" style={{ color: estadoColor }}>{estadoLabel(cuota.estado)}</span>
                   <div className="mc-montos">
-                    {tieneDescuento && (
-                      <div className="mc-monto-original">{formatGs(cuota.monto)}</div>
-                    )}
+                    {tieneDescuento && <div className="mc-monto-original">{formatGs(cuota.monto)}</div>}
                     <div className="mc-monto-pagar">{formatGs(cuota.monto_a_pagar)}</div>
-                    {tieneDescuento && (
-                      <div className="mc-descuento">−{formatGs(cuota.monto_descuento)} becado</div>
-                    )}
-                    <div style={{ marginTop: 8 }}>
-                      <span className={`mc-estado-badge ${cuota.estado}`}>
-                        {estadoLabel(cuota.estado)}
-                      </span>
-                    </div>
+                  </div>
+                  <div className="mc-accion">
                     {cuota.estado === 'pagada' && (
-                      <div className="mc-comprobante">
-                        {cuota.comprobante_estado === 'emitido' && cuota.comprobante_url_pdf ? (
-                          <a
-                            className="mc-comprobante-link"
-                            href={cuota.comprobante_url_pdf}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <i className="ti ti-download" /> Descargar comprobante
-                          </a>
-                        ) : (
-                          <span className="mc-comprobante-pendiente">
-                            Comprobante en proceso, disponible en breve
-                          </span>
-                        )}
-                      </div>
+                      cuota.comprobante_estado === 'emitido' && cuota.comprobante_url_pdf ? (
+                        <a className="mc-comprobante-link" href={cuota.comprobante_url_pdf} target="_blank" rel="noopener noreferrer">
+                          <i className="ti ti-file-check" /> Comprobante
+                        </a>
+                      ) : (
+                        <span className="mc-comprobante-pendiente">Comprobante en proceso</span>
+                      )
                     )}
                     {(cuota.estado === 'pendiente' || cuota.estado === 'vencida') && (
-                      <div style={{ marginTop: 8 }}>
-                        <button
-                          className="mc-pagar-btn"
-                          disabled={pagandoId === cuota.id}
-                          onClick={async () => {
-                            setPagandoId(cuota.id)
-                            try {
-                              const returnUrl = `${window.location.origin}/mis-cuotas`
-                              const res = await initPagoOnline(
-                                cuota.id,
-                                `${returnUrl}?stripe=success`,
-                                `${returnUrl}?stripe=cancel`,
-                              )
-                              window.location.href = res.redirect_url
-                            } catch {
-                              emitToast('Error al iniciar pago', 'error')
-                            } finally {
-                              setPagandoId(null)
-                            }
-                          }}
-                        >
-                          <i className="ti ti-credit-card" /> {pagandoId === cuota.id ? 'Procesando…' : 'Pagar Online'}
-                        </button>
-                      </div>
+                      <button type="button" className={cuota.estado === 'vencida' ? 'btn-primary' : 'btn-ghost'}
+                        style={{ padding: '6px 16px', fontSize: 12 }}
+                        disabled={pagandoId === cuota.id} onClick={() => pagar(cuota)}>
+                        {pagandoId === cuota.id ? 'Procesando…' : 'Pagar'}
+                      </button>
                     )}
                   </div>
                 </div>

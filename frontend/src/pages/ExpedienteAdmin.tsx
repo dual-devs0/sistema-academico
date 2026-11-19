@@ -153,14 +153,14 @@ export default function ExpedienteAdmin() {
     <>
       <style>{css}</style>
       <div className="w-full">
-        <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <header className="page-head">
           <div>
-            <h1 className="page-title" style={{ fontSize: 28 }}>Expediente Académico</h1>
-            <p className="page-subtitle">
+            <div className="page-eyebrow">
               {selectedAlumnoId
                 ? `Expediente de ${alumno?.nombre || alumno?.username || '...'}`
-                : 'Seleccioná un alumno para ver o cerrar su expediente.'}
-            </p>
+                : 'Seleccioná un alumno para ver o cerrar su expediente'}
+            </div>
+            <h1 className="page-title">Expediente Académico</h1>
           </div>
         </header>
 

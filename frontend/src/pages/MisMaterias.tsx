@@ -51,7 +51,7 @@ function StatsStrip({ stats, loading }: { stats: { lbl: string; val: string; hig
       {stats.map(s => (
         <div key={s.lbl} style={{ background: 'var(--bg-input)', border: '0.5px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{s.lbl}</div>
-          <div style={{ fontSize: loading ? 14 : 20, fontWeight: 600, color: s.highlight ? '#D85A30' : 'var(--text-primary)' }}>
+          <div style={{ fontSize: loading ? 14 : 20, fontWeight: 600, color: s.highlight ? 'var(--accent-bright)' : 'var(--text-primary)' }}>
             {loading ? '…' : s.val}
           </div>
         </div>
@@ -400,21 +400,14 @@ export default function MisMaterias() {
 
   return (
     <div style={{ width: '100%', position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 className="page-title" style={{ fontSize: 28 }}>Mis Materias</h1>
-          <p className="page-subtitle">Cátedras activas, histórico docente y agenda personal.</p>
+          <div className="page-eyebrow">Cátedras activas, histórico y agenda</div>
+          <h1 className="page-title">Mis Materias</h1>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           {([['activas', 'Activas'], ['historico', 'Histórico'], ['agenda', 'Agenda']] as [Tab, string][]).map(([t, l]) => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{
-                padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                cursor: 'pointer', transition: 'all .15s',
-                background: tab === t ? '#D85A30' : 'transparent',
-                color: tab === t ? '#fff' : 'var(--text-secondary)',
-                border: tab === t ? 'none' : '0.5px solid var(--border-strong)',
-              }}>
+            <button key={t} type="button" className={`pill-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
               {l}
             </button>
           ))}
@@ -499,8 +492,8 @@ export default function MisMaterias() {
                     background: 'var(--bg-elevated)', border: '0.5px solid var(--border-subtle)', borderBottom: 'none',
                     borderRadius: '12px 12px 0 0',
                   }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#712B13', background: '#FAECE7', borderRadius: 6, padding: '4px 10px' }}>
-                      📅 {p.periodo}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--accent-bright)', background: 'var(--accent-muted)', borderRadius: 6, padding: '4px 10px' }}>
+                      <i className="ti ti-calendar" /> {p.periodo}
                     </span>
                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.catedras.length} materia(s)</span>
                     <div style={{ flex: 1 }} />
@@ -560,8 +553,8 @@ export default function MisMaterias() {
                               {c.porcentaje_aprobacion !== null ? (
                                 <span style={{
                                   display: 'inline-block', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 999,
-                                  background: c.porcentaje_aprobacion >= 70 ? '#EAF3DE' : c.porcentaje_aprobacion >= 50 ? '#FEF3C7' : '#FEE2E2',
-                                  color: c.porcentaje_aprobacion >= 70 ? '#27500A' : c.porcentaje_aprobacion >= 50 ? '#92400E' : '#991B1B',
+                                  background: c.porcentaje_aprobacion >= 70 ? 'var(--success-subtle)' : c.porcentaje_aprobacion >= 50 ? 'var(--warning-subtle)' : 'var(--danger-subtle)',
+                                  color: c.porcentaje_aprobacion >= 70 ? 'var(--success)' : c.porcentaje_aprobacion >= 50 ? 'var(--warning)' : 'var(--danger)',
                                 }}>
                                   {c.porcentaje_aprobacion}%
                                 </span>
@@ -618,9 +611,9 @@ export default function MisMaterias() {
                 return (
                   <div key={d} style={{
                     padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 600,
-                    color: esHoy ? '#D85A30' : 'var(--text-muted)',
+                    color: esHoy ? 'var(--accent-bright)' : 'var(--text-muted)',
                     borderBottom: '0.5px solid var(--border-subtle)',
-                    background: esHoy ? '#FAECE7' : 'transparent',
+                    background: esHoy ? 'var(--accent-muted)' : 'transparent',
                   }}>
                     {d.toUpperCase()} {fecha.getDate()}
                   </div>
@@ -639,14 +632,14 @@ export default function MisMaterias() {
                     minHeight: 110, padding: 8, display: 'flex', flexDirection: 'column',
                     borderRight: i < 6 ? '0.5px solid var(--border-subtle)' : 'none',
                     borderBottom: '0.5px solid var(--border-subtle)',
-                    background: esHoy ? '#FAECE7' : esFinde ? 'var(--bg-input)' : 'transparent',
+                    background: esHoy ? 'var(--accent-muted)' : esFinde ? 'var(--bg-input)' : 'transparent',
                     opacity: esFinde && !esHoy ? 0.6 : 1,
                   }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
                       {delDia.length > 0 ? delDia.map((it, idx) => {
-                        const bg = it.tipo === 'clase' ? '#FAECE7' : it.tipo === 'evento' ? '#EAF3DE' : '#E6F1FB'
-                        const tx = it.tipo === 'clase' ? '#712B13' : it.tipo === 'evento' ? '#27500A' : '#0C447C'
-                        const border = it.tipo === 'clase' ? '1px solid #F5D6C9' : it.tipo === 'evento' ? '1px solid #D4E5C0' : '1px solid #C8DEEE'
+                        const bg = it.tipo === 'clase' ? 'var(--accent-muted)' : it.tipo === 'evento' ? 'var(--success-subtle)' : 'var(--info-subtle)'
+                        const tx = it.tipo === 'clase' ? 'var(--accent-bright)' : it.tipo === 'evento' ? 'var(--success)' : 'var(--info)'
+                        const border = it.tipo === 'clase' ? '1px solid var(--accent-hover)' : it.tipo === 'evento' ? '1px solid rgba(34,197,94,.3)' : '1px solid rgba(59,130,246,.3)'
                         const ahora = esClaseAhora(it)
                         return (
                           <div key={idx} style={{

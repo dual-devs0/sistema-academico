@@ -395,15 +395,15 @@ export default function Usuarios() {
       <style>{css}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
+          <div className="page-eyebrow">Accesos, roles y estados</div>
           <h1 className="page-title">Gestión de Usuarios</h1>
-          <p className="page-subtitle">Administra los accesos, roles y estados de los miembros de la institución.</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span className="mono-label" style={{ fontSize: 10 }}>{lastUpdate.toLocaleTimeString('es-PY')}</span>
-          <button className="btn-ghost" onClick={refreshNow} disabled={refreshing} title="Actualizar">
-            <i className={`ti ti-refresh ${refreshing ? 'spinning' : ''}`} />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn-ghost" onClick={refreshNow} disabled={refreshing} title="Actualizar"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+            <i className={`ti ti-refresh ${refreshing ? 'spinning' : ''}`} /> {lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' })}
           </button>
           <button className="btn-ghost" onClick={exportCSV}><i className="ti ti-cloud-download" /> Exportar</button>
           <button className="btn-primary" onClick={abrirNuevo}><i className="ti ti-user-plus" /> Nuevo Usuario</button>

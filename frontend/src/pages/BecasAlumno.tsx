@@ -91,24 +91,16 @@ export default function BecasAlumno() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
+      <div className="page-head">
         <div>
-          <h1 className="page-title" style={{ marginBottom: 4 }}>Becas y Ayudas</h1>
-          <p className="page-subtitle" style={{ marginBottom: 20 }}>
-            Postulate a becas disponibles y gestioná tus beneficios
-          </p>
+          <div className="page-eyebrow">Postulaciones y beneficios</div>
+          <h1 className="page-title">Becas y Ayudas</h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {lastUpdate && (
-            <span className="mono-label" style={{ fontSize: 11 }}>
-              <i className="ti ti-clock" style={{ marginRight: 4 }} />
-              {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
-          <button type="button" className="btn-ghost" onClick={() => cargarTodo(true)} disabled={refreshing}>
-            <i className={`ti ti-refresh${refreshing ? ' beca-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
-        </div>
+        <button type="button" className="btn-ghost" onClick={() => cargarTodo(true)} disabled={refreshing}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+          <i className={`ti ti-refresh${refreshing ? ' beca-spin' : ''}`} />
+          {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+        </button>
       </div>
 
       <style>{`@keyframes beca-spin{to{transform:rotate(360deg)}}.beca-spin{display:inline-block;animation:beca-spin 1s linear infinite}`}</style>

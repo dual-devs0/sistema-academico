@@ -433,8 +433,13 @@ export default function SolicitudesTramites() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px' }}>
-        <div className="tr-title"><i className="ti ti-file-text" style={{ color: 'var(--accent-bright)' }} /> Solicitudes y Trámites</div>
+      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">Solicitudes académicas</div>
+            <h1 className="page-title">Trámites</h1>
+          </div>
+        </div>
         {esAdmin ? <VistaAdmin /> : <VistaAlumno />}
       </div>
     </>

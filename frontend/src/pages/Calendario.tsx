@@ -179,12 +179,10 @@ export default function Calendario() {
     <>
       <style>{css}</style>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">{loading ? 'Cargando…' : `${delMes.length} evento${delMes.length === 1 ? '' : 's'} este mes`}</div>
           <h1 className="page-title">{MESES[m]} {y}</h1>
-          <span className="badge" style={{ background: 'var(--accent-muted)', color: 'var(--accent-bright)' }}>
-            <i className="ti ti-sparkles" /> {loading ? 'Cargando…' : `${delMes.length} eventos este mes`}
-          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {lastUpdate && (

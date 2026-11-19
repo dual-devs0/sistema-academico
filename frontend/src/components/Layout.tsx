@@ -1,7 +1,13 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { getRole, getUsername } from '../hooks/useRole'
-import { api } from '../lib/api'
+import { api, getCurrentUser } from '../lib/api'
+import { obtenerCreditosAlumno } from '../services/pensumService'
+import { obtenerDashboardProfesor } from '../services/profesorService'
+import { obtenerDashboardAdmin } from '../services/adminService'
+import { obtenerPPA } from '../services/expedienteService'
+import { getEquivalenciasAlumno, getTodasSolicitudes } from '../services/equivalenciasService'
+import { obtenerStatsMaterias } from '../services/asignacionesService'
 import logoUCA from '../assets/uc_logo_sist_academico.webp'
 import { MOBILE_BREAKPOINT } from '../styles/responsiveTokens'
 
@@ -165,6 +171,124 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const username = getUsername()
   const menuItems = getMenuPorRol(role)
 
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(() => new Set(['Recursos', 'Trámites']))
+  const toggleGroup = (name: string) => setClosedGroups(prev => {
+    const next = new Set(prev)
+    if (next.has(name)) next.delete(name); else next.add(name)
+    return next
+  })
+
+  const [sidebarCtx, setSidebarCtx] = useState<{
+    eventosHoy: number; eventosProximos: number; boletaVencida: boolean; materiasCount: number | null
+    creditos: { acumulados: number; total: number | null } | null; ppa: number | null; equivalenciasPendientes: number
+  } | null>(null)
+  const [sidebarCtxProf, setSidebarCtxProf] = useState<{
+    agendaHoy: number; materiasActivas: number; alertas: number
+    aprobacionPct: number | null; asistenciaPromedio: number | null
+  } | null>(null)
+  const [sidebarCtxAdmin, setSidebarCtxAdmin] = useState<{
+    totalAlumnos: number; tramitesPendientes: number; alertas: number; materiasSinOferta: number
+    aprobacionPct: number; materiasSinProfesor: number; equivalenciasPendientes: number
+  } | null>(null)
+
+  useEffect(() => {
+    if (role !== 'alumno') return
+    const user = getCurrentUser()
+    const uid = user ? Number(user.user_id) : NaN
+    Promise.all([
+      api.get<{ eventosCercanos: { fecha: string | null }[]; cuentaSaldoVencido: number }>('/alumno/dashboard'),
+      api.get<{ id: number }[]>('/alumno/mis-materias'),
+      !isNaN(uid) ? obtenerCreditosAlumno(uid).catch(() => null) : Promise.resolve(null),
+      !isNaN(uid) ? obtenerPPA(uid).catch(() => null) : Promise.resolve(null),
+      !isNaN(uid) ? getEquivalenciasAlumno(uid).catch(() => null) : Promise.resolve(null),
+    ]).then(([dash, materias, creditos, ppaRes, equivalencias]) => {
+      const hoy = new Date().toISOString().slice(0, 10)
+      setSidebarCtx({
+        eventosHoy: dash.eventosCercanos.filter(e => e.fecha === hoy).length,
+        eventosProximos: dash.eventosCercanos.length,
+        boletaVencida: dash.cuentaSaldoVencido > 0,
+        materiasCount: materias.length,
+        creditos: creditos ? { acumulados: creditos.creditos_acumulados, total: creditos.creditos_totales } : null,
+        ppa: ppaRes ? ppaRes.ppa : null,
+        equivalenciasPendientes: equivalencias ? equivalencias.filter(s => s.estado === 'pendiente').length : 0,
+      })
+    }).catch(() => {})
+  }, [role])
+
+  useEffect(() => {
+    if (role !== 'profesor') return
+    obtenerDashboardProfesor().then(dash => {
+      setSidebarCtxProf({
+        agendaHoy: dash.agenda_hoy.length,
+        materiasActivas: dash.resumen.materias_activas,
+        alertas: dash.alertas.length,
+        aprobacionPct: dash.resumen.porcentaje_aprobacion,
+        asistenciaPromedio: dash.resumen.asistencia_promedio,
+      })
+    }).catch(() => {})
+  }, [role])
+
+  useEffect(() => {
+    if (role !== 'admin') return
+    Promise.all([
+      obtenerDashboardAdmin(),
+      obtenerStatsMaterias().catch(() => null),
+      getTodasSolicitudes('pendiente').catch(() => null),
+    ]).then(([dash, stats, equivalencias]) => {
+      setSidebarCtxAdmin({
+        totalAlumnos: dash.resumen.total_alumnos,
+        tramitesPendientes: dash.resumen.tramites_pendientes,
+        alertas: dash.alertas.length,
+        materiasSinOferta: dash.resumen.materias_sin_oferta,
+        aprobacionPct: dash.kpis.aprobacion_pct,
+        materiasSinProfesor: stats ? stats.materias_sin_profesor : 0,
+        equivalenciasPendientes: equivalencias ? equivalencias.length : 0,
+      })
+    }).catch(() => {})
+  }, [role])
+
+  function getMonoContext(path: string): { mono?: string; badge?: string } | null {
+    if (role === 'alumno' && sidebarCtx) {
+      switch (path) {
+        case '/dashboard': return sidebarCtx.eventosHoy > 0 ? { mono: `${sidebarCtx.eventosHoy} hoy` } : null
+        case '/calendario': return sidebarCtx.eventosProximos > 0 ? { mono: String(sidebarCtx.eventosProximos).padStart(2, '0') } : null
+        case '/programa': return sidebarCtx.materiasCount != null ? { mono: String(sidebarCtx.materiasCount).padStart(2, '0') } : null
+        case '/boleta': return sidebarCtx.boletaVencida ? { badge: 'VENCIDA' } : null
+        case '/inscripciones': return sidebarCtx.materiasCount != null ? { mono: String(sidebarCtx.materiasCount).padStart(2, '0') } : null
+        case '/malla': return sidebarCtx.creditos ? { mono: `${sidebarCtx.creditos.acumulados}/${sidebarCtx.creditos.total ?? '—'}` } : null
+        case '/expediente': return sidebarCtx.ppa != null ? { mono: `PPA ${sidebarCtx.ppa.toFixed(1)}` } : null
+        case '/mi-graduacion': return sidebarCtx.creditos && sidebarCtx.creditos.total != null ? { mono: `${sidebarCtx.creditos.total - sidebarCtx.creditos.acumulados} cr` } : null
+        case '/mis-equivalencias': return sidebarCtx.equivalenciasPendientes > 0 ? { badge: `${sidebarCtx.equivalenciasPendientes} PEND.` } : null
+        case '/mis-cuotas': return sidebarCtx.boletaVencida ? { badge: 'VENCIDA' } : null
+        default: return null
+      }
+    }
+    if (role === 'profesor' && sidebarCtxProf) {
+      switch (path) {
+        case '/dashboard': return sidebarCtxProf.agendaHoy > 0 ? { mono: `${sidebarCtxProf.agendaHoy} hoy` } : null
+        case '/calendario': return sidebarCtxProf.agendaHoy > 0 ? { mono: `${sidebarCtxProf.agendaHoy} hoy` } : null
+        case '/mis-materias': return { mono: String(sidebarCtxProf.materiasActivas).padStart(2, '0') }
+        case '/asistencia': return sidebarCtxProf.alertas > 0 ? { badge: `${sidebarCtxProf.alertas} ALERTA${sidebarCtxProf.alertas === 1 ? '' : 'S'}` } : null
+        case '/puntajes': return sidebarCtxProf.aprobacionPct != null ? { mono: `${sidebarCtxProf.aprobacionPct}%` } : null
+        case '/estadisticas': return sidebarCtxProf.asistenciaPromedio != null ? { mono: `${sidebarCtxProf.asistenciaPromedio}%` } : null
+        default: return null
+      }
+    }
+    if (role === 'admin' && sidebarCtxAdmin) {
+      switch (path) {
+        case '/usuarios': return { mono: sidebarCtxAdmin.totalAlumnos.toLocaleString('es-PY') }
+        case '/gestion-asignaciones': return sidebarCtxAdmin.materiasSinProfesor > 0 ? { badge: `${sidebarCtxAdmin.materiasSinProfesor} SIN PROF.` } : null
+        case '/tramites': return sidebarCtxAdmin.tramitesPendientes > 0 ? { badge: `${sidebarCtxAdmin.tramitesPendientes} PEND.` } : null
+        case '/reportes': return sidebarCtxAdmin.alertas > 0 ? { badge: `${sidebarCtxAdmin.alertas} ALERTA${sidebarCtxAdmin.alertas === 1 ? '' : 'S'}` } : null
+        case '/malla': return sidebarCtxAdmin.materiasSinOferta > 0 ? { badge: `${sidebarCtxAdmin.materiasSinOferta} SIN OFERTA` } : null
+        case '/puntajes': return { mono: `${sidebarCtxAdmin.aprobacionPct}%` }
+        case '/equivalencias-admin': return sidebarCtxAdmin.equivalenciasPendientes > 0 ? { badge: `${sidebarCtxAdmin.equivalenciasPendientes} PEND.` } : null
+        default: return null
+      }
+    }
+    return null
+  }
+
   useEffect(() => {
     document.title = role === 'admin' ? 'UCA Caacupé - Administrador' : 'Universidad Católica Caacupé'
   }, [role])
@@ -277,11 +401,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         }
         .side-item i { font-size: 16px; flex-shrink: 0; }
 
+        .side-group { padding-bottom: 16px; }
+        .side-group:not(:first-child) { border-top: 1px solid var(--border-light); padding-top: 4px; }
+        .side-group-head {
+          width: 100%; display: flex; align-items: center; justify-content: space-between;
+          background: none; border: none; padding: 14px 12px 6px; margin: 0;
+        }
         .side-group-label {
           font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
           letter-spacing: 0.08em; color: var(--text-muted);
-          padding: 14px 12px 6px; text-transform: uppercase;
+          text-transform: uppercase;
         }
+        .side-group-meta { display: flex; align-items: center; gap: 8px; }
+        .side-group-count { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: var(--text-muted); }
+        .side-group-badge {
+          font-family: var(--font-mono); font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+          padding: 2px 7px; border-radius: 999px; background: var(--danger-subtle); color: var(--danger);
+        }
+        .side-badge {
+          font-family: var(--font-mono); font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+          padding: 2px 7px; border-radius: 999px; background: var(--danger-subtle); color: var(--danger); flex-shrink: 0;
+        }
+        .side-mono { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
 
         .gni-anim { animation: gni-breathe 3s ease-in-out infinite; transform-origin: center; }
         .gni-anim .gni-arcs { animation: gni-flow 2.4s ease-in-out infinite; transform-origin: center; }
@@ -342,23 +483,58 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Nav */}
           <div className="nav-scroll" style={{ flex: 1, padding: '4px 12px', overflowY: 'auto' }}>
-            {menuItems.map((item, idx) => {
+            {(() => {
+              const collapsibleGroups = new Set(['Recursos', 'Trámites'])
+              const renderItem = (item: MenuItem) => {
                 const active = location.pathname === item.path
-                const showHeader = item.group !== undefined && (idx === 0 || item.group !== menuItems[idx - 1].group)
                 const CustomIcon = iconOverride[item.path]
+                const ctx = getMonoContext(item.path)
                 return (
-                  <div key={item.path}>
-                    {showHeader && (
-                      <div className="side-group-label">{item.group}</div>
-                    )}
-                    <button className={`side-item${active ? ' active' : ''}`}
-                      onClick={() => { navigate(item.path); setMobileOpen(false) }}>
-                      {CustomIcon ? <CustomIcon /> : <i className={`ti ${item.icon}`} aria-hidden="true" />}
-                      <span>{item.label}</span>
+                  <button key={item.path} className={`side-item${active ? ' active' : ''}`}
+                    onClick={() => { navigate(item.path); setMobileOpen(false) }}>
+                    {CustomIcon ? <CustomIcon /> : <i className={`ti ${item.icon}`} aria-hidden="true" />}
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {ctx?.badge && <span className="side-badge">{ctx.badge}</span>}
+                    {ctx?.mono && <span className="side-mono">{ctx.mono}</span>}
+                  </button>
+                )
+              }
+              const sections: React.ReactNode[] = []
+              let i = 0
+              while (i < menuItems.length) {
+                const item = menuItems[i]
+                if (item.group === undefined) {
+                  sections.push(renderItem(item))
+                  i++
+                  continue
+                }
+                const groupName = item.group
+                const groupItems: MenuItem[] = []
+                let j = i
+                while (j < menuItems.length && menuItems[j].group === groupName) { groupItems.push(menuItems[j]); j++ }
+                const collapsible = collapsibleGroups.has(groupName)
+                const closed = collapsible && closedGroups.has(groupName)
+                const showVencidaBadge = collapsible && closed && groupName === 'Trámites' && sidebarCtx?.boletaVencida
+                sections.push(
+                  <div key={groupName} className="side-group">
+                    <button type="button" className="side-group-head" style={{ cursor: collapsible ? 'pointer' : 'default' }}
+                      onClick={() => collapsible && toggleGroup(groupName)}>
+                      <span className="side-group-label">{groupName}</span>
+                      {collapsible && (
+                        <span className="side-group-meta">
+                          {showVencidaBadge && <span className="side-group-badge">1 VENC.</span>}
+                          <span className="side-group-count">{groupItems.length}</span>
+                          <i className={`ti ti-chevron-${closed ? 'down' : 'up'}`} style={{ fontSize: 13, color: 'var(--text-muted)' }} />
+                        </span>
+                      )}
                     </button>
+                    {!closed && groupItems.map(renderItem)}
                   </div>
                 )
-              })}
+                i = j
+              }
+              return sections
+            })()}
           </div>
 
           {/* Footer */}

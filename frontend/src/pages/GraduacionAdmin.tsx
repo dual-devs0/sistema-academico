@@ -292,23 +292,19 @@ export default function GraduacionAdmin() {
     <div>
       <style>{css}</style>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h2 className="gr-title" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="page-eyebrow">Candidatos de todas las carreras</div>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ color: 'var(--accent-bright)', display: 'inline-flex' }}><GraduationCapIcon size={20} /></span>
             Graduación — Admin
-          </h2>
-          <p className="page-subtitle">Candidatos a graduación de todas las carreras.</p>
+          </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {lastUpdate && (
-            <span className="gr-last-upd">
-              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" /></svg>
-              {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
-          <button type="button" className="btn-ghost" onClick={() => cargarCandidatos(true)} disabled={refreshing}>
-            <i className={`ti ti-refresh ${refreshing ? 'spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+          <button type="button" className="btn-ghost" onClick={() => cargarCandidatos(true)} disabled={refreshing}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+            <i className={`ti ti-refresh ${refreshing ? 'spin' : ''}`} />
+            {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
           </button>
           <button type="button" className="btn-ghost" onClick={() => setMostrarVerificarId(v => !v)}>
             <i className="ti ti-search" /> Verificar por ID

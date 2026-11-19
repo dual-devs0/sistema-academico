@@ -18,10 +18,10 @@ function defaultScopeDe(filtro: FiltroVista): PdfScope {
 
 export default function BoletaHeader({ nombre, subtitulo, downloading, filtro, anioParaExport, onExport }: Props) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+    <div className="page-head" style={{ marginBottom: 24 }}>
       <div>
-        <h1 className="page-title" style={{ fontSize: 27 }}>Mi Boleta</h1>
-        <p className="page-subtitle">{subtitulo}{nombre ? <> • <span style={{ color: 'var(--accent-bright)' }}>{nombre}</span></> : null}</p>
+        <div className="page-eyebrow">{subtitulo}{nombre ? ` · ${nombre}` : ''}</div>
+        <h1 className="page-title">Mi Boleta</h1>
       </div>
       <PdfExportMenu
         downloading={downloading}

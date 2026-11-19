@@ -65,6 +65,9 @@ export async function actualizarUsuario(
     es_becado: boolean
     carrera_id: number | null
     password: string
+    fecha_ingreso: string | null
+    cv: string | null
+    activo: boolean
   }>
 ): Promise<Usuario> {
   return api.patch<Usuario>(`/users/${id}`, data)

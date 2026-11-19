@@ -75,24 +75,16 @@ export default function EquivalenciasAlumno() {
   return (
     <Skeleton name="equivalencias-alumno" loading={loading && solicitudes.length === 0}>
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div className="page-head">
         <div>
-          <h1 className="page-title" style={{ marginBottom: 4 }}>Equivalencias</h1>
-          <p className="page-subtitle" style={{ marginBottom: 20 }}>
-            Solicitá equivalencias o convalidaciones de materias cursadas en otras instituciones.
-          </p>
+          <div className="page-eyebrow">Convalidación de materias</div>
+          <h1 className="page-title">Equivalencias</h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {lastUpdate && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-              <i className="ti ti-clock" style={{ fontSize: 12 }} />
-              {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
-          <button type="button" className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}>
-            <i className={`ti ti-refresh${refreshing ? ' eqal-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
-        </div>
+        <button type="button" className="btn-ghost" onClick={() => cargar(true)} disabled={refreshing}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+          <i className={`ti ti-refresh${refreshing ? ' eqal-spin' : ''}`} />
+          {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+        </button>
       </div>
 
       <style>{`@keyframes eqal-spin{to{transform:rotate(360deg)}}.eqal-spin{display:inline-block;animation:eqal-spin 1s linear infinite}`}</style>

@@ -75,8 +75,14 @@ export default function SemesterAccordion({ periodos, loading }: Props) {
                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 800 }}>{p.etiqueta}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 800 }}>{p.etiqueta}</span>
+                    <span className="mono-label">
+                      {p.materias.some(m => m.estado === 'cursando') ? 'en curso' : 'cerrado'} · {p.materias.length} materia{p.materias.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span className="mono-label" style={{ color: 'var(--text-muted)' }}>Promedio</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 14, color: p.promedioSemestre >= 2 ? 'var(--success)' : 'var(--danger)' }}>
                       {p.promedioSemestre.toFixed(2)}
                     </span>

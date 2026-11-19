@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import jsQR from 'jsqr'
 import { api, getCurrentUser } from '../lib/api'
+import { PageHead, KpiRow, RefreshButton } from '../components/common/PageKpi'
 
 type Estado = 'idle' | 'verificando' | 'exito' | 'duplicado' | 'expirado' | 'no_autorizado' | 'error'
 type ResultData = { materia_nombre: string; fecha: string; hora_registro: string; presentes: number; ausentes: number }
@@ -25,24 +26,11 @@ const css = `
   .scan-line { position:absolute; left:15%; right:15%; height:2px; background:linear-gradient(90deg,transparent,#22d3ee,transparent); animation:scanline 2.4s ease-in-out infinite; }
   .ring-mat { position:relative; width:46px; height:46px; flex-shrink:0; }
 
-  /* Layout mobile-first: en celular todo apilado (comportamiento ya correcto).
-     En escritorio (>=1024px) el escáner se centra en una columna angosta
-     con las instrucciones al lado, en vez de estirarse a lo ancho de la pantalla. */
-  .scan-page { max-width: 560px; margin: 0 auto; }
-  .scan-cols { display: flex; flex-direction: column; gap: 24px; }
-  .scan-tip {
-    display: none; margin-top: 14px; padding: 12px 14px; border-radius: 12px;
-    background: var(--bg-input); border: 1px solid var(--border-subtle);
-    font-size: 12px; color: var(--text-secondary); line-height: 1.5;
-  }
-  @media(min-width: 1024px) {
-    .scan-page { max-width: 900px; }
-    .scan-cols { flex-direction: row; align-items: flex-start; gap: 36px; }
-    .scan-col-left { flex: 0 0 360px; }
-    .scan-col-right { flex: 1; min-width: 0; }
-    .scan-visor { height: 340px; }
-    .scan-tip { display: block; }
-  }
+  /* Escáner y materias en dos columnas; en mobile se apilan. */
+  .scan-cols { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; align-items: start; }
+  .scan-tip { margin-top: 14px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; display: flex; gap: 8px; }
+  .scan-mat { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); }
+  @media (max-width: 900px) { .scan-cols { grid-template-columns: 1fr; } }
 `
 
 function RingPct({ pct }: { pct: number }) {
@@ -75,9 +63,16 @@ export default function AsistenciaScan() {
   const user = getCurrentUser()
   const nombre = user?.username || 'Alumno'
 
-  useEffect(() => {
-    api.get<MateriaAsist[]>('/alumno/mi-asistencia').then(setMaterias).catch(() => {})
-  }, [])
+  const [cargandoMat, setCargandoMat] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const cargarMaterias = () => {
+    setCargandoMat(true)
+    api.get<MateriaAsist[]>('/alumno/mi-asistencia')
+      .then(d => { setMaterias(d); setLastUpdate(new Date()) })
+      .catch(() => {})
+      .finally(() => setCargandoMat(false))
+  }
+  useEffect(() => { cargarMaterias() }, [])
 
   useEffect(() => {
     if (!token) return
@@ -237,57 +232,92 @@ export default function AsistenciaScan() {
      Mobile: todo apilado (comportamiento ya correcto, sin tocar).
      Desktop (>=1024px): columna del escáner a la izquierda con instrucciones,
      "Mis Materias" a la derecha — en vez de una sola columna angosta estirada. */
+  const LIMITE = 80 // mismo umbral de riesgo que el panel de asistencia de Cursos
+  const totalClases = materias.reduce((acc, m) => acc + m.total_clases, 0)
+  const totalPresentes = materias.reduce((acc, m) => acc + m.presentes, 0)
+  const promedio = totalClases > 0 ? Math.round((totalPresentes / totalClases) * 100) : null
+  const enRiesgo = materias.filter(m => m.porcentaje < LIMITE)
+  const ciclo = `${String(new Date().getMonth() < 6 ? 1 : 2).padStart(2, '0')}-${new Date().getFullYear()}`
+
   return (
     <>
       <style>{css}</style>
-      <div className="scan-page">
-        <h1 className="page-title" style={{ marginBottom: 2 }}>Hola, {nombre}</h1>
-        <p className="page-subtitle" style={{ marginBottom: 16 }}>Escanea el código QR de la clase.</p>
+      <div>
+        <PageHead eyebrow="Asistencia · Escanear QR" title="Registrar asistencia"
+          actions={<RefreshButton onClick={cargarMaterias} refreshing={cargandoMat} lastUpdate={lastUpdate} />} />
+
+        <KpiRow
+          dominant={{
+            label: 'Asistencia promedio',
+            value: promedio ?? '—',
+            unit: promedio === null ? undefined : '%',
+            tone: promedio === null ? 'default' : promedio >= LIMITE ? 'default' : promedio >= 60 ? 'warning' : 'danger',
+            badge: enRiesgo.length > 0 ? (
+              <span className="badge" style={{ background: 'var(--warning-subtle)', color: 'var(--warning)' }}>
+                <i className="ti ti-alert-triangle" /> {enRiesgo.length} en riesgo
+              </span>
+            ) : undefined,
+            foot: [
+              { label: 'Ciclo', value: ciclo },
+              { label: 'Clases presentes', value: `${totalPresentes}/${totalClases}` },
+            ],
+          }}
+          secondary={[
+            { label: 'Materias', value: String(materias.length).padStart(2, '0'), sub: 'con registro de asistencia' },
+            { label: 'Alertas', value: enRiesgo.length, alert: enRiesgo.length > 0, tone: enRiesgo.length > 0 ? 'danger' : 'success',
+              sub: enRiesgo.length > 0 ? enRiesgo.map(m => `${m.materia_nombre} · riesgo`).join(', ') : `Todas sobre el ${LIMITE}%` },
+          ]}
+        />
 
         <div className="scan-cols">
-          <div className="scan-col-left">
+          <div className="card" style={{ padding: 20 }}>
+            <div className="mono-label" style={{ marginBottom: 14 }}>Cámara del dispositivo</div>
             <div className="scan-visor">
               {camara && <video ref={videoRef} muted playsInline />}
               <canvas ref={canvasRef} style={{ display: 'none' }} />
               <span className="scan-corner tl" /><span className="scan-corner tr" />
               <span className="scan-corner bl" /><span className="scan-corner br" />
               {camara ? <span className="scan-line" /> : (
-                <i className="ti ti-scan" style={{ fontSize: 40, color: 'var(--accent-bright)', opacity: 0.7 }} />
+                <i className="ti ti-qrcode" style={{ fontSize: 40, color: 'var(--text-muted)', opacity: 0.7 }} />
               )}
             </div>
 
             {errorMsg && <p style={{ fontSize: 12, color: 'var(--warning)', marginTop: 10 }}>{errorMsg}</p>}
 
-            <button className="btn-primary" style={{ width: '100%', marginTop: 14, padding: 13, fontSize: 14, borderRadius: 14 }}
+            <button className="btn-primary" style={{ width: '100%', marginTop: 14, padding: 12, fontSize: 13.5, justifyContent: 'center' }}
               onClick={camara ? pararCamara : activarCamara}>
               <i className={`ti ${camara ? 'ti-camera-off' : 'ti-camera'}`} /> {camara ? 'Detener Cámara' : 'Activar Cámara'}
             </button>
 
             <div className="scan-tip">
-              <i className="ti ti-info-circle" style={{ color: 'var(--accent-bright)', marginRight: 6 }} />
-              Apuntá la cámara de tu computadora hacia el código QR que proyecta tu profesor. También podés escanearlo con la cámara del celular.
+              <i className="ti ti-info-circle" style={{ color: 'var(--text-muted)', marginTop: 2 }} />
+              <span>Apuntá la cámara hacia el código QR que proyecta tu profesor. También podés escanearlo con la cámara del celular.</span>
             </div>
           </div>
 
-          <div className="scan-col-right">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '26px 0 12px' }}>
-              <h2 style={{ fontSize: 18, fontWeight: 800 }}>Mis Materias</h2>
-              <span className="mono-label" style={{ color: 'var(--accent-bright)' }}>Ciclo {String(new Date().getMonth() < 6 ? 1 : 2).padStart(2, '0')}-{new Date().getFullYear()}</span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span className="mono-label">Mis materias</span>
+              <span className="mono-label">{String(materias.length).padStart(2, '0')}</span>
             </div>
 
             {materias.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Sin registros de asistencia aún.</div>
-            ) : materias.map(mt => (
-              <div key={mt.materia_id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', marginBottom: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800 }}>{mt.materia_nombre}</div>
-                  <div className="mono-label" style={{ fontSize: 9.5, marginTop: 3 }}>
-                    <i className="ti ti-clock" /> {mt.presentes}/{mt.total_clases} clases presentes
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {materias.map(mt => (
+                  <div key={mt.materia_id} className="scan-mat">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800 }}>{mt.materia_nombre}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 3 }}>
+                        {mt.presentes}/{mt.total_clases} clases presentes
+                      </div>
+                    </div>
+                    <RingPct pct={mt.porcentaje} />
                   </div>
-                </div>
-                <RingPct pct={mt.porcentaje} />
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

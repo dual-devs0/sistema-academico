@@ -112,20 +112,15 @@ export default function PasantiasAlumno() {
   return (
     <div>
       <style>{css}</style>
-      <div className="ps-header">
-        <h2 className="ps-title">Mis Pasantías</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {lastUpdate && (
-            <span className="ps-last-upd">
-              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-              {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
-          <button className="ps-btn-refresh" onClick={() => cargar(true)} disabled={refreshing}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-            {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
+      <div className="page-head" style={{ marginBottom: 20 }}>
+        <div>
+          <div className="page-eyebrow">Prácticas profesionales</div>
+          <h1 className="page-title">Mis Pasantías</h1>
         </div>
+        <button className="ps-btn-refresh" onClick={() => cargar(true)} disabled={refreshing}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+        </button>
       </div>
 
       {error && (

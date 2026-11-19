@@ -301,7 +301,8 @@ export default function Biblioteca() {
 
       {/* Hero */}
       <div className="bib-hero">
-        <div className="bib-glass bib-hero-glow" style={{ display:'flex', flexDirection:'column', justifyContent:'center', gap:10 }}>
+        <div className="bib-glass bib-hero-glow" style={{ display:'flex', flexDirection:'column', justifyContent:'center', gap:10, borderLeft: '2px solid var(--accent)' }}>
+          <div className="page-eyebrow">Recursos académicos compartidos</div>
           <h1 className="page-title" style={{ fontSize:28 }}>Biblioteca Digital</h1>
           <p style={{ fontSize:13.5, color:'var(--text-secondary)', maxWidth:440, lineHeight:1.6 }}>
             Explora recursos académicos compartidos por alumnos y profesores: apuntes, guías, resúmenes e investigaciones.

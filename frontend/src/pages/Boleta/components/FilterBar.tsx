@@ -10,15 +10,9 @@ const OPTS: { value: FiltroVista; label: string }[] = [
 
 export default function FilterBar({ filtro, onChange }: Props) {
   return (
-    <div style={{ display: 'inline-flex', gap: 4, padding: 4, background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
+    <div style={{ display: 'flex', gap: 8 }}>
       {OPTS.map(o => (
-        <button key={o.value} type="button" onClick={() => onChange(o.value)}
-          style={{
-            padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700,
-            border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
-            background: filtro === o.value ? 'var(--accent)' : 'transparent',
-            color: filtro === o.value ? '#fff' : 'var(--text-secondary)',
-          }}>
+        <button key={o.value} type="button" className={`pill-tab${filtro === o.value ? ' active' : ''}`} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}

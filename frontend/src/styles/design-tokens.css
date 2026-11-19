@@ -236,3 +236,43 @@
 .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .kpi-value { font-family: var(--font-mono); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); line-height: 1.05; }
 .kpi-unit { font-size: 14px; color: var(--text-secondary); font-weight: 600; }
+
+/* ── Jerarquía por foco (Dashboard, Boleta, Malla, Graduación, ...) ── */
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+  padding-left: 16px; border-left: 2px solid var(--accent); margin-bottom: 24px; flex-wrap: wrap;
+}
+.page-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.kpi-dominant {
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  padding: 24px 26px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
+}
+.kpi-dominant-value { font-family: var(--font-mono); font-size: 76px; font-weight: 800; letter-spacing: -0.04em; color: var(--text-primary); line-height: .9; }
+.kpi-dominant-foot { display: flex; gap: 24px; padding-top: 18px; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; }
+.kpi-secondary { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; }
+.kpi-banner {
+  background: var(--bg-surface); border: 1px solid rgba(239,68,68,.28); border-radius: var(--radius-lg);
+  padding: 20px 22px; display: flex; align-items: center; gap: 18px;
+}
+.kpi-banner.pending { border-color: var(--warning-subtle); }
+.kpi-banner-icon { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+
+/* Fila de KPI: dominante (2 col) + secundarios; se apila en mobile */
+.kpi-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 24px; align-items: stretch; }
+.kpi-row > .kpi-dominant { min-width: 0; }
+.kpi-secondary.alert { border-color: rgba(239,68,68,.28); }
+.focus-grid { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 16px; align-items: start; }
+@keyframes kpiSpin { to { transform: rotate(360deg) } }
+.kpi-spin { animation: kpiSpin 1s linear infinite; display: inline-block; }
+@media (max-width: 900px) {
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .kpi-row > .kpi-dominant { grid-column: 1 / -1; }
+  .focus-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  .kpi-dominant-value { font-size: 56px; }
+}

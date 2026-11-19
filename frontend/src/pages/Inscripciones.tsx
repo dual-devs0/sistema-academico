@@ -1,4 +1,5 @@
 // Alumno. Inscripción a ofertas de materia — bloqueo real por correlatividades, cupo y mora aplicado server-side, esta vista solo refleja el resultado. Depende de: /inscripciones/*, /pensum/*.
+import { KpiRow } from '../components/common/PageKpi'
 import { useState, useEffect, useCallback } from 'react'
 import { api, getCurrentUser, emitToast } from '../lib/api'
 import { Skeleton } from 'boneyard-js/react'
@@ -185,19 +186,18 @@ function AlumnoView({ userId }: { userId: number }) {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 className="page-title">Proceso de Inscripción</h1>
-          <p className="page-subtitle">Selecciona tus materias para el ciclo lectivo {new Date().getFullYear()}-{new Date().getMonth() < 6 ? 'I' : 'II'}</p>
+          <div className="page-eyebrow">Ciclo lectivo {new Date().getFullYear()}-{new Date().getMonth() < 6 ? 'I' : 'II'}</div>
+          <h1 className="page-title">Proceso de inscripción</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {lastUpdate && (
-            <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
-          )}
-          <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}>
-            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-          </button>
           <span className="btn-ghost" style={{ cursor: 'default' }}><i className="ti ti-school" /> {conCupo} con cupo disponible</span>
+          <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+            {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
         </div>
       </div>
 
@@ -208,19 +208,37 @@ function AlumnoView({ userId }: { userId: number }) {
       )}
 
       <Skeleton name="inscripciones" loading={loading}>
-        <div className="ins-grid">
-          <div>
-            {idsInscriptas.size > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="mono-label" style={{ marginBottom: 8 }}>Ya inscriptas ({idsInscriptas.size})</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {[...idsInscriptas].map(id => {
-                    const m = materias.find(x => x.id === id)
-                    return m ? <span key={id} className="badge" style={{ background: 'var(--success-subtle)', color: 'var(--success)' }}>{m.nombre}</span> : null
-                  })}
+        <KpiRow
+          dominant={{
+            label: 'Créditos seleccionados',
+            value: creditos,
+            unit: `/ ${CRED_MAX}`,
+            tone: creditos > 0 ? 'accent' : 'default',
+            children: (
+              <div>
+                <div className="progress-track"><div className="progress-fill" style={{ width: `${Math.min(100, creditos / CRED_MAX * 100)}%` }} /></div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 12 }}>
+                  {seleccion.length === 0
+                    ? 'No has seleccionado materias aún para este ciclo.'
+                    : `${seleccion.length} materia${seleccion.length > 1 ? 's' : ''} seleccionada${seleccion.length > 1 ? 's' : ''} · quedan ${CRED_MAX - creditos} créditos`}
                 </div>
               </div>
-            )}
+            ),
+          }}
+          secondary={[
+            {
+              label: 'Ya inscriptas', value: String(idsInscriptas.size).padStart(2, '0'),
+              sub: [...idsInscriptas].map(id => materias.find(x => x.id === id)?.nombre).filter(Boolean).join(' · ') || 'Ninguna todavía',
+            },
+            {
+              label: 'Cupos disponibles', value: String(conCupo).padStart(2, '0'), tone: conCupo > 0 ? 'success' : 'default',
+              sub: disponibles.filter(m => !cupoDe(m).lleno).map(m => m.codigo ? `${m.nombre} · ${m.codigo}` : m.nombre).join(' · ') || 'Sin cupos libres',
+            },
+          ]}
+        />
+        <div className="ins-grid">
+          <div>
+            <div className="mono-label" style={{ marginBottom: 10 }}>Materias disponibles</div>
             {disponibles.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: 46 }}>
                 <i className="ti ti-circle-check" style={{ fontSize: 36, color: 'var(--success)' }} />
@@ -578,17 +596,16 @@ function AdminView() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
+          <div className="page-eyebrow">Inscripción o baja por carrera</div>
           <h1 className="page-title">Gestión de Inscripciones</h1>
-          <p className="page-subtitle">Inscribí o dá de baja alumnos por carrera</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {lastUpdate && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
-              <i className="ti ti-refresh" style={{ fontSize: 14 }} />
-              <span>{lastUpdate.toLocaleTimeString()}</span>
-            </div>
+            <span className="mono-label" style={{ fontSize: 10.5 }}>
+              <i className="ti ti-refresh" /> {lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' })}
+            </span>
           )}
           {carSelId && (
             <button className="btn-ghost" onClick={handleRefresh} disabled={refreshing} style={{ padding: '9px 14px', fontSize: 12 }}>

@@ -1,8 +1,9 @@
 // Panel de asistencia del alumno (tarjetas circulares + detalle por materia con calificaciones y bitácora + selector de período).
 // Compartido entre pages/Asistencia.tsx (ruta /asistencia) y la pestaña Asistencia de pages/Programa.tsx.
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getCurrentUser } from '../lib/api'
+import { PageHead, KpiRow, RefreshButton } from './common/PageKpi'
 
 type MateriaAsistRow = { materia_id: number; materia_nombre: string; total_clases: number; presentes: number; porcentaje: number }
 type PeriodoRow = { anio: number; semestre: number }
@@ -58,12 +59,12 @@ const cssAlumno = `
 
   /* Grid de tarjetas circulares por materia (escala solo si hay más) */
   .aa-chips-grid {
-    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px;
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;
   }
   .aa-chip-card {
     position:relative; background:var(--bg-surface); border:1px solid var(--border-subtle);
-    border-radius:14px; padding:16px 12px 13px; text-align:center; cursor:pointer;
-    display:flex; flex-direction:column; align-items:center; gap:7px;
+    border-radius:var(--radius-lg); padding:16px 18px; cursor:pointer;
+    display:flex; align-items:center; gap:16px; text-align:left;
     transition:border-color .15s,transform .12s,box-shadow .15s;
   }
   .aa-chip-card:hover { border-color:var(--accent-hover); transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.18); }
@@ -73,8 +74,9 @@ const cssAlumno = `
     position:absolute; top:7px; right:7px; width:19px; height:19px; border-radius:50%;
     background:rgba(239,68,68,.16); color:#ef4444; display:flex; align-items:center; justify-content:center;
   }
-  .aa-chip-nombre { font-size:12px; font-weight:700; line-height:1.3; min-height:32px; display:flex; align-items:center; }
-  .aa-chip-clases { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); }
+  .aa-chip-nombre { font-size:14px; font-weight:800; line-height:1.3; }
+  .aa-chip-clases { font-size:11.5px; color:var(--text-secondary); margin-top:3px; }
+  .aa-chip-badge { display:inline-flex; align-items:center; gap:4px; margin-top:8px; padding:2px 8px; border-radius:6px; font-family:var(--font-mono); font-size:9.5px; font-weight:800; letter-spacing:.08em; }
 
   /* Stat cards chicas — resumen superior */
   .aa-stat-row { display:flex; gap:10px; margin-bottom:18px; }
@@ -135,7 +137,7 @@ function periodoLabel(sel: string): string {
 
 const AA_POLL_MS = 30000
 
-export default function AsistenciaAlumnoPanel() {
+export default function AsistenciaAlumnoPanel({ tabs }: { tabs?: ReactNode } = {}) {
   const navigate = useNavigate()
   const uid = Number(getCurrentUser()?.user_id || 0)
   const [porMateria, setPorMateria] = useState<MateriaAsistRow[]>([])
@@ -319,10 +321,11 @@ export default function AsistenciaAlumnoPanel() {
     <>
       <style>{cssAlumno}</style>
 
-      {/* 1) Header: título + chip período (clickeable) | Escanear QR */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <h1 className="page-title" style={{ margin: 0 }}>Asistencia</h1>
+      {/* 1) Header de una línea: eyebrow con carrera, chip de período, refresh y Escanear QR */}
+      <PageHead
+        eyebrow={`Cursos${carreraNombre ? ` · ${carreraNombre}` : ''}`}
+        title="Asistencia"
+        actions={<>
           <div className="aa-chip-periodo-wrap" ref={periodoRef}>
             <button type="button" className={`aa-chip-periodo${periodoOpen ? ' open' : ''}`} onClick={() => setPeriodoOpen(v => !v)}>
               <span className="aa-dot" style={{ background: '#22c55e' }} />
@@ -347,24 +350,15 @@ export default function AsistenciaAlumnoPanel() {
               </div>
             )}
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {lastUpdate && (
-            <span className="mono-label" style={{ fontSize: 10 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
-          )}
-          <button type="button" className="btn-ghost aa-refresh-btn" disabled={refreshing} onClick={() => cargarPeriodo(periodoSel)}>
-            <svg className={refreshing ? 'spin' : ''} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="23 4 23 10 17 10" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-            </svg>
-          </button>
-          <button type="button" onClick={() => navigate('/asistencia/scan')}
-            style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+          <RefreshButton onClick={() => cargarPeriodo(periodoSel)} refreshing={refreshing} lastUpdate={lastUpdate} />
+          <button type="button" className="btn-primary" onClick={() => navigate('/asistencia/scan')}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
             <i className="ti ti-qrcode" style={{ fontSize: 15 }} /> Escanear QR
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
-      {carreraNombre && <p className="page-subtitle" style={{ marginTop: -10, marginBottom: 16 }}>{carreraNombre}</p>}
+      {tabs}
 
       {error && (
         <div className="aa-err-banner">
@@ -376,21 +370,27 @@ export default function AsistenciaAlumnoPanel() {
         <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Cargando asistencia…</div>
       ) : (
         <>
-          {/* 2) Stat cards chicas (resumen) */}
-          <div className="aa-stat-row">
-            <div className="aa-stat">
-              <div className="aa-stat-label">Promedio total</div>
-              <div className="aa-stat-value" style={{ color: totalClases === 0 ? 'var(--text-muted)' : promedioTotal >= LIMITE ? '#22c55e' : '#ef4444' }}>{totalClases === 0 ? '—' : `${promedioTotal}%`}</div>
-            </div>
-            <div className="aa-stat">
-              <div className="aa-stat-label">Inasistencias</div>
-              <div className="aa-stat-value" style={{ color: inasistencias > 3 ? '#ef4444' : '#f59e0b' }}>{inasistencias}</div>
-            </div>
-            <div className="aa-stat">
-              <div className="aa-stat-label">Alertas</div>
-              <div className="aa-stat-value" style={{ color: alertasCount > 0 ? '#ef4444' : '#22c55e' }}>{alertasCount}</div>
-            </div>
-          </div>
+          {/* 2) Dato dominante: asistencia global; secundarios subordinados */}
+          <KpiRow
+            dominant={{
+              label: 'Asistencia global',
+              value: totalClases === 0 ? '—' : promedioTotal,
+              unit: totalClases === 0 ? undefined : '%',
+              tone: totalClases === 0 ? 'default' : promedioTotal >= LIMITE ? 'success' : promedioTotal >= 60 ? 'warning' : 'danger',
+              children: (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  {carreraNombre ? `${carreraNombre} · ` : ''}{periodoSel === 'actual' ? 'Período actual' : periodoLabel(periodoSel)} · {totalPresentes}/{totalClases} clases presentes
+                </div>
+              ),
+            }}
+            secondary={[
+              { label: 'Inasistencias', value: inasistencias, tone: inasistencias > 3 ? 'warning' : 'default', sub: `Mínimo requerido: ${LIMITE}% por materia` },
+              {
+                label: 'Alertas', value: alertasCount, alert: alertasCount > 0, tone: alertasCount > 0 ? 'danger' : 'success',
+                sub: alertasCount > 0 ? porMateria.filter(m => m.porcentaje < LIMITE).map(m => m.materia_nombre).join(' · ') : 'Ninguna materia en riesgo',
+              },
+            ]}
+          />
 
           {/* 3) Grid de tarjetas circulares por materia */}
           {porMateria.length === 0 ? (
@@ -401,24 +401,28 @@ export default function AsistenciaAlumnoPanel() {
                 const pct = m.porcentaje
                 const riesgo = pct < LIMITE
                 const color = donutColor(pct)
-                const c = 2 * Math.PI * 30
+                const c = 2 * Math.PI * 27
                 return (
                   <div key={m.materia_id}
                     className={`aa-chip-card${riesgo ? ' riesgo' : ''}`}
                     onClick={() => setDetalle(m.materia_id)}>
-                    {riesgo && (
-                      <span className="aa-chip-alerta" title="Materia en riesgo"><i className="ti ti-alert-triangle" style={{ fontSize: 11 }} /></span>
-                    )}
-                    <div style={{ position: 'relative', width: 72, height: 72 }}>
-                      <svg width="72" height="72" style={{ transform: 'rotate(-90deg)' }}>
-                        <circle cx="36" cy="36" r="30" stroke="var(--bg-elevated)" strokeWidth="6" fill="none" />
-                        <circle cx="36" cy="36" r="30" stroke={color} strokeWidth="6" fill="none"
+                    <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+                      <svg width="64" height="64" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="32" cy="32" r="27" stroke="var(--bg-elevated)" strokeWidth="5" fill="none" />
+                        <circle cx="32" cy="32" r="27" stroke={color} strokeWidth="5" fill="none"
                           strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
                       </svg>
-                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 15, color }}>{pct}%</span>
+                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13, color }}>{pct}%</span>
                     </div>
-                    <div className="aa-chip-nombre">{m.materia_nombre}</div>
-                    <div className="aa-chip-clases">{m.presentes}/{m.total_clases} clases</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="aa-chip-nombre">{m.materia_nombre}</div>
+                      <div className="aa-chip-clases">{m.presentes}/{m.total_clases} clases presentes</div>
+                      <span className="aa-chip-badge" style={riesgo
+                        ? { background: 'var(--danger-subtle)', color: 'var(--danger)' }
+                        : { background: 'var(--success-subtle)', color: 'var(--success)' }}>
+                        <i className={`ti ${riesgo ? 'ti-alert-triangle' : 'ti-check'}`} /> {riesgo ? 'EN RIESGO' : 'REGULAR'}
+                      </span>
+                    </div>
                   </div>
                 )
               })}

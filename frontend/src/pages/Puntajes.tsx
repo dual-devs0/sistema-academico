@@ -133,11 +133,10 @@ function AlumnoView({ userId }: { userId: number }) {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <div className="mono-label" style={{ color: 'var(--accent-bright)', marginBottom: 4 }}>Expediente Académico</div>
+          <div className="page-eyebrow">Expediente académico · Semestre {new Date().getMonth() < 6 ? 1 : 2} {new Date().getFullYear()}</div>
           <h1 className="page-title">Mis Calificaciones</h1>
-          <p className="page-subtitle">Semestre {new Date().getMonth() < 6 ? 1 : 2} · {new Date().getFullYear()}</p>
         </div>
       </div>
 
@@ -504,14 +503,14 @@ function ProfesorView({ profesorId }: { profesorId: number }) {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
+          <div className="page-eyebrow">Ciclo lectivo · {new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} cuatrimestre {new Date().getFullYear()}</div>
           <h1 className="page-title">Gestión de Calificaciones</h1>
-          <p className="page-subtitle">Ciclo Lectivo: {new Date().getMonth() < 6 ? 'Primer' : 'Segundo'} Cuatrimestre {new Date().getFullYear()}</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {lastUpdate && (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="mono-label" style={{ fontSize: 10.5 }}>
               <i className="ti ti-refresh" /> {lastUpdate}
             </span>
           )}
@@ -854,17 +853,16 @@ function AdminView() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
+          <div className="page-eyebrow">Expediente de cualquier alumno</div>
           <h1 className="page-title">Calificaciones — Administrador</h1>
-          <p className="page-subtitle">Consultá el expediente de cualquier alumno</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {lastUpdate && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
-              <i className="ti ti-refresh" style={{ fontSize: 14 }} />
-              <span>{lastUpdate.toLocaleTimeString()}</span>
-            </div>
+            <span className="mono-label" style={{ fontSize: 10.5 }}>
+              <i className="ti ti-refresh" /> {lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' })}
+            </span>
           )}
           {selected && (
             <button className="btn-ghost" onClick={handleRefresh} disabled={refreshing} style={{ padding: '9px 14px', fontSize: 12 }}>

@@ -98,19 +98,16 @@ export default function ExpedienteAlumno() {
     <>
       <style>{css}</style>
       <div className="w-full">
-        <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <header className="page-head">
           <div>
-            <h1 className="page-title" style={{ fontSize: 28 }}>Mi Expediente</h1>
-            <p className="page-subtitle">Historial oficial de materias cerradas, PPA y estado de regularidad.</p>
+            <div className="page-eyebrow">Historial académico oficial</div>
+            <h1 className="page-title">Mi Expediente</h1>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {lastUpdate && (
-              <span className="mono-label" style={{ fontSize: 10.5 }}>Actualizado {lastUpdate.toLocaleTimeString('es-PY')}</span>
-            )}
-            <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}>
-              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} /> {refreshing ? 'Actualizando…' : 'Actualizar'}
-            </button>
-          </div>
+          <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => cargar(true)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+            {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
         </header>
 
         {error && (

@@ -191,17 +191,15 @@ export default function EquivalenciasAdmin() {
     <div>
       <style>{css}</style>
 
-      <div className="eqa-header">
-        <h2 className="eqa-title"><i className="ti ti-arrows-exchange" /> Equivalencias — Admin</h2>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">Convalidación de materias</div>
+          <h1 className="page-title"><i className="ti ti-arrows-exchange" /> Equivalencias — Admin</h1>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {lastUpdate && (
-            <span className="eqa-last-upd">
-              <svg className={refreshing ? 'spin' : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" /></svg>
-              {lastUpdate.toLocaleTimeString('es-PY')}
-            </span>
-          )}
           <button className="eqa-btn ghost" onClick={() => fetchData(true)} disabled={refreshing}>
-            <i className="ti ti-refresh" /> {refreshing ? 'Actualizando…' : 'Actualizar'}
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+            {lastUpdate ? lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' }) : refreshing ? 'Actualizando…' : 'Actualizar'}
           </button>
         </div>
       </div>

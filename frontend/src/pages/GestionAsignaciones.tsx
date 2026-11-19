@@ -222,15 +222,15 @@ export default function GestionAsignaciones() {
     <>
       <style>{css}</style>
       <div className="w-full">
-        <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <header className="page-head">
           <div>
-            <h1 className="page-title" style={{ fontSize: 28 }}>Gestión de Asignaciones</h1>
-            <p className="page-subtitle">Distribución de carga académica por materia y profesor — Período {PERIODO_ACTUAL}</p>
+            <div className="page-eyebrow">Período {PERIODO_ACTUAL}</div>
+            <h1 className="page-title">Gestión de Asignaciones</h1>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className="mono-label" style={{ fontSize: 10 }}>{lastUpdate.toLocaleTimeString('es-PY')}</span>
-            <button className="btn-ghost" onClick={refreshNow} disabled={refreshing} title="Actualizar">
-              <i className={`ti ti-refresh ${refreshing ? 'spinning' : ''}`} />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn-ghost" onClick={refreshNow} disabled={refreshing} title="Actualizar"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+              <i className={`ti ti-refresh ${refreshing ? 'spinning' : ''}`} /> {lastUpdate.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' })}
             </button>
             {selectedMateria && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--accent-muted)', border: '1px solid var(--accent-hover)', borderRadius: 10, padding: '7px 14px 7px 12px' }}>
