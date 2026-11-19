@@ -2,12 +2,23 @@ import React from 'react'
 import { render, fireEvent, waitFor } from '@testing-library/react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-// Mock useAuth
+// El login llama a loginRequest (services/authService) y guarda los tokens con useAuth().setTokens
 const mockLogin = jest.fn()
+jest.mock('../services/authService', () => ({
+  loginRequest: (...args: unknown[]) => mockLogin(...args),
+  recuperarContrasenaRequest: jest.fn(),
+  registroRequest: jest.fn(),
+  resetPasswordRequest: jest.fn(),
+}))
+jest.mock('../services/api', () => ({ warmUpBackend: jest.fn() }))
+jest.mock('../services/dashboardService', () => ({
+  fetchPerfil: jest.fn().mockResolvedValue({ nombre: 'Alumno Demo', carrera_nombre: null }),
+}))
 jest.mock('../hooks/useAuth', () => ({
   useAuth: () => ({
     status: 'anon',
-    login: mockLogin,
+    setTokens: jest.fn(),
+    confirmAuth: jest.fn(),
     logout: jest.fn(),
   }),
 }))
@@ -49,7 +60,7 @@ describe('LoginScreen', () => {
   })
 
   it('submit con campos llenos → llama useAuth().login', async () => {
-    mockLogin.mockResolvedValueOnce(undefined)
+    mockLogin.mockResolvedValueOnce({ access_token: 'a', csrf_token: 'c' })
     const { getByPlaceholderText, getByText } = renderLogin()
     fireEvent.changeText(getByPlaceholderText(/documento/i), '12345678')
     fireEvent.changeText(getByPlaceholderText('••••••••••'), 'Alumno1234!')

@@ -41,6 +41,12 @@ jest.mock('../hooks/useTheme', () => ({
   }),
 }))
 
+// El dashboard usa el contexto de scroll que provee el layout de tabs.
+jest.mock('../hooks/useHideOnScroll', () => ({
+  ...jest.requireActual('../hooks/useHideOnScroll'),
+  useTabBarScroll: () => ({ scrollHandler: undefined, contentBottomPadding: 0 }),
+}))
+
 import DashboardScreen from '../app/(tabs)/index'
 
 function renderDashboard() {

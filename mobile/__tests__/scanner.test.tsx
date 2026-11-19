@@ -23,6 +23,20 @@ jest.mock('../services/asistenciaService', () => ({
   verifyQrToken: jest.fn(),
 }))
 
+// Las pantallas leen colores de ThemeContext: se mockea con la paleta oscura real.
+jest.mock('../hooks/useTheme', () => {
+  const mockDesign = require('../constants/design')
+  return {
+    useTheme: () => ({
+      colors: mockDesign.darkColors,
+      preference: 'dark',
+      effective: 'dark',
+      setPreference: jest.fn(),
+      toggleDark: jest.fn(),
+    }),
+  }
+})
+
 import ScannerScreen from '../app/scanner'
 
 const initialMetrics = {

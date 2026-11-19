@@ -189,15 +189,23 @@ const router = useRouter();
 
   const handlePagarAhora = async () => {
     if (!data) return;
-    const pendientes = data.cuotas.filter((c) => c.estado === "pendiente" || c.estado === "vencido");
+    const pendientes = data.cuotas
+      .filter((c) => c.estado === "pendiente" || c.estado === "vencido")
+      .sort((a, b) => a.fechaVencimiento.localeCompare(b.fechaVencimiento));
     if (pendientes.length === 0) {
       showToast("No tenés cuotas pendientes.");
       return;
     }
+    // El pago online es por cuota individual (el backend no soporta checkout combinado);
+    // se inicia con la más antigua/vencida primero.
     setPaying(true);
     try {
-      const url = await iniciarPagoOnline(pendientes.map((c) => c.id));
-      showToast("Redirigiendo al portal de pagos...");
+      const url = await iniciarPagoOnline(pendientes[0].id);
+      showToast(
+        pendientes.length > 1
+          ? "Redirigiendo al portal de pagos (cuota más antigua)..."
+          : "Redirigiendo al portal de pagos..."
+      );
       if (url) await Linking.openURL(url);
     } catch (e: any) {
       showToast("No se pudo iniciar el pago. Intentá más tarde.");

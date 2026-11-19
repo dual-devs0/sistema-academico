@@ -192,11 +192,13 @@ export async function fetchCuenta(): Promise<CuentaData> {
   };
 }
 
-export async function iniciarPagoOnline(cuotaIds: number[]): Promise<string> {
-  const { data } = await api.post<{ gateway_url: string }>("/finanzas/pagos/online/iniciar", {
-    cuota_ids: cuotaIds
+// El backend solo soporta una sesión de checkout por cuota (POST /finanzas/pagos/init
+// toma un único cuota_id) — no existe un endpoint de pago combinado para varias cuotas.
+export async function iniciarPagoOnline(cuotaId: number): Promise<string> {
+  const { data } = await api.post<{ redirect_url: string }>("/finanzas/pagos/init", {
+    cuota_id: cuotaId
   });
-  return data.gateway_url;
+  return data.redirect_url;
 }
 
 // ---------------------------------------------------------------------------
