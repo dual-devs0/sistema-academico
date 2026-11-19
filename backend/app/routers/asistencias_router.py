@@ -417,8 +417,7 @@ def alumnos_asistencia(
     current_user=Depends(get_current_user),
 ):
     """Retorna alumnos matriculados con su porcentaje de asistencia."""
-    if current_user.role not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
+    _verificar_profesor_materia(db, materia_id, current_user)
 
     ofertas_ids = [
         o.id
@@ -538,6 +537,7 @@ def resumen_asistencia(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
+    _verificar_profesor_materia(db, materia_id, current_user)
     ofertas_ids = [
         o.id
         for o in db.query(models.oferta_materia.OfertaMateria.id)
@@ -757,15 +757,12 @@ def profesor_alumnos(
     db: Session = Depends(database.get_db),
     current_user=Depends(get_current_user),
 ):
-    if current_user.role not in ("admin", "profesor"):
-        raise HTTPException(status_code=403, detail="No autorizado")
+    _verificar_profesor_materia(db, materia_id, current_user)
     materia = (
         db.query(models.materia.Materia)
         .filter(models.materia.Materia.id == materia_id)
         .first()
     )
-    if not materia:
-        raise HTTPException(status_code=404, detail="Materia no encontrada")
 
     ofertas_ids = [
         o.id

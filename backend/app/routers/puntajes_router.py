@@ -53,6 +53,8 @@ def obtener_pesos_materia(
     current_user=Depends(get_current_user),
 ):
     """Puntaje máximo configurado por tipo para una materia (default 20/20/10/50 si no hay fila)."""
+    if current_user.role != "admin" and not es_profesor_de_materia(db, materia_id, current_user.user_id):
+        raise HTTPException(status_code=403, detail="No sos el profesor titular de esta materia")
     pesos = get_pesos(db, materia_id)
     fila = db.query(models.peso_evaluacion.PesoEvaluacion).filter(
         models.peso_evaluacion.PesoEvaluacion.materia_id == materia_id

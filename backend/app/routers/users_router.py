@@ -175,7 +175,7 @@ def list_users(
     if role:
         query = query.filter(models.user.User.role == role)
     if es_becado is not None:
-        query = query.filter(models.user.User.es_becado.is_(True))
+        query = query.filter(models.user.User.es_becado.is_(es_becado))
     if carrera_id is not None:
         query = query.filter(models.user.User.carrera_id == carrera_id)
     if q:

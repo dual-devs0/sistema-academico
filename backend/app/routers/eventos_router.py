@@ -199,6 +199,8 @@ def update_evento(
     )
     if not evento:
         raise HTTPException(status_code=404, detail="Evento no encontrado")
+    if current_user.role == "profesor" and evento.creado_por != current_user.user_id:
+        raise HTTPException(status_code=403, detail="No sos el creador de este evento")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(evento, key, value)
     db.commit()
@@ -221,6 +223,8 @@ def delete_evento(
     )
     if not evento:
         raise HTTPException(status_code=404, detail="Evento no encontrado")
+    if current_user.role == "profesor" and evento.creado_por != current_user.user_id:
+        raise HTTPException(status_code=403, detail="No sos el creador de este evento")
     db.delete(evento)
     db.commit()
     return {"detail": "Evento eliminado"}
